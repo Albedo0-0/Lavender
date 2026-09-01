@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cute Journal + Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav id="main-nav">
+    <button class="nav-btn" data-screen="calendar">Calendar</button>
+    <button class="nav-btn" data-screen="journal">Journal</button>
+    <button class="nav-btn" data-screen="planner">Planner</button>
+    <button class="nav-btn" data-screen="progress">Progress</button>
+  </nav>
+
+  <main>
+    <section id="screen-calendar" class="screen">Calendar screen — Phase 2</section>
+    <section id="screen-journal" class="screen">Journal screen — Phase 3</section>
+    <section id="screen-planner" class="screen">Planner screen — Phase 2</section>
+    <section id="screen-progress" class="screen">Progress screen — Phase 8</section>
+  </main>
+
+  <!-- Load order matters: storage -> state -> nav -->
+  <script src="storage.js"></script>
+  <script src="state.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    State.init();
+    Nav.init();
+  </script>
+
+</body>
+</html>
+
