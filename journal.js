@@ -15,7 +15,7 @@ const Journal = (function () {
   function ensureEntry(dateStr) {
     let entry = getEntry(dateStr);
     if (entry) return entry;
-    entry = { id: makeId('jrnl'), date: dateStr, text: '', mood: null, energy: 3, photoIds: [], updatedAt: Date.now() };
+    entry = { id: makeId('jrnl'), date: dateStr, text: '', mood: null, energy: 3, updatedAt: Date.now() };
     State.set({ journalEntries: State.get().journalEntries.concat([entry]) });
     return entry;
   }
@@ -29,21 +29,8 @@ const Journal = (function () {
     State.set({ journalEntries: entries });
   }
 
-  function addPhoto(dateStr, dataUrl) {
-    const entry = ensureEntry(dateStr);
-    const photoId = makeId('photo');
-    return Storage.saveMedia(photoId, dataUrl).then(function () {
-      updateEntry(dateStr, { photoIds: entry.photoIds.concat([photoId]) });
-      return photoId;
-    });
-  }
-
-  function removePhoto(dateStr, photoId) {
-    const entry = getEntry(dateStr);
-    if (!entry) return Promise.resolve();
-    return Storage.deleteMedia(photoId).then(function () {
-      updateEntry(dateStr, { photoIds: entry.photoIds.filter(function (id) { return id !== photoId; }) });
-    });
+  function isToday(dateStr) {
+    return dateStr === Planner.formatDate(new Date());
   }
 
   // --- Rendering ---
@@ -56,7 +43,7 @@ const Journal = (function () {
 
     root.appendChild(buildHeader());
     root.appendChild(buildEntryForm());
-    root.appendChild(buildPhotoSection());
+  
   }
 
   function buildHeader() {
@@ -89,15 +76,24 @@ const Journal = (function () {
     return header;
   }
 
-  function buildEntryForm() {
+function buildEntryForm() {
     const entry = getEntry(viewDate) || { text: '', mood: null, energy: 3 };
+    const editable = isToday(viewDate);
     const wrap = document.createElement('div');
     wrap.className = 'journal-entry-form';
+
+    if (!editable) {
+      const lockNote = document.createElement('p');
+      lockNote.className = 'journal-lock-note';
+      lockNote.textContent = entry.updatedAt ? 'Locked — only editable on the day it was written.' : 'No entry for this day.';
+      wrap.appendChild(lockNote);
+    }
 
     const textarea = document.createElement('textarea');
     textarea.className = 'journal-textarea';
     textarea.placeholder = 'How was today?';
     textarea.value = entry.text || '';
+    textarea.disabled = !editable;
     let saveTimer = null;
     textarea.addEventListener('input', function () {
       clearTimeout(saveTimer);
@@ -114,6 +110,7 @@ const Journal = (function () {
       btn.type = 'button';
       btn.textContent = mood;
       btn.className = 'mood-btn' + (entry.mood === mood ? ' selected' : '');
+      btn.disabled = !editable;
       btn.addEventListener('click', function () {
         updateEntry(viewDate, { mood: mood });
         render();
@@ -131,6 +128,7 @@ const Journal = (function () {
     energyInput.min = '1';
     energyInput.max = '5';
     energyInput.value = entry.energy || 3;
+    energyInput.disabled = !editable;
     const energyValue = document.createElement('span');
     energyValue.textContent = energyInput.value;
     energyInput.addEventListener('input', function () {
@@ -147,58 +145,7 @@ const Journal = (function () {
     return wrap;
   }
 
-  function buildPhotoSection() {
-    const entry = getEntry(viewDate);
-    const wrap = document.createElement('div');
-    wrap.className = 'journal-photo-section';
-
-    const heading = document.createElement('h4');
-    heading.textContent = 'Photos';
-    wrap.appendChild(heading);
-
-    const gallery = document.createElement('div');
-    gallery.className = 'journal-photo-gallery';
-    wrap.appendChild(gallery);
-
-    if (entry && entry.photoIds.length > 0) {
-      entry.photoIds.forEach(function (photoId) {
-        const thumbWrap = document.createElement('div');
-        thumbWrap.className = 'journal-photo-thumb';
-        Storage.loadMedia(photoId).then(function (dataUrl) {
-          if (!dataUrl) return;
-          const img = document.createElement('img');
-          img.src = dataUrl;
-          thumbWrap.appendChild(img);
-        });
-        const delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.textContent = '✕';
-        delBtn.className = 'photo-delete-btn';
-        delBtn.addEventListener('click', function () {
-          removePhoto(viewDate, photoId).then(render);
-        });
-        thumbWrap.appendChild(delBtn);
-        gallery.appendChild(thumbWrap);
-      });
-    }
-
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.addEventListener('change', function () {
-      const file = fileInput.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function () {
-        addPhoto(viewDate, reader.result).then(render);
-      };
-      reader.readAsDataURL(file);
-    });
-    wrap.appendChild(fileInput);
-
-    return wrap;
-  }
-
+  
   function init() {
     render();
   }
