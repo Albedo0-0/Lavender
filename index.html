@@ -22,12 +22,16 @@
     <section id="screen-progress" class="screen">Progress screen — Phase 8</section>
   </main>
 
-  <!-- Load order matters: storage -> state -> nav -->
+<!-- Load order matters: storage -> state -> planner -> calendar -> nav -->
   <script src="storage.js"></script>
   <script src="state.js"></script>
+  <script src="planner.js"></script>
+  <script src="calendar.js"></script>
   <script src="nav.js"></script>
   <script>
     State.init();
+    Planner.init();
+    Calendar.init();
     Nav.init();
   </script>
 
