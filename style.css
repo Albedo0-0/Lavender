@@ -1,0 +1,30 @@
+/* style.css — Phase 1: bare minimum only. Real scrapbook/journal styling happens in Phase 6. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+
+#main-nav {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+
+.nav-btn {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.nav-btn.active {
+  font-weight: bold;
+}
+
+.screen {
+  padding: 16px;
+}
+
