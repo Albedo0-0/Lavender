@@ -28,3 +28,251 @@ body {
   padding: 16px;
 }
 
+/* --- Calendar --- */
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.calendar-header button {
+  cursor: pointer;
+  padding: 4px 10px;
+  border: none;
+  background: #eee;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.calendar-month-label {
+  font-weight: bold;
+  min-width: 140px;
+  text-align: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #888;
+  padding: 4px 0;
+}
+
+.calendar-day {
+  min-height: 56px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.calendar-day.empty {
+  border: none;
+  cursor: default;
+}
+
+.calendar-day.today {
+  border-color: #a6c8f0;
+  background: #f5faff;
+}
+
+.calendar-day:hover:not(.empty) {
+  background: #fafafa;
+}
+
+.calendar-day-num {
+  font-size: 13px;
+}
+
+.calendar-day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.day-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.day-dot.task-dot {
+  background: #333 !important;
+}
+
+/* --- Modal --- */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  width: min(420px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.modal-close-btn {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 16px;
+}
+
+.modal-section {
+  margin-top: 12px;
+}
+
+.modal-empty {
+  color: #999;
+  font-size: 13px;
+}
+
+/* --- Chapters / revisions / tasks / timetable --- */
+
+.chapter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.color-swatch-picker {
+  display: flex;
+  gap: 4px;
+}
+
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.color-swatch.selected {
+  border-color: #333;
+}
+
+.chapter-card {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.chapter-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chapter-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chapter-base-date {
+  color: #888;
+  font-size: 12px;
+}
+
+.chapter-delete-btn,
+.revision-delete-btn,
+.task-delete-btn {
+  margin-left: auto;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: #c66;
+}
+
+.revision-list,
+.task-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0 0 0;
+}
+
+.revision-item,
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+}
+
+.revision-item.completed span,
+.task-item.completed span {
+  text-decoration: line-through;
+  color: #aaa;
+}
+
+.add-task-form {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.add-task-form input {
+  flex: 1;
+}
+
+.timetable-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0 20px 0;
+}
+
+.timetable-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f3f3f3;
+}
+
+.timetable-date {
+  font-size: 12px;
+  color: #888;
+  min-width: 78px;
+}
+
+.timetable-item.completed span {
+  text-decoration: line-through;
+  color: #aaa;
+}
+
