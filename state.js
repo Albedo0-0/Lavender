@@ -6,7 +6,10 @@ const State = (function () {
 
   const defaultState = {
     currentScreen: 'calendar',
-    // Phase 2+ will add: tasks, revisions, journalEntries, exp, level, streak, etc.
+    chapters: [],    // {id, name, color, baseDate, createdAt}
+    revisions: [],   // {id, chapterId, number, date, completed}
+    tasks: [],       // {id, date, text, completed}
+    // Phase 3+ will add: journalEntries, exp, level, streak, etc.
   };
 
   let data = Object.assign({}, defaultState);
