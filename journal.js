@@ -1,4 +1,4 @@
-// journal.js — date-based diary: text, mood, energy, photos (IndexedDB). Loaded after planner.js, before nav.js.
+// journal.js — date-based diary: text, mood, energy. Only today's entry is editable. Loaded after planner.js, before nav.js.
 
 const Journal = (function () {
   const MOODS = ['😢', '😕', '😐', '🙂', '😄'];
