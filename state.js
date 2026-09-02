@@ -1,35 +1,29 @@
-// state.js — single shared app state. Loaded after storage.js, before nav.js.
-// Later phases add their own keys to defaultState and read/write via State.get()/State.set().
+/* style.css — Phase 1: bare minimum only. Real scrapbook/journal styling happens in Phase 6. */
 
-const State = (function () {
-  const STORAGE_KEY = 'appState';
+* {
+  box-sizing: border-box;
+}
 
-  const defaultState = {
-    currentScreen: 'calendar',
-    chapters: [],    // {id, name, color, baseDate, createdAt}
-    revisions: [],   // {id, chapterId, number, date, completed}
-    tasks: [],       // {id, date, text, completed}
-    // Phase 3+ will add: journalEntries, exp, level, streak, etc.
-  };
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
 
-  let data = Object.assign({}, defaultState);
+#main-nav {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
 
-  function get() {
-    return data;
-  }
+.nav-btn {
+  padding: 8px 12px;
+  cursor: pointer;
+}
 
-  function set(partial) {
-    data = Object.assign({}, data, partial);
-    Storage.save(STORAGE_KEY, data);
-  }
+.nav-btn.active {
+  font-weight: bold;
+}
 
-  function init() {
-    const saved = Storage.load(STORAGE_KEY);
-    if (saved) {
-      data = Object.assign({}, defaultState, saved);
-    }
-  }
-
-  return { get, set, init };
-})();
-
+.screen {
+  padding: 16px;
+}
