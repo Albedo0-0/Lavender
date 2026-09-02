@@ -51,4 +51,3 @@ const Storage = (function () {
 
   return { save, load, remove, getDB };
 })();
-
