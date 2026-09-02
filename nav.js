@@ -31,4 +31,3 @@ const Nav = (function () {
 
   return { switchTo, init };
 })();
-
