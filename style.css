@@ -27,3 +27,102 @@ body {
 .screen {
   padding: 16px;
 }
+
+/* Feature 1 — Calendar Date Hub (functional styling only; scrapbook polish comes later) */
+
+#calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+#calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-head {
+  font-weight: bold;
+  text-align: center;
+  font-size: 12px;
+}
+
+.cal-cell {
+  border: 1px solid #ddd;
+  min-height: 70px;
+  padding: 4px;
+  cursor: pointer;
+  background: #fff;
+  overflow: hidden;
+}
+
+.cal-blank {
+  border: none;
+  cursor: default;
+  background: transparent;
+}
+
+.cal-today {
+  border: 2px solid #6b8a4a;
+}
+
+.cal-day-num {
+  font-size: 12px;
+  color: #666;
+}
+
+.cal-note-preview {
+  font-size: 10px;
+  color: #444;
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+#modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#modal-content {
+  background: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  max-width: 360px;
+  width: 90%;
+}
+
+.datehub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.datehub-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.datehub-label {
+  display: block;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#datehub-note {
+  width: 100%;
+}
+
+.datehub-quicknav {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
