@@ -58,6 +58,13 @@ const Calendar = (function () {
       dayNum.textContent = day;
       cell.appendChild(dayNum);
 
+      if (Streak.qualifiesForFire(dateStr)) {
+        const fire = document.createElement('span');
+        fire.className = 'cal-fire';
+        fire.textContent = '\uD83D\uDD25';
+        cell.appendChild(fire);
+      }
+
       if (hub.note) {
         const preview = document.createElement('div');
         preview.className = 'cal-note-preview';
