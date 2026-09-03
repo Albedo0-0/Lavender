@@ -6,7 +6,8 @@ const State = (function () {
 
   const defaultState = {
     currentScreen: 'calendar',
-    // Phase 2+ will add: tasks, revisions, journalEntries, exp, level, streak, etc.
+    dateHubs: {}, // Feature 1: per-date record { color, note, ...future: revisions/journal/mood/exp/streak }
+    // Later: tasks, journalEntries, exp, level, streak, etc.
   };
 
   let data = Object.assign({}, defaultState);
