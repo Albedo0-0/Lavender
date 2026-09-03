@@ -11,16 +11,15 @@ const DateHub = (function () {
 
   function get(dateStr) {
     const hubs = getAll();
-    return hubs[dateStr] || { color: null, note: '', important: false, label: '' };
+    return hubs[dateStr] || { color: null, note: '', important: false, label: '', studyHours: 0 };
   }
 
   function update(dateStr, partial) {
     const hubs = Object.assign({}, getAll());
-    const existing = hubs[dateStr] || { color: null, note: '', important: false, label: '' };
+    const existing = hubs[dateStr] || { color: null, note: '', important: false, label: '', studyHours: 0 };
     hubs[dateStr] = Object.assign({}, existing, partial);
     State.set({ dateHubs: hubs });
   }
-
   return { get: get, getAll: getAll, update: update };
 })();
 
