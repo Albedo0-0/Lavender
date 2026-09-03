@@ -6,8 +6,9 @@ const State = (function () {
 
   const defaultState = {
     currentScreen: 'calendar',
-    dateHubs: {}, // Feature 1: per-date record { color, note, ...future: revisions/journal/mood/exp/streak }
-    // Later: tasks, journalEntries, exp, level, streak, etc.
+    dateHubs: {}, // Feature 1/2B: per-date record { color, note, important, label, studyHours, ... }
+    studyStreak: { highScore: 0 }, // Feature 2B: persisted high score; current streak is always derived live
+    // Later: tasks, journalEntries, exp, level, etc.
   };
 
   let data = Object.assign({}, defaultState);
