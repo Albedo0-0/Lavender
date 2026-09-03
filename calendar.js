@@ -80,6 +80,7 @@ const Calendar = (function () {
     }
 
     renderCountdown();
+    renderStreak();
   }
 
   function openDateHub(dateStr) {
@@ -141,6 +142,16 @@ const Calendar = (function () {
       Modal.close();
       Nav.switchTo('planner');
     });
+  }
+
+  function renderStreak() {
+    const el = document.getElementById('calendar-streak');
+    if (!el) return;
+
+    const result = Streak.recalc();
+    el.innerHTML =
+      '<span class="streak-current">Current streak: ' + result.current + (result.current === 1 ? ' day' : ' days') + '</span>' +
+      '<span class="streak-high">Best: ' + result.highScore + (result.highScore === 1 ? ' day' : ' days') + '</span>';
   }
 
   function daysUntil(dateStr) {
