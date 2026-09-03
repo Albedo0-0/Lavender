@@ -71,6 +71,8 @@ const Calendar = (function () {
 
       grid.appendChild(cell);
     }
+
+    renderCountdown();
   }
 
   function openDateHub(dateStr) {
@@ -85,6 +87,11 @@ const Calendar = (function () {
         '<input type="color" id="datehub-color" value="' + (hub.color || '#ffffff') + '">' +
         '<label class="datehub-label">note</label>' +
         '<textarea id="datehub-note" rows="4">' + (hub.note || '') + '</textarea>' +
+        '<label class="datehub-label">important date</label>' +
+        '<div class="datehub-important-row">' +
+          '<input type="checkbox" id="datehub-important"' + (hub.important ? ' checked' : '') + '>' +
+          '<input type="text" id="datehub-important-label" placeholder="label (e.g. NEET, Birthday)" value="' + (hub.label || '') + '"' + (hub.important ? '' : ' disabled') + '>' +
+        '</div>' +
         '<button id="datehub-save">Save</button>' +
         '<div class="datehub-quicknav">' +
           '<button id="datehub-goto-journal">\uD83D\uDCD4 Journal</button>' +
@@ -99,7 +106,9 @@ const Calendar = (function () {
     document.getElementById('datehub-save').addEventListener('click', function () {
       const note = document.getElementById('datehub-note').value;
       const color = document.getElementById('datehub-color').value;
-      DateHub.update(dateStr, { note: note, color: color });
+      const important = document.getElementById('datehub-important').checked;
+      const label = document.getElementById('datehub-important-label').value.trim();
+      DateHub.update(dateStr, { note: note, color: color, important: important, label: important ? label : '' });
       render();
       Modal.close();
     });
@@ -107,6 +116,10 @@ const Calendar = (function () {
     document.getElementById('datehub-color').addEventListener('change', function (e) {
       DateHub.update(dateStr, { color: e.target.value });
       render();
+    });
+
+    document.getElementById('datehub-important').addEventListener('change', function (e) {
+      document.getElementById('datehub-important-label').disabled = !e.target.checked;
     });
 
     // Placeholder hooks — Journal/Planner tabs don't read the selected date yet.
@@ -121,6 +134,44 @@ const Calendar = (function () {
       Modal.close();
       Nav.switchTo('planner');
     });
+  }
+
+  function daysUntil(dateStr) {
+    const target = new Date(dateStr + 'T00:00:00');
+    const base = new Date(todayStr() + 'T00:00:00');
+    return Math.round((target - base) / 86400000);
+  }
+
+  function getNextImportantDate() {
+    const hubs = DateHub.getAll();
+    const today = todayStr();
+    const upcoming = Object.keys(hubs)
+      .filter(function (dateStr) { return hubs[dateStr].important && dateStr >= today; })
+      .sort();
+    if (upcoming.length === 0) return null;
+    const dateStr = upcoming[0];
+    return { dateStr: dateStr, label: hubs[dateStr].label || '' };
+  }
+
+  function renderCountdown() {
+    const el = document.getElementById('calendar-countdown');
+    if (!el) return;
+
+    const next = getNextImportantDate();
+    if (!next) {
+      el.innerHTML = '<p class="countdown-empty">No important dates coming up.</p>';
+      return;
+    }
+
+    const days = daysUntil(next.dateStr);
+    const daysText = days === 0 ? 'Today!' : (days === 1 ? '1 day left' : days + ' days left');
+
+    el.innerHTML =
+      '<div class="countdown-box">' +
+        '<div class="countdown-label">' + (next.label || 'Important date') + '</div>' +
+        '<div class="countdown-date">' + formatLong(next.dateStr) + '</div>' +
+        '<div class="countdown-days">' + daysText + '</div>' +
+      '</div>';
   }
 
   function next() {
