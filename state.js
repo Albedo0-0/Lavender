@@ -8,7 +8,9 @@ const State = (function () {
     currentScreen: 'calendar',
     dateHubs: {}, // Feature 1/2B: per-date record { color, note, important, label, studyHours, ... }
     studyStreak: { highScore: 0 }, // Feature 2B: persisted high score; current streak is always derived live
-    // Later: tasks, journalEntries, exp, level, etc.
+    topics: {}, // Planner: topicId -> { topicId, subject, topicName }
+    tasks: {},  // Planner: taskId -> { taskId, topicId, subject, topicName, taskType, date, completed, completedDate, note, revisionNumber, cycleId }
+    // Later: journalEntries, exp, level, etc.
   };
 
   let data = Object.assign({}, defaultState);
