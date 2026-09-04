@@ -2,7 +2,8 @@
 
 const Calendar = (function () {
   let viewYear, viewMonth; // viewMonth is 0-indexed
-
+  let initialized = false;
+  
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
 
@@ -65,6 +66,33 @@ const Calendar = (function () {
         cell.appendChild(fire);
       }
 
+      if (typeof PlannerData !== 'undefined') {
+        const dueTasks = PlannerData.getIncompleteTasksForDate(dateStr);
+        if (dueTasks.length > 0) {
+          const snippet = document.createElement('div');
+          snippet.className = 'cal-todo-snippet';
+          const shown = dueTasks.slice(0, 2).map(function (t) {
+            return t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName;
+          });
+          let text = shown.join(', ');
+          if (dueTasks.length > shown.length) text += ' +' + (dueTasks.length - shown.length);
+          snippet.textContent = text;
+          cell.appendChild(snippet);
+        }
+
+        const revisionCount = PlannerData.getTasksForDate(dateStr).filter(function (t) { return t.taskType === 'revision'; }).length;
+        if (revisionCount > 0) {
+          const dots = document.createElement('div');
+          dots.className = 'cal-revision-dots';
+          for (let i = 0; i < revisionCount; i++) {
+            const dot = document.createElement('span');
+            dot.className = 'cal-revision-dot';
+            dots.appendChild(dot);
+          }
+          cell.appendChild(dots);
+        }
+      }
+
       if (hub.note) {
         const preview = document.createElement('div');
         preview.className = 'cal-note-preview';
@@ -87,16 +115,32 @@ const Calendar = (function () {
     if (typeof PlannerData === 'undefined') return '<p class="datehub-todo-empty">No planner tasks.</p>';
     const tasks = PlannerData.getIncompleteTasksForDate(dateStr);
     if (tasks.length === 0) return '<p class="datehub-todo-empty">Nothing due.</p>';
-    return '<ul class="datehub-todo-list">' +
-      tasks.map(function (t) {
-        return '<li class="datehub-todo-item">' +
-          '<label>' +
-            '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '">' +
-            ' ' + t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t) +
-          '</label>' +
-        '</li>';
-      }).join('') +
-    '</ul>';
+
+    const bySubject = { Biology: [], Chemistry: [], Physics: [] };
+    tasks.forEach(function (t) {
+      if (bySubject[t.subject]) bySubject[t.subject].push(t);
+    });
+
+    return Object.keys(bySubject).map(function (subject) {
+      const subjectTasks = bySubject[subject];
+      if (subjectTasks.length === 0) return '';
+      return '<div class="datehub-todo-subject">' +
+        '<div class="datehub-todo-subject-name">' + subject + '</div>' +
+        '<ul class="datehub-todo-list">' +
+          subjectTasks.map(function (t) {
+            const label = t.taskType === 'revision'
+              ? (t.topicName + ' \u2014 ' + t.revisionNumber)
+              : (t.topicName + ' (' + PlannerData.taskLabel(t) + ')');
+            return '<li class="datehub-todo-item">' +
+              '<label>' +
+                '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '">' +
+                ' ' + label +
+              '</label>' +
+            '</li>';
+          }).join('') +
+        '</ul>' +
+      '</div>';
+    }).join('');
   }
 
   function openDateHub(dateStr) {
@@ -235,14 +279,19 @@ const Calendar = (function () {
     viewYear = now.getFullYear();
     viewMonth = now.getMonth();
 
-    const prevBtn = document.getElementById('calendar-prev');
+const prevBtn = document.getElementById('calendar-prev');
     const nextBtn = document.getElementById('calendar-next');
     if (prevBtn) prevBtn.addEventListener('click', prev);
     if (nextBtn) nextBtn.addEventListener('click', next);
 
+    initialized = true;
     render();
   }
 
-  return { init: init, render: render };
+  function isReady() {
+    return initialized;
+  }
+
+  return { init: init, render: render, isReady: isReady };
 })();
 
