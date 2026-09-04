@@ -331,3 +331,37 @@ body {
   color: #888;
   margin: 4px 0 0 0;
 }
+
+.cal-todo-snippet {
+  font-size: 9px;
+  color: #6b8a4a;
+  margin-top: 2px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.cal-revision-dots {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  display: flex;
+  gap: 2px;
+}
+
+.cal-revision-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #4a8a4a;
+  display: inline-block;
+}
+
+.datehub-todo-subject {
+  margin-top: 6px;
+}
+
+.datehub-todo-subject-name {
+  font-weight: bold;
+  font-size: 12px;
+  color: #c0392b;
+}
