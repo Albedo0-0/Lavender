@@ -178,6 +178,7 @@ const Calendar = (function () {
     document.querySelectorAll('.datehub-todo-check').forEach(function (cb) {
       cb.addEventListener('change', function () {
         PlannerData.toggleComplete(cb.dataset.taskId);
+        render();
         openDateHub(dateStr);
       });
     });
