@@ -83,6 +83,22 @@ const Calendar = (function () {
     renderStreak();
   }
 
+  function renderTodoList(dateStr) {
+    if (typeof PlannerData === 'undefined') return '<p class="datehub-todo-empty">No planner tasks.</p>';
+    const tasks = PlannerData.getIncompleteTasksForDate(dateStr);
+    if (tasks.length === 0) return '<p class="datehub-todo-empty">Nothing due.</p>';
+    return '<ul class="datehub-todo-list">' +
+      tasks.map(function (t) {
+        return '<li class="datehub-todo-item">' +
+          '<label>' +
+            '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '">' +
+            ' ' + t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t) +
+          '</label>' +
+        '</li>';
+      }).join('') +
+    '</ul>';
+  }
+
   function openDateHub(dateStr) {
     const hub = DateHub.get(dateStr);
     const html =
@@ -101,6 +117,10 @@ const Calendar = (function () {
           '<input type="text" id="datehub-important-label" placeholder="label (e.g. NEET, Birthday)" value="' + (hub.label || '') + '"' + (hub.important ? '' : ' disabled') + '>' +
         '</div>' +
         '<button id="datehub-save">Save</button>' +
+        '<div class="datehub-todo-section">' +
+          '<label class="datehub-label datehub-todo-heading">To Do</label>' +
+          renderTodoList(dateStr) +
+        '</div>' +
         '<div class="datehub-quicknav">' +
           '<button id="datehub-goto-journal">\uD83D\uDCD4 Journal</button>' +
           '<button id="datehub-goto-planner">\uD83D\uDCDA Planner</button>' +
@@ -111,6 +131,12 @@ const Calendar = (function () {
 
     document.getElementById('datehub-close').addEventListener('click', Modal.close);
 
+    document.querySelectorAll('.datehub-todo-check').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        PlannerData.toggleComplete(cb.dataset.taskId);
+        openDateHub(dateStr);
+      });
+    });
     document.getElementById('datehub-save').addEventListener('click', function () {
       const note = document.getElementById('datehub-note').value;
       const color = document.getElementById('datehub-color').value;
