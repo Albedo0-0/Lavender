@@ -158,8 +158,10 @@ const Calendar = (function () {
           '<h3>' + formatLong(dateStr) + '</h3>' +
           '<button id="datehub-close" class="datehub-close">&times;</button>' +
         '</div>' +
-        '<label class="datehub-label">background</label>' +
-        '<input type="color" id="datehub-color" value="' + (hub.color || '#ffffff') + '">' +
+        '<div class="datehub-todo-section">' +
+          '<label class="datehub-label datehub-todo-heading">To Do</label>' +
+          renderTodoList(dateStr) +
+        '</div>' +
         '<label class="datehub-label">note</label>' +
         '<textarea id="datehub-note" rows="4">' + (hub.note || '') + '</textarea>' +
         '<label class="datehub-label">important date</label>' +
@@ -167,11 +169,9 @@ const Calendar = (function () {
           '<input type="checkbox" id="datehub-important"' + (hub.important ? ' checked' : '') + '>' +
           '<input type="text" id="datehub-important-label" placeholder="label (e.g. NEET, Birthday)" value="' + (hub.label || '') + '"' + (hub.important ? '' : ' disabled') + '>' +
         '</div>' +
+        '<label class="datehub-label">background</label>' +
+        '<input type="color" id="datehub-color" value="' + (hub.color || '#ffffff') + '">' +
         '<button id="datehub-save">Save</button>' +
-        '<div class="datehub-todo-section">' +
-          '<label class="datehub-label datehub-todo-heading">To Do</label>' +
-          renderTodoList(dateStr) +
-        '</div>' +
         '<div class="datehub-quicknav">' +
           '<button id="datehub-goto-journal">\uD83D\uDCD4 Journal</button>' +
           '<button id="datehub-goto-planner">\uD83D\uDCDA Planner</button>' +
