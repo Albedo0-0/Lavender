@@ -66,6 +66,23 @@ const Calendar = (function () {
         cell.appendChild(fire);
       }
 
+      if (typeof JournalData !== 'undefined' && JournalData.isBlueFire(dateStr)) {
+        const blueFire = document.createElement('span');
+        blueFire.className = 'cal-bluefire';
+        blueFire.textContent = '\uD83D\uDD35';
+        cell.appendChild(blueFire);
+      }
+
+      if (typeof JournalData !== 'undefined') {
+        const jEntry = JournalData.getEntry(dateStr);
+        if (jEntry.mood) {
+          const moodEl = document.createElement('span');
+          moodEl.className = 'cal-mood';
+          moodEl.textContent = jEntry.mood.split(' ')[0];
+          cell.appendChild(moodEl);
+        }
+      }
+
       if (typeof PlannerData !== 'undefined') {
         const dueTasks = PlannerData.getIncompleteTasksForDate(dateStr);
         if (dueTasks.length > 0) {
@@ -213,6 +230,7 @@ const Calendar = (function () {
     // of these buttons growing their own logic.
     document.getElementById('datehub-goto-journal').addEventListener('click', function () {
       Modal.close();
+      if (typeof Journal !== 'undefined' && Journal.openDate) Journal.openDate(dateStr);
       Nav.switchTo('journal');
     });
 
