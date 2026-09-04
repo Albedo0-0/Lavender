@@ -16,8 +16,12 @@ const Nav = (function () {
     });
 
     State.set({ currentScreen: screenName });
-  }
 
+    // Refresh the screen being switched into so it always reflects the latest
+    // shared data (e.g. a task completed in Planner shows correctly in Calendar's Date Hub, and vice versa).
+    if (screenName === 'calendar' && typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
+    if (screenName === 'planner' && typeof Planner !== 'undefined' && Planner.render) Planner.render();
+  }
   function init() {
     document.querySelectorAll('.nav-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
