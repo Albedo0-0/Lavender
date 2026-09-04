@@ -528,7 +528,7 @@ body {
 
 .cal-mood {
   position: absolute;
-  top: 2px;
+  bottom: 2px;
   left: 2px;
   font-size: 10px;
   line-height: 1;
