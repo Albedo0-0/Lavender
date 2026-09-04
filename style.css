@@ -436,14 +436,16 @@ body {
 
 .journal-weather,
 .journal-mood,
-.journal-hours {
+.journal-hours,
+.journal-questions {
   flex: 1 1 140px;
   min-width: 120px;
 }
 
 .journal-weather select,
 .journal-mood select,
-.journal-hours input {
+.journal-hours input,
+.journal-questions input {
   width: 100%;
 }
 
