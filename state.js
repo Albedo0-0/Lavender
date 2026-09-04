@@ -10,7 +10,10 @@ const State = (function () {
     studyStreak: { highScore: 0 }, // Feature 2B: persisted high score; current streak is always derived live
     topics: {}, // Planner: topicId -> { topicId, subject, topicName }
     tasks: {},  // Planner: taskId -> { taskId, topicId, subject, topicName, taskType, date, completed, completedDate, note, revisionNumber, cycleId }
-    // Later: journalEntries, exp, level, etc.
+    journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
+    journalPasswordHash: null, // Journal: global lock password hash
+    journalLocked: false, // Journal: global lock state
+    // Later: exp, level, etc.
   };
 
   let data = Object.assign({}, defaultState);
