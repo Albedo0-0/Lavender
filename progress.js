@@ -1,7 +1,6 @@
 // progress.js — Progress tab UI. Depends on: State, ProgressData.
 // Builds into #screen-progress (see index.html). PART 1: sidebar framework + Mood, Weather, Study Hours.
-// PART 2 (separate patch) will add Questions, Productivity, Other Stats sections to this same file.
-
+// PART 2: Questions, Productivity, Other Stats sections added.
 const Progress = (function () {
   const SECTIONS = [
     { key: 'mood', label: 'Mood' },
@@ -94,6 +93,55 @@ const Progress = (function () {
     });
   }
 
+  // ---------- Other Stats section ----------
+
+  const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function ProgressData_parseDateStr(dateStr) {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return null;
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  function formatStatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = ProgressData_parseDateStr(dateStr);
+    return d ? (MONTH_ABBR[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear()) : dateStr;
+  }
+
+  function statCard(label, value) {
+    return '<div class="progress-stat-card">' +
+      '<div class="progress-stat-label">' + label + '</div>' +
+      '<div class="progress-stat-value">' + value + '</div>' +
+    '</div>';
+  }
+
+  function renderOtherStats(container) {
+    const stats = ProgressData.getOtherStats();
+
+    const highestStudy = stats.highestDailyStudyHours;
+    const highestQuestions = stats.highestQuestionsInOneDay;
+    const mostProductive = stats.mostProductiveDay;
+
+    const cards = [
+      statCard('Best Study Streak', stats.bestStudyStreak + ' days'),
+      statCard('Total Study Hours', stats.totalStudyHours + ' hrs'),
+      statCard('Total Questions Solved', stats.totalQuestionsSolved),
+      statCard('Total Tasks', stats.totalTasks),
+      statCard('Total Completed Revision Cycles', stats.totalCompletedRevisionCycles),
+      statCard('Highest Daily Study Hours', highestStudy ?
+        (highestStudy.value + ' hrs<br><small>' + formatStatDate(highestStudy.date) + '</small>') : '\u2013'),
+      statCard('Highest Questions Solved', highestQuestions ?
+        (highestQuestions.value + '<br><small>' + formatStatDate(highestQuestions.date) + '</small>') : '\u2013'),
+      statCard('Most Productive Day', mostProductive ?
+        (mostProductive.value + '/10<br><small>' + formatStatDate(mostProductive.date) + '</small>') : '\u2013')
+    ].join('');
+
+    container.innerHTML =
+      '<h2 class="progress-section-title">Other Stats</h2>' +
+      '<div class="progress-stats-grid">' + cards + '</div>';
+  }
+  
   // ---------- Main render dispatch ----------
 
   function render() {
@@ -111,11 +159,11 @@ const Progress = (function () {
     } else if (activeSection === 'studyHours') {
       renderGraphSection(main, 'Study Hours', 'studyHours');
     } else if (activeSection === 'questions') {
-      main.innerHTML = '<h2 class="progress-section-title">Questions</h2><p class="progress-placeholder">Coming in Part 2.</p>';
+      renderGraphSection(main, 'Questions', 'questions');
     } else if (activeSection === 'productivity') {
-      main.innerHTML = '<h2 class="progress-section-title">Productivity</h2><p class="progress-placeholder">Coming in Part 2.</p>';
+      renderGraphSection(main, 'Productivity', 'productivity');
     } else if (activeSection === 'other') {
-      main.innerHTML = '<h2 class="progress-section-title">Other Stats</h2><p class="progress-placeholder">Coming in Part 2.</p>';
+      renderOtherStats(main);
     }
   }
 
