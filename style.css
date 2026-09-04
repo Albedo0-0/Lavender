@@ -365,3 +365,179 @@ body {
   font-size: 12px;
   color: #c0392b;
 }
+
+/* Journal — Feature 1 (functional styling only; scrapbook polish comes later) */
+
+#journal-lock-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.journal-locked-placeholder {
+  font-size: 14px;
+  color: #888;
+  padding: 24px 0;
+}
+
+.journal-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.journal-date-label {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.journal-bluefire {
+  font-size: 14px;
+}
+
+.journal-important-tag {
+  font-size: 11px;
+  color: #c0392b;
+  border: 1px solid #c0392b;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.journal-change-pass-btn {
+  margin-left: auto;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.journal-label {
+  display: block;
+  font-size: 12px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.journal-morning input,
+.journal-diary textarea,
+.journal-manifestation textarea {
+  width: 100%;
+}
+
+.journal-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.journal-weather,
+.journal-mood,
+.journal-hours {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.journal-weather select,
+.journal-mood select,
+.journal-hours input {
+  width: 100%;
+}
+
+.journal-photo-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.journal-photo-empty {
+  font-size: 12px;
+  color: #888;
+}
+
+.journal-photo-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.journal-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid #ddd;
+}
+
+.journal-photo-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  padding: 0;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+
+.journal-challenge {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #ddd;
+}
+
+.journal-challenge-line {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.journal-challenge-timer {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.journal-challenge-question {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.journal-challenge-result {
+  font-size: 13px;
+  margin-top: 6px;
+  font-weight: bold;
+}
+
+.journal-lock-modal input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.journal-lock-error {
+  font-size: 12px;
+  color: #c0392b;
+  min-height: 16px;
+  margin-top: 4px;
+}
+
+.cal-mood {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.cal-bluefire {
+  position: absolute;
+  top: 2px;
+  right: 14px;
+  font-size: 10px;
+  line-height: 1;
+}
