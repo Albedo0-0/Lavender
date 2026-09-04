@@ -91,10 +91,9 @@ const Planner = (function () {
       btn.classList.toggle('active', btn.dataset.tab === activeTab);
     });
     renderTabContent();
-  } 
-  
-function renderTabContent() {
-  
+  }
+
+  function renderTabContent() {
     const container = document.getElementById('planner-tab-content');
     if (!container) return;
 
@@ -137,6 +136,7 @@ function renderTabContent() {
     });
 
     renderTaskList(document.getElementById('planner-history-list'), tasks);
+  }
 
   function renderTaskList(container, tasks) {
     if (!container) return;
