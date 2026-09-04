@@ -2,7 +2,7 @@
 // Builds into #planner-form and #planner-tab-content (see index.html).
 
 const Planner = (function () {
-  let activeTab = 'history'; // 'history' | 'pending' | 'today'
+let activeTab = 'today'; // 'today' | 'pending' | 'history'
   let historyFilterTopicId = '';
 
   function todayStr() {
