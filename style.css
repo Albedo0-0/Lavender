@@ -192,3 +192,142 @@ body {
 .streak-current {
   font-weight: bold;
 }
+
+/* Planner */
+
+#planner-layout {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+#planner-main {
+  flex: 1 1 280px;
+  min-width: 240px;
+}
+
+#planner-side {
+  flex: 1 1 280px;
+  min-width: 240px;
+  border-left: 1px solid #ddd;
+  padding-left: 16px;
+}
+
+.planner-field-label {
+  display: block;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+#planner-form select,
+#planner-form input[type="text"],
+#planner-form input[type="date"],
+#planner-form textarea {
+  width: 100%;
+}
+
+.planner-tasktype-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+#planner-save-task {
+  margin-top: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+#planner-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.planner-tab-btn {
+  flex: 1;
+  padding: 6px 8px;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.planner-tab-btn.active {
+  font-weight: bold;
+  border-color: #6b8a4a;
+}
+
+.planner-history-filter-row select {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.planner-task-row {
+  border: 1px solid #eee;
+  padding: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.planner-task-done {
+  opacity: 0.7;
+}
+
+.planner-task-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.planner-task-meta {
+  font-weight: bold;
+}
+
+.planner-task-sub {
+  font-size: 11px;
+  color: #777;
+  margin-top: 2px;
+}
+
+.planner-task-note {
+  font-size: 12px;
+  color: #444;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.planner-empty {
+  font-size: 13px;
+  color: #888;
+}
+
+/* Date Hub — To Do section (Planner tasks due that date) */
+
+.datehub-todo-section {
+  margin-top: 12px;
+}
+
+.datehub-todo-heading {
+  color: #c0392b;
+}
+
+.datehub-todo-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+
+.datehub-todo-item {
+  color: #c0392b;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.datehub-todo-empty {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0 0 0;
+}
