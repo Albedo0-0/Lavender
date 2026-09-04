@@ -35,6 +35,7 @@ const JournalData = (function () {
       weather: null,
       mood: null,
       hoursStudied: 0,
+      questionsSolved: 0,
       diaryText: '',
       photos: [],
       manifestationText: '',
