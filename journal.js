@@ -185,6 +185,10 @@ const Journal = (function () {
           '<label class="journal-label">Hours studied</label>' +
           '<input type="number" id="journal-hours" min="0" step="0.5" value="' + entry.hoursStudied + '">' +
         '</div>' +
+        '<div class="journal-questions">' +
+          '<label class="journal-label">Questions solved</label>' +
+          '<input type="number" id="journal-questions" min="0" step="1" value="' + entry.questionsSolved + '">' +
+        '</div>' +
       '</div>' +
 
       '<div class="journal-diary">' +
@@ -248,6 +252,10 @@ const Journal = (function () {
     document.getElementById('journal-hours').addEventListener('change', function (e) {
       JournalData.setHoursStudied(currentDate, e.target.value);
       if (typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
+    });
+    document.getElementById('journal-questions').addEventListener('change', function (e) {
+      const n = Math.max(0, Number(e.target.value) || 0);
+      JournalData.updateEntry(currentDate, { questionsSolved: n });
     });
     document.getElementById('journal-diary-text').addEventListener('change', function (e) {
       JournalData.updateEntry(currentDate, { diaryText: e.target.value });
