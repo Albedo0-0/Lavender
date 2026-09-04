@@ -136,28 +136,25 @@ function renderTabContent() {
       renderTabContent();
     });
 
-    renderTaskList(document.getElementById('planner-history-list'), tasks, false);
-  }
+    renderTaskList(document.getElementById('planner-history-list'), tasks);
 
-  function renderTaskList(container, tasks, withCheckbox) {
+  function renderTaskList(container, tasks) {
     if (!container) return;
     if (tasks.length === 0) {
       container.innerHTML = '<p class="planner-empty">' + emptyMessage() + '</p>';
       return;
     }
-    container.innerHTML = tasks.map(function (t) { return renderTaskRow(t, withCheckbox); }).join('');
+    container.innerHTML = tasks.map(renderTaskRow).join('');
 
-    if (withCheckbox) {
-      tasks.forEach(function (t) {
-        const cb = document.getElementById('planner-check-' + t.taskId);
-        if (cb) {
-          cb.addEventListener('change', function () {
-            PlannerData.toggleComplete(t.taskId);
-            renderSidePanel();
-          });
-        }
-      });
-    }
+    tasks.forEach(function (t) {
+      const cb = document.getElementById('planner-check-' + t.taskId);
+      if (cb) {
+        cb.addEventListener('change', function () {
+          PlannerData.toggleComplete(t.taskId);
+          renderSidePanel();
+        });
+      }
+    });
   }
 
   function emptyMessage() {
@@ -166,23 +163,19 @@ function renderTabContent() {
     return 'Nothing scheduled for today.';
   }
 
-  function renderTaskRow(t, withCheckbox) {
+  function renderTaskRow(t) {
     const meta = t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t);
+    const checkedAttr = t.completed ? ' checked' : '';
+    const dateLine = t.completed
+      ? 'Scheduled: ' + t.date + ' \u2014 Completed: ' + t.completedDate
+      : 'Scheduled: ' + t.date;
 
-    if (!withCheckbox) {
-      return '<div class="planner-task-row planner-task-done">' +
-        '<div class="planner-task-meta">' + meta + '</div>' +
-        '<div class="planner-task-sub">Scheduled: ' + t.date + ' — Completed: ' + t.completedDate + '</div>' +
-        (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      '</div>';
-    }
-
-    return '<div class="planner-task-row">' +
+    return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
       '<label class="planner-task-check-label">' +
-        '<input type="checkbox" id="planner-check-' + t.taskId + '">' +
+        '<input type="checkbox" id="planner-check-' + t.taskId + '"' + checkedAttr + '>' +
         '<span class="planner-task-meta">' + meta + '</span>' +
       '</label>' +
-      '<div class="planner-task-sub">Scheduled: ' + t.date + '</div>' +
+      '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
     '</div>';
   }
