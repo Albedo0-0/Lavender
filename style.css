@@ -543,3 +543,138 @@ body {
   font-size: 10px;
   line-height: 1;
 }
+
+/* Progress tab — functional placeholder styling only; scrapbook/Ghibli polish comes later. */
+
+#progress-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+#progress-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 150px;
+  flex-shrink: 0;
+  border-right: 1px solid #ddd;
+  padding-right: 12px;
+}
+
+.progress-nav-btn {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.progress-nav-btn.active {
+  font-weight: bold;
+  background: #eee;
+}
+
+#progress-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-section-title {
+  margin-top: 0;
+}
+
+.progress-period-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.progress-period-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.progress-period-btn.active {
+  font-weight: bold;
+  background: #eee;
+}
+
+.progress-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 220px;
+  border-bottom: 1px solid #ccc;
+  padding: 8px 4px 0;
+  overflow-x: auto;
+}
+
+.progress-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 36px;
+  flex: 1;
+}
+
+.progress-bar-value {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.progress-bar-track {
+  width: 22px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: #f2f2f2;
+  border-radius: 3px 3px 0 0;
+}
+
+.progress-bar-fill {
+  width: 100%;
+  background: #9b8cd8;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+
+.progress-bar-label {
+  font-size: 10px;
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.progress-placeholder {
+  color: #888;
+}
+
+.progress-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.progress-stat-card {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.progress-stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.progress-stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  margin-top: 4px;
+}
