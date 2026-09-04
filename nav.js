@@ -22,6 +22,7 @@ const Nav = (function () {
     if (screenName === 'calendar' && typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
     if (screenName === 'planner' && typeof Planner !== 'undefined' && Planner.render) Planner.render();
     if (screenName === 'journal' && typeof Journal !== 'undefined' && Journal.render) Journal.render();
+    if (screenName === 'progress' && typeof Progress !== 'undefined' && Progress.render) Progress.render();
   }
   function init() {
     document.querySelectorAll('.nav-btn').forEach(function (btn) {
