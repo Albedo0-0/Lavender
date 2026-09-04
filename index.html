@@ -27,7 +27,22 @@
       <div id="calendar-streak"></div>
     </section>
     <section id="screen-journal" class="screen">Journal screen — Phase 3</section>
-    <section id="screen-planner" class="screen">Planner screen — Phase 2</section>
+    <section id="screen-planner" class="screen">
+      <div id="planner-layout">
+        <div id="planner-main">
+          <h3>New Study Task</h3>
+          <div id="planner-form"></div>
+        </div>
+        <div id="planner-side">
+          <div id="planner-tabs">
+            <button class="planner-tab-btn active" data-tab="history">History</button>
+            <button class="planner-tab-btn" data-tab="pending">Pending</button>
+            <button class="planner-tab-btn" data-tab="today">Today</button>
+          </div>
+          <div id="planner-tab-content"></div>
+        </div>
+      </div>
+    </section>
     <section id="screen-progress" class="screen">Progress screen — Phase 8</section>
 </main>
 
@@ -36,18 +51,21 @@
   </div>
 
   <!-- Load order matters: storage -> state -> nav -->
-  <script src="storage.js"></script>
+<script src="storage.js"></script>
   <script src="state.js"></script>
   <script src="nav.js"></script>
   <script src="datehub.js"></script>
   <script src="streak.js"></script>
+  <script src="planner-data.js"></script>
   <script src="modal.js"></script>
   <script src="calendar.js"></script>
+  <script src="planner.js"></script>
   <script>
     State.init();
     Nav.init();
     Modal.init();
     Calendar.init();
+    Planner.init();
   </script>
 
 </body>
