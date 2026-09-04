@@ -9,14 +9,17 @@
 const JournalData = (function () {
   const CHALLENGE_MS = 60 * 60 * 1000;
   const PHYSICAL_CHALLENGES = [
-    '10 minute walk outside',
-    '20 jumping jacks',
-    '5 minute stretch break',
-    '15 squats',
-    '2 minute plank (broken into sets if needed)',
-    'Tidy your desk for 10 minutes',
-    '10 minute walk up and down stairs',
-    'Drink a full bottle of water and do a lap around the house'
+    '20 minute meditation and breathing',
+    '50 to 100 situps (minimum 50 atleast)',
+    '20 minute stretching (Not even a minute less than 20, put on a stretching video on yt) ',
+    '5 sets of 15 squats',
+    '3 sets of 2 minute plank ',
+    'Tidy your desk while singing a song',
+    'Drink half bottle of water and stand in balcony for 15 minutes',
+    '5 sets of 20 lunges',
+    '5 sets of 20 burpees',
+    '5 sets of 10 pushups',
+   ' Balancing exercises for 20 min'
   ];
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
