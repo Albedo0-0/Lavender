@@ -74,9 +74,16 @@ const Calendar = (function () {
           const shown = dueTasks.slice(0, 2).map(function (t) {
             return t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName;
           });
-          let text = shown.join(', ');
-          if (dueTasks.length > shown.length) text += ' +' + (dueTasks.length - shown.length);
-          snippet.textContent = text;
+          shown.forEach(function (line) {
+            const lineEl = document.createElement('div');
+            lineEl.textContent = line;
+            snippet.appendChild(lineEl);
+          });
+          if (dueTasks.length > shown.length) {
+            const moreEl = document.createElement('div');
+            moreEl.textContent = '+' + (dueTasks.length - shown.length) + ' more';
+            snippet.appendChild(moreEl);
+          }
           cell.appendChild(snippet);
         }
 
