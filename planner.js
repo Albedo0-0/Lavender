@@ -91,9 +91,10 @@ const Planner = (function () {
       btn.classList.toggle('active', btn.dataset.tab === activeTab);
     });
     renderTabContent();
-  }
-
-  function renderTabContent() {
+  } 
+  
+function renderTabContent() {
+  
     const container = document.getElementById('planner-tab-content');
     if (!container) return;
 
@@ -103,7 +104,7 @@ const Planner = (function () {
     }
 
     const tasks = activeTab === 'pending' ? PlannerData.getPendingTasks() : PlannerData.getTodayTasks();
-    renderTaskList(container, tasks, true);
+    renderTaskList(container, tasks);
   }
 
   function renderHistoryTab(container) {
