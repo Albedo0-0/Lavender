@@ -237,6 +237,17 @@ const PlannerData = (function () {
     return sortByDate(getTasksList().filter(function (t) { return t.date === dateStr; }));
   }
 
+  // True if [startTime, stopTime) overlaps any other task's slot on the same date.
+  // Tasks without a full slot (missing start or stop) are ignored on both sides.
+  function hasSlotConflict(dateStr, startTime, stopTime, excludeTaskId) {
+    if (!startTime || !stopTime) return false;
+    return getTasksForDate(dateStr).some(function (t) {
+      if (t.taskId === excludeTaskId) return false;
+      if (!t.startTime || !t.stopTime) return false;
+      return startTime < t.stopTime && t.startTime < stopTime;
+    });
+  }
+  
   function getIncompleteTasksForDate(dateStr) {
     return getTasksForDate(dateStr).filter(function (t) { return !t.completed; });
   }
@@ -285,7 +296,9 @@ function slotLabel(t) {
     getTasksForDate: getTasksForDate,
     getIncompleteTasksForDate: getIncompleteTasksForDate,
     getSuggestedTasksForDate: getSuggestedTasksForDate,
+    hasSlotConflict: hasSlotConflict,
     taskLabel: taskLabel,
     slotLabel: slotLabel
+
   };
 })();
