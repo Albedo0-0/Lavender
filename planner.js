@@ -3,6 +3,7 @@
 
 const Planner = (function () {
 let activeTab = 'today'; // 'today' | 'pending' | 'history'
+  let addMode = 'subject'; // 'subject' | 'custom' | 'suggested'
   let historyView = 'subjects'; // 'subjects' | 'chapters' | 'chapter'
   let historySubject = null;
   let historyTopicId = null;
