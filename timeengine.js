@@ -196,8 +196,11 @@ const TimeEngine = (function () {
   function extendActiveAndShift(deltaMs) {
     const active = getActiveSession();
     if (active) {
+      const baseEndMs = active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd);
+      const newEndMs = baseEndMs + deltaMs;
       updateRecord(active.sessionId, {
-        adjustedEnd: hhmmFromMs(timeStrToMs(active.date, active.adjustedEnd) + deltaMs),
+        adjustedEnd: hhmmFromMs(newEndMs),
+        adjustedEndAt: newEndMs,
         endPromptFired: false
       });
     }
@@ -254,7 +257,9 @@ const TimeEngine = (function () {
       studyMs: 0,
       breakMs: 0,
       adjustedStart: hhmmFromMs(now),
-      adjustedEnd: hhmmFromMs(now + Math.max(0, durationMs))
+      adjustedEnd: hhmmFromMs(now + Math.max(0, durationMs)),
+      adjustedStartAt: now,
+      adjustedEndAt: now + Math.max(0, durationMs)
     });
     setEngine({ activeSessionId: sessionId, prompt: null });
   }
@@ -442,7 +447,7 @@ const TimeEngine = (function () {
     const active = getActiveSession();
     if (active) {
       if (active.state === 'active' && !active.endPromptFired) {
-        const stopMs = timeStrToMs(today, active.adjustedEnd);
+        const stopMs = active.adjustedEndAt || timeStrToMs(today, active.adjustedEnd);
         if (now >= stopMs) {
           updateRecord(active.sessionId, { endPromptFired: true });
           setEngine({ prompt: { sessionId: active.sessionId, taskId: active.taskId, kind: 'end', fireAt: now, deadline: now + PROMPT_TIMEOUT_MS, autoBreakActive: false, autoBreakCount: 0 } });
@@ -459,8 +464,18 @@ const TimeEngine = (function () {
     }
   }
 
+  function isPastCutoff() { return new Date().getHours() >= 23; }
+
+  function lockPastCutoff() {
+    const engine = getEngine();
+    const active = getActiveSession();
+    if (active && active.state === 'active') pauseSessionInternal(active.sessionId);
+    if (engine.prompt || engine.manualBreakUntil) setEngine({ prompt: null, manualBreakUntil: null });
+  }
+
   function tick() {
     ensureDate();
+    if (isPastCutoff()) { lockPastCutoff(); notify(); return; }
     syncSessionsForToday();
     processGlobalBreak();
     processManualBreak();
@@ -573,6 +588,7 @@ const TimeEngine = (function () {
     getDailySummary: getDailySummary,
     getAllDailySummaries: getSummaries,
     getAllTrackedDates: getAllTrackedDates,
-    recordStandaloneStudy: recordStandaloneStudy
+    recordStandaloneStudy: recordStandaloneStudy,
+    isPastCutoff: isPastCutoff
   };
 })();
