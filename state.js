@@ -17,7 +17,8 @@ const State = (function () {
     timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
     sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
     timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
-    studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
+    dailySummaries: {}, // Time Engine retention: dateStr -> { date, studyMs, breakMs, tasksTotal, tasksCompleted } for dates older than RETENTION_DAYS
+ studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
     favoriteTopics: [], // History nav: topicIds marked as favorite
     // Later: exp, level, etc.
   };
