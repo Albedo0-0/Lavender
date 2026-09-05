@@ -136,7 +136,7 @@ const PlannerData = (function () {
   }
 
   // Theory / Questions: single task, no repeats.
-  function createSingleTask(subject, topicName, taskType, dateStr, note) {
+  function createSingleTask(subject, topicName, taskType, dateStr, note, startTime, stopTime) {
     const topic = getOrCreateTopic(subject, topicName);
     const tasks = Object.assign({}, State.get().tasks || {});
     const task = blankTask({
@@ -145,6 +145,8 @@ const PlannerData = (function () {
       topicName: topic.topicName,
       taskType: taskType,
       date: dateStr,
+      startTime: startTime || null,
+      stopTime: stopTime || null,
       note: note || ''
     });
     tasks[task.taskId] = task;
@@ -237,6 +239,17 @@ const PlannerData = (function () {
     return sortByDate(getTasksList().filter(function (t) { return t.date === dateStr; }));
   }
 
+  // Time validation (approved optimisation #1): a session's end time must be strictly after
+  // its start time, on the same day — 'HH:MM' strings compare correctly lexicographically, and
+  // this also rejects overnight sessions (e.g. 23:00 -> 01:00), since there's no way to express
+  // "next day" in this single time-of-day field. A task may still have no slot at all
+  // (both blank = unscheduled); only reject when a slot is actually being set.
+  function isValidSlot(startTime, stopTime) {
+    if (!startTime && !stopTime) return true;
+    if (!startTime || !stopTime) return false;
+    return stopTime > startTime;
+  }
+
   // True if [startTime, stopTime) overlaps any other task's slot on the same date.
   // Tasks without a full slot (missing start or stop) are ignored on both sides.
   function hasSlotConflict(dateStr, startTime, stopTime, excludeTaskId) {
@@ -298,6 +311,7 @@ function slotLabel(t) {
     getTasksForDate: getTasksForDate,
     getIncompleteTasksForDate: getIncompleteTasksForDate,
     getSuggestedTasksForDate: getSuggestedTasksForDate,
+    isValidSlot: isValidSlot,
     hasSlotConflict: hasSlotConflict,
     taskLabel: taskLabel,
     slotLabel: slotLabel
