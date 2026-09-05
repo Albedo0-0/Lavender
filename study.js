@@ -143,13 +143,15 @@ const Study = (function () {
     if (btn) btn.onclick = openAlarmListModal;
   }
 
-  function openAlarmListModal() {
+  let alarmModalOpen = false;
+
+  function buildAlarmListHtml() {
     const today = todayStr();
     const slots = PlannerData.getTasksForDate(today)
       .filter(function (t) { return t.startTime; })
       .sort(function (a, b) { return a.startTime < b.startTime ? -1 : 1; });
 
-    const rows = slots.map(function (t) {
+    return slots.map(function (t) {
       const rec = TimeEngine.getRecordForTask(t.taskId, today);
       let status = 'Upcoming';
       if (t.completed) status = 'Done';
@@ -160,8 +162,19 @@ const Study = (function () {
       return '<div class="study-alarm-row"><span>' + slotTime + '</span>' +
         '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span></div>';
     }).join('') || '<p class="planner-empty">No slots scheduled today.</p>';
+  }
 
-    Modal.open('<h3>Today\'s Alarms</h3><div class="study-alarm-list">' + rows + '</div>');
+  function openAlarmListModal() {
+    alarmModalOpen = true;
+    Modal.open('<h3>Today\'s Alarms</h3><div id="study-alarm-list" class="study-alarm-list">' + buildAlarmListHtml() + '</div>');
+  }
+
+  function refreshAlarmListModal() {
+    if (!alarmModalOpen) return;
+    const overlay = document.getElementById('modal-overlay');
+    const list = document.getElementById('study-alarm-list');
+    if (!overlay || overlay.style.display === 'none' || !list) { alarmModalOpen = false; return; }
+    list.innerHTML = buildAlarmListHtml();
   }
 
   function startTaskSession(taskId) { TimeEngine.startTaskSession(taskId); }
@@ -180,7 +193,12 @@ const Study = (function () {
       const task = PlannerData.getAllTasks()[upcoming.taskId];
       container.innerHTML = '<p class="study-active-label">Next up: ' + taskLabelFull(task) + ' at ' + upcoming.adjustedStart + '</p>' +
         '<button id="study-start-now">Start Now</button>';
-      document.getElementById('study-start-now').addEventListener('click', function () { startTaskSession(upcoming.taskId); });
+      document.getElementById('study-start-now').addEventListener('click', function (e) {
+        const btn = e.currentTarget;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        startTaskSession(upcoming.taskId);
+      });
     } else {
       container.innerHTML = '<p class="study-active-label">No active slot session.</p>';
     }
@@ -200,7 +218,8 @@ const Study = (function () {
     container.innerHTML =
       '<div class="study-focus-mode">' +
         '<p class="study-active-label">' + taskLabelFull(task) + '</p>' +
-        '<div id="study-focus-clock" class="study-focus-clock"></div>' +
+           '<div id="study-focus-clock" class="study-focus-clock"></div>' +
+        '<div id="study-focus-remaining" class="study-focus-remaining"></div>' +
         (active.state === 'paused' ? '<p class="study-paused-note">Paused</p>' : '') +
         '<div class="study-focus-actions">' +
           '<button id="study-focus-complete">Completed</button>' +
@@ -210,17 +229,30 @@ const Study = (function () {
       '</div>';
 
     renderFocusClock();
-    document.getElementById('study-focus-complete').addEventListener('click', function () { TimeEngine.completeActive(); });
-    document.getElementById('study-focus-pause').addEventListener('click', function () {
+    document.getElementById('study-focus-complete').addEventListener('click', function (e) {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      TimeEngine.completeActive();
+    });
+    document.getElementById('study-focus-pause').addEventListener('click', function (e) {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
       const cur = TimeEngine.getActiveSession();
       if (cur && cur.state === 'paused') TimeEngine.resumeActive(); else TimeEngine.pauseActive();
     });
-    document.getElementById('study-focus-later').addEventListener('click', function () { openDoItLaterModal(active.taskId); });
+    document.getElementById('study-focus-later').addEventListener('click', function () { confirmDoItLater(active.taskId); });
   }
 
   function renderFocusClock() {
     const el = document.getElementById('study-focus-clock');
     if (el) el.textContent = fmtDuration(TimeEngine.getClockDisplayMs());
+    const remainEl = document.getElementById('study-focus-remaining');
+    if (remainEl) {
+      const active = TimeEngine.getActiveSession();
+      remainEl.textContent = active ? ('Remaining: ' + fmtDuration(Math.max(0, timeStrToMs(active.date, active.adjustedEnd) - Date.now()))) : '';
+    }
   }
 
   function exitFocusMode() {
@@ -230,6 +262,19 @@ const Study = (function () {
     if (clockPanel) clockPanel.style.display = 'block';
     if (alarmIcon) alarmIcon.style.display = 'inline-block';
     if (breakBtn) breakBtn.style.display = 'inline-block';
+  }
+
+  function confirmDoItLater(taskId) {
+    Modal.open(
+      '<h3>Do it later?</h3>' +
+      '<p>This will end your current session and reschedule the task. Continue?</p>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="study-later-proceed">Yes, reschedule</button>' +
+        '<button id="study-later-cancel">Cancel</button>' +
+      '</div>'
+    );
+    document.getElementById('study-later-proceed').addEventListener('click', function () { openDoItLaterModal(taskId); });
+    document.getElementById('study-later-cancel').addEventListener('click', function () { Modal.close(); });
   }
 
   function openDoItLaterModal(taskId) {
@@ -392,6 +437,7 @@ const Study = (function () {
     const pastCutoff = isPastCutoff();
     setCutoffMode(pastCutoff);
     renderBreakStatus();
+    refreshAlarmListModal();
     if (!pastCutoff) {
       const active = TimeEngine.getActiveSession();
       const upcoming = TimeEngine.getUpcomingSession();
