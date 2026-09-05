@@ -51,13 +51,42 @@ const Study = (function () {
   function getClock() { return State.get().studyClock; }
   function setClock(partial) { State.set({ studyClock: Object.assign({}, getClock(), partial) }); }
 
+  // Elapsed study time to record for the CURRENT run: for a timer, capped at its total (so a
+  // Reset clicked after it's already run past zero can't over-record), for a stopwatch just the
+  // raw elapsed.
+  function elapsedForRecording(c) {
+    const elapsed = c.running ? (c.elapsedMs + (Date.now() - c.startedAt)) : c.elapsedMs;
+    return c.mode === 'timer' ? Math.min(elapsed, c.timerTotalMs) : elapsed;
+  }
+
+  // Records the current run into TimeEngine's unified session store exactly once per run —
+  // 'recorded' is flipped true immediately and only reset when a fresh Start/Resume-less run
+  // begins, so double-clicks, a Reset after natural completion, or a refresh mid-way through
+  // can never record (or lose) the same block of time twice (req 4, 7, 9, 11).
+  function recordClockIfNeeded() {
+    const c = getClock();
+    if (c.recorded) return;
+    const ms = elapsedForRecording(c);
+    if (ms > 0) TimeEngine.recordStandaloneStudy(ms, c.mode);
+    setClock({ recorded: true });
+  }
+
   function startStopwatch() {
-    setClock({ mode: 'stopwatch', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: 0 });
+    setClock({ mode: 'stopwatch', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: 0, recorded: false });
     renderClock();
   }
 
   function startTimer(minutes) {
-    setClock({ mode: 'timer', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: minutes * 60 * 1000 });
+    setClock({ mode: 'timer', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: minutes * 60 * 1000, recorded: false });
+    renderClock();
+  }
+
+  // Resumes a paused clock from exactly where it left off — elapsedMs/timerTotalMs are untouched,
+  // only the running flag and a fresh startedAt anchor are set (req 5).
+  function resumeClock() {
+    const c = getClock();
+    if (c.running) return;
+    setClock({ running: true, startedAt: Date.now() });
     renderClock();
   }
 
@@ -70,7 +99,8 @@ const Study = (function () {
   }
 
   function resetClock() {
-    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0 });
+    recordClockIfNeeded();
+    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recorded: false });
     renderClock();
   }
 
@@ -81,12 +111,23 @@ const Study = (function () {
   }
 
   function renderClock() {
+    const c = getClock();
+    // A running timer that has naturally reached zero records its full duration on its own —
+    // the person shouldn't have to click Reset just to get credit for a completed timer (req 4).
+    if (c.mode === 'timer' && c.running && !c.recorded && (c.elapsedMs + (Date.now() - c.startedAt)) >= c.timerTotalMs) {
+      TimeEngine.recordStandaloneStudy(c.timerTotalMs, 'timer');
+      setClock({ running: false, startedAt: null, elapsedMs: c.timerTotalMs, recorded: true });
+    }
     const display = document.getElementById('study-clock-display');
     if (display) display.textContent = fmtDuration(currentClockMs());
     const startBtn = document.getElementById('study-clock-start');
     const pauseBtn = document.getElementById('study-clock-pause');
-    if (startBtn) startBtn.style.display = getClock().running ? 'none' : 'inline-block';
-    if (pauseBtn) pauseBtn.style.display = getClock().running ? 'inline-block' : 'none';
+    const fresh = getClock();
+    if (startBtn) {
+      startBtn.style.display = fresh.running ? 'none' : 'inline-block';
+      startBtn.textContent = (!fresh.running && fresh.elapsedMs > 0) ? 'Resume' : 'Start';
+    }
+    if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
   }
 
   function renderClockPanel() {
@@ -113,13 +154,16 @@ const Study = (function () {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
         if (getClock().running) return;
-        setClock({ mode: btn.dataset.mode, elapsedMs: 0, timerTotalMs: 0 });
+        recordClockIfNeeded(); // flush any paused, unrecorded time before switching modes — don't lose it
+        setClock({ mode: btn.dataset.mode, elapsedMs: 0, timerTotalMs: 0, recorded: false });
         renderClockPanel();
       });
     });
 
     document.getElementById('study-clock-start').addEventListener('click', function () {
-      if (getClock().mode === 'timer') {
+      const cur = getClock();
+      if (!cur.running && cur.elapsedMs > 0) { resumeClock(); return; } // paused mid-run — continue, don't restart
+      if (cur.mode === 'timer') {
         const minutes = parseInt(document.getElementById('study-timer-minutes').value, 10);
         if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
         startTimer(minutes);
@@ -334,15 +378,19 @@ const Study = (function () {
   function showPrompt(prompt) {
     const task = PlannerData.getAllTasks()[prompt.taskId];
     const heading = prompt.kind === 'start' ? 'Time for: ' : 'Wrap up: ';
+    // Wrap-up (kind 'end') primary action is "Completed" — it ends the session for real.
+    // The start prompt's primary action is still "Started".
+    const primaryLabel = prompt.kind === 'end' ? 'Completed' : 'Started';
+    const primaryChoice = prompt.kind === 'end' ? 'complete' : 'start';
     Modal.open(
       '<h3>' + heading + (task ? taskLabelFull(task) : '') + '</h3>' +
       '<div class="study-prompt-actions">' +
-        '<button id="study-prompt-start">Started</button>' +
+        '<button id="study-prompt-start">' + primaryLabel + '</button>' +
         '<button id="study-prompt-break">Need a break</button>' +
         '<button id="study-prompt-time">Need more time</button>' +
       '</div>'
     );
-    document.getElementById('study-prompt-start').addEventListener('click', function () { TimeEngine.resolvePrompt('start'); Modal.close(); });
+    document.getElementById('study-prompt-start').addEventListener('click', function () { TimeEngine.resolvePrompt(primaryChoice); Modal.close(); });
     document.getElementById('study-prompt-break').addEventListener('click', function () { TimeEngine.resolvePrompt('break'); Modal.close(); });
     document.getElementById('study-prompt-time').addEventListener('click', function () { showTimeInput(); });
   }
