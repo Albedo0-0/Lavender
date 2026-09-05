@@ -249,7 +249,10 @@ const TimeEngine = (function () {
     if (!active || active.state !== 'paused') return;
     const pauseDur = active.pausedSince ? Date.now() - active.pausedSince : 0;
     resumeSessionInternal(active.sessionId);
-    applyShift(pauseDur);
+    // Extend the session's own adjustedEnd by however long the pause actually lasted (not just
+    // a fixed default like the prompt-driven breaks), and shift the rest of the day the same amount —
+    // otherwise a manual mid-session pause would silently shorten the remaining study time.
+    extendActiveAndShift(pauseDur);
     notify();
   }
 
