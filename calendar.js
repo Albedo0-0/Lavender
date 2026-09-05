@@ -89,6 +89,7 @@ const Calendar = (function () {
           const snippet = document.createElement('div');
           snippet.className = 'cal-todo-snippet';
           const shown = dueTasks.slice(0, 2).map(function (t) {
+            if (t.taskType === 'custom') return t.title;
             return t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName;
           });
           shown.forEach(function (line) {
@@ -137,12 +138,13 @@ const Calendar = (function () {
 
   function renderTodoList(dateStr) {
     if (typeof PlannerData === 'undefined') return '<p class="datehub-todo-empty">No planner tasks.</p>';
-    const tasks = PlannerData.getIncompleteTasksForDate(dateStr);
+    const tasks = PlannerData.getTasksForDate(dateStr);
     if (tasks.length === 0) return '<p class="datehub-todo-empty">Nothing due.</p>';
 
-    const bySubject = { Biology: [], Chemistry: [], Physics: [] };
+    const bySubject = { Biology: [], Chemistry: [], Physics: [], Other: [] };
     tasks.forEach(function (t) {
       if (bySubject[t.subject]) bySubject[t.subject].push(t);
+      else bySubject.Other.push(t);
     });
 
     return Object.keys(bySubject).map(function (subject) {
@@ -152,12 +154,13 @@ const Calendar = (function () {
         '<div class="datehub-todo-subject-name">' + subject + '</div>' +
         '<ul class="datehub-todo-list">' +
           subjectTasks.map(function (t) {
-            const label = t.taskType === 'revision'
-              ? (t.topicName + ' \u2014 ' + t.revisionNumber)
-              : (t.topicName + ' (' + PlannerData.taskLabel(t) + ')');
-            return '<li class="datehub-todo-item">' +
+            const label = t.taskType === 'custom' ? t.title
+              : (t.taskType === 'revision'
+                ? (t.topicName + ' \u2014 ' + t.revisionNumber)
+                : (t.topicName + ' (' + PlannerData.taskLabel(t) + ')'));
+            return '<li class="datehub-todo-item' + (t.completed ? ' datehub-todo-item-done' : '') + '">' +
               '<label>' +
-                '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '">' +
+                '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '"' + (t.completed ? ' checked' : '') + '>' +
                 ' ' + label +
               '</label>' +
             '</li>';
