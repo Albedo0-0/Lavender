@@ -9,6 +9,8 @@
 //   State.get().timeEngineBreaks  -> [ { id, date, type: 'auto'|'global'|'manual', durationMs, startedAt } ]
 //
 // SessionRecord:
+//   taskId is null for a standalone Stopwatch/Timer record (see recordStandaloneStudy) —
+//   those carry a `source: 'stopwatch'|'timer'` tag instead and are created already 'completed'.
 //   { sessionId, taskId, date,
 //     plannedStart, plannedEnd,      // 'HH:MM' as originally scheduled in Planner
 //     adjustedStart, adjustedEnd,    // 'HH:MM' current, shifts with breaks/pauses
@@ -21,7 +23,6 @@
 const TimeEngine = (function () {
   const START_BREAK_MS = 10 * 60 * 1000;   // "Need a break" default at a start prompt
   const END_BREAK_MS = 10 * 60 * 1000;     // "Need a break" default at an end/stop prompt
-  const END_CONTINUE_MS = 15 * 60 * 1000;  // "Started" (continue) default grace at an end/stop prompt
   const PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3-minute unanswered timeout
   const AUTO_BREAK_MS = 5 * 60 * 1000;     // automatic break length when a prompt times out
   const RETENTION_DAYS = 14;               // days of full-detail sessionRecords/timeEngineBreaks kept before rollup
