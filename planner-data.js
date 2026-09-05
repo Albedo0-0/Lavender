@@ -238,7 +238,7 @@ const PlannerData = (function () {
 function slotLabel(t) {
     if (!t.startTime && !t.stopTime) return '';
     return (t.startTime || '?') + '\u2013' + (t.stopTime || '?');
-}
+  }
   
   return {
     SUBJECTS: SUBJECTS,
@@ -247,6 +247,8 @@ function slotLabel(t) {
     getTopicsBySubject: getTopicsBySubject,
     createRevisionCycle: createRevisionCycle,
     createSingleTask: createSingleTask,
+    createCustomTask: createCustomTask,
+    rescheduleTask: rescheduleTask,
     toggleComplete: toggleComplete,
     getAllTasks: getAllTasks,
     getTasksList: getTasksList,
@@ -255,6 +257,8 @@ function slotLabel(t) {
     getHistoryTasks: getHistoryTasks,
     getTasksForDate: getTasksForDate,
     getIncompleteTasksForDate: getIncompleteTasksForDate,
-    taskLabel: taskLabel
+    getSuggestedTasksForDate: getSuggestedTasksForDate,
+    taskLabel: taskLabel,
+    slotLabel: slotLabel
   };
 })();
