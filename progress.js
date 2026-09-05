@@ -127,7 +127,7 @@ const Progress = (function () {
       statCard('Best Study Streak', stats.bestStudyStreak + ' days'),
       statCard('Total Study Hours', stats.totalStudyHours + ' hrs'),
       statCard('Total Questions Solved', stats.totalQuestionsSolved),
-      statCard('Total Tasks', stats.totalTasks),
+      statCard('Total Tasks Completed', stats.totalTasks),
       statCard('Total Completed Revision Cycles', stats.totalCompletedRevisionCycles),
       statCard('Highest Daily Study Hours', highestStudy ?
         (highestStudy.value + ' hrs<br><small>' + formatStatDate(highestStudy.date) + '</small>') : '\u2013'),
