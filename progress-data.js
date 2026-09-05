@@ -1,6 +1,7 @@
-// progress-data.js — Progress tab data layer. No UI here. Depends on: State, JournalData, PlannerData, DateHub, Streak.
+// progress-data.js — Progress tab data layer. No UI here. Depends on: State, JournalData, PlannerData, DateHub, Streak, TimeEngine.
 // Reads existing Journal / Planner / DateHub data as the source of truth. Does not store anything of its own.
-
+// Total Study Time additionally reads TimeEngine (the actual-study-time ledger for Study sessions
+// + standalone Stopwatch/Timer) and merges it with Journal's manual entry per day — see getTotalStudyHours.
 const ProgressData = (function () {
   // Mood strings come from journal.js option labels, e.g. "\uD83D\uDE04 great", "\uD83D\uDE42 good",
   // "\uD83D\uDE10 okay", "\uD83D\uDE14 low", "\uD83D\uDE22 rough" — matched by keyword, case-insensitive.
@@ -178,13 +179,26 @@ const ProgressData = (function () {
     return result.highScore || 0;
   }
 
+  // Total Study Time combines two sources: Journal's manually-entered hoursStudied, and
+  // TimeEngine's automatically-recorded actual study time (scheduled Study sessions + standalone
+  // Stopwatch/Timer runs — see timeengine.js recordStandaloneStudy, the single source of truth
+  // for actual elapsed study time). Per day we take whichever is LARGER rather than summing them,
+  // so a day that has both a manual Journal entry and engine-recorded time is never double-counted;
+  // days with only one source still count normally, preserving existing Journal-only behaviour.
   function getTotalStudyHours() {
-    const list = getAllEntriesList();
-    return Math.round(list.reduce(function (sum, item) {
-      return sum + (studyHoursValue(item.entry) || 0);
-    }, 0) * 10) / 10;
+    const dateSet = {};
+    getAllEntriesList().forEach(function (item) { dateSet[item.date] = true; });
+    if (typeof TimeEngine !== 'undefined') {
+      TimeEngine.getAllTrackedDates().forEach(function (d) { dateSet[d] = true; });
+    }
+    let totalMs = 0;
+    Object.keys(dateSet).forEach(function (dateStr) {
+      const journalMs = (studyHoursValue(getEntryFor(dateStr)) || 0) * 3600000;
+      const engineMs = (typeof TimeEngine !== 'undefined') ? (TimeEngine.getDayStats(dateStr).studyMs || 0) : 0;
+      totalMs += Math.max(journalMs, engineMs);
+    });
+    return Math.round((totalMs / 3600000) * 10) / 10;
   }
-
   function getTotalQuestionsSolved() {
     const list = getAllEntriesList();
     return list.reduce(function (sum, item) {
