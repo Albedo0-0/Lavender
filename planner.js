@@ -458,6 +458,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       ? 'Scheduled: ' + t.date + ' \u2014 Completed: ' + t.completedDate
       : 'Scheduled: ' + t.date) + (slot ? ' \u00B7 ' + slot : '');
 
+    const sessionActive = typeof Study !== 'undefined' && Study.isSessionActive && Study.isSessionActive();
+    const studyBtn = (t.startTime && !t.completed)
+      ? '<button class="planner-start-study-btn"' + (sessionActive ? ' disabled' : '') + ' data-task-id="' + t.taskId + '">Start in Study</button>'
+      : '';
+
     return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
       '<label class="planner-task-check-label">' +
         '<input type="checkbox" id="planner-check-' + t.taskId + '"' + checkedAttr + '>' +
@@ -465,7 +470,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      ((t.startTime && !t.completed) ? '<button class="planner-start-study-btn" data-task-id="' + t.taskId + '">Start in Study</button>' : '') +
+      studyBtn +
     '</div>';
   }
 
