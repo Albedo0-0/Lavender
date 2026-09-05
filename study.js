@@ -349,8 +349,9 @@ const Study = (function () {
     const cutoffView = document.getElementById('study-cutoff-view');
     const alarmIcon = document.getElementById('study-alarm-icon');
     const linksIcon = document.getElementById('study-links-icon');
-    if (clockPanel) clockPanel.style.display = active ? 'none' : 'block';
-    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
+    const hideForCutoff = active && !getAlarmState().activeTaskId;
+    if (clockPanel) clockPanel.style.display = hideForCutoff ? 'none' : 'block';
+    if (sessionPanel) sessionPanel.style.display = hideForCutoff ? 'none' : 'block';
     if (cutoffView) cutoffView.style.display = active ? 'block' : 'none';
     if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
     if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
@@ -379,6 +380,10 @@ const Study = (function () {
     }
 
     if (alarmState.prompt) {
+      const overlay = document.getElementById('modal-overlay');
+      const overlayOpen = overlay && overlay.style.display === 'flex';
+      const ownedByPrompt = document.getElementById('study-prompt-start') !== null;
+      if (overlayOpen && !ownedByPrompt) return;
       if (Date.now() >= alarmState.prompt.fireAt) showPrompt(alarmState.prompt.taskId);
       return;
     }
