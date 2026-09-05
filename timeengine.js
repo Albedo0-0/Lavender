@@ -211,6 +211,7 @@ const TimeEngine = (function () {
         beginActiveSession(prompt.sessionId);
       } else if (choice === 'break') {
         applyShift(START_BREAK_MS);
+        pushBreak(todayStr(), 'manual', START_BREAK_MS);
         setEngine({ prompt: null });
       } else if (choice === 'time') {
         applyShift(Math.max(1, minutes || 1) * 60 * 1000);
@@ -298,7 +299,10 @@ const TimeEngine = (function () {
       ? Object.assign({}, promptNow, { deadline: promptNow.deadline + breakMs })
       : promptNow;
     applyShift(breakMs);
-    pushBreak(todayStr(), 'global', breakMs);
+    // Only log a standalone break entry when there's no paused session to track it instead —
+    // if we just paused the active session, its own breakMs (finalized on resume) already
+    // covers this time in getDayStats, and pushBreak here would double-count it.
+    if (!pausedActiveSession) pushBreak(todayStr(), 'global', breakMs);
     setEngine({ prompt: shiftedPrompt, globalBreak: { active: true, resumeAt: Date.now() + breakMs, startedAt: Date.now(), pausedActiveSession: pausedActiveSession } });
     notify();
     return true;
@@ -336,10 +340,12 @@ const TimeEngine = (function () {
       const active = getActiveSession();
       if (active && active.sessionId === prompt.sessionId && active.state === 'active') { pauseSessionInternal(active.sessionId); autoPaused = true; }
       extendActiveAndShift(AUTO_BREAK_MS);
+      // No pushBreak here: the paused session's own breakMs (finalized on resume, below) already
+      // accounts for this time in getDayStats — an extra pushBreak would double-count it.
     } else {
       applyShift(AUTO_BREAK_MS);
+      pushBreak(todayStr(), 'auto', AUTO_BREAK_MS);
     }
-    pushBreak(todayStr(), 'auto', AUTO_BREAK_MS);
     setEngine({ prompt: Object.assign({}, prompt, { autoBreakActive: true, autoPaused: autoPaused, autoBreakResumeAt: now + AUTO_BREAK_MS, autoBreakCount: (prompt.autoBreakCount || 0) + 1 }) });
   }
 
