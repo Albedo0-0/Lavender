@@ -13,9 +13,10 @@ const State = (function () {
     journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
     journalPasswordHash: null, // Journal: global lock password hash
     journalLocked: false, // Journal: global lock state
-    studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0 }, // Study §3.1
-    sessionLog: [], // Study §0/§3.2: [{ taskId, date, startTime, stopTime, outcome }]
-    alarmState: { date: null, delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [], globalBreak: { active: false, resumeAt: null, wasClockRunning: false } }, // Study §3.2
+    studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0 }, // Study §3.1 — independent manual stopwatch/timer, not tied to sessions
+    timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
+    sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
+    timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
     studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
     favoriteTopics: [], // History nav: topicIds marked as favorite
     // Later: exp, level, etc.
