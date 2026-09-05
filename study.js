@@ -122,21 +122,22 @@ const Study = (function () {
     if (display) display.textContent = fmtDuration(currentClockMs());
     const startBtn = document.getElementById('study-clock-start');
     const pauseBtn = document.getElementById('study-clock-pause');
+    const modesEl = document.getElementById('study-clock-modes');
     const fresh = getClock();
     if (startBtn) {
       startBtn.style.display = fresh.running ? 'none' : 'inline-block';
       startBtn.textContent = (!fresh.running && fresh.elapsedMs > 0) ? 'Resume' : 'Start';
     }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
+    if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
   }
-
   function renderClockPanel() {
     const container = document.getElementById('study-clock-panel');
     if (!container) return;
     const c = getClock();
 
     container.innerHTML =
-      '<div class="study-clock-modes">' +
+      '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (c.running ? 'none' : 'flex') + '">' +
         '<button class="study-mode-btn" data-mode="stopwatch">Stopwatch</button>' +
         '<button class="study-mode-btn" data-mode="timer">Timer</button>' +
       '</div>' +
