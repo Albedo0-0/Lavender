@@ -52,7 +52,7 @@ const Study = (function () {
 
   function getAlarmState() { return State.get().alarmState || defaultAlarmState(); }
   function setAlarmState(partial) { State.set({ alarmState: Object.assign({}, getAlarmState(), partial) }); }
-
+  function isSessionActive() { return !!getAlarmState().activeTaskId; }
   // ---------- 3.1 Clock ----------
 
   function getClock() { return State.get().studyClock; }
@@ -196,10 +196,7 @@ const Study = (function () {
 
   function startTaskSession(taskId) {
     const alarmState = getAlarmState();
-    if (alarmState.activeTaskId) {
-      alert('Finish the current session before starting another.');
-      return;
-    }
+    if (alarmState.activeTaskId) return;
     const task = PlannerData.getAllTasks()[taskId];
     if (!task || task.completed) return;
     beginSession(taskId);
