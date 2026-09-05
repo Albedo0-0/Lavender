@@ -155,6 +155,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
+    if (PlannerData.hasSlotConflict(dateStr, startTime, stopTime, null)) {
+      alert('That time slot overlaps an existing task on this date.');
+      return;
+    }
+
     if (taskType === 'revision') {
       PlannerData.createRevisionCycle(subject, topicName, dateStr, note, startTime, stopTime);
     } else {
@@ -179,6 +184,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
+    if (PlannerData.hasSlotConflict(dateStr, startTime, stopTime, null)) {
+      alert('That time slot overlaps an existing task on this date.');
+      return;
+    }
+
     PlannerData.createCustomTask(title, dateStr, note, startTime, stopTime);
 
     document.getElementById('planner-custom-title').value = '';
@@ -194,6 +204,12 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       alert('Please pick a date first.');
       return;
     }
+
+    if (PlannerData.hasSlotConflict(dateStr, startTime, stopTime, taskId)) {
+      alert('That time slot overlaps an existing task on this date.');
+      return;
+    }
+    
     PlannerData.rescheduleTask(taskId, dateStr, startTime, stopTime);
     renderAddModeBody();
     renderSidePanel();
