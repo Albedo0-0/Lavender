@@ -12,6 +12,7 @@
     <button class="nav-btn" data-screen="calendar">Calendar</button>
     <button class="nav-btn" data-screen="journal">Journal</button>
     <button class="nav-btn" data-screen="planner">Planner</button>
+    <button class="nav-btn" data-screen="study">Study</button>
     <button class="nav-btn" data-screen="progress">Progress</button>
   </nav>
   <button id="journal-lock-toggle" title="Journal lock">&#128275;</button>
@@ -44,6 +45,16 @@
         </div>
       </div>
     </section>
+    <section id="screen-study" class="screen">
+      <div id="study-layout">
+        <div id="study-header">
+          <h3>Study</h3>
+          <button id="study-alarm-icon" title="Today's alarms">&#9200;</button>
+        </div>
+        <div id="study-clock-panel"></div>
+        <div id="study-session-panel"></div>
+      </div>
+    </section>
     <section id="screen-progress" class="screen"></section>
 </main>
 
@@ -63,6 +74,7 @@
   <script src="journal.js"></script>
   <script src="calendar.js"></script>
   <script src="planner.js"></script>
+  <script src="study.js"></script>
   <script src="progress-data.js"></script>
   <script src="progress.js"></script>
   <script>
@@ -72,6 +84,7 @@
     Calendar.init();
     Journal.init();
     Planner.init();
+    Study.init();
     Progress.init();
   </script>
 
