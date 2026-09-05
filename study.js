@@ -296,6 +296,7 @@ const Study = (function () {
     if (remainEl) {
       const active = TimeEngine.getActiveSession();
       remainEl.textContent = active ? ('Remaining: ' + fmtDuration(Math.max(0, (active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd)) - Date.now()))) : '';
+    }
   }
 
   function exitFocusMode() {
