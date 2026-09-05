@@ -206,7 +206,7 @@ const ProgressData = (function () {
       const engineMs = (typeof TimeEngine !== 'undefined') ? (TimeEngine.getDayStats(dateStr).studyMs || 0) : 0;
       totalMs += Math.max(journalMs, engineMs);
     });
-    return Math.round((totalMs / 3600000) * 10) / 10;
+    return totalMs / 3600000;
   }
   function getTotalQuestionsSolved() {
     const list = getAllEntriesList();
