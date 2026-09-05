@@ -193,7 +193,7 @@ const ProgressData = (function () {
   }
 
   function getTotalTasks() {
-    return PlannerData.getTasksList().length;
+    return PlannerData.getTasksList().filter(function (t) { return t.completed; }).length;
   }
 
   // A revision cycle only counts as completed once all 6 tasks (R1..R6) sharing its
