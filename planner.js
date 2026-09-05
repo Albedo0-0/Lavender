@@ -155,6 +155,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
+    if (!PlannerData.isValidSlot(startTime, stopTime)) {
+      alert('End time must be after start time, on the same day (no overnight sessions). Leave both blank for no time slot.');
+      return;
+    }
+
     if (PlannerData.hasSlotConflict(dateStr, startTime, stopTime, null)) {
       alert('That time slot overlaps an existing task on this date.');
       return;
@@ -184,13 +189,17 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
+    if (!PlannerData.isValidSlot(startTime, stopTime)) {
+      alert('End time must be after start time, on the same day (no overnight sessions). Leave both blank for no time slot.');
+      return;
+    }
+
     if (PlannerData.hasSlotConflict(dateStr, startTime, stopTime, null)) {
       alert('That time slot overlaps an existing task on this date.');
       return;
     }
 
     PlannerData.createCustomTask(title, dateStr, note, startTime, stopTime);
-
     document.getElementById('planner-custom-title').value = '';
     document.getElementById('planner-custom-note').value = '';
     renderSidePanel();
@@ -202,6 +211,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const stopTime = document.getElementById('planner-stop-time').value;
     if (!dateStr) {
       alert('Please pick a date first.');
+      return;
+    }
+
+    if (!PlannerData.isValidSlot(startTime, stopTime)) {
+      alert('End time must be after start time, on the same day (no overnight sessions). Leave both blank for no time slot.');
       return;
     }
 
