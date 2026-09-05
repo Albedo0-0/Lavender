@@ -4,6 +4,7 @@
 const Study = (function () {
   let tickHandle = null;
   let timeInputOpen = false;
+  let breakInputOpen = false;
 
   // ---------- helpers ----------
 
@@ -46,7 +47,7 @@ const Study = (function () {
   }
 
   function defaultAlarmState(dateStr) {
-    return { date: dateStr || todayStr(), delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [] };
+    return { date: dateStr || todayStr(), delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [], globalBreak: { active: false, resumeAt: null, wasClockRunning: false } };
   }
 
   function getAlarmState() { return State.get().alarmState || defaultAlarmState(); }
@@ -175,9 +176,91 @@ const Study = (function () {
       container.innerHTML = '<p class="study-active-label">Studying: ' + taskLabelFull(task) + '</p>' +
         '<button id="study-finish-session">Finish Session</button>';
       document.getElementById('study-finish-session').addEventListener('click', finishSession);
+      return;
+    }
+
+    const today = todayStr();
+    const handled = alarmState.handledTaskIds || [];
+    const upcoming = PlannerData.getTasksForDate(today)
+      .filter(function (t) { return t.startTime && !t.completed && handled.indexOf(t.taskId) === -1; })
+      .sort(function (a, b) { return a.startTime < b.startTime ? -1 : 1; })[0];
+
+    if (upcoming) {
+      container.innerHTML = '<p class="study-active-label">Next up: ' + taskLabelFull(upcoming) + ' at ' + upcoming.startTime + '</p>' +
+        '<button id="study-start-now">Start Now</button>';
+      document.getElementById('study-start-now').addEventListener('click', function () { startTaskSession(upcoming.taskId); });
     } else {
       container.innerHTML = '<p class="study-active-label">No active slot session.</p>';
     }
+  }
+
+  function startTaskSession(taskId) {
+    const alarmState = getAlarmState();
+    if (alarmState.activeTaskId) {
+      alert('Finish the current session before starting another.');
+      return;
+    }
+    const task = PlannerData.getAllTasks()[taskId];
+    if (!task || task.completed) return;
+    beginSession(taskId);
+    setAlarmState({ handledTaskIds: (getAlarmState().handledTaskIds || []).concat([taskId]) });
+    if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('study');
+  }
+
+  function renderBreakStatus() {
+    const btn = document.getElementById('global-break-btn');
+    if (!btn) return;
+    const gb = getAlarmState().globalBreak;
+    if (gb && gb.active) {
+      const remainingMin = Math.ceil((gb.resumeAt - Date.now()) / 60000);
+      btn.textContent = 'Break (' + Math.max(0, remainingMin) + 'm)';
+      btn.disabled = true;
+    } else {
+      btn.textContent = 'Break';
+      btn.disabled = false;
+    }
+  }
+
+  function openBreakInputModal() {
+    breakInputOpen = true;
+    Modal.open(
+      '<h3>Take a break</h3>' +
+      '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes">' +
+      '<button id="global-break-confirm">Start Break</button>'
+    );
+    document.getElementById('global-break-confirm').addEventListener('click', function () {
+      const minutes = parseInt(document.getElementById('global-break-minutes').value, 10);
+      if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
+      breakInputOpen = false;
+      Modal.close();
+      startGlobalBreak(minutes);
+    });
+  }
+
+  function startGlobalBreak(minutes) {
+    const alarmState = getAlarmState();
+    if (alarmState.globalBreak && alarmState.globalBreak.active) { alert('A break is already running.'); return; }
+    const breakMs = minutes * 60 * 1000;
+    const wasRunning = getClock().running;
+    if (wasRunning) pauseClock();
+
+    const updatedPrompt = alarmState.prompt ? { taskId: alarmState.prompt.taskId, fireAt: alarmState.prompt.fireAt + breakMs } : null;
+
+    setAlarmState({
+      delayMs: (alarmState.delayMs || 0) + breakMs,
+      prompt: updatedPrompt,
+      globalBreak: { active: true, resumeAt: Date.now() + breakMs, wasClockRunning: wasRunning }
+    });
+    renderBreakStatus();
+  }
+
+  function endGlobalBreak() {
+    const alarmState = getAlarmState();
+    if (alarmState.globalBreak && alarmState.globalBreak.wasClockRunning) {
+      setClock({ running: true, startedAt: Date.now() });
+    }
+    setAlarmState({ globalBreak: { active: false, resumeAt: null, wasClockRunning: false } });
+    renderBreakStatus();
   }
 
   function showPrompt(taskId) {
@@ -359,12 +442,22 @@ const Study = (function () {
   }
 
 
-  function tick() {
+function tick() {
     const today = todayStr();
     let alarmState = getAlarmState();
     if (alarmState.date !== today) {
       alarmState = defaultAlarmState(today);
       setAlarmState(alarmState);
+    }
+
+    if (alarmState.globalBreak && alarmState.globalBreak.active) {
+      if (Date.now() < alarmState.globalBreak.resumeAt) {
+        renderClock();
+        renderBreakStatus();
+        return;
+      }
+      endGlobalBreak();
+      alarmState = getAlarmState();
     }
 
     const pastCutoff = isPastCutoff();
@@ -377,6 +470,10 @@ const Study = (function () {
     if (timeInputOpen) {
       if (document.getElementById('study-time-minutes')) return;
       timeInputOpen = false;
+    }
+    if (breakInputOpen) {
+      if (document.getElementById('global-break-minutes')) return;
+      breakInputOpen = false;
     }
 
     if (alarmState.prompt) {
@@ -481,6 +578,9 @@ const Study = (function () {
     renderLinksIcon();
     checkMidFlightRecovery();
     setCutoffMode(isPastCutoff());
+    renderBreakStatus();
+    const breakBtn = document.getElementById('global-break-btn');
+    if (breakBtn) breakBtn.addEventListener('click', openBreakInputModal);
     if (!tickHandle) tickHandle = setInterval(tick, 1000);
   }
 
@@ -490,7 +590,8 @@ const Study = (function () {
     renderAlarmIcon();
     renderLinksIcon();
     setCutoffMode(isPastCutoff());
+    renderBreakStatus();
   }
 
-  return { init: init, render: render };
+  return { init: init, render: render, startTaskSession: startTaskSession };
 })();
