@@ -241,10 +241,15 @@ const Study = (function () {
     const wasRunning = getClock().running;
     if (wasRunning) pauseClock();
 
+    const today = todayStr();
+    const handled = alarmState.handledTaskIds || [];
+    const hasUpcoming = PlannerData.getTasksForDate(today).some(function (t) { return t.startTime && !t.completed && handled.indexOf(t.taskId) === -1; });
+    const shouldShiftTimetable = wasRunning || !!alarmState.prompt || hasUpcoming;
+
     const updatedPrompt = alarmState.prompt ? { taskId: alarmState.prompt.taskId, fireAt: alarmState.prompt.fireAt + breakMs } : null;
 
     setAlarmState({
-      delayMs: (alarmState.delayMs || 0) + breakMs,
+      delayMs: shouldShiftTimetable ? (alarmState.delayMs || 0) + breakMs : (alarmState.delayMs || 0),
       prompt: updatedPrompt,
       globalBreak: { active: true, resumeAt: Date.now() + breakMs, wasClockRunning: wasRunning }
     });
@@ -590,5 +595,5 @@ function tick() {
     renderBreakStatus();
   }
 
-  return { init: init, render: render, startTaskSession: startTaskSession };
+  return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive };
 })();
