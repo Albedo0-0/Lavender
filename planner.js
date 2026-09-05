@@ -242,17 +242,57 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       renderHistoryChapters(container);
     } else if (historyView === 'chapter') {
       renderHistoryChapter(container);
+    } else if (historyView === 'today') {
+      renderHistoryToday(container);
     } else {
       renderHistorySubjects(container);
     }
   }
 
-  function renderHistorySubjects(container) {
-    const html = PlannerData.SUBJECTS.map(function (subject) {
-      return '<button class="planner-history-subject-btn" data-subject="' + subject + '">' + subject + '</button>';
-    }).join('');
+  function toggleFavoriteTopic(topicId) {
+    const favs = State.get().favoriteTopics || [];
+    const idx = favs.indexOf(topicId);
+    const updated = idx === -1 ? favs.concat([topicId]) : favs.filter(function (id) { return id !== topicId; });
+    State.set({ favoriteTopics: updated });
+  }
 
-    container.innerHTML = '<div class="planner-history-subject-list">' + html + '</div>';
+  function renderHistorySubjects(container) {
+    const favIds = State.get().favoriteTopics || [];
+    const allTopics = PlannerData.getAllTopics();
+    const favTopics = favIds.map(function (id) { return allTopics[id]; }).filter(Boolean);
+
+    let html = '<div class="planner-history-toolbar">' +
+      '<button class="planner-history-today-btn">Today</button>' +
+    '</div>';
+
+    if (favTopics.length > 0) {
+      html += '<div class="planner-history-favorites">' +
+        '<div class="planner-suggested-group-title">Favorites</div>' +
+        favTopics.map(function (t) {
+          return '<button class="planner-history-fav-btn" data-subject="' + t.subject + '" data-topic-id="' + t.topicId + '">' + t.subject + ' \u00B7 ' + t.topicName + '</button>';
+        }).join('') +
+      '</div>';
+    }
+
+    html += '<div class="planner-history-subject-list">' + PlannerData.SUBJECTS.map(function (subject) {
+      return '<button class="planner-history-subject-btn" data-subject="' + subject + '">' + subject + '</button>';
+    }).join('') + '</div>';
+
+    container.innerHTML = html;
+
+    container.querySelector('.planner-history-today-btn').addEventListener('click', function () {
+      historyView = 'today';
+      renderTabContent();
+    });
+
+    container.querySelectorAll('.planner-history-fav-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        historySubject = btn.dataset.subject;
+        historyTopicId = btn.dataset.topicId;
+        historyView = 'chapter';
+        renderTabContent();
+      });
+    });
 
     container.querySelectorAll('.planner-history-subject-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -262,19 +302,25 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       });
     });
   }
-
+  
   function renderHistoryChapters(container) {
     const grouped = PlannerData.getTopicsBySubject();
     const topics = grouped[historySubject] || [];
+    const favIds = State.get().favoriteTopics || [];
 
     let html = '<button class="planner-history-back">&lt; Subjects</button>' +
-      '<h4 class="planner-history-heading">' + historySubject + '</h4>';
+      '<h4 class="planner-history-heading">' + historySubject + '</h4>' +
+      '<input type="text" id="planner-history-search" placeholder="Search chapters...">';
 
     if (topics.length === 0) {
       html += '<p class="planner-empty">No chapters yet for ' + historySubject + '.</p>';
     } else {
-      html += '<div class="planner-history-chapter-list">' + topics.map(function (t) {
-        return '<button class="planner-history-chapter-btn" data-topic-id="' + t.topicId + '">' + t.topicName + '</button>';
+      html += '<div class="planner-history-chapter-list" id="planner-history-chapter-list">' + topics.map(function (t) {
+        const isFav = favIds.indexOf(t.topicId) !== -1;
+        return '<div class="planner-history-chapter-item" data-name="' + t.topicName.toLowerCase() + '">' +
+          '<button class="planner-history-chapter-btn" data-topic-id="' + t.topicId + '">' + t.topicName + '</button>' +
+          '<button class="planner-history-fav-toggle' + (isFav ? ' active' : '') + '" data-topic-id="' + t.topicId + '">' + (isFav ? '\u2605' : '\u2606') + '</button>' +
+        '</div>';
       }).join('') + '</div>';
     }
 
@@ -288,6 +334,63 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
 
     container.querySelectorAll('.planner-history-chapter-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        historyTopicId = btn.dataset.topicId;
+        historyView = 'chapter';
+        renderTabContent();
+      });
+    });
+
+    container.querySelectorAll('.planner-history-fav-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        toggleFavoriteTopic(btn.dataset.topicId);
+        renderTabContent();
+      });
+    });
+
+    const searchInput = document.getElementById('planner-history-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        const q = searchInput.value.trim().toLowerCase();
+        document.querySelectorAll('#planner-history-chapter-list .planner-history-chapter-item').forEach(function (item) {
+          item.style.display = item.dataset.name.indexOf(q) === -1 ? 'none' : 'flex';
+        });
+      });
+    }
+  }
+
+  function renderHistoryToday(container) {
+    const today = todayStr();
+    const todaysTasks = PlannerData.getTasksForDate(today).filter(function (t) { return t.topicId; });
+    const grouped = {};
+    todaysTasks.forEach(function (t) {
+      if (!grouped[t.topicId]) grouped[t.topicId] = { subject: t.subject, topicName: t.topicName, topicId: t.topicId, tasks: [] };
+      grouped[t.topicId].tasks.push(t);
+    });
+    const rows = Object.keys(grouped).map(function (id) { return grouped[id]; });
+
+    let html = '<button class="planner-history-back">&lt; Subjects</button>' +
+      '<h4 class="planner-history-heading">Today\'s Chapter Activity</h4>';
+
+    if (rows.length === 0) {
+      html += '<p class="planner-empty">No chapter-linked tasks scheduled for today.</p>';
+    } else {
+      html += '<div class="planner-history-chapter-list">' + rows.map(function (r) {
+        return '<button class="planner-history-today-row" data-subject="' + r.subject + '" data-topic-id="' + r.topicId + '">' +
+          r.subject + ' \u00B7 ' + r.topicName + ' (' + r.tasks.length + ')' +
+        '</button>';
+      }).join('') + '</div>';
+    }
+
+    container.innerHTML = html;
+
+    container.querySelector('.planner-history-back').addEventListener('click', function () {
+      historyView = 'subjects';
+      renderTabContent();
+    });
+
+    container.querySelectorAll('.planner-history-today-row').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        historySubject = btn.dataset.subject;
         historyTopicId = btn.dataset.topicId;
         historyView = 'chapter';
         renderTabContent();
