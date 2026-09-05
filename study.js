@@ -327,7 +327,11 @@ const Study = (function () {
     if (timeInputOpen && document.getElementById('study-time-minutes')) return;
     if (!prompt) { promptToken = null; return; }
     const token = promptTokenFor(prompt);
-    if (token === promptToken) return; // this exact prompt state is already on screen
+    const overlay = document.getElementById('modal-overlay');
+    const overlayOpen = !!overlay && overlay.style.display !== 'none';
+    // Re-show even if the token hasn't changed when the overlay got dismissed (e.g. backdrop
+    // click) — an unanswered prompt must stay visible until answered or it auto-times out.
+    if (token === promptToken && overlayOpen) return;
     promptToken = token;
     timeInputOpen = false;
     if (prompt.autoBreakActive) showAutoBreakNotice(prompt); else showPrompt(prompt);
