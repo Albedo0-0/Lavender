@@ -15,6 +15,9 @@ const Nav = (function () {
       btn.classList.toggle('active', btn.dataset.screen === screenName);
     });
 
+    const lockBtn = document.getElementById('journal-lock-toggle');
+    if (lockBtn) lockBtn.style.display = (screenName === 'journal') ? 'inline-block' : 'none';
+
     State.set({ currentScreen: screenName });
 
     // Refresh the screen being switched into so it always reflects the latest
