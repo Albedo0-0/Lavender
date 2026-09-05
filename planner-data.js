@@ -1,9 +1,11 @@
 // planner-data.js — Planner data layer (topics + tasks). No UI here.
 // State shape: State.get().topics = { topicId: {topicId, subject, topicName} }
 //              State.get().tasks  = { taskId:  {taskId, topicId, subject, topicName,
-//                                                taskType, date, completed, completedDate,
-//                                                note, revisionNumber, cycleId} }
-// taskType: 'base' | 'theory' | 'questions' | 'revision'
+//                                                taskType, date, startTime, stopTime,
+//                                                completed, completedDate,
+//                                                note, revisionNumber, cycleId, title} }
+// taskType: 'base' | 'theory' | 'questions' | 'revision' | 'custom'
+// title is only used for taskType 'custom' (no subject/topic link); others use topicName.
 
 const PlannerData = (function () {
   const SUBJECTS = ['Biology', 'Chemistry', 'Physics'];
@@ -96,7 +98,9 @@ const PlannerData = (function () {
   }
 
   // Repeated Revision: creates the base study task + R1..R6, all sharing topicId + cycleId.
-  function createRevisionCycle(subject, topicName, baseDateStr, note) {
+  // Only the base task gets the slot entered now; R1..R6 are slot-less until their own day
+  // arrives, where they show up in the Planner's "Suggested" mode to be given a per-occurrence slot.
+  function createRevisionCycle(subject, topicName, baseDateStr, note, startTime, stopTime) {
     const topic = getOrCreateTopic(subject, topicName);
     const cycleId = generateId('cycle');
     const tasks = Object.assign({}, State.get().tasks || {});
@@ -107,6 +111,8 @@ const PlannerData = (function () {
       topicName: topic.topicName,
       taskType: 'base',
       date: baseDateStr,
+      startTime: startTime || null,
+      stopTime: stopTime || null,
       note: note || '',
       cycleId: cycleId
     });
@@ -173,14 +179,14 @@ const PlannerData = (function () {
 
   function sortByDate(list) {
     return list.slice().sort(function (a, b) {
-      if (a.date === b.date) return a.topicName.localeCompare(b.topicName);
+      if (a.date === b.date) return (a.topicName || a.title || '').localeCompare(b.topicName || b.title || '');
       return a.date < b.date ? -1 : 1;
     });
   }
 
   function sortByCompletedDesc(list) {
     return list.slice().sort(function (a, b) {
-      if (a.completedDate === b.completedDate) return a.topicName.localeCompare(b.topicName);
+      if (a.completedDate === b.completedDate) return (a.topicName || a.title || '').localeCompare(b.topicName || b.title || '');
       return a.completedDate > b.completedDate ? -1 : 1;
     });
   }
@@ -208,14 +214,32 @@ const PlannerData = (function () {
     return getTasksForDate(dateStr).filter(function (t) { return !t.completed; });
   }
 
+  // Suggestion pools for the Planner's "Suggested" add-mode, kept scoped separately:
+  // pending = all overdue incomplete tasks (any past date); dueRevisions = revision
+  // occurrences whose own date is exactly dateStr (this is how per-occurrence slots get set).
+  function getSuggestedTasksForDate(dateStr) {
+    return {
+      pending: getPendingTasks(),
+      dueRevisions: getTasksForDate(dateStr).filter(function (t) {
+        return t.taskType === 'revision' && !t.completed;
+      })
+    };
+  }
+  
   function taskLabel(t) {
     if (t.taskType === 'revision') return 'Revision ' + t.revisionNumber;
     if (t.taskType === 'base') return 'Study';
     if (t.taskType === 'theory') return 'Theory';
     if (t.taskType === 'questions') return 'Questions';
+    if (t.taskType === 'custom') return t.title;
     return t.taskType;
   }
-
+  
+function slotLabel(t) {
+    if (!t.startTime && !t.stopTime) return '';
+    return (t.startTime || '?') + '\u2013' + (t.stopTime || '?');
+}
+  
   return {
     SUBJECTS: SUBJECTS,
     getOrCreateTopic: getOrCreateTopic,
