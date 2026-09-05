@@ -178,6 +178,7 @@ const Progress = (function () {
   function init() {
     renderShell();
     render();
+    if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) TimeEngine.subscribe(render);
   }
 
   return { init: init, render: function () { renderShell(); render(); } };
