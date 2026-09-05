@@ -116,6 +116,13 @@ const Progress = (function () {
     '</div>';
   }
 
+  function fmtHrsMin(hoursDecimal) {
+    const totalMin = Math.round(hoursDecimal * 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h + 'hr ' + String(m).padStart(2, '0') + 'min';
+  }
+
   function renderOtherStats(container) {
     const stats = ProgressData.getOtherStats();
 
@@ -125,12 +132,13 @@ const Progress = (function () {
 
     const cards = [
       statCard('Best Study Streak', stats.bestStudyStreak + ' days'),
-      statCard('Total Study Hours', stats.totalStudyHours + ' hrs'),
+      statCard('Total Study Hours', fmtHrsMin(stats.totalStudyHours)),
       statCard('Total Questions Solved', stats.totalQuestionsSolved),
       statCard('Total Tasks Completed', stats.totalTasks),
       statCard('Total Completed Revision Cycles', stats.totalCompletedRevisionCycles),
       statCard('Highest Daily Study Hours', highestStudy ?
-        (highestStudy.value + ' hrs<br><small>' + formatStatDate(highestStudy.date) + '</small>') : '\u2013'),
+        (fmtHrsMin(highestStudy.value) + '<br><small>' + formatStatDate(highestStudy.date) + '</small>') : '\u2013'),
+
       statCard('Highest Questions Solved', highestQuestions ?
         (highestQuestions.value + '<br><small>' + formatStatDate(highestQuestions.date) + '</small>') : '\u2013'),
       statCard('Most Productive Day', mostProductive ?
