@@ -152,6 +152,33 @@ const PlannerData = (function () {
     return task;
   }
 
+  // Custom task: no subject/topic link, free title. Covers non-study slots.
+  function createCustomTask(title, dateStr, note, startTime, stopTime) {
+    const tasks = Object.assign({}, State.get().tasks || {});
+    const task = blankTask({
+      title: title.trim(),
+      taskType: 'custom',
+      date: dateStr,
+      startTime: startTime || null,
+      stopTime: stopTime || null,
+      note: note || ''
+    });
+    tasks[task.taskId] = task;
+    State.set({ tasks: tasks });
+    return task;
+  }
+  // Move an existing task (e.g. a suggested pending/revision task) onto a new date/slot.
+  function rescheduleTask(taskId, dateStr, startTime, stopTime) {
+    const tasks = Object.assign({}, State.get().tasks || {});
+    const task = tasks[taskId];
+    if (!task) return;
+    tasks[taskId] = Object.assign({}, task, {
+      date: dateStr,
+      startTime: startTime || null,
+      stopTime: stopTime || null
+    });
+    State.set({ tasks: tasks });
+  }
   // ---------- Tasks: completion ----------
 
   function toggleComplete(taskId) {
