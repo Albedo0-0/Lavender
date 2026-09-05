@@ -781,3 +781,54 @@ body {
   font-weight: bold;
   margin-top: 4px;
 }
+
+/* Study §4 — Focus Mode (active/paused session view) */
+
+.study-focus-mode {
+  text-align: center;
+  padding: 24px 12px;
+}
+
+.study-focus-clock {
+  font-size: 48px;
+  font-weight: bold;
+  color: #6b8a4a;
+  margin: 16px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.study-paused-note {
+  color: #c0392b;
+  font-weight: bold;
+  margin: 0 0 8px;
+}
+
+.study-focus-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.study-focus-actions button {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.study-focus-actions button:hover {
+  border-color: #6b8a4a;
+}
+
+#study-focus-complete:hover {
+  border-color: #4a8a4a;
+  color: #4a8a4a;
+}
+
+#study-focus-later:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+}
