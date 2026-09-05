@@ -14,6 +14,13 @@ const Study = (function () {
     return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
   }
 
+  function tomorrowStr() {
+    const t = new Date();
+    t.setDate(t.getDate() + 1);
+    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  }
+
+  
   function nowHHMM() {
     const t = new Date();
     return pad(t.getHours()) + ':' + pad(t.getMinutes());
@@ -248,7 +255,7 @@ const Study = (function () {
 
     if (alarmState.date !== todayStr()) {
       const log = (State.get().sessionLog || []).map(function (e) {
-        if (e.taskId === alarmState.activeTaskId && e.stopTime === null) return Object.assign({}, e, { stopTime: null, outcome: 'ended (stale)' });
+        if (e.taskId === alarmState.activeTaskId && e.stopTime === null) return Object.assign({}, e, { stopTime: e.startTime, outcome: 'ended (stale)' });
         return e;
       });
       State.set({ sessionLog: log });
@@ -280,6 +287,77 @@ const Study = (function () {
     });
   }
 
+  function isPastCutoff() {
+    return new Date().getHours() >= 23;
+  }
+
+  function computeSessionMs(entry) {
+    if (!entry.startTime) return 0;
+    const start = timeStrToMs(entry.date, entry.startTime);
+    const end = entry.stopTime ? timeStrToMs(entry.date, entry.stopTime) : Date.now();
+    return Math.max(0, end - start);
+  }
+
+  function computeDayStats() {
+    const today = todayStr();
+    const tasks = PlannerData.getTasksForDate(today);
+    const doneCount = tasks.filter(function (t) { return t.completed; }).length;
+    const totalCount = tasks.length;
+    const workDonePct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
+    const studyMs = (State.get().sessionLog || [])
+      .filter(function (e) { return e.date === today; })
+      .reduce(function (sum, e) { return sum + computeSessionMs(e); }, 0);
+    const breakMs = getAlarmState().delayMs || 0;
+    const totalTrackedMs = studyMs + breakMs;
+    const breakPct = totalTrackedMs === 0 ? 0 : Math.round((breakMs / totalTrackedMs) * 100);
+    const studyPct = totalTrackedMs === 0 ? 0 : 100 - breakPct;
+
+    return {
+      doneCount: doneCount,
+      totalCount: totalCount,
+      workDonePct: workDonePct,
+      studyPct: studyPct,
+      breakPct: breakPct
+    };
+  }
+
+  function renderCutoffView() {
+    const container = document.getElementById('study-cutoff-view');
+    if (!container) return;
+    const stats = computeDayStats();
+    const pendingTomorrow = PlannerData.getTasksForDate(tomorrowStr()).filter(function (t) { return !t.completed; }).length;
+
+    container.innerHTML =
+      '<p class="study-goodnight-msg">Goodnight, you did well. Proud of you... We will be better tomorrow</p>' +
+      '<div class="study-cutoff-stats">' +
+        '<div class="study-cutoff-stat"><div>Work done: ' + stats.workDonePct + '% (' + stats.doneCount + '/' + stats.totalCount + ')</div>' +
+          '<div>Not done: ' + (100 - stats.workDonePct) + '%</div></div>' +
+        '<div class="study-cutoff-stat"><div>Study: ' + stats.studyPct + '%</div>' +
+          '<div>Breaks: ' + stats.breakPct + '%</div></div>' +
+      '</div>' +
+      '<div class="study-cutoff-reminders">' +
+        '<p>Pending tasks for tomorrow: ' + pendingTomorrow + '</p>' +
+        '<p class="study-reminder-highlight">Add tomorrow\'s goal in Calendar.</p>' +
+        '<p class="study-reminder-highlight">Fill out today\'s journal.</p>' +
+      '</div>';
+  }
+
+  function setCutoffMode(active) {
+    const clockPanel = document.getElementById('study-clock-panel');
+    const sessionPanel = document.getElementById('study-session-panel');
+    const cutoffView = document.getElementById('study-cutoff-view');
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    const linksIcon = document.getElementById('study-links-icon');
+    if (clockPanel) clockPanel.style.display = active ? 'none' : 'block';
+    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
+    if (cutoffView) cutoffView.style.display = active ? 'block' : 'none';
+    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
+    if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
+    if (active) renderCutoffView();
+  }
+
+
   function tick() {
     const today = todayStr();
     let alarmState = getAlarmState();
@@ -288,10 +366,17 @@ const Study = (function () {
       setAlarmState(alarmState);
     }
 
+    const pastCutoff = isPastCutoff();
+    setCutoffMode(pastCutoff);
+    if (pastCutoff) return;
+
     renderClock();
 
     if (alarmState.activeTaskId) return;
-    if (timeInputOpen) return;
+    if (timeInputOpen) {
+      if (document.getElementById('study-time-minutes')) return;
+      timeInputOpen = false;
+    }
 
     if (alarmState.prompt) {
       if (Date.now() >= alarmState.prompt.fireAt) showPrompt(alarmState.prompt.taskId);
@@ -311,11 +396,86 @@ const Study = (function () {
     }
   }
 
+  function getLinks() { return State.get().studyLinks || {}; }
+
+  function addLink(subject, url, note) {
+    const links = Object.assign({}, getLinks());
+    const id = 'link_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    links[id] = { linkId: id, subject: subject, url: url.trim(), note: note || '' };
+    State.set({ studyLinks: links });
+  }
+
+  function deleteLink(linkId) {
+    const links = Object.assign({}, getLinks());
+    delete links[linkId];
+    State.set({ studyLinks: links });
+  }
+
+  function getLinksBySubject(subject) {
+    const links = getLinks();
+    return Object.keys(links).map(function (id) { return links[id]; }).filter(function (l) { return l.subject === subject; });
+  }
+
+  function renderLinksIcon() {
+    const btn = document.getElementById('study-links-icon');
+    if (btn) btn.onclick = function () { openLinksModal(); };
+  }
+
+  function openLinksModal(activeSubject) {
+    const subject = activeSubject || PlannerData.SUBJECTS[0];
+    const tabsHtml = PlannerData.SUBJECTS.map(function (s) {
+      return '<button class="study-links-tab-btn' + (s === subject ? ' active' : '') + '" data-subject="' + s + '">' + s + '</button>';
+    }).join('');
+
+    const list = getLinksBySubject(subject);
+    const listHtml = list.length === 0
+      ? '<p class="planner-empty">No links yet for ' + subject + '.</p>'
+      : list.map(function (l) {
+          return '<div class="study-link-row">' +
+            '<a href="' + l.url + '" target="_blank" rel="noopener">' + l.url + '</a>' +
+            (l.note ? '<div class="study-link-note">' + l.note + '</div>' : '') +
+            '<button class="study-link-delete" data-link-id="' + l.linkId + '">Remove</button>' +
+          '</div>';
+        }).join('');
+
+    Modal.open(
+      '<h3>Links</h3>' +
+      '<div class="study-links-tabs">' + tabsHtml + '</div>' +
+      '<div class="study-links-list">' + listHtml + '</div>' +
+      '<div class="study-links-form">' +
+        '<input type="url" id="study-link-url" placeholder="YouTube URL">' +
+        '<textarea id="study-link-note" rows="2" placeholder="Note (optional)"></textarea>' +
+        '<button id="study-link-save">Add Link</button>' +
+      '</div>'
+    );
+
+    document.querySelectorAll('.study-links-tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { openLinksModal(btn.dataset.subject); });
+    });
+
+    document.querySelectorAll('.study-link-delete').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        deleteLink(btn.dataset.linkId);
+        openLinksModal(subject);
+      });
+    });
+
+    document.getElementById('study-link-save').addEventListener('click', function () {
+      const url = document.getElementById('study-link-url').value.trim();
+      if (!url) { alert('Enter a URL.'); return; }
+      const note = document.getElementById('study-link-note').value;
+      addLink(subject, url, note);
+      openLinksModal(subject);
+    });
+  }
+
   function init() {
     renderClockPanel();
     renderAlarmPanel();
     renderAlarmIcon();
+    renderLinksIcon();
     checkMidFlightRecovery();
+    setCutoffMode(isPastCutoff());
     if (!tickHandle) tickHandle = setInterval(tick, 1000);
   }
 
@@ -323,6 +483,8 @@ const Study = (function () {
     renderClockPanel();
     renderAlarmPanel();
     renderAlarmIcon();
+    renderLinksIcon();
+    setCutoffMode(isPastCutoff());
   }
 
   return { init: init, render: render };
