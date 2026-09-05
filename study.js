@@ -295,8 +295,7 @@ const Study = (function () {
     const remainEl = document.getElementById('study-focus-remaining');
     if (remainEl) {
       const active = TimeEngine.getActiveSession();
-      remainEl.textContent = active ? ('Remaining: ' + fmtDuration(Math.max(0, timeStrToMs(active.date, active.adjustedEnd) - Date.now()))) : '';
-    }
+      remainEl.textContent = active ? ('Remaining: ' + fmtDuration(Math.max(0, (active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd)) - Date.now()))) : '';
   }
 
   function exitFocusMode() {
@@ -468,14 +467,15 @@ const Study = (function () {
     const sessionPanel = document.getElementById('study-session-panel');
     const cutoffView = document.getElementById('study-cutoff-view');
     const linksIcon = document.getElementById('study-links-icon');
-    const hideForCutoff = active && !TimeEngine.isSessionActive();
     const clockPanel = document.getElementById('study-clock-panel');
     const alarmIcon = document.getElementById('study-alarm-icon');
-    if (clockPanel && !TimeEngine.isSessionActive()) clockPanel.style.display = hideForCutoff ? 'none' : 'block';
-    if (sessionPanel) sessionPanel.style.display = hideForCutoff ? 'none' : 'block';
+    const breakBtn = document.getElementById('global-break-btn');
+    if (clockPanel) clockPanel.style.display = active ? 'none' : 'block';
+    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
     if (cutoffView) cutoffView.style.display = active ? 'block' : 'none';
-    if (alarmIcon && !TimeEngine.isSessionActive()) alarmIcon.style.display = active ? 'none' : 'inline-block';
+    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
     if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
+    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
     if (active) renderCutoffView();
   }
 
@@ -499,6 +499,7 @@ const Study = (function () {
         renderClock();
       }
     }
+    if (pastCutoff) return;
     if (breakInputOpen && document.getElementById('global-break-minutes')) return;
     if (doItLaterOpen && document.getElementById('study-later-date')) return;
     handlePrompt();
