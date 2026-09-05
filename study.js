@@ -2,7 +2,6 @@
 // Depends on: State, PlannerData, Modal. Loaded after planner.js (see index.html).
 
 const Study = (function () {
-  let tickHandle = null;
   let timeInputOpen = false;
   let breakInputOpen = false;
 
@@ -46,13 +45,7 @@ const Study = (function () {
       : (task.subject + ' \u00B7 ' + task.topicName + ' \u00B7 ' + PlannerData.taskLabel(task));
   }
 
-  function defaultAlarmState(dateStr) {
-    return { date: dateStr || todayStr(), delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [], globalBreak: { active: false, resumeAt: null, wasClockRunning: false } };
-  }
-
-  function getAlarmState() { return State.get().alarmState || defaultAlarmState(); }
-  function setAlarmState(partial) { State.set({ alarmState: Object.assign({}, getAlarmState(), partial) }); }
-  function isSessionActive() { return !!getAlarmState().activeTaskId; }
+  
   // ---------- 3.1 Clock ----------
 
   function getClock() { return State.get().studyClock; }
@@ -436,68 +429,277 @@ const Study = (function () {
     const linksIcon = document.getElementById('study-links-icon');
     const hideForCutoff = active && !getAlarmState().activeTaskId;
     if (clockPanel) clockPanel.style.display = hideForCutoff ? 'none' : 'block';
+// ---------- 3.2 Timetable execution — delegates entirely to TimeEngine (single source of truth) ----------
+
+  let promptToken = null;   // dedupe: which exact prompt-state is currently shown as a modal
+  let doItLaterOpen = false;
+  let lastSessionSig = null;
+
+  function renderAlarmIcon() {
+    const btn = document.getElementById('study-alarm-icon');
+    if (btn) btn.onclick = openAlarmListModal;
+  }
+
+  function openAlarmListModal() {
+    const today = todayStr();
+    const slots = PlannerData.getTasksForDate(today)
+      .filter(function (t) { return t.startTime; })
+      .sort(function (a, b) { return a.startTime < b.startTime ? -1 : 1; });
+
+    const rows = slots.map(function (t) {
+      const rec = TimeEngine.getRecordForTask(t.taskId, today);
+      let status = 'Upcoming';
+      if (t.completed) status = 'Done';
+      else if (rec && rec.state === 'active') status = 'In progress';
+      else if (rec && rec.state === 'paused') status = 'Paused';
+      else if (rec && rec.state === 'rescheduled') status = 'Moved to another day';
+      const slotTime = rec ? (rec.adjustedStart + '\u2013' + rec.adjustedEnd) : (t.startTime + '\u2013' + t.stopTime);
+      return '<div class="study-alarm-row"><span>' + slotTime + '</span>' +
+        '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span></div>';
+    }).join('') || '<p class="planner-empty">No slots scheduled today.</p>';
+
+    Modal.open('<h3>Today\'s Alarms</h3><div class="study-alarm-list">' + rows + '</div>');
+  }
+
+  function startTaskSession(taskId) { TimeEngine.startTaskSession(taskId); }
+  function isSessionActive() { return TimeEngine.isSessionActive(); }
+
+  function renderAlarmPanel() {
+    const container = document.getElementById('study-session-panel');
+    if (!container) return;
+    const active = TimeEngine.getActiveSession();
+
+    if (active) { renderFocusMode(active); return; }
+    exitFocusMode();
+
+    const upcoming = TimeEngine.getUpcomingSession();
+    if (upcoming) {
+      const task = PlannerData.getAllTasks()[upcoming.taskId];
+      container.innerHTML = '<p class="study-active-label">Next up: ' + taskLabelFull(task) + ' at ' + upcoming.adjustedStart + '</p>' +
+        '<button id="study-start-now">Start Now</button>';
+      document.getElementById('study-start-now').addEventListener('click', function () { startTaskSession(upcoming.taskId); });
+    } else {
+      container.innerHTML = '<p class="study-active-label">No active slot session.</p>';
+    }
+  }
+
+  // Focus Mode (§4): large clock + only Links / Completed / Pause / Do it later.
+  function renderFocusMode(active) {
+    const container = document.getElementById('study-session-panel');
+    const task = PlannerData.getAllTasks()[active.taskId];
+    const clockPanel = document.getElementById('study-clock-panel');
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    const breakBtn = document.getElementById('global-break-btn');
+    if (clockPanel) clockPanel.style.display = 'none';
+    if (alarmIcon) alarmIcon.style.display = 'none';
+    if (breakBtn) breakBtn.style.display = 'none';
+
+    container.innerHTML =
+      '<div class="study-focus-mode">' +
+        '<p class="study-active-label">' + taskLabelFull(task) + '</p>' +
+        '<div id="study-focus-clock" class="study-focus-clock"></div>' +
+        (active.state === 'paused' ? '<p class="study-paused-note">Paused</p>' : '') +
+        '<div class="study-focus-actions">' +
+          '<button id="study-focus-complete">Completed</button>' +
+          '<button id="study-focus-pause">' + (active.state === 'paused' ? 'Resume' : 'Pause') + '</button>' +
+          '<button id="study-focus-later">Do it later</button>' +
+        '</div>' +
+      '</div>';
+
+    renderFocusClock();
+    document.getElementById('study-focus-complete').addEventListener('click', function () { TimeEngine.completeActive(); });
+    document.getElementById('study-focus-pause').addEventListener('click', function () {
+      const cur = TimeEngine.getActiveSession();
+      if (cur && cur.state === 'paused') TimeEngine.resumeActive(); else TimeEngine.pauseActive();
+    });
+    document.getElementById('study-focus-later').addEventListener('click', function () { openDoItLaterModal(active.taskId); });
+  }
+
+  function renderFocusClock() {
+    const el = document.getElementById('study-focus-clock');
+    if (el) el.textContent = fmtDuration(TimeEngine.getClockDisplayMs());
+  }
+
+  function exitFocusMode() {
+    const clockPanel = document.getElementById('study-clock-panel');
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    const breakBtn = document.getElementById('global-break-btn');
+    if (clockPanel) clockPanel.style.display = 'block';
+    if (alarmIcon) alarmIcon.style.display = 'inline-block';
+    if (breakBtn) breakBtn.style.display = 'inline-block';
+  }
+
+  function openDoItLaterModal(taskId) {
+    doItLaterOpen = true;
+    Modal.open(
+      '<h3>Do it later</h3>' +
+      '<input type="date" id="study-later-date" value="' + tomorrowStr() + '" min="' + todayStr() + '">' +
+      '<button id="study-later-confirm">Reschedule</button>'
+    );
+    document.getElementById('study-later-confirm').addEventListener('click', function () {
+      const dateVal = document.getElementById('study-later-date').value;
+      if (!dateVal) { alert('Pick a date.'); return; }
+      doItLaterOpen = false;
+      Modal.close();
+      TimeEngine.doItLater(taskId, dateVal);
+    });
+  }
+
+  function renderBreakStatus() {
+    const btn = document.getElementById('global-break-btn');
+    if (!btn) return;
+    if (TimeEngine.isSessionActive()) { btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-block';
+    const gb = TimeEngine.getGlobalBreak();
+    if (gb && gb.active) {
+      const remainingMin = Math.ceil((gb.resumeAt - Date.now()) / 60000);
+      btn.textContent = 'Break (' + Math.max(0, remainingMin) + 'm)';
+      btn.disabled = true;
+    } else {
+      btn.textContent = 'Break';
+      btn.disabled = false;
+    }
+  }
+
+  function openBreakInputModal() {
+    breakInputOpen = true;
+    Modal.open(
+      '<h3>Take a break</h3>' +
+      '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes">' +
+      '<button id="global-break-confirm">Start Break</button>'
+    );
+    document.getElementById('global-break-confirm').addEventListener('click', function () {
+      const minutes = parseInt(document.getElementById('global-break-minutes').value, 10);
+      if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
+      breakInputOpen = false;
+      Modal.close();
+      TimeEngine.startGlobalBreak(minutes);
+      renderBreakStatus();
+    });
+  }
+
+  function promptTokenFor(prompt) {
+    return prompt ? [prompt.sessionId, prompt.kind, prompt.fireAt, prompt.autoBreakActive].join('|') : null;
+  }
+
+  function showPrompt(prompt) {
+    const task = PlannerData.getAllTasks()[prompt.taskId];
+    const heading = prompt.kind === 'start' ? 'Time for: ' : 'Wrap up: ';
+    Modal.open(
+      '<h3>' + heading + (task ? taskLabelFull(task) : '') + '</h3>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="study-prompt-start">Started</button>' +
+        '<button id="study-prompt-break">Need a break</button>' +
+        '<button id="study-prompt-time">Need more time</button>' +
+      '</div>'
+    );
+    document.getElementById('study-prompt-start').addEventListener('click', function () { TimeEngine.resolvePrompt('start'); Modal.close(); });
+    document.getElementById('study-prompt-break').addEventListener('click', function () { TimeEngine.resolvePrompt('break'); Modal.close(); });
+    document.getElementById('study-prompt-time').addEventListener('click', function () { showTimeInput(); });
+  }
+
+  function showTimeInput() {
+    timeInputOpen = true;
+    Modal.open(
+      '<h3>How many minutes?</h3>' +
+      '<input type="number" id="study-time-minutes" min="1">' +
+      '<button id="study-time-confirm">Confirm</button>'
+    );
+    document.getElementById('study-time-confirm').addEventListener('click', function () {
+      const minutes = parseInt(document.getElementById('study-time-minutes').value, 10);
+      if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
+      timeInputOpen = false;
+      TimeEngine.resolvePrompt('time', minutes);
+      Modal.close();
+    });
+  }
+
+  function showAutoBreakNotice(prompt) {
+    const remainMin = Math.max(0, Math.ceil((prompt.autoBreakResumeAt - Date.now()) / 60000));
+    Modal.open('<h3>On a short break</h3><p>No response, so a 5-minute break started automatically. Back in ' + remainMin + ' min \u2014 you\'ll be asked again.</p>');
+  }
+
+  function handlePrompt() {
+    const prompt = TimeEngine.getPrompt();
+    if (timeInputOpen && document.getElementById('study-time-minutes')) return;
+    if (!prompt) { promptToken = null; return; }
+    const token = promptTokenFor(prompt);
+    if (token === promptToken) return; // this exact prompt state is already on screen
+    promptToken = token;
+    timeInputOpen = false;
+    if (prompt.autoBreakActive) showAutoBreakNotice(prompt); else showPrompt(prompt);
+  }
+
+  function isPastCutoff() {
+    return new Date().getHours() >= 23;
+  }
+
+  function renderCutoffView() {
+    const container = document.getElementById('study-cutoff-view');
+    if (!container) return;
+    const today = todayStr();
+    const stats = TimeEngine.getDayStats(today);
+    const tasks = PlannerData.getTasksForDate(today);
+    const doneCount = tasks.filter(function (t) { return t.completed; }).length;
+    const totalCount = tasks.length;
+    const workDonePct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+    const totalTrackedMs = stats.studyMs + stats.breakMs;
+    const breakPct = totalTrackedMs === 0 ? 0 : Math.round((stats.breakMs / totalTrackedMs) * 100);
+    const studyPct = totalTrackedMs === 0 ? 0 : 100 - breakPct;
+    const pendingTomorrow = PlannerData.getTasksForDate(tomorrowStr()).filter(function (t) { return !t.completed; }).length;
+
+    container.innerHTML =
+      '<p class="study-goodnight-msg">Goodnight, you did well. Proud of you... We will be better tomorrow</p>' +
+      '<div class="study-cutoff-stats">' +
+        '<div class="study-cutoff-stat"><div>Work done: ' + workDonePct + '% (' + doneCount + '/' + totalCount + ')</div>' +
+          '<div>Not done: ' + (100 - workDonePct) + '%</div></div>' +
+        '<div class="study-cutoff-stat"><div>Study: ' + studyPct + '%</div>' +
+          '<div>Breaks: ' + breakPct + '%</div></div>' +
+      '</div>' +
+      '<div class="study-cutoff-reminders">' +
+        '<p>Pending tasks for tomorrow: ' + pendingTomorrow + '</p>' +
+        '<p class="study-reminder-highlight">Add tomorrow\'s goal in Calendar.</p>' +
+        '<p class="study-reminder-highlight">Fill out today\'s journal.</p>' +
+      '</div>';
+  }
+
+  function setCutoffMode(active) {
+    const sessionPanel = document.getElementById('study-session-panel');
+    const cutoffView = document.getElementById('study-cutoff-view');
+    const linksIcon = document.getElementById('study-links-icon');
+    const hideForCutoff = active && !TimeEngine.isSessionActive();
+    const clockPanel = document.getElementById('study-clock-panel');
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    if (clockPanel && !TimeEngine.isSessionActive()) clockPanel.style.display = hideForCutoff ? 'none' : 'block';
     if (sessionPanel) sessionPanel.style.display = hideForCutoff ? 'none' : 'block';
     if (cutoffView) cutoffView.style.display = active ? 'block' : 'none';
-    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
+    if (alarmIcon && !TimeEngine.isSessionActive()) alarmIcon.style.display = active ? 'none' : 'inline-block';
     if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
     if (active) renderCutoffView();
   }
 
-
-function tick() {
-    const today = todayStr();
-    let alarmState = getAlarmState();
-    if (alarmState.date !== today) {
-      alarmState = defaultAlarmState(today);
-      setAlarmState(alarmState);
-    }
-
-    if (alarmState.globalBreak && alarmState.globalBreak.active) {
-      if (Date.now() < alarmState.globalBreak.resumeAt) {
-        renderClock();
-        renderBreakStatus();
-        return;
-      }
-      endGlobalBreak();
-      alarmState = getAlarmState();
-    }
-
+  // Single re-render callback — invoked by TimeEngine's one-and-only heartbeat (every 1s)
+  // and immediately after every user action, so there is exactly one timer driving the UI.
+  function onEngineTick() {
     const pastCutoff = isPastCutoff();
     setCutoffMode(pastCutoff);
-    if (pastCutoff) return;
-
-    renderClock();
-
-    if (alarmState.activeTaskId) return;
-    if (timeInputOpen) {
-      if (document.getElementById('study-time-minutes')) return;
-      timeInputOpen = false;
+    renderBreakStatus();
+    if (!pastCutoff) {
+      const active = TimeEngine.getActiveSession();
+      const upcoming = TimeEngine.getUpcomingSession();
+      const sig = active ? (active.sessionId + ':' + active.state) : ('idle:' + (upcoming ? upcoming.sessionId : 'none'));
+      if (sig !== lastSessionSig) {
+        lastSessionSig = sig;
+        renderAlarmPanel();
+      } else if (active) {
+        renderFocusClock();
+      } else {
+        renderClock();
+      }
     }
-    if (breakInputOpen) {
-      if (document.getElementById('global-break-minutes')) return;
-      breakInputOpen = false;
-    }
-
-    if (alarmState.prompt) {
-      const overlay = document.getElementById('modal-overlay');
-      const overlayOpen = overlay && overlay.style.display === 'flex';
-      const ownedByPrompt = document.getElementById('study-prompt-start') !== null;
-      if (overlayOpen && !ownedByPrompt) return;
-      if (Date.now() >= alarmState.prompt.fireAt) showPrompt(alarmState.prompt.taskId);
-      return;
-    }
-
-    const handled = alarmState.handledTaskIds || [];
-    const slots = PlannerData.getTasksForDate(today)
-      .filter(function (t) { return t.startTime && !t.completed && handled.indexOf(t.taskId) === -1; })
-      .sort(function (a, b) { return a.startTime < b.startTime ? -1 : 1; });
-
-    if (slots.length === 0) return;
-    const next = slots[0];
-    const effectiveStart = timeStrToMs(today, next.startTime) + (alarmState.delayMs || 0);
-    if (Date.now() >= effectiveStart) {
-      setAlarmState({ prompt: { taskId: next.taskId, fireAt: Date.now() } });
-    }
+    if (breakInputOpen && document.getElementById('global-break-minutes')) return;
+    if (doItLaterOpen && document.getElementById('study-later-date')) return;
+    handlePrompt();
   }
 
   function getLinks() { return State.get().studyLinks || {}; }
@@ -575,22 +777,24 @@ function tick() {
 
   function init() {
     renderClockPanel();
-    renderAlarmPanel();
     renderAlarmIcon();
     renderLinksIcon();
-    checkMidFlightRecovery();
+    renderAlarmPanel();
+    lastSessionSig = null;
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
     const breakBtn = document.getElementById('global-break-btn');
     if (breakBtn) breakBtn.addEventListener('click', openBreakInputModal);
-    if (!tickHandle) tickHandle = setInterval(tick, 1000);
+    // TimeEngine owns the single interval for all timing/session state (see timeengine.js §1).
+    TimeEngine.subscribe(onEngineTick);
   }
 
   function render() {
     renderClockPanel();
-    renderAlarmPanel();
     renderAlarmIcon();
     renderLinksIcon();
+    lastSessionSig = null;
+    renderAlarmPanel();
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
   }
