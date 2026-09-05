@@ -3,7 +3,9 @@
 
 const Planner = (function () {
 let activeTab = 'today'; // 'today' | 'pending' | 'history'
-  let historyFilterTopicId = '';
+  let historyView = 'subjects'; // 'subjects' | 'chapters' | 'chapter'
+  let historySubject = null;
+  let historyTopicId = null;
 
   function todayStr() {
     const t = new Date();
@@ -107,31 +109,78 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function renderHistoryTab(container) {
-    const grouped = PlannerData.getTopicsBySubject();
-    let filterHtml = '<select id="planner-history-filter"><option value="">All Topics</option>';
-    PlannerData.SUBJECTS.forEach(function (subject) {
-      const topics = grouped[subject] || [];
-      if (topics.length === 0) return;
-      filterHtml += '<optgroup label="' + subject + '">';
-      topics.forEach(function (t) {
-        const selected = t.topicId === historyFilterTopicId ? ' selected' : '';
-        filterHtml += '<option value="' + t.topicId + '"' + selected + '>' + t.topicName + '</option>';
-      });
-      filterHtml += '</optgroup>';
-    });
-    filterHtml += '</select>';
+    if (historyView === 'chapters') {
+      renderHistoryChapters(container);
+    } else if (historyView === 'chapter') {
+      renderHistoryChapter(container);
+    } else {
+      renderHistorySubjects(container);
+    }
+  }
 
-    let tasks = PlannerData.getHistoryTasks();
-    if (historyFilterTopicId) {
-      tasks = tasks.filter(function (t) { return t.topicId === historyFilterTopicId; });
+  function renderHistorySubjects(container) {
+    const html = PlannerData.SUBJECTS.map(function (subject) {
+      return '<button class="planner-history-subject-btn" data-subject="' + subject + '">' + subject + '</button>';
+    }).join('');
+
+    container.innerHTML = '<div class="planner-history-subject-list">' + html + '</div>';
+
+    container.querySelectorAll('.planner-history-subject-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        historySubject = btn.dataset.subject;
+        historyView = 'chapters';
+        renderTabContent();
+      });
+    });
+  }
+
+  function renderHistoryChapters(container) {
+    const grouped = PlannerData.getTopicsBySubject();
+    const topics = grouped[historySubject] || [];
+
+    let html = '<button class="planner-history-back">&lt; Subjects</button>' +
+      '<h4 class="planner-history-heading">' + historySubject + '</h4>';
+
+    if (topics.length === 0) {
+      html += '<p class="planner-empty">No chapters yet for ' + historySubject + '.</p>';
+    } else {
+      html += '<div class="planner-history-chapter-list">' + topics.map(function (t) {
+        return '<button class="planner-history-chapter-btn" data-topic-id="' + t.topicId + '">' + t.topicName + '</button>';
+      }).join('') + '</div>';
     }
 
+    container.innerHTML = html;
+
+    const backBtn = container.querySelector('.planner-history-back');
+    if (backBtn) backBtn.addEventListener('click', function () {
+      historyView = 'subjects';
+      renderTabContent();
+    });
+
+    container.querySelectorAll('.planner-history-chapter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        historyTopicId = btn.dataset.topicId;
+        historyView = 'chapter';
+        renderTabContent();
+      });
+    });
+  }
+
+  function renderHistoryChapter(container) {
+    const grouped = PlannerData.getTopicsBySubject();
+    const topics = grouped[historySubject] || [];
+    const topic = topics.find(function (t) { return t.topicId === historyTopicId; });
+    const chapterName = topic ? topic.topicName : '';
+
+    const tasks = PlannerData.getHistoryTasks().filter(function (t) { return t.topicId === historyTopicId; });
+
     container.innerHTML =
-      '<div class="planner-history-filter-row">' + filterHtml + '</div>' +
+      '<button class="planner-history-back">&lt; ' + historySubject + '</button>' +
+      '<h4 class="planner-history-heading">' + chapterName + '</h4>' +
       '<div id="planner-history-list"></div>';
 
-    document.getElementById('planner-history-filter').addEventListener('change', function (e) {
-      historyFilterTopicId = e.target.value;
+    container.querySelector('.planner-history-back').addEventListener('click', function () {
+      historyView = 'chapters';
       renderTabContent();
     });
 
@@ -158,7 +207,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function emptyMessage() {
-    if (activeTab === 'history') return 'No completed tasks yet.';
+    if (activeTab === 'history') return 'No completed tasks for this chapter yet.';
     if (activeTab === 'pending') return 'Nothing pending — nice!';
     return 'Nothing scheduled for today.';
   }
