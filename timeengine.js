@@ -281,11 +281,15 @@ const TimeEngine = (function () {
   }
 
   // "Do it later" — works on the active session's task OR any scheduled task for today.
+  // Returns true on success, false if the task's slot would overlap an existing slot on the
+  // target date (nothing is touched in that case — caller should tell the user and let them
+  // pick a different date/time instead of silently creating an overlapping schedule).
   function doItLater(taskId, newDateStr) {
     const today = todayStr();
     const rec = findOpenRecordForTask(taskId, today);
     const task = PlannerData.getAllTasks()[taskId];
-    if (!task) return;
+    if (!task) return false;
+    if (PlannerData.hasSlotConflict(newDateStr, task.startTime, task.stopTime, taskId)) return false;
     const engine = getEngine();
     if (rec && engine.activeSessionId === rec.sessionId) {
       const studyMs = (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Date.now() - rec.activeSince : 0);
@@ -297,6 +301,7 @@ const TimeEngine = (function () {
     }
     PlannerData.rescheduleTask(taskId, newDateStr, task.startTime, task.stopTime);
     notify();
+    return true;
   }
 
   function startGlobalBreak(minutes) {
