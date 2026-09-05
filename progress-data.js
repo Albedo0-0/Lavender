@@ -50,10 +50,12 @@ const ProgressData = (function () {
     return WEATHER_MAP.hasOwnProperty(entry.weather) ? WEATHER_MAP[entry.weather] : null;
   }
 
-  function studyHoursValue(entry) {
-    if (!entry) return null;
-    const v = Number(entry.hoursStudied);
-    return isNaN(v) ? null : v;
+  function studyHoursValue(entry, dateStr) {
+    const jv = entry ? Number(entry.hoursStudied) : NaN;
+    const journalHrs = isNaN(jv) ? 0 : jv;
+    const engineHrs = (dateStr && typeof TimeEngine !== 'undefined') ? (TimeEngine.getDayStats(dateStr).studyMs || 0) / 3600000 : 0;
+    if (isNaN(jv) && engineHrs <= 0) return null;
+    return Math.round(Math.max(journalHrs, engineHrs) * 10) / 10;
   }
 
   function questionsValue(entry) {
@@ -64,16 +66,15 @@ const ProgressData = (function () {
 
   // Productivity Score (0-10): normalized average of Mood, Study Hours, Questions Solved.
   // Weather is never included. Days with no journal activity at all return null (no data).
-  function productivityValue(entry) {
-    if (!entry) return null;
-    const hasAny = entry.mood || (Number(entry.hoursStudied) > 0) || (Number(entry.questionsSolved) > 0);
+  function productivityValue(entry, dateStr) {
+    const sv = studyHoursValue(entry, dateStr);
+    const hasAny = (entry && entry.mood) || (sv !== null && sv > 0) || (entry && Number(entry.questionsSolved) > 0);
     if (!hasAny) return null;
 
     const parts = [];
     const mv = moodValue(entry);
     if (mv !== null) parts.push((mv - 1) / 4 * 10); // 1..5 -> 0..10
 
-    const sv = studyHoursValue(entry);
     if (sv !== null) parts.push(Math.min(10, (sv / STUDY_HOURS_CAP) * 10));
 
     const qv = questionsValue(entry);
@@ -83,7 +84,6 @@ const ProgressData = (function () {
     const avg = parts.reduce(function (a, b) { return a + b; }, 0) / parts.length;
     return Math.max(0, Math.min(10, Math.round(avg * 10) / 10));
   }
-
   const METRICS = {
     mood: moodValue,
     weather: weatherValue,
@@ -111,7 +111,7 @@ const ProgressData = (function () {
       const d = addDays(sunday, i);
       const dateStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
       labels.push(DAY_NAMES[i] + ' ' + (d.getMonth() + 1) + '/' + d.getDate());
-      values.push(metricFn(getEntryFor(dateStr)));
+      values.push(metricFn(getEntryFor(dateStr), dateStr));
     }
     return { labels: labels, values: values };
   }
@@ -131,7 +131,7 @@ const ProgressData = (function () {
       const endDay = Math.min(startDay + 6, daysInMonth);
       const weekValues = [];
       for (let day = startDay; day <= endDay; day++) {
-        weekValues.push(metricFn(getEntryFor(toDateStr(y, m, day))));
+        weekValues.push(metricFn(getEntryFor(toDateStr(y, m, day)), toDateStr(y, m, day)));
       }
       labels.push('Week ' + weekIdx);
       values.push(average(weekValues));
@@ -150,7 +150,7 @@ const ProgressData = (function () {
       const daysInMonth = new Date(y, m + 1, 0).getDate();
       const monthValues = [];
       for (let day = 1; day <= daysInMonth; day++) {
-        monthValues.push(metricFn(getEntryFor(toDateStr(y, m, day))));
+        monthValues.push(metricFn(getEntryFor(toDateStr(y, m, day)), toDateStr(y, m, day)));
       }
       labels.push(MONTH_NAMES[m].slice(0, 3));
       values.push(average(monthValues));
@@ -172,6 +172,15 @@ const ProgressData = (function () {
     return Object.keys(all).map(function (dateStr) {
       return { date: dateStr, entry: all[dateStr] };
     });
+  }
+
+  function getAllTrackedDateList() {
+    const dateSet = {};
+    getAllEntriesList().forEach(function (item) { dateSet[item.date] = true; });
+    if (typeof TimeEngine !== 'undefined') {
+      TimeEngine.getAllTrackedDates().forEach(function (d) { dateSet[d] = true; });
+    }
+    return Object.keys(dateSet).map(function (d) { return { date: d, entry: getEntryFor(d) }; });
   }
 
   function getBestStudyStreak() {
@@ -236,10 +245,10 @@ const ProgressData = (function () {
   }
 
   function getHighestDailyStudyHours() {
-    const list = getAllEntriesList();
+    const list = getAllTrackedDateList();
     let best = null;
     list.forEach(function (item) {
-      const v = studyHoursValue(item.entry);
+      const v = studyHoursValue(item.entry, item.date);
       if (v !== null && (best === null || v > best.value)) best = { value: v, date: item.date };
     });
     return best;
@@ -257,10 +266,10 @@ const ProgressData = (function () {
 
   // Most Productive Day considers only Mood, Study Hours, Questions Solved (never Weather).
   function getMostProductiveDay() {
-    const list = getAllEntriesList();
+    const list = getAllTrackedDateList();
     let best = null;
     list.forEach(function (item) {
-      const v = productivityValue(item.entry);
+      const v = productivityValue(item.entry, item.date);
       if (v !== null && (best === null || v > best.value)) best = { value: v, date: item.date };
     });
     return best;
