@@ -24,6 +24,8 @@ const TimeEngine = (function () {
   const END_CONTINUE_MS = 15 * 60 * 1000;  // "Started" (continue) default grace at an end/stop prompt
   const PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3-minute unanswered timeout
   const AUTO_BREAK_MS = 5 * 60 * 1000;     // automatic break length when a prompt times out
+  const RETENTION_DAYS = 14;               // days of full-detail sessionRecords/timeEngineBreaks kept before rollup
+
 
   const listeners = [];
 
@@ -65,6 +67,58 @@ const TimeEngine = (function () {
     State.set({ timeEngineBreaks: list });
   }
 
+  // ---------- retention: roll old daily detail into summaries, then prune (approved approach) ----------
+
+  function getSummaries() { return State.get().dailySummaries || {}; }
+  function setSummaries(summaries) { State.set({ dailySummaries: summaries }); }
+  function getDailySummary(dateStr) { return getSummaries()[dateStr] || null; }
+
+  function daysAgo(dateStr, refDateStr) {
+    const a = new Date(dateStr + 'T00:00:00').getTime();
+    const b = new Date(refDateStr + 'T00:00:00').getTime();
+    return Math.round((b - a) / 86400000);
+  }
+
+  function summarizeDate(dateStr) {
+    const recs = getRecordsForDate(dateStr);
+    let studyMs = 0, breakMs = 0;
+    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); });
+    (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === dateStr; }).forEach(function (b) { breakMs += b.durationMs; });
+    return {
+      date: dateStr,
+      studyMs: studyMs,
+      breakMs: breakMs,
+      tasksTotal: recs.length,
+      tasksCompleted: recs.filter(function (r) { return r.state === 'completed'; }).length
+    };
+  }
+
+  // Rolls any sessionRecords/timeEngineBreaks older than RETENTION_DAYS into dailySummaries,
+  // then drops the raw entries for those dates. Runs once per day (from ensureDate's rollover),
+  // scans all dates each time so it also catches any backlog.
+  function pruneOldRecords(today) {
+    const records = getRecords();
+    const breaks = State.get().timeEngineBreaks || [];
+    const staleDates = {};
+    Object.keys(records).forEach(function (id) {
+      if (daysAgo(records[id].date, today) > RETENTION_DAYS) staleDates[records[id].date] = true;
+    });
+    breaks.forEach(function (b) { if (daysAgo(b.date, today) > RETENTION_DAYS) staleDates[b.date] = true; });
+    const staleList = Object.keys(staleDates);
+    if (!staleList.length) return;
+
+    const summaries = Object.assign({}, getSummaries());
+    staleList.forEach(function (d) { summaries[d] = summarizeDate(d); });
+
+    const keptRecords = {};
+    Object.keys(records).forEach(function (id) { if (!staleDates[records[id].date]) keptRecords[id] = records[id]; });
+    const keptBreaks = breaks.filter(function (b) { return !staleDates[b.date]; });
+
+    setSummaries(summaries);
+    setRecords(keptRecords);
+    State.set({ timeEngineBreaks: keptBreaks });
+  }
+
   // ---------- rollover ----------
 
   function ensureDate() {
@@ -77,6 +131,7 @@ const TimeEngine = (function () {
       const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Date.now() - active.activeSince : 0);
       updateRecord(active.sessionId, { state: 'stale', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
     }
+    pruneOldRecords(today);
     setEngine(defaultEngine(today));
   }
 
@@ -425,8 +480,13 @@ const TimeEngine = (function () {
 
   function getDayStats(dateStr) {
     const d = dateStr || todayStr();
+    const recs = getRecordsForDate(d);
+    if (!recs.length) {
+      const summary = getDailySummary(d);
+      if (summary) return { studyMs: summary.studyMs, breakMs: summary.breakMs };
+    }
     let studyMs = 0, breakMs = 0;
-    getRecordsForDate(d).forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); });
+    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); });
     (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === d; }).forEach(function (b) { breakMs += b.durationMs; });
     return { studyMs: studyMs, breakMs: breakMs };
   }
@@ -462,6 +522,8 @@ const TimeEngine = (function () {
     getDayStats: getDayStats,
     getRecord: getRecord,
     getRecordForTask: findOpenRecordForTask,
-    getRecordsForDate: getRecordsForDate
+    getRecordsForDate: getRecordsForDate,
+    getDailySummary: getDailySummary,
+    getAllDailySummaries: getSummaries
   };
 })();
