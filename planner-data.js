@@ -279,7 +279,7 @@ function slotLabel(t) {
   }
   
   return {
-    return {
+
     SUBJECTS: SUBJECTS,
     getAllTopics: getAllTopics,
     getOrCreateTopic: getOrCreateTopic,
