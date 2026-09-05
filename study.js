@@ -242,9 +242,10 @@ const Study = (function () {
     document.getElementById('study-later-confirm').addEventListener('click', function () {
       const dateVal = document.getElementById('study-later-date').value;
       if (!dateVal) { alert('Pick a date.'); return; }
+      const ok = TimeEngine.doItLater(taskId, dateVal);
+      if (!ok) { alert('That slot overlaps another task on ' + dateVal + '. Pick a different date.'); return; }
       doItLaterOpen = false;
       Modal.close();
-      TimeEngine.doItLater(taskId, dateVal);
     });
   }
 
