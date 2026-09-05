@@ -15,8 +15,9 @@ const State = (function () {
     journalLocked: false, // Journal: global lock state
     studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0 }, // Study §3.1
     sessionLog: [], // Study §0/§3.2: [{ taskId, date, startTime, stopTime, outcome }]
-    alarmState: { date: null, delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [] }, // Study §3.2
+    alarmState: { date: null, delayMs: 0, activeTaskId: null, sessionStartedAt: null, prompt: null, handledTaskIds: [], globalBreak: { active: false, resumeAt: null, wasClockRunning: false } }, // Study §3.2
     studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
+    favoriteTopics: [], // History nav: topicIds marked as favorite
     // Later: exp, level, etc.
   };
 
