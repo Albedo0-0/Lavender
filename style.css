@@ -264,6 +264,43 @@ body {
   margin-bottom: 10px;
 }
 
+.planner-history-subject-list,
+.planner-history-chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planner-history-subject-btn,
+.planner-history-chapter-btn {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.planner-history-subject-btn:hover,
+.planner-history-chapter-btn:hover {
+  border-color: #6b8a4a;
+}
+
+.planner-history-back {
+  background: none;
+  border: none;
+  color: #6b8a4a;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 0 8px 0;
+  display: block;
+}
+
+.planner-history-heading {
+  margin: 0 0 10px 0;
+}
+
 .planner-task-row {
   border: 1px solid #eee;
   padding: 8px;
