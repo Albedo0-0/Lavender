@@ -287,9 +287,9 @@ const TimeEngine = (function () {
         setEngine({ prompt: null });
       }
     } else if (prompt.kind === 'end') {
-      if (choice === 'start') { // "Started" == keep going a bit longer
-        extendActiveAndShift(END_CONTINUE_MS);
-        setEngine({ prompt: null });
+      if (choice === 'complete') { // "Completed" — wrap-up is done: stop the clock and record actual time
+        completeActive();
+        return; // completeActive() already clears prompt/activeSessionId and notifies
       } else if (choice === 'break') {
         extendActiveAndShift(END_BREAK_MS);
         const active = getActiveSession();
@@ -479,6 +479,52 @@ const TimeEngine = (function () {
     return active ? liveStudyMs(active) : 0;
   }
 
+  // Every date the engine has study data for, whether still-detailed (sessionRecords) or
+  // already rolled into a dailySummary. Lets Progress merge with Journal per-day without
+  // Progress needing to know anything about the retention/rollup split.
+  function getAllTrackedDates() {
+    const dates = {};
+    const records = getRecords();
+    Object.keys(records).forEach(function (id) { dates[records[id].date] = true; });
+    const summaries = getSummaries();
+    Object.keys(summaries).forEach(function (d) { dates[d] = true; });
+    return Object.keys(dates);
+  }
+
+  // ---------- unified standalone recording (Stopwatch / Timer, §4/§11) ----------
+  // Records a finished block of untracked study time (from the standalone clock) as its own
+  // completed, taskless session record — the SAME sessionRecords store scheduled Study sessions
+  // use, so Progress/getDayStats/streaks all see one unified actual-study-time ledger instead of
+  // a second, parallel source of truth. Callers (study.js) are responsible for calling this
+  // exactly once per stopwatch/timer run (see the clock's own 'recorded' guard).
+  function recordStandaloneStudy(ms, source) {
+    if (!ms || ms <= 0) return null;
+    ensureDate();
+    const now = Date.now();
+    const rec = {
+      sessionId: genId('sess'),
+      taskId: null,
+      date: todayStr(),
+      plannedStart: null,
+      plannedEnd: null,
+      adjustedStart: null,
+      adjustedEnd: null,
+      actualStart: now - ms,
+      actualEnd: now,
+      state: 'completed',
+      studyMs: ms,
+      breakMs: 0,
+      activeSince: null,
+      pausedSince: null,
+      endPromptFired: false,
+      source: source || 'standalone',
+      createdAt: now
+    };
+    upsertRecord(rec);
+    notify();
+    return rec.sessionId;
+  }
+
   function getDayStats(dateStr) {
     const d = dateStr || todayStr();
     const recs = getRecordsForDate(d);
@@ -525,6 +571,8 @@ const TimeEngine = (function () {
     getRecordForTask: findOpenRecordForTask,
     getRecordsForDate: getRecordsForDate,
     getDailySummary: getDailySummary,
-    getAllDailySummaries: getSummaries
+    getAllDailySummaries: getSummaries,
+    getAllTrackedDates: getAllTrackedDates,
+    recordStandaloneStudy: recordStandaloneStudy
   };
 })();
