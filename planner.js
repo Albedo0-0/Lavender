@@ -333,6 +333,12 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
         });
       }
     });
+
+    container.querySelectorAll('.planner-start-study-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (typeof Study !== 'undefined' && Study.startTaskSession) Study.startTaskSession(btn.dataset.taskId);
+      });
+    });
   }
 
   function emptyMessage() {
@@ -356,6 +362,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
+      ((t.startTime && !t.completed) ? '<button class="planner-start-study-btn" data-task-id="' + t.taskId + '">Start in Study</button>' : '') +
     '</div>';
   }
 
