@@ -21,6 +21,9 @@ const Modal = (function () {
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) close();
     });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.style.display !== 'none') close();
+    });
   }
 
   return { open: open, close: close, init: init };
