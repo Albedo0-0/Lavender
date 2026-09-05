@@ -185,10 +185,23 @@ const TimeEngine = (function () {
   function beginActiveSession(sessionId) {
     const rec = getRecord(sessionId);
     if (!rec) return;
-    updateRecord(sessionId, { state: 'active', actualStart: Date.now(), activeSince: Date.now(), studyMs: 0, breakMs: 0 });
+    const now = Date.now();
+    // Anchor this session's own end to the ACTUAL start time + its originally planned duration,
+    // not to the original wall-clock stop time. Whatever caused the late start (an explicit break,
+    // a slow tap on "Started", anything) the person still gets the full duration they planned for —
+    // e.g. a 10:00-11:00 task started at 10:10 now ends at 11:10, not 11:00.
+    const durationMs = timeStrToMs(rec.date, rec.plannedEnd) - timeStrToMs(rec.date, rec.plannedStart);
+    updateRecord(sessionId, {
+      state: 'active',
+      actualStart: now,
+      activeSince: now,
+      studyMs: 0,
+      breakMs: 0,
+      adjustedStart: hhmmFromMs(now),
+      adjustedEnd: hhmmFromMs(now + Math.max(0, durationMs))
+    });
     setEngine({ activeSessionId: sessionId, prompt: null });
   }
-
   // "Started" chosen at a START prompt (or Study's "Start Now" shortcut, or Planner's "Start in Study").
   function startTaskSession(taskId) {
     if (isSessionActive()) return;
