@@ -226,6 +226,67 @@ body {
   width: 100%;
 }
 
+.planner-slot-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.planner-slot-row > div {
+  flex: 1;
+}
+
+.planner-addmode-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.planner-addmode-btn {
+  flex: 1;
+  padding: 6px 4px;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 12px;
+}
+
+.planner-addmode-btn.active {
+  font-weight: bold;
+  border-color: #6b8a4a;
+}
+
+.planner-suggested-group {
+  margin-bottom: 12px;
+}
+
+.planner-suggested-group-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.planner-suggested-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planner-suggested-btn {
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.planner-suggested-btn:hover {
+  border-color: #6b8a4a;
+}
+
 .planner-tasktype-row {
   display: flex;
   flex-direction: column;
@@ -361,6 +422,11 @@ body {
   color: #c0392b;
   font-size: 12px;
   margin-bottom: 4px;
+}
+
+.datehub-todo-item-done {
+  color: #888;
+  text-decoration: line-through;
 }
 
 .datehub-todo-empty {
