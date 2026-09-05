@@ -20,6 +20,50 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     if (!container) return;
 
     container.innerHTML =
+      '<label class="planner-field-label">Date</label>' +
+      '<input type="date" id="planner-date">' +
+      '<div class="planner-slot-row">' +
+        '<div><label class="planner-field-label">Start</label><input type="time" id="planner-start-time"></div>' +
+        '<div><label class="planner-field-label">Stop</label><input type="time" id="planner-stop-time"></div>' +
+      '</div>' +
+      '<div class="planner-addmode-tabs">' +
+        '<button class="planner-addmode-btn" data-mode="subject">Subject/Chapter</button>' +
+        '<button class="planner-addmode-btn" data-mode="custom">Custom</button>' +
+        '<button class="planner-addmode-btn" data-mode="suggested">Suggested</button>' +
+      '</div>' +
+      '<div id="planner-addmode-body"></div>';
+
+    const dateInput = document.getElementById('planner-date');
+    if (dateInput) {
+      dateInput.value = todayStr();
+      dateInput.addEventListener('change', renderAddModeBody);
+    }
+
+    renderAddModeTabs();
+    renderAddModeBody();
+  }
+
+  function renderAddModeTabs() {
+    document.querySelectorAll('.planner-addmode-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.mode === addMode);
+      btn.addEventListener('click', function () {
+        addMode = btn.dataset.mode;
+        renderAddModeTabs();
+        renderAddModeBody();
+      });
+    });
+  }
+
+  function renderAddModeBody() {
+    const body = document.getElementById('planner-addmode-body');
+    if (!body) return;
+    if (addMode === 'custom') renderCustomModeBody(body);
+    else if (addMode === 'suggested') renderSuggestedModeBody(body);
+    else renderSubjectModeBody(body);
+  }
+
+  function renderSubjectModeBody(body) {
+    body.innerHTML =
       '<label class="planner-field-label">Subject</label>' +
       '<select id="planner-subject">' +
         '<option value="Biology">Biology</option>' +
@@ -29,8 +73,6 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<label class="planner-field-label">Topic</label>' +
       '<input type="text" id="planner-topic" list="planner-topic-options" placeholder="e.g. Cell, Genetics">' +
       '<datalist id="planner-topic-options"></datalist>' +
-      '<label class="planner-field-label">Date</label>' +
-      '<input type="date" id="planner-date">' +
       '<label class="planner-field-label">Task Type</label>' +
       '<div class="planner-tasktype-row">' +
         '<label><input type="radio" name="planner-tasktype" value="revision" checked> Repeated Revision (6-cycle)</label>' +
@@ -41,13 +83,49 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<textarea id="planner-note" rows="3"></textarea>' +
       '<button id="planner-save-task">Add Task</button>';
 
-    const dateInput = document.getElementById('planner-date');
-    if (dateInput) dateInput.value = todayStr();
-
     updateTopicOptions();
-
     document.getElementById('planner-subject').addEventListener('change', updateTopicOptions);
-    document.getElementById('planner-save-task').addEventListener('click', handleSave);
+    document.getElementById('planner-save-task').addEventListener('click', handleSaveSubjectTask);
+  }
+
+  function renderCustomModeBody(body) {
+    body.innerHTML =
+      '<label class="planner-field-label">Title</label>' +
+      '<input type="text" id="planner-custom-title" placeholder="e.g. Call dentist">' +
+      '<label class="planner-field-label">Note (optional)</label>' +
+      '<textarea id="planner-custom-note" rows="3"></textarea>' +
+      '<button id="planner-save-custom">Add Task</button>';
+
+    document.getElementById('planner-save-custom').addEventListener('click', handleSaveCustomTask);
+  }
+
+  function renderSuggestedModeBody(body) {
+    const dateStr = document.getElementById('planner-date').value || todayStr();
+    const suggestions = PlannerData.getSuggestedTasksForDate(dateStr);
+
+    if (suggestions.pending.length === 0 && suggestions.dueRevisions.length === 0) {
+      body.innerHTML = '<p class="planner-empty">No pending or due-revision tasks to suggest.</p>';
+      return;
+    }
+
+    function suggestionGroup(title, list) {
+      if (list.length === 0) return '';
+      return '<div class="planner-suggested-group">' +
+        '<div class="planner-suggested-group-title">' + title + '</div>' +
+        '<div class="planner-suggested-list">' + list.map(function (t) {
+          const label = t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t);
+          return '<button class="planner-suggested-btn" data-task-id="' + t.taskId + '">' + label + '</button>';
+        }).join('') + '</div>' +
+      '</div>';
+    }
+
+    body.innerHTML =
+      suggestionGroup('Pending', suggestions.pending) +
+      suggestionGroup('Due Revisions', suggestions.dueRevisions);
+
+    body.querySelectorAll('.planner-suggested-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { handleUseSuggestion(btn.dataset.taskId); });
+    });
   }
 
   function updateTopicOptions() {
@@ -61,10 +139,12 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     }).join('');
   }
 
-  function handleSave() {
+  function handleSaveSubjectTask() {
     const subject = document.getElementById('planner-subject').value;
     const topicName = document.getElementById('planner-topic').value.trim();
     const dateStr = document.getElementById('planner-date').value;
+    const startTime = document.getElementById('planner-start-time').value;
+    const stopTime = document.getElementById('planner-stop-time').value;
     const taskTypeInput = document.querySelector('input[name="planner-tasktype"]:checked');
     const taskType = taskTypeInput ? taskTypeInput.value : 'theory';
     const note = document.getElementById('planner-note').value;
@@ -75,14 +155,46 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     }
 
     if (taskType === 'revision') {
-      PlannerData.createRevisionCycle(subject, topicName, dateStr, note);
+      PlannerData.createRevisionCycle(subject, topicName, dateStr, note, startTime, stopTime);
     } else {
-      PlannerData.createSingleTask(subject, topicName, taskType, dateStr, note);
+      PlannerData.createSingleTask(subject, topicName, taskType, dateStr, note, startTime, stopTime);
     }
 
     document.getElementById('planner-topic').value = '';
     document.getElementById('planner-note').value = '';
     updateTopicOptions();
+    renderSidePanel();
+  }
+
+  function handleSaveCustomTask() {
+    const title = document.getElementById('planner-custom-title').value.trim();
+    const dateStr = document.getElementById('planner-date').value;
+    const startTime = document.getElementById('planner-start-time').value;
+    const stopTime = document.getElementById('planner-stop-time').value;
+    const note = document.getElementById('planner-custom-note').value;
+
+    if (!title || !dateStr) {
+      alert('Please enter a title and a date.');
+      return;
+    }
+
+    PlannerData.createCustomTask(title, dateStr, note, startTime, stopTime);
+
+    document.getElementById('planner-custom-title').value = '';
+    document.getElementById('planner-custom-note').value = '';
+    renderSidePanel();
+  }
+
+  function handleUseSuggestion(taskId) {
+    const dateStr = document.getElementById('planner-date').value;
+    const startTime = document.getElementById('planner-start-time').value;
+    const stopTime = document.getElementById('planner-stop-time').value;
+    if (!dateStr) {
+      alert('Please pick a date first.');
+      return;
+    }
+    PlannerData.rescheduleTask(taskId, dateStr, startTime, stopTime);
+    renderAddModeBody();
     renderSidePanel();
   }
 
@@ -213,11 +325,12 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function renderTaskRow(t) {
-    const meta = t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t);
+    const meta = t.taskType === 'custom' ? t.title : (t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t));
     const checkedAttr = t.completed ? ' checked' : '';
-    const dateLine = t.completed
+    const slot = PlannerData.slotLabel(t);
+    const dateLine = (t.completed
       ? 'Scheduled: ' + t.date + ' \u2014 Completed: ' + t.completedDate
-      : 'Scheduled: ' + t.date;
+      : 'Scheduled: ' + t.date) + (slot ? ' \u00B7 ' + slot : '');
 
     return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
       '<label class="planner-task-check-label">' +
