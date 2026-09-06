@@ -458,8 +458,36 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
         if (typeof Study !== 'undefined' && Study.startTaskSession) Study.startTaskSession(btn.dataset.taskId);
       });
     });
+
+    container.querySelectorAll('.planner-reschedule-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { openRescheduleModal(btn.dataset.taskId); });
+    });
   }
 
+  function openRescheduleModal(taskId) {
+    const task = PlannerData.getAllTasks()[taskId];
+    if (!task) return;
+    Modal.open(
+      '<h3>Reschedule</h3>' +
+      '<label class="planner-field-label">Date</label>' +
+      '<input type="date" id="planner-resched-date" value="' + task.date + '">' +
+      '<div class="planner-slot-row">' +
+        '<div><label class="planner-field-label">Start</label><input type="time" id="planner-resched-start" value="' + (task.startTime || '') + '"></div>' +
+        '<div><label class="planner-field-label">Stop</label><input type="time" id="planner-resched-stop" value="' + (task.stopTime || '') + '"></div>' +
+      '</div>' +
+      '<button id="planner-resched-confirm">Reschedule</button>'
+    );
+    document.getElementById('planner-resched-confirm').addEventListener('click', function () {
+      const dateVal = document.getElementById('planner-resched-date').value;
+      const startVal = document.getElementById('planner-resched-start').value;
+      const stopVal = document.getElementById('planner-resched-stop').value;
+      if (!dateVal) { alert('Pick a date.'); return; }
+      const ok = TimeEngine.doItLater(taskId, dateVal, startVal, stopVal);
+      if (!ok) { alert('That slot is invalid or overlaps another task on ' + dateVal + '.'); return; }
+      Modal.close();
+      renderSidePanel();
+    });
+  }
   function emptyMessage() {
     if (activeTab === 'history') return 'No completed tasks for this chapter yet.';
     if (activeTab === 'pending') return 'Nothing pending — nice!';
@@ -478,6 +506,9 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const studyBtn = (t.startTime && !t.completed)
       ? '<button class="planner-start-study-btn"' + (sessionActive ? ' disabled' : '') + ' data-task-id="' + t.taskId + '">Start in Study</button>'
       : '';
+    const reschedBtn = !t.completed
+      ? '<button class="planner-reschedule-btn" data-task-id="' + t.taskId + '">Reschedule</button>'
+      : '';
 
     return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
       '<label class="planner-task-check-label">' +
@@ -486,7 +517,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      studyBtn +
+      studyBtn + reschedBtn +
     '</div>';
   }
 
