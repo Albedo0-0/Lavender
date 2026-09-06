@@ -150,8 +150,8 @@ const Study = (function () {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
         if (getClock().running) return;
-        recordClockIfNeeded(); // flush any paused, unrecorded time before switching modes — don't lose it
-        setClock({ mode: btn.dataset.mode, elapsedMs: 0, timerTotalMs: 0, recorded: false });
+        flushClockSegment(getClock()); // flush any paused, unrecorded time before switching modes — don't lose it
+        setClock({ mode: btn.dataset.mode, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
         renderClockPanel();
       });
     });
