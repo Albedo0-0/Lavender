@@ -51,9 +51,8 @@ const Study = (function () {
   function getClock() { return State.get().studyClock; }
   function setClock(partial) { State.set({ studyClock: Object.assign({}, getClock(), partial) }); }
 
-  // New design: every Start begins a brand-new segment at 0 — nothing ever carries over.
-  // Pause, Reset, and a timer running out each commit whatever that segment has built up,
-  // straight into TimeEngine, immediately.
+  // Every Start begins a brand-new segment at 0 — nothing carries over between runs.
+  // Pause and Reset each commit whatever the current segment has built up, immediately.
   function commitSegment() {
     const c = getClock();
     if (!c.running || !c.startedAt) return;
@@ -63,31 +62,59 @@ const Study = (function () {
   }
 
   function startClock(mode, timerTotalMs) {
-    setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0 });
-    renderClock();
+    setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, awaitingDecision: false });
+    renderClockPanel();
   }
-
-  function startStopwatch() {
-    startClock('stopwatch', 0);
-  }
-
-  function startTimer(minutes) {
-    startClock('timer', minutes * 60 * 1000);
-  }
+  function startStopwatch() { startClock('stopwatch', 0); }
+  function startTimer(minutes) { startClock('timer', minutes * 60 * 1000); }
 
   function pauseClock() {
     const c = getClock();
     if (!c.running) return;
     commitSegment();
     setClock({ running: false, startedAt: null });
-    renderClock();
+    renderClockPanel();
   }
 
   function resetClock() {
     const c = getClock();
     if (c.running) commitSegment();
-    setClock({ running: false, startedAt: null, timerTotalMs: 0 });
-    renderClock();
+    setClock({ running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false });
+    renderClockPanel();
+  }
+
+  // "Add 10 min" — extends the SAME run (startedAt never moves), so elapsed keeps climbing
+  // toward the new, bigger target. Nothing is recorded here; only Save records.
+  function addTenMinutes() {
+    const c = getClock();
+    setClock({ timerTotalMs: c.timerTotalMs + 10 * 60 * 1000, running: true, awaitingDecision: false });
+    renderClockPanel();
+  }
+
+  // Save — records the FULL elapsed time (original duration + every added 10 min) as one
+  // entry, logs it, and resets the whole clock back to its original blank state.
+  function saveTimerAndReset() {
+    const c = getClock();
+    const elapsed = c.startedAt ? Math.max(0, Date.now() - c.startedAt) : 0;
+    const capped = Math.min(elapsed, c.timerTotalMs);
+    if (capped > 0) TimeEngine.recordStandaloneStudy(capped, 'timer');
+    setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false });
+    renderClockPanel();
+  }
+
+  // While a Stopwatch/Timer run (or the end-of-timer decision) is active, it takes over the
+  // whole Study tab like a session: big clock, everything else hidden.
+  function applyClockFocusUI(active) {
+    const sessionPanel = document.getElementById('study-session-panel');
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    const linksIcon = document.getElementById('study-links-icon');
+    const breakBtn = document.getElementById('global-break-btn');
+    const clockPanel = document.getElementById('study-clock-panel');
+    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
+    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
+    if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
+    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
+    if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
   }
 
   function currentClockMs() {
@@ -97,26 +124,30 @@ const Study = (function () {
     return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;
   }
 
+  let lastClockUiMode = null; // 'normal' | 'decision' — tracks which markup renderClockPanel last drew
+
   function renderClock() {
     const c = getClock();
-    // The moment a running timer reaches zero it records itself automatically — no Pause,
-    // Resume, or Reset click needed from the person.
-    if (c.mode === 'timer' && c.running && Math.max(0, Date.now() - c.startedAt) >= c.timerTotalMs) {
-      TimeEngine.recordStandaloneStudy(c.timerTotalMs, 'timer');
-      setClock({ running: false, startedAt: null, timerTotalMs: 0 });
+    // The moment a running timer reaches zero, freeze it and ask — no auto-recording.
+    if (c.mode === 'timer' && c.running && !c.awaitingDecision && Math.max(0, Date.now() - c.startedAt) >= c.timerTotalMs) {
+      setClock({ running: false, awaitingDecision: true });
+    }
+    const fresh = getClock();
+    const uiMode = fresh.awaitingDecision ? 'decision' : 'normal';
+    if (uiMode !== lastClockUiMode) {
+      lastClockUiMode = uiMode;
+      renderClockPanel();
+      return;
     }
     const display = document.getElementById('study-clock-display');
     if (display) display.textContent = fmtDuration(currentClockMs());
     const startBtn = document.getElementById('study-clock-start');
     const pauseBtn = document.getElementById('study-clock-pause');
     const modesEl = document.getElementById('study-clock-modes');
-    const fresh = getClock();
-    if (startBtn) {
-      startBtn.style.display = fresh.running ? 'none' : 'inline-block';
-      startBtn.textContent = 'Start';
-    }
+    if (startBtn) { startBtn.style.display = fresh.running ? 'none' : 'inline-block'; startBtn.textContent = 'Start'; }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
     if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
+    applyClockFocusUI(fresh.running || fresh.awaitingDecision);
     renderStudyLog();
   }
 
@@ -145,12 +176,26 @@ const Study = (function () {
     if (!container) return;
     const c = getClock();
 
+    if (c.awaitingDecision) {
+      container.innerHTML =
+        '<div id="study-clock-display" class="study-clock-display">' + fmtDuration(0) + '</div>' +
+        '<div class="study-clock-controls">' +
+          '<button id="study-clock-add10">Add 10 min</button>' +
+          '<button id="study-clock-save">Save</button>' +
+        '</div>';
+      document.getElementById('study-clock-add10').addEventListener('click', addTenMinutes);
+      document.getElementById('study-clock-save').addEventListener('click', saveTimerAndReset);
+      applyClockFocusUI(true);
+      renderStudyLog();
+      return;
+    }
+
     container.innerHTML =
       '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (c.running ? 'none' : 'flex') + '">' +
         '<button class="study-mode-btn" data-mode="stopwatch">Stopwatch</button>' +
         '<button class="study-mode-btn" data-mode="timer">Timer</button>' +
       '</div>' +
-      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' ? 'block' : 'none') + '">' +
+      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' && !c.running ? 'block' : 'none') + '">' +
         '<input type="number" id="study-timer-minutes" min="1" placeholder="Minutes">' +
       '</div>' +
       '<div id="study-clock-display" class="study-clock-display"></div>' +
@@ -182,8 +227,13 @@ const Study = (function () {
     document.getElementById('study-clock-pause').addEventListener('click', pauseClock);
     document.getElementById('study-clock-reset').addEventListener('click', resetClock);
 
+    applyClockFocusUI(c.running);
+    lastClockUiMode = 'normal';
     renderClock();
   }
+
+  
+
 
   // ---------- 3.2 Timetable execution — delegates entirely to TimeEngine (single source of truth) ----------
   let promptToken = null;   // dedupe: which exact prompt-state is currently shown as a modal
