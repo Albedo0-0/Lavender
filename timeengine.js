@@ -336,11 +336,13 @@ const TimeEngine = (function () {
     if (!active) return;
     const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Math.max(0, Date.now() - active.activeSince) : 0);
     updateRecord(active.sessionId, { state: 'completed', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
-    if (!PlannerData.getAllTasks()[active.taskId].completed) PlannerData.toggleComplete(active.taskId);
+    const task = PlannerData.getAllTasks()[active.taskId];
+    if (task && !task.completed) PlannerData.toggleComplete(active.taskId);
+    const label = 'Study session (' + (task ? (task.taskType === 'custom' ? task.title : task.topicName) : 'Task') + ')';
+    pushLog(active.date, label, studyMs, 'hr');
     setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
     notify();
   }
-
   // "Do it later" — works on the active session's task OR any scheduled task for today.
   // Returns true on success, false if the task's slot would overlap an existing slot on the
   // target date (nothing is touched in that case — caller should tell the user and let them
@@ -535,8 +537,22 @@ const TimeEngine = (function () {
       createdAt: now
     };
     upsertRecord(rec);
+    pushLog(rec.date, source === 'timer' ? 'Timer' : 'Stopwatch', ms, 'min');
     notify();
     return rec.sessionId;
+  }
+
+  // ---------- chronological "what was studied where" log (Study tab, temporary bottom-left panel) ----------
+  function pushLog(dateStr, label, ms, kind) {
+    if (!ms || ms <= 0) return;
+    const logs = State.get().studyLog || {};
+    const day = logs[dateStr] || [];
+    const updated = day.concat([{ label: label, ms: ms, kind: kind || 'min', at: Date.now() }]);
+    State.set({ studyLog: Object.assign({}, logs, { [dateStr]: updated }) });
+  }
+  function getLogForDate(dateStr) {
+    const logs = State.get().studyLog || {};
+    return logs[dateStr || todayStr()] || [];
   }
 
   function getDayStats(dateStr) {
@@ -588,6 +604,8 @@ const TimeEngine = (function () {
     getAllDailySummaries: getSummaries,
     getAllTrackedDates: getAllTrackedDates,
     recordStandaloneStudy: recordStandaloneStudy,
-    isPastCutoff: isPastCutoff
+    isPastCutoff: isPastCutoff,
+    pushLog: pushLog,
+    getLogForDate: getLogForDate
   };
 })();
