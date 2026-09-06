@@ -510,9 +510,10 @@ const Study = (function () {
 
   function openBreakInputModal() {
     breakInputOpen = true;
+    const defaultMin = (State.get().settings || {}).defaultBreakDuration;
     Modal.open(
       '<h3>Take a break</h3>' +
-      '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes">' +
+      '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes"' + (defaultMin ? ' value="' + defaultMin + '"' : '') + '>' +
       '<button id="global-break-confirm">Start Break</button>' +
       '<hr>' +
       '<h4>Already took a break?</h4>' +
@@ -546,8 +547,9 @@ const Study = (function () {
     const heading = prompt.kind === 'start' ? 'Time for: ' : 'Wrap up: ';
     // Wrap-up (kind 'end') primary action is "Completed" — it ends the session for real.
     // The start prompt's primary action is still "Started".
-    const primaryLabel = prompt.kind === 'end' ? 'Completed' : 'Started';
+      const primaryLabel = prompt.kind === 'end' ? 'Completed' : 'Started';
     const primaryChoice = prompt.kind === 'end' ? 'complete' : 'start';
+    Notify.deliver(heading.trim(), task ? taskLabelFull(task) : '');
     Modal.open(
       '<h3>' + heading + (task ? taskLabelFull(task) : '') + '</h3>' +
       '<div class="study-prompt-actions">' +
@@ -598,6 +600,7 @@ const Study = (function () {
 
   function showAutoBreakNotice(prompt) {
     const remainMin = Math.max(0, Math.ceil((prompt.autoBreakResumeAt - Date.now()) / 60000));
+    Notify.deliver('On a short break', 'Back in ' + remainMin + ' min \u2014 you\'ll be asked again.');
     Modal.open('<h3>On a short break</h3><p>No response, so a 5-minute break started automatically. Back in ' + remainMin + ' min \u2014 you\'ll be asked again.</p>');
   }
 
@@ -771,6 +774,7 @@ const Study = (function () {
   }
 
   function init() {
+    Notify.requestPermission();
     renderClockPanel();
     renderAlarmIcon();
     renderLinksIcon();
