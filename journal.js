@@ -182,11 +182,11 @@ const Journal = (function () {
           '</select>' +
         '</div>' +
         '<div class="journal-hours">' +
-          '<label class="journal-label">Hours studied</label>' +
+          '<label class="journal-label">Hours studied <span style="font-size:11px;opacity:0.65;">(Unrecorded time)</span></label>' +
           '<input type="number" id="journal-hours" min="0" step="0.5" value="' + entry.hoursStudied + '">' +
         '</div>' +
         '<div class="journal-questions">' +
-          '<label class="journal-label">Questions solved</label>' +
+          '<label class="journal-label">Questions solved <span style="font-size:11px;opacity:0.65;">(Unrecorded questions)</span></label>' +
           '<input type="number" id="journal-questions" min="0" step="1" value="' + entry.questionsSolved + '">' +
         '</div>' +
       '</div>' +
