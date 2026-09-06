@@ -51,54 +51,70 @@ const Study = (function () {
   function getClock() { return State.get().studyClock; }
   function setClock(partial) { State.set({ studyClock: Object.assign({}, getClock(), partial) }); }
 
-  // Every Start begins a brand-new segment at 0 — nothing carries over between runs.
-  // Pause and Reset each commit whatever the current segment has built up, immediately.
+  // Commits only the CURRENT segment (since the last Start/Resume) — never the whole run.
+  // elapsedMs is always the fully-committed baseline already sent to TimeEngine, so calling
+  // this repeatedly (Pause after Pause after Pause) can never double-record anything.
   function commitSegment() {
     const c = getClock();
-    if (!c.running || !c.startedAt) return;
+    if (!c.running || !c.startedAt) return 0;
     const elapsed = Math.max(0, Date.now() - c.startedAt);
-    const capped = c.mode === 'timer' ? Math.min(elapsed, c.timerTotalMs) : elapsed;
+    const remaining = c.mode === 'timer' ? Math.max(0, c.timerTotalMs - (c.elapsedMs || 0)) : Infinity;
+    const capped = Math.min(elapsed, remaining);
     if (capped > 0) TimeEngine.recordStandaloneStudy(capped, c.mode);
+    return capped;
   }
 
   function startClock(mode, timerTotalMs) {
-    setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, awaitingDecision: false });
+    setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
   function startStopwatch() { startClock('stopwatch', 0); }
   function startTimer(minutes) { startClock('timer', minutes * 60 * 1000); }
 
+  // Normal pause/resume: freezes the display, continues from the same point on Resume.
+  function resumeClock() {
+    const c = getClock();
+    if (c.running) return;
+    setClock({ running: true, startedAt: Date.now() });
+    renderClockPanel();
+  }
+
   function pauseClock() {
     const c = getClock();
     if (!c.running) return;
-    commitSegment();
-    setClock({ running: false, startedAt: null });
+    const segment = commitSegment();
+    setClock({ running: false, startedAt: null, elapsedMs: (c.elapsedMs || 0) + segment });
     renderClockPanel();
   }
 
   function resetClock() {
     const c = getClock();
     if (c.running) commitSegment();
-    setClock({ running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false });
+    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
 
-  // "Add 10 min" — extends the SAME run (startedAt never moves), so elapsed keeps climbing
-  // toward the new, bigger target. Nothing is recorded here; only Save records.
+  // Timer hit its target — freeze it, commit whatever tail segment wasn't committed by an
+  // earlier pause yet, and ask what to do. elapsedMs becomes fully committed the instant this runs.
+  function freezeTimerAtTarget() {
+    const c = getClock();
+    const segment = commitSegment();
+    setClock({ running: false, startedAt: null, awaitingDecision: true, elapsedMs: (c.elapsedMs || 0) + segment });
+    renderClockPanel();
+  }
+
+  // "Add 10 min" — extends the same run; elapsedMs (already fully committed) stays as the
+  // baseline, a fresh segment starts counting from now toward the new, bigger target.
   function addTenMinutes() {
     const c = getClock();
-    setClock({ timerTotalMs: c.timerTotalMs + 10 * 60 * 1000, running: true, awaitingDecision: false });
+    setClock({ timerTotalMs: c.timerTotalMs + 10 * 60 * 1000, running: true, startedAt: Date.now(), awaitingDecision: false });
     renderClockPanel();
   }
 
-  // Save — records the FULL elapsed time (original duration + every added 10 min) as one
-  // entry, logs it, and resets the whole clock back to its original blank state.
+  // Save — everything was already committed the moment the timer hit its target (and by any
+  // pauses before that), so this just resets the tab back to its original blank state.
   function saveTimerAndReset() {
-    const c = getClock();
-    const elapsed = c.startedAt ? Math.max(0, Date.now() - c.startedAt) : 0;
-    const capped = Math.min(elapsed, c.timerTotalMs);
-    if (capped > 0) TimeEngine.recordStandaloneStudy(capped, 'timer');
-    setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false });
+    setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
 
@@ -119,18 +135,18 @@ const Study = (function () {
 
   function currentClockMs() {
     const c = getClock();
-    if (!c.running) return 0;
-    const elapsed = Math.max(0, Date.now() - c.startedAt);
-    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;
+    const liveDelta = c.running ? Math.max(0, Date.now() - c.startedAt) : 0;
+    const totalElapsed = (c.elapsedMs || 0) + liveDelta;
+    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - totalElapsed) : totalElapsed;
   }
 
   let lastClockUiMode = null; // 'normal' | 'decision' — tracks which markup renderClockPanel last drew
 
   function renderClock() {
     const c = getClock();
-    // The moment a running timer reaches zero, freeze it and ask — no auto-recording.
-    if (c.mode === 'timer' && c.running && !c.awaitingDecision && Math.max(0, Date.now() - c.startedAt) >= c.timerTotalMs) {
-      setClock({ running: false, awaitingDecision: true });
+    if (c.mode === 'timer' && c.running && !c.awaitingDecision) {
+      const totalElapsed = (c.elapsedMs || 0) + Math.max(0, Date.now() - c.startedAt);
+      if (totalElapsed >= c.timerTotalMs) { freezeTimerAtTarget(); return; }
     }
     const fresh = getClock();
     const uiMode = fresh.awaitingDecision ? 'decision' : 'normal';
@@ -144,10 +160,13 @@ const Study = (function () {
     const startBtn = document.getElementById('study-clock-start');
     const pauseBtn = document.getElementById('study-clock-pause');
     const modesEl = document.getElementById('study-clock-modes');
-    if (startBtn) { startBtn.style.display = fresh.running ? 'none' : 'inline-block'; startBtn.textContent = 'Start'; }
+    if (startBtn) {
+      startBtn.style.display = fresh.running ? 'none' : 'inline-block';
+      startBtn.textContent = (!fresh.running && (fresh.elapsedMs || 0) > 0) ? 'Resume' : 'Start';
+    }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
     if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
-    applyClockFocusUI(fresh.running || fresh.awaitingDecision);
+    applyClockFocusUI(fresh.running);
     renderStudyLog();
   }
 
@@ -178,13 +197,14 @@ const Study = (function () {
 
     if (c.awaitingDecision) {
       container.innerHTML =
-        '<div id="study-clock-display" class="study-clock-display">' + fmtDuration(0) + '</div>' +
+        '<div id="study-clock-display" class="study-clock-display">' + fmtDuration(currentClockMs()) + '</div>' +
         '<div class="study-clock-controls">' +
           '<button id="study-clock-add10">Add 10 min</button>' +
           '<button id="study-clock-save">Save</button>' +
         '</div>';
       document.getElementById('study-clock-add10').addEventListener('click', addTenMinutes);
       document.getElementById('study-clock-save').addEventListener('click', saveTimerAndReset);
+      lastClockUiMode = 'decision';
       applyClockFocusUI(true);
       renderStudyLog();
       return;
@@ -209,13 +229,14 @@ const Study = (function () {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
         if (getClock().running) return;
-        setClock({ mode: btn.dataset.mode, timerTotalMs: 0 });
+        setClock({ mode: btn.dataset.mode, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
         renderClockPanel();
       });
     });
 
     document.getElementById('study-clock-start').addEventListener('click', function () {
       const cur = getClock();
+      if (!cur.running && (cur.elapsedMs || 0) > 0) { resumeClock(); return; }
       if (cur.mode === 'timer') {
         const minutes = parseInt(document.getElementById('study-timer-minutes').value, 10);
         if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
@@ -227,11 +248,13 @@ const Study = (function () {
     document.getElementById('study-clock-pause').addEventListener('click', pauseClock);
     document.getElementById('study-clock-reset').addEventListener('click', resetClock);
 
-    applyClockFocusUI(c.running);
     lastClockUiMode = 'normal';
+    applyClockFocusUI(c.running);
     renderClock();
   }
 
+  
+  
   
 
 
