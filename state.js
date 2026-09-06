@@ -13,7 +13,7 @@ const State = (function () {
     journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
     journalPasswordHash: null, // Journal: global lock password hash
     journalLocked: false, // Journal: global lock state
-    studyClock: { mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0 }, // Study §3.1 — manual stopwatch/timer; every Start begins a fresh 0 segment; Pause/Reset/natural-timer-end each commit that segment to TimeEngine.recordStandaloneStudy immediately, nothing carries over between runs
+    studyClock: { mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false },
     timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
     sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
     timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
