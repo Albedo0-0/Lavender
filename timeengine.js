@@ -537,7 +537,6 @@ const TimeEngine = (function () {
       createdAt: now
     };
     upsertRecord(rec);
-    pushLog(rec.date, source === 'timer' ? 'Timer' : 'Stopwatch', ms, 'min');
     notify();
     return rec.sessionId;
   }
