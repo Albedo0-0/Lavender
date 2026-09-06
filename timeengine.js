@@ -266,12 +266,18 @@ const TimeEngine = (function () {
   // "Started" chosen at a START prompt (or Study's "Start Now" shortcut, or Planner's "Start in Study").
   function startTaskSession(taskId) {
     if (isSessionActive()) return;
+    if (isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before starting a study session.'); return; }
     syncSessionsForToday();
     let rec = findOpenRecordForTask(taskId, todayStr());
     if (!rec) return; // task has no valid slot today
     beginActiveSession(rec.sessionId);
     if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('study');
     notify();
+  }
+
+  function isManualClockActive() {
+    const c = State.get().studyClock;
+    return !!(c && (c.running || (c.elapsedMs || 0) > 0 || c.awaitingDecision));
   }
 
   // Resolve whichever prompt (start or end) is currently showing.
@@ -282,6 +288,7 @@ const TimeEngine = (function () {
 
     if (prompt.kind === 'start') {
       if (choice === 'start') {
+        if (isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before starting a study session.'); return; }
         beginActiveSession(prompt.sessionId);
       } else if (choice === 'break') {
         applyShift(START_BREAK_MS);
