@@ -55,7 +55,7 @@ const ProgressData = (function () {
     const journalHrs = isNaN(jv) ? 0 : jv;
     const engineHrs = (dateStr && typeof TimeEngine !== 'undefined') ? (TimeEngine.getDayStats(dateStr).studyMs || 0) / 3600000 : 0;
     if (isNaN(jv) && engineHrs <= 0) return null;
-    return Math.round(Math.max(journalHrs, engineHrs) * 10) / 10;
+    return Math.round((journalHrs + engineHrs) * 10) / 10;
   }
 
   function questionsValue(entry) {
@@ -194,20 +194,16 @@ const ProgressData = (function () {
   // for actual elapsed study time). Per day we take whichever is LARGER rather than summing them,
   // so a day that has both a manual Journal entry and engine-recorded time is never double-counted;
   // days with only one source still count normally, preserving existing Journal-only behaviour.
-  function getTotalStudyHours() {
-    const dateSet = {};
-    getAllEntriesList().forEach(function (item) { dateSet[item.date] = true; });
-    if (typeof TimeEngine !== 'undefined') {
-      TimeEngine.getAllTrackedDates().forEach(function (d) { dateSet[d] = true; });
-    }
-    let totalMs = 0;
+  let totalMs = 0;
     Object.keys(dateSet).forEach(function (dateStr) {
-      const journalMs = (studyHoursValue(getEntryFor(dateStr)) || 0) * 3600000;
+      const entry = getEntryFor(dateStr);
+      const jv = entry ? Number(entry.hoursStudied) : NaN;
+      const journalMs = isNaN(jv) ? 0 : jv * 3600000;
       const engineMs = (typeof TimeEngine !== 'undefined') ? (TimeEngine.getDayStats(dateStr).studyMs || 0) : 0;
-      totalMs += Math.max(journalMs, engineMs);
+      totalMs += journalMs + engineMs;
     });
     return totalMs / 3600000;
-  }
+  
   function getTotalQuestionsSolved() {
     const list = getAllEntriesList();
     return list.reduce(function (sum, item) {
