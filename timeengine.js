@@ -290,6 +290,7 @@ const TimeEngine = (function () {
       if (choice === 'start') {
         if (isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before starting a study session.'); return; }
         beginActiveSession(prompt.sessionId);
+        if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('study');
       } else if (choice === 'break') {
         applyShift(START_BREAK_MS);
         pushBreak(todayStr(), 'manual', START_BREAK_MS);
