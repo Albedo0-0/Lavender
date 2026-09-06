@@ -301,14 +301,22 @@ const Study = (function () {
       else if (rec && rec.state === 'paused') status = 'Paused';
       else if (rec && rec.state === 'rescheduled') status = 'Moved to another day';
       const slotTime = rec ? (rec.adjustedStart + '\u2013' + rec.adjustedEnd) : (t.startTime + '\u2013' + t.stopTime);
+      const reschedBtn = !t.completed ? '<button class="study-alarm-resched-btn" data-task-id="' + t.taskId + '">Reschedule</button>' : '';
       return '<div class="study-alarm-row"><span>' + slotTime + '</span>' +
-        '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span></div>';
+        '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span>' + reschedBtn + '</div>';
     }).join('') || '<p class="planner-empty">No slots scheduled today.</p>';
+  }
+
+  function attachAlarmListListeners() {
+    document.querySelectorAll('.study-alarm-resched-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { openDoItLaterModal(btn.dataset.taskId); });
+    });
   }
 
   function openAlarmListModal() {
     alarmModalOpen = true;
     Modal.open('<h3>Today\'s Alarms</h3><div id="study-alarm-list" class="study-alarm-list">' + buildAlarmListHtml() + '</div>');
+    attachAlarmListListeners();
   }
 
   function refreshAlarmListModal() {
@@ -317,6 +325,7 @@ const Study = (function () {
     const list = document.getElementById('study-alarm-list');
     if (!overlay || overlay.style.display === 'none' || !list) { alarmModalOpen = false; return; }
     list.innerHTML = buildAlarmListHtml();
+    attachAlarmListListeners();
   }
 
   function startTaskSession(taskId) { TimeEngine.startTaskSession(taskId); }
@@ -421,16 +430,23 @@ const Study = (function () {
 
   function openDoItLaterModal(taskId) {
     doItLaterOpen = true;
+    const task = PlannerData.getAllTasks()[taskId];
     Modal.open(
       '<h3>Do it later</h3>' +
       '<input type="date" id="study-later-date" value="' + tomorrowStr() + '" min="' + todayStr() + '">' +
+      '<div class="planner-slot-row">' +
+        '<div><label class="planner-field-label">Start</label><input type="time" id="study-later-start" value="' + ((task && task.startTime) || '') + '"></div>' +
+        '<div><label class="planner-field-label">Stop</label><input type="time" id="study-later-stop" value="' + ((task && task.stopTime) || '') + '"></div>' +
+      '</div>' +
       '<button id="study-later-confirm">Reschedule</button>'
     );
     document.getElementById('study-later-confirm').addEventListener('click', function () {
       const dateVal = document.getElementById('study-later-date').value;
+      const startVal = document.getElementById('study-later-start').value;
+      const stopVal = document.getElementById('study-later-stop').value;
       if (!dateVal) { alert('Pick a date.'); return; }
-      const ok = TimeEngine.doItLater(taskId, dateVal);
-      if (!ok) { alert('That slot overlaps another task on ' + dateVal + '. Pick a different date.'); return; }
+      const ok = TimeEngine.doItLater(taskId, dateVal, startVal, stopVal);
+      if (!ok) { alert('That slot is invalid or overlaps another task on ' + dateVal + '. Pick a different date/time.'); return; }
       doItLaterOpen = false;
       Modal.close();
     });
