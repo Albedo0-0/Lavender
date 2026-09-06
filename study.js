@@ -51,67 +51,59 @@ const Study = (function () {
   function getClock() { return State.get().studyClock; }
   function setClock(partial) { State.set({ studyClock: Object.assign({}, getClock(), partial) }); }
 
-  // Flushes whatever time has accumulated but not yet been sent to TimeEngine — the single
-  // ledger every study-time source (Planner sessions, Journal, Stopwatch/Timer) feeds into.
-  // Called on every pause, natural timer completion, and reset, so progress is never sitting
-  // unrecorded for long. recordedMs tracks how much of the current run has already been flushed,
-  // so calling this repeatedly can never double-record the same block of time.
-  function flushClockSegment(c) {
-    const totalElapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
-    const cappedElapsed = c.mode === 'timer' ? Math.min(totalElapsed, c.timerTotalMs) : totalElapsed;
-    const already = c.recordedMs || 0;
-    const segment = cappedElapsed - already;
-    if (segment > 0) TimeEngine.recordStandaloneStudy(segment, c.mode);
-    return cappedElapsed;
+  // New design: every Start begins a brand-new segment at 0 — nothing ever carries over.
+  // Pause, Reset, and a timer running out each commit whatever that segment has built up,
+  // straight into TimeEngine, immediately.
+  function commitSegment() {
+    const c = getClock();
+    if (!c.running || !c.startedAt) return;
+    const elapsed = Math.max(0, Date.now() - c.startedAt);
+    const capped = c.mode === 'timer' ? Math.min(elapsed, c.timerTotalMs) : elapsed;
+    if (capped > 0) TimeEngine.recordStandaloneStudy(capped, c.mode);
+  }
+
+  function startClock(mode, timerTotalMs) {
+    setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0 });
+    renderClock();
   }
 
   function startStopwatch() {
-    setClock({ mode: 'stopwatch', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
-    renderClock();
+    startClock('stopwatch', 0);
   }
 
   function startTimer(minutes) {
-    setClock({ mode: 'timer', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: minutes * 60 * 1000, recordedMs: 0 });
-    renderClock();
-  }
-
-  // Resumes a paused clock from exactly where it left off — elapsedMs/timerTotalMs are untouched,
-  // only the running flag and a fresh startedAt anchor are set (req 5).
-  function resumeClock() {
-    const c = getClock();
-    if (c.running) return;
-    setClock({ running: true, startedAt: Date.now() });
-    renderClock();
+    startClock('timer', minutes * 60 * 1000);
   }
 
   function pauseClock() {
     const c = getClock();
     if (!c.running) return;
-    const elapsed = flushClockSegment(c);
-    setClock({ running: false, elapsedMs: elapsed, recordedMs: elapsed, startedAt: null });
+    commitSegment();
+    setClock({ running: false, startedAt: null });
     renderClock();
   }
 
   function resetClock() {
     const c = getClock();
-    flushClockSegment(c);
-    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
+    if (c.running) commitSegment();
+    setClock({ running: false, startedAt: null, timerTotalMs: 0 });
     renderClock();
   }
 
   function currentClockMs() {
     const c = getClock();
-    const elapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
-    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;;
+    if (!c.running) return 0;
+    const elapsed = Math.max(0, Date.now() - c.startedAt);
+    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;
   }
 
   function renderClock() {
     const c = getClock();
-    // A running timer that has naturally reached zero records its full duration on its own —
-    // the person shouldn't have to click Reset just to get credit for a completed timer (req 4).
-    if (c.mode === 'timer' && c.running && (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) >= c.timerTotalMs) {
-      flushClockSegment(c);
-      setClock({ running: false, startedAt: null, elapsedMs: c.timerTotalMs, recordedMs: c.timerTotalMs });
+    // The moment a running timer reaches zero it records itself automatically — no Pause,
+    // Resume, or Reset click needed from the person.
+    if (c.mode === 'timer' && c.running && Math.max(0, Date.now() - c.startedAt) >= c.timerTotalMs) {
+      TimeEngine.recordStandaloneStudy(c.timerTotalMs, 'timer');
+      setClock({ running: false, startedAt: null, timerTotalMs: 0 });
     }
     const display = document.getElementById('study-clock-display');
     if (display) display.textContent = fmtDuration(currentClockMs());
@@ -121,11 +113,33 @@ const Study = (function () {
     const fresh = getClock();
     if (startBtn) {
       startBtn.style.display = fresh.running ? 'none' : 'inline-block';
-      startBtn.textContent = (!fresh.running && fresh.elapsedMs > 0) ? 'Resume' : 'Start';
+      startBtn.textContent = 'Start';
     }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
     if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
+    renderStudyLog();
   }
+
+  // ---------- temporary chronological study log (bottom-left, Study tab only) ----------
+  function fmtLogEntry(entry) {
+    const totalMin = Math.round(entry.ms / 60000);
+    if (entry.kind === 'hr') {
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return entry.label + ' - ' + (m > 0 ? (h + 'hr ' + m + 'min') : (h + 'hr'));
+    }
+    return entry.label + ' - ' + totalMin + 'min';
+  }
+
+  function renderStudyLog() {
+    const panel = document.getElementById('study-log-panel');
+    if (!panel) return;
+    const entries = TimeEngine.getLogForDate(todayStr());
+    if (!entries.length) { panel.innerHTML = '<strong>Today\'s study log</strong><div>Nothing recorded yet.</div>'; return; }
+    panel.innerHTML = '<strong>Today\'s study log</strong>' +
+      entries.map(function (e) { return '<div>' + fmtLogEntry(e) + '</div>'; }).join('');
+  }
+
   function renderClockPanel() {
     const container = document.getElementById('study-clock-panel');
     if (!container) return;
@@ -150,15 +164,13 @@ const Study = (function () {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
         if (getClock().running) return;
-        flushClockSegment(getClock()); // flush any paused, unrecorded time before switching modes — don't lose it
-        setClock({ mode: btn.dataset.mode, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
+        setClock({ mode: btn.dataset.mode, timerTotalMs: 0 });
         renderClockPanel();
       });
     });
 
     document.getElementById('study-clock-start').addEventListener('click', function () {
       const cur = getClock();
-      if (!cur.running && cur.elapsedMs > 0) { resumeClock(); return; } // paused mid-run — continue, don't restart
       if (cur.mode === 'timer') {
         const minutes = parseInt(document.getElementById('study-timer-minutes').value, 10);
         if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
@@ -479,6 +491,7 @@ const Study = (function () {
   // Single re-render callback — invoked by TimeEngine's one-and-only heartbeat (every 1s)
   // and immediately after every user action, so there is exactly one timer driving the UI.
   function onEngineTick() {
+    renderStudyLog();
     const pastCutoff = isPastCutoff();
     setCutoffMode(pastCutoff);
     renderBreakStatus();
@@ -583,6 +596,7 @@ const Study = (function () {
     lastSessionSig = null;
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
+    renderStudyLog();
     const breakBtn = document.getElementById('global-break-btn');
     if (breakBtn) breakBtn.addEventListener('click', openBreakInputModal);
     // TimeEngine owns the single interval for all timing/session state (see timeengine.js §1).
@@ -597,7 +611,7 @@ const Study = (function () {
     renderAlarmPanel();
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
+    renderStudyLog();
   }
-
   return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive };
 })();
