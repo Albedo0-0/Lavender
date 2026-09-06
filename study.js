@@ -89,7 +89,9 @@ const Study = (function () {
 
   function resetClock() {
     const c = getClock();
-    if (c.running) commitSegment();
+    let total = c.elapsedMs || 0;
+    if (c.running) total += commitSegment();
+    if (total > 0) TimeEngine.pushLog(todayStr(), c.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
     setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
@@ -114,6 +116,9 @@ const Study = (function () {
   // Save — everything was already committed the moment the timer hit its target (and by any
   // pauses before that), so this just resets the tab back to its original blank state.
   function saveTimerAndReset() {
+    const c = getClock();
+    const total = c.elapsedMs || 0;
+    if (total > 0) TimeEngine.pushLog(todayStr(), 'Timer', total, 'min');
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
@@ -231,7 +236,10 @@ const Study = (function () {
     document.querySelectorAll('.study-mode-btn').forEach(function (btn) {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
-        if (getClock().running) return;
+        const cur = getClock();
+        if (cur.running) return;
+        const total = cur.elapsedMs || 0;
+        if (total > 0) TimeEngine.pushLog(todayStr(), cur.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
         setClock({ mode: btn.dataset.mode, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
         renderClockPanel();
       });
