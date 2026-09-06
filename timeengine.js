@@ -129,7 +129,7 @@ const TimeEngine = (function () {
     // finalize any still-open session from a previous day as stale (refresh-safe, no data loss).
     const active = engine.activeSessionId ? getRecord(engine.activeSessionId) : null;
     if (active && !active.actualEnd) {
-      const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Date.now() - active.activeSince : 0);
+      const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Math.max(0, Date.now() - active.activeSince) : 0);
       updateRecord(active.sessionId, { state: 'stale', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
     }
     pruneOldRecords(today);
@@ -212,14 +212,14 @@ const TimeEngine = (function () {
   function pauseSessionInternal(sessionId) {
     const rec = getRecord(sessionId);
     if (!rec || rec.state !== 'active') return;
-    const studyMs = (rec.studyMs || 0) + (rec.activeSince ? Date.now() - rec.activeSince : 0);
+    const studyMs = (rec.studyMs || 0) + (rec.activeSince ? Math.max(0, Date.now() - rec.activeSince) : 0);
     updateRecord(sessionId, { state: 'paused', studyMs: studyMs, activeSince: null, pausedSince: Date.now() });
   }
 
   function resumeSessionInternal(sessionId) {
     const rec = getRecord(sessionId);
     if (!rec || rec.state !== 'paused') return;
-    const breakMs = (rec.breakMs || 0) + (rec.pausedSince ? Date.now() - rec.pausedSince : 0);
+    const breakMs = (rec.breakMs || 0) + (rec.pausedSince ? Math.max(0, Date.now() - rec.pausedSince) : 0);
     updateRecord(sessionId, { state: 'active', breakMs: breakMs, activeSince: Date.now(), pausedSince: null });
   }
 
@@ -322,7 +322,7 @@ const TimeEngine = (function () {
   function resumeActive() {
     const active = getActiveSession();
     if (!active || active.state !== 'paused') return;
-    const pauseDur = active.pausedSince ? Date.now() - active.pausedSince : 0;
+    const pauseDur = active.pausedSince ? Math.max(0, Date.now() - active.pausedSince) : 0;
     resumeSessionInternal(active.sessionId);
     // Extend the session's own adjustedEnd by however long the pause actually lasted (not just
     // a fixed default like the prompt-driven breaks), and shift the rest of the day the same amount —
@@ -334,7 +334,7 @@ const TimeEngine = (function () {
   function completeActive() {
     const active = getActiveSession();
     if (!active) return;
-    const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Date.now() - active.activeSince : 0);
+    const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Math.max(0, Date.now() - active.activeSince) : 0);
     updateRecord(active.sessionId, { state: 'completed', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
     if (!PlannerData.getAllTasks()[active.taskId].completed) PlannerData.toggleComplete(active.taskId);
     setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
@@ -353,7 +353,7 @@ const TimeEngine = (function () {
     if (PlannerData.hasSlotConflict(newDateStr, task.startTime, task.stopTime, taskId)) return false;
     const engine = getEngine();
     if (rec && engine.activeSessionId === rec.sessionId) {
-      const studyMs = (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Date.now() - rec.activeSince : 0);
+      const studyMs = (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Math.max(0, Date.now() - rec.activeSince) : 0);
       updateRecord(rec.sessionId, { state: 'rescheduled', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
       setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
     } else if (rec) {
@@ -486,9 +486,8 @@ const TimeEngine = (function () {
 
   // ---------- read-only helpers for UI / Progress ----------
 
-  function liveStudyMs(rec) { return (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Date.now() - rec.activeSince : 0); }
-  function liveBreakMs(rec) { return (rec.breakMs || 0) + (rec.state === 'paused' && rec.pausedSince ? Date.now() - rec.pausedSince : 0); }
-
+  function liveStudyMs(rec) { return (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Math.max(0, Date.now() - rec.activeSince) : 0); }
+  function liveBreakMs(rec) { return (rec.breakMs || 0) + (rec.state === 'paused' && rec.pausedSince ? Math.max(0, Date.now() - rec.pausedSince) : 0); }
   function getClockDisplayMs() {
     const active = getActiveSession();
     return active ? liveStudyMs(active) : 0;
