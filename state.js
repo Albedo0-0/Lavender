@@ -13,7 +13,7 @@ const State = (function () {
     journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
     journalPasswordHash: null, // Journal: global lock password hash
     journalLocked: false, // Journal: global lock state
-    studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recorded: false }, // Study §3.1 — manual stopwatch/timer; elapsed time feeds TimeEngine.recordStandaloneStudy (see study.js), recorded flags that the current run's time has already been saved so it's never double-counted
+    studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 }, // Study §3.1 — manual stopwatch/timer; elapsed time feeds TimeEngine.recordStandaloneStudy (see study.js), recordedMs tracks how much of the current run has already been flushed to TimeEngine so pauses/resets never double-count
     timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
     sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
     timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
