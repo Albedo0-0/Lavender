@@ -51,33 +51,27 @@ const Study = (function () {
   function getClock() { return State.get().studyClock; }
   function setClock(partial) { State.set({ studyClock: Object.assign({}, getClock(), partial) }); }
 
-  // Elapsed study time to record for the CURRENT run: for a timer, capped at its total (so a
-  // Reset clicked after it's already run past zero can't over-record), for a stopwatch just the
-  // raw elapsed.
-  function elapsedForRecording(c) {
-    const elapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
-    return c.mode === 'timer' ? Math.min(elapsed, c.timerTotalMs) : elapsed;
-  }
-
-  // Records the current run into TimeEngine's unified session store exactly once per run —
-  // 'recorded' is flipped true immediately and only reset when a fresh Start/Resume-less run
-  // begins, so double-clicks, a Reset after natural completion, or a refresh mid-way through
-  // can never record (or lose) the same block of time twice (req 4, 7, 9, 11).
-  function recordClockIfNeeded() {
-    const c = getClock();
-    if (c.recorded) return;
-    const ms = elapsedForRecording(c);
-    if (ms > 0) TimeEngine.recordStandaloneStudy(ms, c.mode);
-    setClock({ recorded: true });
+  // Flushes whatever time has accumulated but not yet been sent to TimeEngine — the single
+  // ledger every study-time source (Planner sessions, Journal, Stopwatch/Timer) feeds into.
+  // Called on every pause, natural timer completion, and reset, so progress is never sitting
+  // unrecorded for long. recordedMs tracks how much of the current run has already been flushed,
+  // so calling this repeatedly can never double-record the same block of time.
+  function flushClockSegment(c) {
+    const totalElapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
+    const cappedElapsed = c.mode === 'timer' ? Math.min(totalElapsed, c.timerTotalMs) : totalElapsed;
+    const already = c.recordedMs || 0;
+    const segment = cappedElapsed - already;
+    if (segment > 0) TimeEngine.recordStandaloneStudy(segment, c.mode);
+    return cappedElapsed;
   }
 
   function startStopwatch() {
-    setClock({ mode: 'stopwatch', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: 0, recorded: false });
+    setClock({ mode: 'stopwatch', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
     renderClock();
   }
 
   function startTimer(minutes) {
-    setClock({ mode: 'timer', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: minutes * 60 * 1000, recorded: false });
+    setClock({ mode: 'timer', running: true, startedAt: Date.now(), elapsedMs: 0, timerTotalMs: minutes * 60 * 1000, recordedMs: 0 });
     renderClock();
   }
 
@@ -93,14 +87,15 @@ const Study = (function () {
   function pauseClock() {
     const c = getClock();
     if (!c.running) return;
-    const elapsed = c.elapsedMs + Math.max(0, Date.now() - c.startedAt);
-    setClock({ running: false, elapsedMs: elapsed, startedAt: null });
+    const elapsed = flushClockSegment(c);
+    setClock({ running: false, elapsedMs: elapsed, recordedMs: elapsed, startedAt: null });
     renderClock();
   }
 
   function resetClock() {
-    recordClockIfNeeded();
-    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recorded: false });
+    const c = getClock();
+    flushClockSegment(c);
+    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 });
     renderClock();
   }
 
@@ -114,9 +109,9 @@ const Study = (function () {
     const c = getClock();
     // A running timer that has naturally reached zero records its full duration on its own —
     // the person shouldn't have to click Reset just to get credit for a completed timer (req 4).
-    if (c.mode === 'timer' && c.running && !c.recorded && (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) >= c.timerTotalMs) {
-      TimeEngine.recordStandaloneStudy(c.timerTotalMs, 'timer');
-      setClock({ running: false, startedAt: null, elapsedMs: c.timerTotalMs, recorded: true });
+    if (c.mode === 'timer' && c.running && (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) >= c.timerTotalMs) {
+      flushClockSegment(c);
+      setClock({ running: false, startedAt: null, elapsedMs: c.timerTotalMs, recordedMs: c.timerTotalMs });
     }
     const display = document.getElementById('study-clock-display');
     if (display) display.textContent = fmtDuration(currentClockMs());
