@@ -20,7 +20,7 @@ const State = (function () {
     studyLog: {}, // dateStr -> [{ label, ms, kind: 'min'|'hr', at }] — chronological "what was studied where" log for Study tab
  studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
         favoriteTopics: [], // History nav: topicIds marked as favorite
-    settings: { breakWallpaper: null }, // Settings scaffold (§B.9): breakWallpaper data slot only, no upload UI yet
+    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true }, // Settings scaffold (§B.9): data slots only, no settings UI yet
     // Later: exp, level, etc.
   };
   let data = Object.assign({}, defaultState);
