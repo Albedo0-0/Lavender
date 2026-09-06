@@ -13,11 +13,12 @@ const State = (function () {
     journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
     journalPasswordHash: null, // Journal: global lock password hash
     journalLocked: false, // Journal: global lock state
-    studyClock: { mode: 'stopwatch', running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, recordedMs: 0 }, // Study §3.1 — manual stopwatch/timer; elapsed time feeds TimeEngine.recordStandaloneStudy (see study.js), recordedMs tracks how much of the current run has already been flushed to TimeEngine so pauses/resets never double-count
+    studyClock: { mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0 }, // Study §3.1 — manual stopwatch/timer; every Start begins a fresh 0 segment; Pause/Reset/natural-timer-end each commit that segment to TimeEngine.recordStandaloneStudy immediately, nothing carries over between runs
     timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
     sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
     timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
     dailySummaries: {}, // Time Engine retention: dateStr -> { date, studyMs, breakMs, tasksTotal, tasksCompleted } for dates older than RETENTION_DAYS
+    studyLog: {}, // dateStr -> [{ label, ms, kind: 'min'|'hr', at }] — chronological "what was studied where" log for Study tab
  studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
     favoriteTopics: [], // History nav: topicIds marked as favorite
     // Later: exp, level, etc.
