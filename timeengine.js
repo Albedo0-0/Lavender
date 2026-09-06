@@ -611,6 +611,7 @@ const TimeEngine = (function () {
     getAllTrackedDates: getAllTrackedDates,
     recordStandaloneStudy: recordStandaloneStudy,
     isPastCutoff: isPastCutoff,
+    isManualClockActive: isManualClockActive,
     pushLog: pushLog,
     getLogForDate: getLogForDate
   };
