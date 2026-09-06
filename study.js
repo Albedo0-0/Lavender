@@ -454,20 +454,58 @@ const Study = (function () {
     });
   }
 
+  
   function renderBreakStatus() {
     const btn = document.getElementById('global-break-btn');
     if (!btn) return;
-    if (TimeEngine.isSessionActive()) { btn.style.display = 'none'; return; }
-    btn.style.display = 'inline-block';
     const gb = TimeEngine.getGlobalBreak();
-    if (gb && gb.active) {
-      const remainingMin = Math.ceil((gb.resumeAt - Date.now()) / 60000);
-      btn.textContent = 'Break (' + Math.max(0, remainingMin) + 'm)';
-      btn.disabled = true;
-    } else {
-      btn.textContent = 'Break';
-      btn.disabled = false;
-    }
+    if ((gb && gb.active) || TimeEngine.isSessionActive()) { btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-block';
+    btn.textContent = 'Break';
+    btn.disabled = false;
+  }
+
+  // §2.3 — full-takeover break screen: Break / remaining time / Add Time / End Break, nothing
+  // else. Wallpaper (§2.5, Settings-only for now) shown as background when configured.
+  function renderBreakTakeover() {
+    const container = document.getElementById('global-break-takeover');
+    if (!container) return;
+    const gb = TimeEngine.getGlobalBreak();
+    if (!gb || !gb.active) { container.style.display = 'none'; return; }
+    const remainingMin = Math.max(0, Math.ceil((gb.resumeAt - Date.now()) / 60000));
+    const settings = State.get().settings || {};
+    container.style.display = 'flex';
+    container.style.backgroundImage = settings.breakWallpaper ? 'url(' + settings.breakWallpaper + ')' : 'none';
+    container.innerHTML =
+      '<div class="break-takeover-inner">' +
+        '<h2>Break</h2>' +
+        '<div class="break-takeover-remaining">' + remainingMin + 'm left</div>' +
+        '<div class="break-takeover-actions">' +
+          '<button id="break-takeover-add">Add Time</button>' +
+          '<button id="break-takeover-end">End Break</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('break-takeover-add').addEventListener('click', openAddBreakTimeModal);
+    document.getElementById('break-takeover-end').addEventListener('click', function () {
+      TimeEngine.endGlobalBreak();
+      renderBreakTakeover();
+      renderBreakStatus();
+    });
+  }
+
+  function openAddBreakTimeModal() {
+    Modal.open(
+      '<h3>Add time</h3>' +
+      '<input type="number" id="break-add-minutes" min="1" placeholder="Minutes">' +
+      '<button id="break-add-confirm">Add</button>'
+    );
+    document.getElementById('break-add-confirm').addEventListener('click', function () {
+      const minutes = parseInt(document.getElementById('break-add-minutes').value, 10);
+      if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
+      TimeEngine.addGlobalBreakTime(minutes);
+      Modal.close();
+      renderBreakTakeover();
+    });
   }
 
   function openBreakInputModal() {
@@ -475,7 +513,11 @@ const Study = (function () {
     Modal.open(
       '<h3>Take a break</h3>' +
       '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes">' +
-      '<button id="global-break-confirm">Start Break</button>'
+      '<button id="global-break-confirm">Start Break</button>' +
+      '<hr>' +
+      '<h4>Already took a break?</h4>' +
+      '<input type="number" id="unrecorded-break-minutes" min="1" placeholder="Minutes">' +
+      '<button id="unrecorded-break-confirm">Log it</button>'
     );
     document.getElementById('global-break-confirm').addEventListener('click', function () {
       const minutes = parseInt(document.getElementById('global-break-minutes').value, 10);
@@ -484,6 +526,14 @@ const Study = (function () {
       Modal.close();
       TimeEngine.startGlobalBreak(minutes);
       renderBreakStatus();
+      renderBreakTakeover();
+    });
+    document.getElementById('unrecorded-break-confirm').addEventListener('click', function () {
+      const minutes = parseInt(document.getElementById('unrecorded-break-minutes').value, 10);
+      if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
+      TimeEngine.logUnrecordedBreak(minutes);
+      breakInputOpen = false;
+      Modal.close();
     });
   }
 
@@ -621,11 +671,12 @@ const Study = (function () {
 
   // Single re-render callback — invoked by TimeEngine's one-and-only heartbeat (every 1s)
   // and immediately after every user action, so there is exactly one timer driving the UI.
-  function onEngineTick() {
+   function onEngineTick() {
     renderStudyLog();
     const pastCutoff = isPastCutoff();
     setCutoffMode(pastCutoff);
     renderBreakStatus();
+    renderBreakTakeover();
     refreshAlarmListModal();
     if (!pastCutoff) {
       const active = TimeEngine.getActiveSession();
@@ -727,6 +778,7 @@ const Study = (function () {
     lastSessionSig = null;
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
+    renderBreakTakeover();
     renderStudyLog();
     const breakBtn = document.getElementById('global-break-btn');
     if (breakBtn) breakBtn.addEventListener('click', openBreakInputModal);
@@ -742,6 +794,7 @@ const Study = (function () {
     renderAlarmPanel();
     setCutoffMode(isPastCutoff());
     renderBreakStatus();
+    renderBreakTakeover();
     renderStudyLog();
   }
   return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive };
