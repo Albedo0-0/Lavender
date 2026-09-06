@@ -141,6 +141,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function handleSaveSubjectTask() {
+    if (typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before scheduling a task.'); return; }
     const subject = document.getElementById('planner-subject').value;
     const topicName = document.getElementById('planner-topic').value.trim();
     const dateStr = document.getElementById('planner-date').value;
@@ -178,6 +179,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function handleSaveCustomTask() {
+    if (typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before scheduling a task.'); return; }
     const title = document.getElementById('planner-custom-title').value.trim();
     const dateStr = document.getElementById('planner-date').value;
     const startTime = document.getElementById('planner-start-time').value;
@@ -206,6 +208,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   function handleUseSuggestion(taskId) {
+    if (typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before scheduling a task.'); return; }
     const dateStr = document.getElementById('planner-date').value;
     const startTime = document.getElementById('planner-start-time').value;
     const stopTime = document.getElementById('planner-stop-time').value;
