@@ -73,9 +73,13 @@ const JournalData = (function () {
 
   function setHoursStudied(dateStr, hours) {
     const n = Math.max(0, Number(hours) || 0);
+    const prev = getEntry(dateStr).hoursStudied;
     updateEntry(dateStr, { hoursStudied: n });
     // Journal is the source of truth; mirror into DateHub so Streak/Calendar read it unchanged.
     DateHub.update(dateStr, { studyHours: n });
+    if (n > 0 && n !== prev && typeof TimeEngine !== 'undefined') {
+      TimeEngine.pushLog(dateStr, 'Journal', n * 3600000, 'hr');
+    }
   }
 
   function isImportant(dateStr) {
