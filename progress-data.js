@@ -194,7 +194,13 @@ const ProgressData = (function () {
   // for actual elapsed study time). Per day we take whichever is LARGER rather than summing them,
   // so a day that has both a manual Journal entry and engine-recorded time is never double-counted;
   // days with only one source still count normally, preserving existing Journal-only behaviour.
-  let totalMs = 0;
+  function getTotalStudyHours() {
+    const dateSet = {};
+    getAllEntriesList().forEach(function (item) { dateSet[item.date] = true; });
+    if (typeof TimeEngine !== 'undefined') {
+      TimeEngine.getAllTrackedDates().forEach(function (d) { dateSet[d] = true; });
+    }
+    let totalMs = 0;
     Object.keys(dateSet).forEach(function (dateStr) {
       const entry = getEntryFor(dateStr);
       const jv = entry ? Number(entry.hoursStudied) : NaN;
@@ -203,7 +209,8 @@ const ProgressData = (function () {
       totalMs += journalMs + engineMs;
     });
     return totalMs / 3600000;
-  
+  }
+
   function getTotalQuestionsSolved() {
     const list = getAllEntriesList();
     return list.reduce(function (sum, item) {
