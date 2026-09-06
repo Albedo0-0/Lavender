@@ -174,7 +174,7 @@ const Study = (function () {
       startBtn.textContent = (!fresh.running && (fresh.elapsedMs || 0) > 0) ? 'Resume' : 'Start';
     }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
-    if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
+    if (modesEl) modesEl.style.display = isClockActive(fresh) ? 'none' : 'flex';
     applyClockFocusUI(isClockActive(fresh));
     renderStudyLog();
   }
@@ -219,7 +219,7 @@ const Study = (function () {
     }
 
     container.innerHTML =
-      '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (c.running ? 'none' : 'flex') + '">' +
+      '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (isClockActive(c) ? 'none' : 'flex') + '">' +
         '<button class="study-mode-btn" data-mode="stopwatch">Stopwatch</button>' +
         '<button class="study-mode-btn" data-mode="timer">Timer</button>' +
       '</div>' +
@@ -346,9 +346,11 @@ const Study = (function () {
     const task = PlannerData.getAllTasks()[active.taskId];
     const clockPanel = document.getElementById('study-clock-panel');
     const alarmIcon = document.getElementById('study-alarm-icon');
+    const linksIcon = document.getElementById('study-links-icon');
     const breakBtn = document.getElementById('global-break-btn');
     if (clockPanel) clockPanel.style.display = 'none';
     if (alarmIcon) alarmIcon.style.display = 'none';
+    if (linksIcon) linksIcon.style.display = 'none';
     if (breakBtn) breakBtn.style.display = 'none';
 
     container.innerHTML =
@@ -387,16 +389,24 @@ const Study = (function () {
     const remainEl = document.getElementById('study-focus-remaining');
     if (remainEl) {
       const active = TimeEngine.getActiveSession();
-      remainEl.textContent = active ? ('Remaining: ' + fmtDuration(Math.max(0, (active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd)) - Date.now()))) : '';
+      if (active) {
+        const endMs = active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd);
+        const nowRef = active.state === 'paused' ? active.pausedSince : Date.now();
+        remainEl.textContent = 'Remaining: ' + fmtDuration(Math.max(0, endMs - nowRef));
+      } else {
+        remainEl.textContent = '';
+      }
     }
   }
 
   function exitFocusMode() {
     const clockPanel = document.getElementById('study-clock-panel');
     const alarmIcon = document.getElementById('study-alarm-icon');
+    const linksIcon = document.getElementById('study-links-icon');
     const breakBtn = document.getElementById('global-break-btn');
     if (clockPanel) clockPanel.style.display = 'block';
     if (alarmIcon) alarmIcon.style.display = 'inline-block';
+    if (linksIcon) linksIcon.style.display = 'inline-block';
     if (breakBtn) breakBtn.style.display = 'inline-block';
   }
 
