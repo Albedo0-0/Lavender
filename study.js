@@ -127,21 +127,27 @@ const Study = (function () {
   // whole Study tab like a session: big clock, everything else hidden.
   function applyClockFocusUI(active) {
     const sessionPanel = document.getElementById('study-session-panel');
-    const alarmIcon = document.getElementById('study-alarm-icon');
-    const linksIcon = document.getElementById('study-links-icon');
-    const breakBtn = document.getElementById('global-break-btn');
     const clockPanel = document.getElementById('study-clock-panel');
     if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
-    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
-    if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
-    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
     if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
+    applyChromeVisibility();
   }
-
   function isClockActive(c) {
     return !!(c.running || (c.elapsedMs || 0) > 0 || c.awaitingDecision);
   }
 
+  // Single source of truth for the shared chrome (alarm icon, links icon, break button) — hidden
+  // whenever EITHER a planner session OR the manual Stopwatch/Timer is active, computed fresh
+  // every time so the two flows can never fight each other and cause a flicker.
+  function applyChromeVisibility() {
+    const active = !!TimeEngine.getActiveSession() || isClockActive(getClock());
+    const alarmIcon = document.getElementById('study-alarm-icon');
+    const linksIcon = document.getElementById('study-links-icon');
+    const breakBtn = document.getElementById('global-break-btn');
+    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
+    if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
+    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
+  }
   function currentClockMs() {
     const c = getClock();
     const liveDelta = c.running ? Math.max(0, Date.now() - c.startedAt) : 0;
@@ -223,7 +229,7 @@ const Study = (function () {
         '<button class="study-mode-btn" data-mode="stopwatch">Stopwatch</button>' +
         '<button class="study-mode-btn" data-mode="timer">Timer</button>' +
       '</div>' +
-      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' && !c.running ? 'block' : 'none') + '">' +
+      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' && !isClockActive(c) ? 'block' : 'none') + '">' +
         '<input type="number" id="study-timer-minutes" min="1" placeholder="Minutes">' +
       '</div>' +
       '<div id="study-clock-display" class="study-clock-display"></div>' +
@@ -345,13 +351,8 @@ const Study = (function () {
     const container = document.getElementById('study-session-panel');
     const task = PlannerData.getAllTasks()[active.taskId];
     const clockPanel = document.getElementById('study-clock-panel');
-    const alarmIcon = document.getElementById('study-alarm-icon');
-    const linksIcon = document.getElementById('study-links-icon');
-    const breakBtn = document.getElementById('global-break-btn');
     if (clockPanel) clockPanel.style.display = 'none';
-    if (alarmIcon) alarmIcon.style.display = 'none';
-    if (linksIcon) linksIcon.style.display = 'none';
-    if (breakBtn) breakBtn.style.display = 'none';
+    applyChromeVisibility();
 
     container.innerHTML =
       '<div class="study-focus-mode">' +
@@ -401,13 +402,8 @@ const Study = (function () {
 
   function exitFocusMode() {
     const clockPanel = document.getElementById('study-clock-panel');
-    const alarmIcon = document.getElementById('study-alarm-icon');
-    const linksIcon = document.getElementById('study-links-icon');
-    const breakBtn = document.getElementById('global-break-btn');
     if (clockPanel) clockPanel.style.display = 'block';
-    if (alarmIcon) alarmIcon.style.display = 'inline-block';
-    if (linksIcon) linksIcon.style.display = 'inline-block';
-    if (breakBtn) breakBtn.style.display = 'inline-block';
+    applyChromeVisibility();
   }
 
   function confirmDoItLater(taskId) {
