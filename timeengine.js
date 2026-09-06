@@ -65,7 +65,17 @@ const TimeEngine = (function () {
 
   function pushBreak(dateStr, type, durationMs) {
     const list = (State.get().timeEngineBreaks || []).slice();
-    list.push({ id: genId('brk'), date: dateStr, type: type, durationMs: durationMs, startedAt: Date.now() });
+    const id = genId('brk');
+    list.push({ id: id, date: dateStr, type: type, durationMs: durationMs, startedAt: Date.now() });
+    State.set({ timeEngineBreaks: list });
+    return id;
+  }
+
+  function adjustBreakDuration(id, deltaMs) {
+    const list = (State.get().timeEngineBreaks || []).slice();
+    const idx = list.findIndex(function (b) { return b.id === id; });
+    if (idx === -1) return;
+    list[idx] = Object.assign({}, list[idx], { durationMs: Math.max(0, list[idx].durationMs + deltaMs) });
     State.set({ timeEngineBreaks: list });
   }
 
@@ -207,6 +217,17 @@ const TimeEngine = (function () {
       });
     }
     applyShift(deltaMs);
+  }
+
+  // Extends ONE record's own adjustedEnd only — no shifting of other sessions. Used when the
+  // rest of the day was already shifted separately (Global Break start/Add Time), so only the
+  // paused session's own remaining time needs correcting on resume.
+  function extendRecordEnd(sessionId, deltaMs) {
+    const rec = getRecord(sessionId);
+    if (!rec) return;
+    const baseEndMs = rec.adjustedEndAt || timeStrToMs(rec.date, rec.adjustedEnd);
+    const newEndMs = baseEndMs + deltaMs;
+    updateRecord(sessionId, { adjustedEnd: hhmmFromMs(newEndMs), adjustedEndAt: newEndMs, endPromptFired: false });
   }
 
   // ---------- pause/resume primitives (no shifting side-effects — callers decide shifting) ----------
@@ -381,6 +402,7 @@ const TimeEngine = (function () {
     notify();
     return true;
   }
+  
   function startGlobalBreak(minutes) {
     const engine = getEngine();
     if (engine.globalBreak && engine.globalBreak.active) return false;
@@ -397,10 +419,55 @@ const TimeEngine = (function () {
     // Only log a standalone break entry when there's no paused session to track it instead —
     // if we just paused the active session, its own breakMs (finalized on resume) already
     // covers this time in getDayStats, and pushBreak here would double-count it.
-    if (!pausedActiveSession) pushBreak(todayStr(), 'global', breakMs);
-    setEngine({ prompt: shiftedPrompt, globalBreak: { active: true, resumeAt: Date.now() + breakMs, startedAt: Date.now(), pausedActiveSession: pausedActiveSession } });
+    const breakId = pausedActiveSession ? null : pushBreak(todayStr(), 'global', breakMs);
+    setEngine({ prompt: shiftedPrompt, globalBreak: { active: true, resumeAt: Date.now() + breakMs, startedAt: Date.now(), pausedActiveSession: pausedActiveSession, breakId: breakId, plannedMs: breakMs } });
     notify();
     return true;
+  }
+
+  // §2.1 — extra duration mid-break: shifts later sessions same as the initial break did, and
+  // keeps the break's own logged duration in sync.
+  function addGlobalBreakTime(minutes) {
+    const engine = getEngine();
+    const gb = engine.globalBreak;
+    if (!gb || !gb.active) return false;
+    const extraMs = Math.max(1, minutes || 1) * 60 * 1000;
+    applyShift(extraMs);
+    if (gb.breakId) adjustBreakDuration(gb.breakId, extraMs);
+    setEngine({ globalBreak: Object.assign({}, gb, { resumeAt: gb.resumeAt + extraMs, plannedMs: (gb.plannedMs || 0) + extraMs }) });
+    notify();
+    return true;
+  }
+
+  // §2.2 — ends immediately: un-shifts the unused planned time and corrects the logged/implicit
+  // break duration down to what was actually taken, instead of the originally chosen amount.
+  function endGlobalBreak() {
+    const engine = getEngine();
+    const gb = engine.globalBreak;
+    if (!gb || !gb.active) return false;
+    const now = Date.now();
+    const actualMs = Math.max(0, now - gb.startedAt);
+    const unusedMs = Math.max(0, gb.resumeAt - now);
+    if (unusedMs > 0) applyShift(-unusedMs);
+    if (gb.pausedActiveSession) {
+      const active = getRecord(engine.activeSessionId);
+      if (active && active.pausedSince) extendRecordEnd(active.sessionId, Math.max(0, now - active.pausedSince));
+      resumeSessionInternal(engine.activeSessionId);
+    } else if (gb.breakId) {
+      adjustBreakDuration(gb.breakId, actualMs - (gb.plannedMs || 0));
+    }
+    setEngine({ globalBreak: null });
+    notify();
+    return true;
+  }
+
+  // §2.4 — unrecorded break: retroactive entry for break time taken outside the app. Same
+  // timeEngineBreaks source as live breaks (feeds the same stats); no live countdown, no
+  // schedule shift, since the time already passed.
+  function logUnrecordedBreak(minutes) {
+    const ms = Math.max(1, minutes || 1) * 60 * 1000;
+    pushBreak(todayStr(), 'unrecorded', ms);
+    notify();
   }
 
   function getGlobalBreak() { return getEngine().globalBreak; }
@@ -412,7 +479,11 @@ const TimeEngine = (function () {
     const gb = engine.globalBreak;
     if (!gb || !gb.active) return;
     if (Date.now() < gb.resumeAt) return;
-    if (gb.pausedActiveSession) resumeSessionInternal(engine.activeSessionId);
+    if (gb.pausedActiveSession) {
+      const active = getRecord(engine.activeSessionId);
+      if (active && active.pausedSince) extendRecordEnd(active.sessionId, Math.max(0, Date.now() - active.pausedSince));
+      resumeSessionInternal(engine.activeSessionId);
+    }
     setEngine({ globalBreak: null });
   }
 
@@ -622,6 +693,9 @@ const TimeEngine = (function () {
     completeActive: completeActive,
     doItLater: doItLater,
     startGlobalBreak: startGlobalBreak,
+    addGlobalBreakTime: addGlobalBreakTime,
+    endGlobalBreak: endGlobalBreak,
+    logUnrecordedBreak: logUnrecordedBreak,
     getClockDisplayMs: getClockDisplayMs,
     getDayStats: getDayStats,
     getQuestionsForDate: getQuestionsForDate,
