@@ -13,8 +13,7 @@ const State = (function () {
     journalEntries: {}, // Journal: dateStr -> { morningQuote, weather, mood, hoursStudied, diaryText, photos, manifestationText, challenge }
     journalPasswordHash: null, // Journal: global lock password hash
     journalLocked: false, // Journal: global lock state
-    studyClock: { mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, awaitingDecision: false },
-    timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
+    studyClock: { mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false },    timeEngine: null, // Time Engine §1: header/control state (date, activeSessionId, shiftMs, prompt, globalBreak) — see timeengine.js
     sessionRecords: {}, // Time Engine §1: sessionId -> SessionRecord (planned/adjusted/actual times, durations, state) — source of truth for Progress
     timeEngineBreaks: [], // Time Engine: [{ id, date, type: 'auto'|'global', durationMs, startedAt }]
     dailySummaries: {}, // Time Engine retention: dateStr -> { date, studyMs, breakMs, tasksTotal, tasksCompleted } for dates older than RETENTION_DAYS
