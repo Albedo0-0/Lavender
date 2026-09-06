@@ -87,9 +87,8 @@ body {
   background: rgba(0,0,0,0.4);
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
 }
-
 #modal-content {
   background: #fff;
   padding: 16px;
