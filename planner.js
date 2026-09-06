@@ -82,7 +82,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</div>' +
       '<label class="planner-field-label">Note (optional)</label>' +
       '<textarea id="planner-note" rows="3"></textarea>' +
-      '<button id="planner-save-task">Add Task</button>';
+      '<button id="planner-save-task"' + ((typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) ? ' disabled' : '') + '>Add Task</button>';
 
     updateTopicOptions();
     document.getElementById('planner-subject').addEventListener('change', updateTopicOptions);
@@ -95,11 +95,10 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<input type="text" id="planner-custom-title" placeholder="e.g. Call dentist">' +
       '<label class="planner-field-label">Note (optional)</label>' +
       '<textarea id="planner-custom-note" rows="3"></textarea>' +
-      '<button id="planner-save-custom">Add Task</button>';
+      '<button id="planner-save-custom"' + ((typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) ? ' disabled' : '') + '>Add Task</button>';
 
     document.getElementById('planner-save-custom').addEventListener('click', handleSaveCustomTask);
   }
-
   function renderSuggestedModeBody(body) {
     const dateStr = document.getElementById('planner-date').value || todayStr();
     const suggestions = PlannerData.getSuggestedTasksForDate(dateStr);
