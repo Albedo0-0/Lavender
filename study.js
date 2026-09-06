@@ -133,6 +133,10 @@ const Study = (function () {
     if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
   }
 
+  function isClockActive(c) {
+    return !!(c.running || (c.elapsedMs || 0) > 0 || c.awaitingDecision);
+  }
+
   function currentClockMs() {
     const c = getClock();
     const liveDelta = c.running ? Math.max(0, Date.now() - c.startedAt) : 0;
@@ -166,10 +170,9 @@ const Study = (function () {
     }
     if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
     if (modesEl) modesEl.style.display = fresh.running ? 'none' : 'flex';
-    applyClockFocusUI(fresh.running);
+    applyClockFocusUI(isClockActive(fresh));
     renderStudyLog();
   }
-
   // ---------- temporary chronological study log (bottom-left, Study tab only) ----------
   function fmtLogEntry(entry) {
     const totalMin = Math.round(entry.ms / 60000);
@@ -249,7 +252,7 @@ const Study = (function () {
     document.getElementById('study-clock-reset').addEventListener('click', resetClock);
 
     lastClockUiMode = 'normal';
-    applyClockFocusUI(c.running);
+    applyClockFocusUI(isClockActive(c));
     renderClock();
   }
 
