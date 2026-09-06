@@ -354,26 +354,28 @@ const TimeEngine = (function () {
   // Returns true on success, false if the task's slot would overlap an existing slot on the
   // target date (nothing is touched in that case — caller should tell the user and let them
   // pick a different date/time instead of silently creating an overlapping schedule).
-  function doItLater(taskId, newDateStr) {
+  function doItLater(taskId, newDateStr, newStartTime, newStopTime) {
     const today = todayStr();
     const rec = findOpenRecordForTask(taskId, today);
     const task = PlannerData.getAllTasks()[taskId];
     if (!task) return false;
-    if (PlannerData.hasSlotConflict(newDateStr, task.startTime, task.stopTime, taskId)) return false;
+    const startTime = newStartTime || task.startTime;
+    const stopTime = newStopTime || task.stopTime;
+    if (!PlannerData.isValidSlot(startTime, stopTime)) return false;
+    if (PlannerData.hasSlotConflict(newDateStr, startTime, stopTime, taskId)) return false;
     const engine = getEngine();
     if (rec && engine.activeSessionId === rec.sessionId) {
-      const studyMs = (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Math.max(0, Date.now() - rec.activeSince) : 0);
+      const studyMs = (rec.studyMs || 0) + (rec.state === 'active' && rec.activeSince ? Date.now() - rec.activeSince : 0);
       updateRecord(rec.sessionId, { state: 'rescheduled', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
       setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
     } else if (rec) {
       updateRecord(rec.sessionId, { state: 'rescheduled' });
       if (engine.prompt && engine.prompt.sessionId === rec.sessionId) setEngine({ prompt: null });
     }
-    PlannerData.rescheduleTask(taskId, newDateStr, task.startTime, task.stopTime);
+    PlannerData.rescheduleTask(taskId, newDateStr, startTime, stopTime);
     notify();
     return true;
   }
-
   function startGlobalBreak(minutes) {
     const engine = getEngine();
     if (engine.globalBreak && engine.globalBreak.active) return false;
