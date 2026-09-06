@@ -19,10 +19,10 @@ const State = (function () {
     dailySummaries: {}, // Time Engine retention: dateStr -> { date, studyMs, breakMs, tasksTotal, tasksCompleted } for dates older than RETENTION_DAYS
     studyLog: {}, // dateStr -> [{ label, ms, kind: 'min'|'hr', at }] — chronological "what was studied where" log for Study tab
  studyLinks: {}, // Study §3.4: linkId -> { linkId, subject, url, note }
-    favoriteTopics: [], // History nav: topicIds marked as favorite
+        favoriteTopics: [], // History nav: topicIds marked as favorite
+    settings: { breakWallpaper: null }, // Settings scaffold (§B.9): breakWallpaper data slot only, no upload UI yet
     // Later: exp, level, etc.
   };
-
   let data = Object.assign({}, defaultState);
 
   function get() {
