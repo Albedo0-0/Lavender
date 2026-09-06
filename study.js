@@ -565,17 +565,19 @@ const Study = (function () {
   function setCutoffMode(active) {
     const sessionPanel = document.getElementById('study-session-panel');
     const cutoffView = document.getElementById('study-cutoff-view');
-    const linksIcon = document.getElementById('study-links-icon');
     const clockPanel = document.getElementById('study-clock-panel');
-    const alarmIcon = document.getElementById('study-alarm-icon');
-    const breakBtn = document.getElementById('global-break-btn');
-    if (clockPanel) clockPanel.style.display = active ? 'none' : 'block';
-    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
-    if (cutoffView) cutoffView.style.display = active ? 'block' : 'none';
-    if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
-    if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
-    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
-    if (active) renderCutoffView();
+    if (active) {
+      if (clockPanel) clockPanel.style.display = 'none';
+      if (sessionPanel) sessionPanel.style.display = 'none';
+      if (cutoffView) cutoffView.style.display = 'block';
+      renderCutoffView();
+    } else {
+      if (cutoffView) cutoffView.style.display = 'none';
+    }
+    // Never force-show clockPanel/sessionPanel/alarmIcon/linksIcon/breakBtn here — that's what
+    // was fighting with renderFocusMode/applyClockFocusUI and causing the flicker. Leave those
+    // to whichever flow (Planner session or manual clock) is actually authoritative right now.
+    applyChromeVisibility();
   }
 
   // Single re-render callback — invoked by TimeEngine's one-and-only heartbeat (every 1s)
