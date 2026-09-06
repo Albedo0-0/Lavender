@@ -4,6 +4,8 @@
 const Study = (function () {
   let timeInputOpen = false;
   let breakInputOpen = false;
+  let questionsInputOpen = false;
+  const QUESTION_TASK_TYPES = ['revision', 'theory', 'questions'];
 
   // ---------- helpers ----------
 
@@ -504,7 +506,11 @@ const Study = (function () {
         '<button id="study-prompt-time">Need more time</button>' +
       '</div>'
     );
-    document.getElementById('study-prompt-start').addEventListener('click', function () { TimeEngine.resolvePrompt(primaryChoice); Modal.close(); });
+    document.getElementById('study-prompt-start').addEventListener('click', function () {
+      if (prompt.kind === 'end' && task && QUESTION_TASK_TYPES.indexOf(task.taskType) !== -1) { showQuestionsInput(); return; }
+      TimeEngine.resolvePrompt(primaryChoice);
+      Modal.close();
+    });
     document.getElementById('study-prompt-break').addEventListener('click', function () { TimeEngine.resolvePrompt('break'); Modal.close(); });
     document.getElementById('study-prompt-time').addEventListener('click', function () { showTimeInput(); });
   }
@@ -525,6 +531,21 @@ const Study = (function () {
     });
   }
 
+  function showQuestionsInput() {
+    questionsInputOpen = true;
+    Modal.open(
+      '<h3>How many questions did you solve?</h3>' +
+      '<input type="number" id="study-questions-count" min="0" step="1">' +
+      '<button id="study-questions-confirm">Confirm</button>'
+    );
+    document.getElementById('study-questions-confirm').addEventListener('click', function () {
+      const n = Math.max(0, parseInt(document.getElementById('study-questions-count').value, 10) || 0);
+      questionsInputOpen = false;
+      TimeEngine.resolvePrompt('complete', null, n);
+      Modal.close();
+    });
+  }
+
   function showAutoBreakNotice(prompt) {
     const remainMin = Math.max(0, Math.ceil((prompt.autoBreakResumeAt - Date.now()) / 60000));
     Modal.open('<h3>On a short break</h3><p>No response, so a 5-minute break started automatically. Back in ' + remainMin + ' min \u2014 you\'ll be asked again.</p>');
@@ -533,6 +554,7 @@ const Study = (function () {
   function handlePrompt() {
     const prompt = TimeEngine.getPrompt();
     if (timeInputOpen && document.getElementById('study-time-minutes')) return;
+    if (questionsInputOpen && document.getElementById('study-questions-count')) return;
     if (!prompt) { promptToken = null; return; }
     const token = promptTokenFor(prompt);
     const overlay = document.getElementById('modal-overlay');
@@ -542,6 +564,7 @@ const Study = (function () {
     if (token === promptToken && overlayOpen) return;
     promptToken = token;
     timeInputOpen = false;
+    questionsInputOpen = false;
     if (prompt.autoBreakActive) showAutoBreakNotice(prompt); else showPrompt(prompt);
   }
 
