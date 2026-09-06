@@ -18,7 +18,8 @@
 //     state: 'scheduled'|'active'|'paused'|'completed'|'rescheduled'|'stale',
 //     studyMs, breakMs,              // accumulated (finalized) durations
 //     activeSince, pausedSince,      // timestamps (ms) or null — live deltas computed from these
-//     endPromptFired, createdAt }
+//     endPromptFired, createdAt,
+//     questionsSolved }              // optional int — only set on completion for revision/theory/questions tasks
 
 const TimeEngine = (function () {
   const START_BREAK_MS = 10 * 60 * 1000;   // "Need a break" default at a start prompt
@@ -82,13 +83,14 @@ const TimeEngine = (function () {
 
   function summarizeDate(dateStr) {
     const recs = getRecordsForDate(dateStr);
-    let studyMs = 0, breakMs = 0;
-    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); });
+    let studyMs = 0, breakMs = 0, questionsSolved = 0;
+    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); questionsSolved += Number(rec.questionsSolved) || 0; });
     (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === dateStr; }).forEach(function (b) { breakMs += b.durationMs; });
     return {
       date: dateStr,
       studyMs: studyMs,
       breakMs: breakMs,
+      questionsSolved: questionsSolved,
       tasksTotal: recs.length,
       tasksCompleted: recs.filter(function (r) { return r.state === 'completed'; }).length
     };
@@ -281,7 +283,7 @@ const TimeEngine = (function () {
   }
 
   // Resolve whichever prompt (start or end) is currently showing.
-  function resolvePrompt(choice, minutes) {
+  function resolvePrompt(choice, minutes, questionsSolved) {
     const engine = getEngine();
     const prompt = engine.prompt;
     if (!prompt) return;
@@ -301,7 +303,7 @@ const TimeEngine = (function () {
       }
     } else if (prompt.kind === 'end') {
       if (choice === 'complete') { // "Completed" — wrap-up is done: stop the clock and record actual time
-        completeActive();
+        completeActive(questionsSolved);
         return; // completeActive() already clears prompt/activeSessionId and notifies
       } else if (choice === 'break') {
         extendActiveAndShift(END_BREAK_MS);
@@ -339,11 +341,13 @@ const TimeEngine = (function () {
     notify();
   }
 
-  function completeActive() {
+  function completeActive(questionsSolved) {
     const active = getActiveSession();
     if (!active) return;
     const studyMs = (active.studyMs || 0) + (active.state === 'active' && active.activeSince ? Math.max(0, Date.now() - active.activeSince) : 0);
-    updateRecord(active.sessionId, { state: 'completed', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
+    const patch = { state: 'completed', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null };
+    if (questionsSolved !== undefined && questionsSolved !== null) patch.questionsSolved = questionsSolved;
+    updateRecord(active.sessionId, patch);
     const task = PlannerData.getAllTasks()[active.taskId];
     if (task && !task.completed) PlannerData.toggleComplete(active.taskId);
     const label = 'Study session (' + (task ? (task.taskType === 'custom' ? task.title : task.topicName) : 'Task') + ')';
@@ -577,6 +581,20 @@ const TimeEngine = (function () {
     return { studyMs: studyMs, breakMs: breakMs };
   }
 
+// Sum of questionsSolved across this date's session records (1.2) — the session-specific
+  // half of Progress's per-day question total (1.3); Journal's own number is the other half.
+  function getQuestionsForDate(dateStr) {
+    const d = dateStr || todayStr();
+    const recs = getRecordsForDate(d);
+    if (!recs.length) {
+      const summary = getDailySummary(d);
+      return (summary && summary.questionsSolved) || 0;
+    }
+    let total = 0;
+    recs.forEach(function (rec) { total += Number(rec.questionsSolved) || 0; });
+    return total;
+  }
+
   // ---------- subscriptions ----------
 
   function subscribe(fn) { listeners.push(fn); }
@@ -606,6 +624,7 @@ const TimeEngine = (function () {
     startGlobalBreak: startGlobalBreak,
     getClockDisplayMs: getClockDisplayMs,
     getDayStats: getDayStats,
+    getQuestionsForDate: getQuestionsForDate,
     getRecord: getRecord,
     getRecordForTask: findOpenRecordForTask,
     getRecordsForDate: getRecordsForDate,
