@@ -844,3 +844,17 @@ body {
   font-size: 4rem;
   margin: 24px 0;
 }
+
+#global-break-takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background-color: #fff;
+  background-size: cover;
+  background-position: center;
+  align-items: center;
+  justify-content: center;
+}
+.break-takeover-inner {
+  text-align: center;
+}
