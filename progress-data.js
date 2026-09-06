@@ -58,17 +58,19 @@ const ProgressData = (function () {
     return Math.round((journalHrs + engineHrs) * 10) / 10;
   }
 
-  function questionsValue(entry) {
-    if (!entry) return null;
-    const v = Number(entry.questionsSolved);
-    return isNaN(v) ? null : v;
+  function questionsValue(entry, dateStr) {
+    const jv = entry ? Number(entry.questionsSolved) : NaN;
+    const journalQ = isNaN(jv) ? 0 : jv;
+    const sessionQ = (dateStr && typeof TimeEngine !== 'undefined') ? (TimeEngine.getQuestionsForDate(dateStr) || 0) : 0;
+    if (isNaN(jv) && sessionQ <= 0) return null;
+    return journalQ + sessionQ;
   }
-
   // Productivity Score (0-10): normalized average of Mood, Study Hours, Questions Solved.
   // Weather is never included. Days with no journal activity at all return null (no data).
   function productivityValue(entry, dateStr) {
     const sv = studyHoursValue(entry, dateStr);
-    const hasAny = (entry && entry.mood) || (sv !== null && sv > 0) || (entry && Number(entry.questionsSolved) > 0);
+    const qv = questionsValue(entry, dateStr);
+    const hasAny = (entry && entry.mood) || (sv !== null && sv > 0) || (qv !== null && qv > 0);
     if (!hasAny) return null;
 
     const parts = [];
@@ -77,7 +79,6 @@ const ProgressData = (function () {
 
     if (sv !== null) parts.push(Math.min(10, (sv / STUDY_HOURS_CAP) * 10));
 
-    const qv = questionsValue(entry);
     if (qv !== null) parts.push(Math.min(10, (qv / QUESTIONS_CAP) * 10));
 
     if (!parts.length) return null;
@@ -212,9 +213,9 @@ const ProgressData = (function () {
   }
 
   function getTotalQuestionsSolved() {
-    const list = getAllEntriesList();
+    const list = getAllTrackedDateList();
     return list.reduce(function (sum, item) {
-      return sum + (questionsValue(item.entry) || 0);
+      return sum + (questionsValue(item.entry, item.date) || 0);
     }, 0);
   }
 
@@ -258,10 +259,10 @@ const ProgressData = (function () {
   }
 
   function getHighestQuestionsInOneDay() {
-    const list = getAllEntriesList();
+    const list = getAllTrackedDateList();
     let best = null;
     list.forEach(function (item) {
-      const v = questionsValue(item.entry);
+      const v = questionsValue(item.entry, item.date);
       if (v !== null && (best === null || v > best.value)) best = { value: v, date: item.date };
     });
     return best;
