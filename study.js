@@ -55,7 +55,7 @@ const Study = (function () {
   // Reset clicked after it's already run past zero can't over-record), for a stopwatch just the
   // raw elapsed.
   function elapsedForRecording(c) {
-    const elapsed = c.running ? (c.elapsedMs + (Date.now() - c.startedAt)) : c.elapsedMs;
+    const elapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
     return c.mode === 'timer' ? Math.min(elapsed, c.timerTotalMs) : elapsed;
   }
 
@@ -93,7 +93,7 @@ const Study = (function () {
   function pauseClock() {
     const c = getClock();
     if (!c.running) return;
-    const elapsed = c.elapsedMs + (Date.now() - c.startedAt);
+    const elapsed = c.elapsedMs + Math.max(0, Date.now() - c.startedAt);
     setClock({ running: false, elapsedMs: elapsed, startedAt: null });
     renderClock();
   }
@@ -106,15 +106,15 @@ const Study = (function () {
 
   function currentClockMs() {
     const c = getClock();
-    const elapsed = c.running ? (c.elapsedMs + (Date.now() - c.startedAt)) : c.elapsedMs;
-    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;
+    const elapsed = c.running ? (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) : c.elapsedMs;
+    return c.mode === 'timer' ? Math.max(0, c.timerTotalMs - elapsed) : elapsed;;
   }
 
   function renderClock() {
     const c = getClock();
     // A running timer that has naturally reached zero records its full duration on its own —
     // the person shouldn't have to click Reset just to get credit for a completed timer (req 4).
-    if (c.mode === 'timer' && c.running && !c.recorded && (c.elapsedMs + (Date.now() - c.startedAt)) >= c.timerTotalMs) {
+    if (c.mode === 'timer' && c.running && !c.recorded && (c.elapsedMs + Math.max(0, Date.now() - c.startedAt)) >= c.timerTotalMs) {
       TimeEngine.recordStandaloneStudy(c.timerTotalMs, 'timer');
       setClock({ running: false, startedAt: null, elapsedMs: c.timerTotalMs, recorded: true });
     }
