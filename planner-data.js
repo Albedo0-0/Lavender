@@ -181,6 +181,18 @@ const PlannerData = (function () {
     });
     State.set({ tasks: tasks });
   }
+
+  // Deletes exactly one task instance (by taskId). Revision-cycle siblings, if any, are left
+  // untouched — deletion is always single-instance, never whole-cycle. Does not touch
+  // TimeEngine's sessionRecords, so completed-session history for this task is preserved even
+  // after the schedule row is gone.
+  function deleteTask(taskId) {
+    const tasks = Object.assign({}, State.get().tasks || {});
+    if (!tasks[taskId]) return;
+    delete tasks[taskId];
+    State.set({ tasks: tasks });
+  }
+  // ---------- Tasks: completion ----------
   // ---------- Tasks: completion ----------
 
   function toggleComplete(taskId) {
@@ -309,6 +321,7 @@ function slotLabel(t) {
     createSingleTask: createSingleTask,
     createCustomTask: createCustomTask,
     rescheduleTask: rescheduleTask,
+    deleteTask: deleteTask,
     toggleComplete: toggleComplete,
     getAllTasks: getAllTasks,
     getTasksList: getTasksList,
