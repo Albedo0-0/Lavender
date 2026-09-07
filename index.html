@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cute Journal + Planner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav id="main-nav">
+    <button class="nav-btn" data-screen="calendar">Calendar</button>
+    <button class="nav-btn" data-screen="journal">Journal</button>
+    <button class="nav-btn" data-screen="planner">Planner</button>
+    <button class="nav-btn" data-screen="study">Study</button>
+    <button class="nav-btn" data-screen="progress">Progress</button>
+  </nav>
+  <button id="journal-lock-toggle" title="Journal lock" aria-label="Toggle journal lock" style="display:none">&#128275;</button>
+  <button id="global-break-btn" title="Take a break" aria-label="Take a break">Break</button>
+  <button id="water-icon" title="Log water" aria-label="Log water">&#128167;</button>
+  <button id="sleep-icon" title="Sleep tracker" aria-label="Sleep tracker">&#128564;</button>
+  <button id="assistant-icon" title="Assistant" aria-label="Open Assistant">&#128203;</button>
+  <button id="settings-icon" title="Settings" aria-label="Open Settings">&#9881;</button>
+  <div id="global-break-takeover" style="display:none"></div>
+
+  <div id="top-meter-bar">
+    <div id="productivity-bar-wrap" title="Productivity">
+      <div id="productivity-bar-fill"></div>
+      <span id="productivity-bar-label"></span>
+    </div>
+    <div id="exp-bar-wrap" title="EXP">
+      <div id="exp-bar-fill"></div>
+      <span id="exp-bar-label"></span>
+    </div>
+  </div>
+
+  <main>
+    <section id="screen-calendar" class="screen">
+      <div id="calendar-header">
+        <button id="calendar-prev">&lt; prev</button>
+        <span id="calendar-month-label"></span>
+        <button id="calendar-next">next &gt;</button>
+      </div>
+      <div id="calendar-grid"></div>
+      <div id="calendar-countdown"></div>
+      <div id="calendar-streak"></div>
+    </section>
+    <section id="screen-journal" class="screen"></section>
+    <section id="screen-planner" class="screen">
+      <div id="planner-layout">
+        <div id="planner-main">
+          <h3>New Study Task</h3>
+          <div id="planner-form"></div>
+        </div>
+        <div id="planner-side">
+          <div id="planner-tabs">
+            <button class="planner-tab-btn active" data-tab="today">Today</button>
+            <button class="planner-tab-btn" data-tab="pending">Pending</button>
+            <button class="planner-tab-btn" data-tab="history">History</button>
+          </div>
+          <div id="planner-tab-content"></div>
+        </div>
+      </div>
+    </section>
+    <section id="screen-study" class="screen">
+      <div id="study-layout">
+        <div id="study-header">
+          <h3>Study</h3>
+          <button id="study-links-icon" title="Links" aria-label="Subject links">&#128279;</button>
+          <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
+        </div>
+        <div id="study-clock-panel"></div>
+        <div id="study-session-panel"></div>
+        <div id="study-cutoff-view" style="display:none"></div>
+        <div id="study-log-panel" style="position:fixed; bottom:10px; left:10px; max-width:260px; max-height:220px; overflow-y:auto; background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px 10px; font-size:12px; z-index:999; box-shadow:0 1px 4px rgba(0,0,0,0.15);"></div>
+      </div>
+    </section>
+    <section id="screen-progress" class="screen"></section>
+</main>
+
+  <div id="modal-overlay">
+    <div id="modal-content" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <!-- Load order matters: storage -> state -> nav -->
+<script src="storage.js"></script>
+<script src="state.js"></script>
+  <script src="notify.js"></script>
+  <script src="sleep-data.js"></script>
+  <script src="water-data.js"></script>
+  <script src="alarm-data.js"></script>
+  <script src="nav.js"></script>
+  <script src="datehub.js"></script>
+  <script src="streak.js"></script>
+  <script src="planner-data.js"></script>
+  <script src="timeengine.js"></script>
+  <script src="journal-data.js"></script>
+  <script src="modal.js"></script>
+  <script src="sleep.js"></script>
+  <script src="water.js"></script>
+  <script src="alarm.js"></script>
+  <script src="journal.js"></script>
+  <script src="calendar.js"></script>
+  <script src="planner.js"></script>
+  <script src="study.js"></script>
+  <script src="progress-data.js"></script>
+  <script src="productivity-data.js"></script>
+  <script src="progress.js"></script>
+  <script src="assistant-data.js"></script>
+  <script src="assistant.js"></script>
+  <script src="gamification-data.js"></script>
+  <script src="gamification.js"></script>
+  <script src="backup.js"></script>
+  <script src="settings.js"></script>
+  <script>
+    State.init();
+    Nav.init();
+    Modal.init();
+    Sleep.init();
+    Water.init();
+    Alarm.init();
+    TimeEngine.init();
+    Calendar.init();
+    Journal.init();
+    Planner.init();
+    Study.init();
+    Progress.init();
+    Assistant.init();
+    Gamification.init();
+    Settings.init();
+  </script>
+
+</body>
+</html>
+
+
