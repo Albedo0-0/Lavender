@@ -5,8 +5,13 @@ const Study = (function () {
   let timeInputOpen = false;
   let breakInputOpen = false;
   let questionsInputOpen = false;
+  // Guards the Timer/Stopwatch completion lifecycle (Save and natural auto-completion both
+  // funnel through this). Prevents: the natural-completion tick firing while a Save click is
+  // still being processed (or vice versa), a stale/delayed callback re-finalizing a run that's
+  // already been logged and reset, and any accidental recursive completion — all of which
+  // previously could log the same run more than once.
+  let clockCompleting = false;
   const QUESTION_TASK_TYPES = ['revision', 'theory', 'questions'];
-
   // ---------- helpers ----------
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -62,11 +67,12 @@ const Study = (function () {
     const elapsed = TimeEngine.safeElapsed(c.startedAt, Date.now());
     const remaining = c.mode === 'timer' ? Math.max(0, TimeEngine.safeMs(c.timerTotalMs) - TimeEngine.safeMs(c.elapsedMs)) : Infinity;
     const capped = Math.min(elapsed, remaining);
-    if (capped > 0) {
-      TimeEngine.recordStandaloneStudy(capped, c.mode);
-      // Live EXP (item 1) — 100/hour, proportional, logged even for very short segments.
-      if (typeof GamificationData !== 'undefined') GamificationData.awardStudyTime(capped, c.mode);
-    }
+    // Reject anything non-finite or non-positive outright — a suspended/throttled tab, a clock
+    // jump, or a corrupted timerTotalMs/elapsedMs must never turn into a logged/recorded segment.
+    if (!isFinite(capped) || capped <= 0) return 0;
+    TimeEngine.recordStandaloneStudy(capped, c.mode);
+    // Live EXP (item 1) — 100/hour, proportional, logged even for very short segments.
+    if (typeof GamificationData !== 'undefined') GamificationData.awardStudyTime(capped, c.mode);
     return capped;
   }
 
@@ -97,24 +103,38 @@ const Study = (function () {
   // still running (if any), logs the full accumulated total exactly once, then resets the
   // clock to a blank idle state. Pause/Resume never call this and never log.
   function saveClockAndReset() {
+    if (clockCompleting) return; // a completion (auto or manual) is already finalizing this run
+    clockCompleting = true;
     const c = getClock();
     let total = c.elapsedMs || 0;
     if (c.running) total += commitSegment();
     if (total > 0) TimeEngine.pushLog(todayStr(), c.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
+    clockCompleting = false;
   }
 
   // Timer hit its target — commit whatever tail segment wasn't committed by an earlier pause
   // yet, log the full originally-entered duration exactly once, and reset immediately. No
   // freeze, no separate decision step: natural completion behaves like an automatic Save.
   function autoCompleteTimer() {
+    if (clockCompleting) return; // duplicate/re-entrant/stale trigger for a run already finalizing
+    clockCompleting = true;
     const c = getClock();
-    const segment = commitSegment();
-    const total = (c.elapsedMs || 0) + segment;
-    if (total > 0) TimeEngine.pushLog(todayStr(), 'Timer', total, 'min');
+    // Natural completion always logs exactly the originally entered duration — never a re-derived
+    // sum of live segments, which could drift from a stale Date.now() - startedAt read (e.g. a
+    // throttled/backgrounded tab) into more or less than what was actually promised to the user.
+    const originalDuration = TimeEngine.safeMs(c.timerTotalMs);
+    // Still commit the true final live segment to TimeEngine/Gamification (already capped to
+    // remaining time by commitSegment, so it can never push actual tracked study time past the
+    // timer's own duration) — this is separate from, and unaffected by, the value logged below.
+    commitSegment();
+    if (originalDuration > 0) TimeEngine.pushLog(todayStr(), 'Timer', originalDuration, 'min');
+    // Stop everything about this run — mode/running/startedAt/timerTotalMs all reset together so
+    // any stale/delayed callback that still fires afterward reads a dead run and is a no-op.
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
+    clockCompleting = false;
   }
 
   // While a Stopwatch/Timer run (or the end-of-timer decision) is active, it takes over the
@@ -158,10 +178,13 @@ const Study = (function () {
   // could be hours old. Pulling this out and calling it unconditionally, first thing, on every
   // single tick (see onEngineTick) closes that gap regardless of cutoff/session state.
   function checkTimerTarget() {
+    if (clockCompleting) return false; // a completion is already being finalized — never re-enter
     const c = getClock();
     if (c.mode === 'timer' && c.running && !c.awaitingDecision) {
+      const target = TimeEngine.safeMs(c.timerTotalMs);
       const totalElapsed = TimeEngine.safeMs(c.elapsedMs) + TimeEngine.safeElapsed(c.startedAt, Date.now());
-      if (totalElapsed >= c.timerTotalMs) { autoCompleteTimer(); return true; }
+      // target > 0 rejects an impossible/corrupted timerTotalMs from ever satisfying completion.
+      if (target > 0 && totalElapsed >= target) { autoCompleteTimer(); return true; }
     }
     return false;
   }
