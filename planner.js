@@ -471,6 +471,10 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     container.querySelectorAll('.planner-reschedule-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { openRescheduleModal(btn.dataset.taskId); });
     });
+
+    container.querySelectorAll('.planner-delete-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { confirmDeleteTask(btn.dataset.taskId); });
+    });
   }
 
   function openRescheduleModal(taskId) {
@@ -497,6 +501,23 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       renderSidePanel();
     });
   }
+
+  function confirmDeleteTask(taskId) {
+    Modal.open(
+      '<h3>Delete task?</h3>' +
+      '<p>This removes it from your schedule. This cannot be undone.</p>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="planner-delete-confirm">Delete</button>' +
+        '<button id="planner-delete-cancel">Cancel</button>' +
+      '</div>'
+    );
+    document.getElementById('planner-delete-confirm').addEventListener('click', function () {
+      PlannerData.deleteTask(taskId);
+      Modal.close();
+      renderSidePanel();
+    });
+    document.getElementById('planner-delete-cancel').addEventListener('click', function () { Modal.close(); });
+  }
   function emptyMessage() {
     if (activeTab === 'history') return 'No completed tasks for this chapter yet.';
     if (activeTab === 'pending') return 'Nothing pending — nice!';
@@ -518,6 +539,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const reschedBtn = !t.completed
       ? '<button class="planner-reschedule-btn" data-task-id="' + t.taskId + '">Reschedule</button>'
       : '';
+    const deleteBtn = '<button class="planner-delete-btn" data-task-id="' + t.taskId + '">Delete</button>';
 
     return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
       '<label class="planner-task-check-label">' +
@@ -526,7 +548,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      studyBtn + reschedBtn +
+      studyBtn + reschedBtn + deleteBtn +
     '</div>';
   }
 
