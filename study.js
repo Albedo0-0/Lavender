@@ -316,8 +316,9 @@ function renderClock() {
       else if (rec && rec.state === 'rescheduled') status = 'Moved to another day';
       const slotTime = rec ? (rec.adjustedStart + '\u2013' + rec.adjustedEnd) : (t.startTime + '\u2013' + t.stopTime);
       const reschedBtn = !t.completed ? '<button class="study-alarm-resched-btn" data-task-id="' + t.taskId + '">Reschedule</button>' : '';
+      const deleteBtn = '<button class="study-alarm-delete-btn" data-task-id="' + t.taskId + '">Delete</button>';
       return '<div class="study-alarm-row"><span>' + slotTime + '</span>' +
-        '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span>' + reschedBtn + '</div>';
+        '<span>' + taskLabelFull(t) + '</span><span>' + status + '</span>' + reschedBtn + deleteBtn + '</div>';
     }).join('') || '<p class="planner-empty">No slots scheduled today.</p>';
   }
 
@@ -325,6 +326,25 @@ function renderClock() {
     document.querySelectorAll('.study-alarm-resched-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { openDoItLaterModal(btn.dataset.taskId); });
     });
+    document.querySelectorAll('.study-alarm-delete-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { confirmDeleteScheduledTask(btn.dataset.taskId); });
+    });
+  }
+
+  function confirmDeleteScheduledTask(taskId) {
+    Modal.open(
+      '<h3>Delete task?</h3>' +
+      '<p>This removes it from your schedule. This cannot be undone.</p>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="study-delete-confirm">Delete</button>' +
+        '<button id="study-delete-cancel">Cancel</button>' +
+      '</div>'
+    );
+    document.getElementById('study-delete-confirm').addEventListener('click', function () {
+      PlannerData.deleteTask(taskId);
+      openAlarmListModal();
+    });
+    document.getElementById('study-delete-cancel').addEventListener('click', function () { openAlarmListModal(); });
   }
 
   function openAlarmListModal() {
