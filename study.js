@@ -93,29 +93,25 @@ const Study = (function () {
     renderClockPanel();
   }
 
-  function resetClock() {
+  // Save — the ONLY action that ever writes a visible log entry. Commits whatever segment is
+  // still running (if any), logs the full accumulated total exactly once, then resets the
+  // clock to a blank idle state. Pause/Resume never call this and never log.
+  function saveClockAndReset() {
     const c = getClock();
     let total = c.elapsedMs || 0;
     if (c.running) total += commitSegment();
     if (total > 0) TimeEngine.pushLog(todayStr(), c.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
-    setClock({ running: false, startedAt: null, elapsedMs: 0, timerTotalMs: 0, awaitingDecision: false });
+    setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
   }
 
-  // Timer hit its target — freeze it, commit whatever tail segment wasn't committed by an
-  // earlier pause yet, and ask what to do. elapsedMs becomes fully committed the instant this runs.
-  function freezeTimerAtTarget() {
+  // Timer hit its target — commit whatever tail segment wasn't committed by an earlier pause
+  // yet, log the full originally-entered duration exactly once, and reset immediately. No
+  // freeze, no separate decision step: natural completion behaves like an automatic Save.
+  function autoCompleteTimer() {
     const c = getClock();
     const segment = commitSegment();
-    setClock({ running: false, startedAt: null, awaitingDecision: true, elapsedMs: (c.elapsedMs || 0) + segment });
-    renderClockPanel();
-  }
-
-  // Save — everything was already committed the moment the timer hit its target (and by any
-  // pauses before that), so this just resets the tab back to its original blank state.
-  function saveTimerAndReset() {
-    const c = getClock();
-    const total = c.elapsedMs || 0;
+    const total = (c.elapsedMs || 0) + segment;
     if (total > 0) TimeEngine.pushLog(todayStr(), 'Timer', total, 'min');
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
     renderClockPanel();
@@ -165,15 +161,15 @@ const Study = (function () {
     const c = getClock();
     if (c.mode === 'timer' && c.running && !c.awaitingDecision) {
       const totalElapsed = TimeEngine.safeMs(c.elapsedMs) + TimeEngine.safeElapsed(c.startedAt, Date.now());
-      if (totalElapsed >= c.timerTotalMs) { freezeTimerAtTarget(); return true; }
+      if (totalElapsed >= c.timerTotalMs) { autoCompleteTimer(); return true; }
     }
     return false;
   }
 
-  function renderClock() {
+function renderClock() {
     if (checkTimerTarget()) return;
     const fresh = getClock();
-    const uiMode = fresh.awaitingDecision ? 'decision' : 'normal';
+    const uiMode = isClockActive(fresh) ? 'active' : 'idle';
     if (uiMode !== lastClockUiMode) {
       lastClockUiMode = uiMode;
       renderClockPanel();
@@ -181,15 +177,8 @@ const Study = (function () {
     }
     const display = document.getElementById('study-clock-display');
     if (display) display.textContent = fmtDuration(currentClockMs());
-    const startBtn = document.getElementById('study-clock-start');
-    const pauseBtn = document.getElementById('study-clock-pause');
-    const modesEl = document.getElementById('study-clock-modes');
-    if (startBtn) {
-      startBtn.style.display = fresh.running ? 'none' : 'inline-block';
-      startBtn.textContent = (!fresh.running && (fresh.elapsedMs || 0) > 0) ? 'Resume' : 'Start';
-    }
-    if (pauseBtn) pauseBtn.style.display = fresh.running ? 'inline-block' : 'none';
-    if (modesEl) modesEl.style.display = isClockActive(fresh) ? 'none' : 'flex';
+    const toggleBtn = document.getElementById('study-clock-toggle');
+    if (toggleBtn) toggleBtn.textContent = fresh.running ? 'Pause' : 'Resume';
     applyClockFocusUI(isClockActive(fresh));
     renderStudyLog();
   }
@@ -213,49 +202,35 @@ const Study = (function () {
       entries.map(function (e) { return '<div>' + fmtLogEntry(e) + '</div>'; }).join('');
   }
 
+  
   function renderClockPanel() {
     const container = document.getElementById('study-clock-panel');
     if (!container) return;
     const c = getClock();
-
-    if (c.awaitingDecision) {
-      // Timer hit its target — just one option (Save), per item 3. elapsedMs is already fully
-      // committed by freezeTimerAtTarget(), so this display can only ever show the timer's own
-      // total, never anything still counting up.
-      container.innerHTML =
-        '<div id="study-clock-display" class="study-clock-display">' + fmtDuration(c.elapsedMs || 0) + '</div>' +
-        '<div class="study-clock-controls">' +
-          '<button id="study-clock-save">Save</button>' +
-        '</div>';
-      document.getElementById('study-clock-save').addEventListener('click', saveTimerAndReset);
-      lastClockUiMode = 'decision';
-      applyClockFocusUI(true);
-      renderStudyLog();
-      return;
-    }
+    const active = isClockActive(c);
 
     container.innerHTML =
-      '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (isClockActive(c) ? 'none' : 'flex') + '">' +
+      '<div id="study-clock-modes" class="study-clock-modes" style="display:' + (active ? 'none' : 'flex') + '">' +
         '<button class="study-mode-btn" data-mode="stopwatch">Stopwatch</button>' +
         '<button class="study-mode-btn" data-mode="timer">Timer</button>' +
       '</div>' +
-      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' && !isClockActive(c) ? 'block' : 'none') + '">' +
+      '<div id="study-timer-setup" class="study-timer-setup" style="display:' + (c.mode === 'timer' && !active ? 'block' : 'none') + '">' +
         '<input type="number" id="study-timer-minutes" min="1" placeholder="Minutes">' +
       '</div>' +
       '<div id="study-clock-display" class="study-clock-display"></div>' +
       '<div class="study-clock-controls">' +
-        '<button id="study-clock-start">Start</button>' +
-        '<button id="study-clock-pause">Pause</button>' +
-        '<button id="study-clock-reset">Reset</button>' +
+        '<button id="study-clock-start" style="display:' + (active ? 'none' : 'inline-block') + '">Start</button>' +
+        '<button id="study-clock-toggle" style="display:' + (active ? 'inline-block' : 'none') + '">' + (c.running ? 'Pause' : 'Resume') + '</button>' +
+        '<button id="study-clock-save" style="display:' + (active ? 'inline-block' : 'none') + '">Save</button>' +
       '</div>';
 
     document.querySelectorAll('.study-mode-btn').forEach(function (btn) {
       btn.classList.toggle('active', btn.dataset.mode === c.mode);
       btn.addEventListener('click', function () {
-        const cur = getClock();
-        if (cur.running) return;
-        const total = cur.elapsedMs || 0;
-        if (total > 0) TimeEngine.pushLog(todayStr(), cur.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
+        // Switching modes is only allowed from a fully idle clock — switching away from an
+        // active/paused-with-time run would otherwise be an implicit, silent save (or silent
+        // data loss), which the "only Save logs" rule doesn't allow. Save first, then switch.
+        if (isClockActive(getClock())) return;
         setClock({ mode: btn.dataset.mode, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
         renderClockPanel();
       });
@@ -263,7 +238,6 @@ const Study = (function () {
 
     document.getElementById('study-clock-start').addEventListener('click', function () {
       const cur = getClock();
-      if (!cur.running && (cur.elapsedMs || 0) > 0) { resumeClock(); return; }
       if (cur.mode === 'timer') {
         const minutes = parseInt(document.getElementById('study-timer-minutes').value, 10);
         if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
@@ -272,11 +246,18 @@ const Study = (function () {
         startStopwatch();
       }
     });
-    document.getElementById('study-clock-pause').addEventListener('click', pauseClock);
-    document.getElementById('study-clock-reset').addEventListener('click', resetClock);
+    document.getElementById('study-clock-toggle').addEventListener('click', function () {
+      if (getClock().running) pauseClock(); else resumeClock();
+    });
+    document.getElementById('study-clock-save').addEventListener('click', function (e) {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      saveClockAndReset();
+    });
 
-    lastClockUiMode = 'normal';
-    applyClockFocusUI(isClockActive(c));
+    lastClockUiMode = active ? 'active' : 'idle';
+    applyClockFocusUI(active);
     renderClock();
   }
 
