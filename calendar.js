@@ -163,11 +163,29 @@ const Calendar = (function () {
                 '<input type="checkbox" class="datehub-todo-check" data-task-id="' + t.taskId + '"' + (t.completed ? ' checked' : '') + '>' +
                 ' ' + label +
               '</label>' +
+              '<button class="datehub-todo-delete" data-task-id="' + t.taskId + '">Delete</button>' +
             '</li>';
           }).join('') +
         '</ul>' +
       '</div>';
     }).join('');
+  }
+
+  function confirmDeleteDateHubTask(taskId, dateStr) {
+    Modal.open(
+      '<h3>Delete task?</h3>' +
+      '<p>This removes it from your schedule. This cannot be undone.</p>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="datehub-delete-confirm">Delete</button>' +
+        '<button id="datehub-delete-cancel">Cancel</button>' +
+      '</div>'
+    );
+    document.getElementById('datehub-delete-confirm').addEventListener('click', function () {
+      PlannerData.deleteTask(taskId);
+      render();
+      openDateHub(dateStr);
+    });
+    document.getElementById('datehub-delete-cancel').addEventListener('click', function () { openDateHub(dateStr); });
   }
 
   function openDateHub(dateStr) {
@@ -208,6 +226,10 @@ const Calendar = (function () {
         render();
         openDateHub(dateStr);
       });
+    });
+
+    document.querySelectorAll('.datehub-todo-delete').forEach(function (btn) {
+      btn.addEventListener('click', function () { confirmDeleteDateHubTask(btn.dataset.taskId, dateStr); });
     });
     document.getElementById('datehub-save').addEventListener('click', function () {
       const note = document.getElementById('datehub-note').value;
