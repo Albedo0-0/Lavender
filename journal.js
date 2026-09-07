@@ -4,6 +4,7 @@
 const Journal = (function () {
   let initialized = false;
   let currentDate = null;
+  let openedViaCalendar = false;
   let timerInterval = null;
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -31,6 +32,16 @@ const Journal = (function () {
 
   function openDate(dateStr) {
     currentDate = dateStr;
+    openedViaCalendar = true;
+    render();
+  }
+
+  function enterViaNav() {
+    if (openedViaCalendar) {
+      openedViaCalendar = false;
+    } else {
+      currentDate = todayStr();
+    }
     render();
   }
 
@@ -201,7 +212,7 @@ const Journal = (function () {
       '<div class="journal-photos">' +
         '<label class="journal-label">Photos</label>' +
         '<div id="journal-photo-list" class="journal-photo-list"></div>' +
-        '<input type="file" id="journal-photo-input" accept="image/*" multiple>' +
+        '<input type="file" id="journal-photo-input" accept="image/*" multiple' + dis + '>' +
       '</div>' +
 
       '<div class="journal-manifestation">' +
@@ -293,10 +304,11 @@ const Journal = (function () {
 
   // ---------- Photos ----------
 
-  function renderPhotos() {
+function renderPhotos() {
     const list = document.getElementById('journal-photo-list');
     if (!list) return;
     const entry = JournalData.getEntry(currentDate);
+    const readOnly = !!entry.saved;
     if (entry.photos.length === 0) {
       list.innerHTML = '<span class="journal-photo-empty">No photos yet.</span>';
       return;
@@ -304,7 +316,7 @@ const Journal = (function () {
     list.innerHTML = entry.photos.map(function (id) {
       return '<div class="journal-photo-item" data-photo-id="' + id + '">' +
         '<img class="journal-photo-img" data-photo-id="' + id + '">' +
-        '<button class="journal-photo-remove" data-photo-id="' + id + '">&times;</button>' +
+        (readOnly ? '' : '<button class="journal-photo-remove" data-photo-id="' + id + '">&times;</button>') +
       '</div>';
     }).join('');
 
@@ -315,11 +327,13 @@ const Journal = (function () {
       });
     });
 
-    list.querySelectorAll('.journal-photo-remove').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        JournalData.removePhoto(currentDate, btn.dataset.photoId).then(renderPhotos);
+    if (!readOnly) {
+      list.querySelectorAll('.journal-photo-remove').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          JournalData.removePhoto(currentDate, btn.dataset.photoId).then(renderPhotos);
+        });
       });
-    });
+    }
   }
 
   // ---------- Daily Challenge ----------
@@ -409,5 +423,5 @@ const Journal = (function () {
     return initialized;
   }
 
-  return { init: init, render: render, openDate: openDate, isReady: isReady };
+  return { init: init, render: render, openDate: openDate, enterViaNav: enterViaNav, isReady: isReady };
 })();
