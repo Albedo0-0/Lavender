@@ -1,11 +1,9 @@
 // nav.js — switches between empty screen placeholders. Loaded after state.js.
 
 const Nav = (function () {
-  const screens = ['calendar', 'journal', 'planner', 'study', 'progress'];
-
+  const screens = ['calendar', 'journal', 'library', 'study', 'progress'];
   function switchTo(screenName) {
-    if (!screens.includes(screenName)) return;
-
+    if (screenName === 'library' && typeof Library !== 'undefined' && Library.render) Library.render();
     screens.forEach(function (name) {
       const el = document.getElementById('screen-' + name);
       if (el) el.style.display = (name === screenName) ? 'block' : 'none';
