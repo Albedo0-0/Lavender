@@ -69,6 +69,30 @@ const PlannerData = (function () {
     return grouped;
   }
 
+  function getTasksForTopic(topicId) {
+    return getTasksList().filter(function (t) { return t.topicId === topicId; });
+  }
+
+  function renameTopic(topicId, newName) {
+    const topics = Object.assign({}, getAllTopics());
+    if (!topics[topicId]) return false;
+    topics[topicId] = Object.assign({}, topics[topicId], { topicName: newName.trim() });
+    State.set({ topics: topics });
+    const tasks = Object.assign({}, State.get().tasks || {});
+    Object.keys(tasks).forEach(function (id) {
+      if (tasks[id].topicId === topicId) tasks[id] = Object.assign({}, tasks[id], { topicName: newName.trim() });
+    });
+    State.set({ tasks: tasks });
+    return true;
+  }
+
+  function deleteTopic(topicId) {
+    if (getTasksForTopic(topicId).length > 0) return false;
+    const topics = Object.assign({}, getAllTopics());
+    delete topics[topicId];
+    State.set({ topics: topics });
+    return true;
+  }
   // ---------- Tasks: creation ----------
 
   function computeRevisionDates(baseDateStr) {
@@ -317,6 +341,9 @@ function slotLabel(t) {
     getOrCreateTopic: getOrCreateTopic,
     findTopic: findTopic,
     getTopicsBySubject: getTopicsBySubject,
+    getTasksForTopic: getTasksForTopic,
+    renameTopic: renameTopic,
+    deleteTopic: deleteTopic,
     createRevisionCycle: createRevisionCycle,
     createSingleTask: createSingleTask,
     createCustomTask: createCustomTask,
