@@ -108,7 +108,9 @@ const Alarm = (function () {
       const result = editingId ? AlarmData.update(editingId, fields) : AlarmData.create(fields);
 
       if (!result) {
-        document.getElementById('alarm-form-error').textContent = 'Pick a valid time and recurrence (weekdays needs at least one day; specific date needs a date).';
+        const reason = (typeof AlarmData.getLastError === 'function' && AlarmData.getLastError()) ||
+          'Pick a valid time and recurrence (weekdays needs at least one day; specific date needs a date).';
+        document.getElementById('alarm-form-error').textContent = reason;
         return;
       }
       openList();
