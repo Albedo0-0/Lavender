@@ -20,6 +20,45 @@ const AlarmData = (function () {
     return pad(t.getHours()) + ':' + pad(t.getMinutes());
   }
 
+  // §Feature 4 — last rejection reason from create()/update(), surfaced by alarm.js's form UI.
+  let lastError = null;
+  function getLastError() { return lastError; }
+
+  // Does a given calendar date fall within this alarm's recurrence pattern? Generalizes
+  // recurrenceMatchesToday() to an arbitrary date instead of "now", so conflict-checking can
+  // test a task's actual scheduled date rather than only today.
+  function dateMatchesRecurrence(recurrence, dateStr) {
+    if (recurrence.type === 'daily') return true;
+    if (recurrence.type === 'weekdays') {
+      const d = new Date(dateStr + 'T00:00:00');
+      return Array.isArray(recurrence.days) && recurrence.days.indexOf(DAY_KEYS[d.getDay()]) !== -1;
+    }
+    if (recurrence.type === 'date') return recurrence.date === dateStr;
+    if (recurrence.type === 'once') return dateStr === todayStr();
+    return false;
+  }
+
+  function timeFallsInSlot(time, startTime, stopTime) {
+    if (!startTime || !stopTime) return false;
+    return time >= startTime && time < stopTime;
+  }
+
+  // §Feature 4 — checks a candidate alarm time/recurrence against Planner's scheduled tasks.
+  // Reuses PlannerData.getAllTasks() (already relied on elsewhere, e.g. planner.js) rather than
+  // duplicating any task-storage logic. Read-only — never mutates Planner state.
+  function findTaskConflict(recurrence, time) {
+    if (typeof PlannerData === 'undefined' || typeof PlannerData.getAllTasks !== 'function') return null;
+    const tasks = PlannerData.getAllTasks();
+    const ids = Object.keys(tasks);
+    for (let i = 0; i < ids.length; i++) {
+      const t = tasks[ids[i]];
+      if (!t || !t.date || !t.startTime || !t.stopTime) continue;
+      if (!dateMatchesRecurrence(recurrence, t.date)) continue;
+      if (timeFallsInSlot(time, t.startTime, t.stopTime)) return t;
+    }
+    return null;
+  }
+
   function getAll() {
     return State.get().generalAlarms || {};
   }
@@ -51,9 +90,20 @@ const AlarmData = (function () {
     return false;
   }
 
-  // §6.2 — create; returns the new alarm, or null if the recurrence is invalid (§6.4).
+ // §6.2 — create; returns the new alarm, or null if the recurrence is invalid (§6.4) or the
+  // alarm's time conflicts with a Planner task on a date that recurrence would fire on (Feature 4).
+  // On null, call getLastError() for the specific reason.
   function create(fields) {
-    if (!validateRecurrence(fields.recurrence, fields.time)) return null;
+    lastError = null;
+    if (!validateRecurrence(fields.recurrence, fields.time)) {
+      lastError = 'Pick a valid time and recurrence (weekdays needs at least one day; specific date needs a date).';
+      return null;
+    }
+    const conflictTask = findTaskConflict(fields.recurrence, fields.time);
+    if (conflictTask) {
+      lastError = 'That time conflicts with a scheduled task on ' + conflictTask.date + ' (' + conflictTask.startTime + '\u2013' + conflictTask.stopTime + ').';
+      return null;
+    }
     const id = 'al' + Date.now() + Math.floor(Math.random() * 1000);
     const alarm = {
       id: id,
@@ -70,12 +120,22 @@ const AlarmData = (function () {
     return alarm;
   }
 
-  // §6.2 — edit; rejects the update (leaves the alarm unchanged) if the new recurrence is invalid.
+ // §6.2 — edit; rejects the update (leaves the alarm unchanged) if the new recurrence is invalid
+  // or conflicts with a Planner task (Feature 4). On null, call getLastError() for the reason.
   function update(id, fields) {
+    lastError = null;
     const existing = getById(id);
     if (!existing) return null;
     const next = Object.assign({}, existing, fields);
-    if (!validateRecurrence(next.recurrence, next.time)) return null;
+    if (!validateRecurrence(next.recurrence, next.time)) {
+      lastError = 'Pick a valid time and recurrence (weekdays needs at least one day; specific date needs a date).';
+      return null;
+    }
+    const conflictTask = findTaskConflict(next.recurrence, next.time);
+    if (conflictTask) {
+      lastError = 'That time conflicts with a scheduled task on ' + conflictTask.date + ' (' + conflictTask.startTime + '\u2013' + conflictTask.stopTime + ').';
+      return null;
+    }
     const all = Object.assign({}, getAll());
     all[id] = next;
     State.set({ generalAlarms: all });
@@ -149,6 +209,7 @@ const AlarmData = (function () {
     dismiss: dismiss,
     snooze: snooze,
     isDueNow: isDueNow,
-    getDueAlarms: getDueAlarms
+    getDueAlarms: getDueAlarms,
+    getLastError: getLastError
   };
 })();
