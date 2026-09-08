@@ -11,7 +11,7 @@
   <nav id="main-nav">
     <button class="nav-btn" data-screen="calendar">Calendar</button>
     <button class="nav-btn" data-screen="journal">Journal</button>
-    <button class="nav-btn" data-screen="planner">Planner</button>
+    <button class="nav-btn" data-screen="library">Library</button>
     <button class="nav-btn" data-screen="study">Study</button>
     <button class="nav-btn" data-screen="progress">Progress</button>
   </nav>
@@ -46,13 +46,16 @@
       <div id="calendar-streak"></div>
     </section>
     <section id="screen-journal" class="screen"></section>
-    <section id="screen-planner" class="screen">
-      <div id="planner-layout">
-        <div id="planner-main">
-          <h3>New Study Task</h3>
-          <div id="planner-form"></div>
+    <section id="screen-library" class="screen">
+      <div id="library-layout">
+        <div id="library-main">
+          <div id="library-body"></div>
         </div>
         <div id="planner-side">
+          <div id="planner-main">
+            <h3>New Study Task</h3>
+            <div id="planner-form"></div>
+          </div>
           <div id="planner-tabs">
             <button class="planner-tab-btn active" data-tab="today">Today</button>
             <button class="planner-tab-btn" data-tab="pending">Pending</button>
@@ -66,7 +69,6 @@
       <div id="study-layout">
         <div id="study-header">
           <h3>Study</h3>
-          <button id="study-links-icon" title="Links" aria-label="Subject links">&#128279;</button>
           <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
         </div>
         <div id="study-clock-panel"></div>
@@ -102,6 +104,7 @@
   <script src="journal.js"></script>
   <script src="calendar.js"></script>
   <script src="planner.js"></script>
+  <script src="library.js"></script>
   <script src="study.js"></script>
   <script src="progress-data.js"></script>
   <script src="productivity-data.js"></script>
@@ -123,6 +126,7 @@
     Calendar.init();
     Journal.init();
     Planner.init();
+    Library.init();
     Study.init();
     Progress.init();
     Assistant.init();
