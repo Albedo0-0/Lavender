@@ -18,6 +18,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   // navigation afterwards is unaffected.
   function openDate(dateStr) {
     pendingOpenDate = dateStr;
+    activeTab = 'today';
+    renderSidePanel();
   }
 
   // ---------- Task creation form ----------
@@ -413,6 +415,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   function openHistory(subject, topicId) {
     activeTab = 'history';
     historyTopicId = topicId || null;
+    renderSidePanel();
   }
   return { init: init, render: function () { renderForm(); renderSidePanel(); }, openHistory: openHistory, openDate: openDate };
 })();
