@@ -30,11 +30,8 @@ const Assistant = (function () {
       subjectCards +
       '<hr>' +
       '<div id="assistant-menu">' +
-        '<button data-go="notepad">Notepad</button>' +
         '<button data-go="store">Store</button>' +
         '<button data-go="timeline">Timeline</button>' +
-        '<button data-go="history">History</button>' +
-        '<button data-go="pending">Pending</button>' +
         '<button data-go="tomorrow">Tomorrow</button>' +
         '<button data-go="leftoff">Where I Left Off</button>' +
         '<button data-go="search">Global Search</button>' +
@@ -55,11 +52,8 @@ const Assistant = (function () {
   }
 
   function routeTo(key) {
-    if (key === 'notepad') return openNotepad();
     if (key === 'store') return openStore();
     if (key === 'timeline') return openTimeline();
-    if (key === 'history') return openHistory();
-    if (key === 'pending') return openPending();
     if (key === 'tomorrow') return openTomorrow();
     if (key === 'leftoff') return openWhereLeftOff();
     if (key === 'search') return openSearch();
@@ -85,38 +79,15 @@ const Assistant = (function () {
     Modal.open(backBtnHtml() + '<h3>' + esc(subject) + ' \u2014 Today</h3>' + rows);
     wireBack();
     document.querySelectorAll('.assistant-topic-history-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { openHistory(btn.dataset.subject, btn.dataset.topic); });
+      btn.addEventListener('click', function () {
+        Modal.close();
+        if (typeof Planner !== 'undefined' && Planner.openHistory) Planner.openHistory(btn.dataset.subject, btn.dataset.topic);
+        Nav.switchTo('library');
+      });
     });
   }
 
-  // ---------- Notepad / Quick Capture (merged — one feature, per instruction) ----------
-
-  function notepadHtml() {
-    const notes = AssistantData.getNotes();
-    const rows = notes.length ? notes.map(function (n) {
-      return '<div class="assistant-note-row" data-id="' + n.id + '">' +
-        '<span class="assistant-note-text">' + esc(n.text) + '</span> ' +
-        '<button class="assistant-note-delete-btn" data-id="' + n.id + '">Delete</button>' +
-      '</div>';
-    }).join('') : '<p>No notes yet.</p>';
-
-    return backBtnHtml() + '<h3>Notepad</h3>' +
-      '<textarea id="assistant-note-input" placeholder="Capture anything — a note, a to-do, a thought..."></textarea><br>' +
-      '<button id="assistant-note-add-btn">Add</button><br><br>' + rows;
-  }
-
-  function openNotepad() {
-    Modal.open(notepadHtml());
-    wireBack();
-    document.getElementById('assistant-note-add-btn').addEventListener('click', function () {
-      const input = document.getElementById('assistant-note-input');
-      AssistantData.addNote(input.value);
-      openNotepad();
-    });
-    document.querySelectorAll('.assistant-note-delete-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { AssistantData.removeNote(btn.dataset.id); openNotepad(); });
-    });
-  }
+ 
 
   // ---------- Store (placeholder, §7.3) ----------
 
@@ -136,78 +107,15 @@ const Assistant = (function () {
     wireBack();
   }
 
-  // ---------- History (§7.3, item 6) — subjects -> chapters -> tasks, inline in this modal.
-  // Reuses PlannerData's topic/task data directly (same source Planner's own history view reads,
-  // §7.2) so there's no second data model — just an Assistant-local presentation of it, since
-  // routing out to the Planner tab (the old behavior) broke the Assistant flow.
+  
 
-  let historySubject = null;
-  let historyTopicId = null;
-
-  function historySubjectsHtml() {
-    return backBtnHtml() + '<h3>History</h3>' +
-      PlannerData.SUBJECTS.map(function (s) {
-        return '<button class="assistant-history-subject-btn" data-subject="' + s + '">' + s + '</button>';
-      }).join('<br>');
-  }
-
-  function historyChaptersHtml(subject) {
-    const topics = (PlannerData.getTopicsBySubject()[subject] || []);
-    const rows = topics.length ? topics.map(function (t) {
-      return '<button class="assistant-history-chapter-btn" data-topic-id="' + t.topicId + '">' + esc(t.topicName) + '</button>';
-    }).join('<br>') : '<p>No chapters yet for ' + esc(subject) + '.</p>';
-    return '<button id="assistant-history-back-subjects">\u2190 Subjects</button><br><br>' +
-      '<h3>' + esc(subject) + '</h3>' + rows;
-  }
-
-  function historyTasksHtml(subject, topicId) {
-    const topics = (PlannerData.getTopicsBySubject()[subject] || []);
-    const topic = topics.find(function (t) { return t.topicId === topicId; });
-    const tasks = PlannerData.getHistoryTasks().filter(function (t) { return t.topicId === topicId; });
-    const rows = tasks.length ? tasks.map(function (t) {
-      return '<div class="assistant-history-task-row">' +
-        esc(t.completedDate || t.date) + ' \u2014 ' + esc(PlannerData.taskLabel(t)) +
-        (t.note ? '<div class="assistant-topic-note">' + esc(t.note) + '</div>' : '') +
-      '</div>';
-    }).join('') : '<p>No completed tasks for this chapter yet.</p>';
-    return '<button id="assistant-history-back-chapters">\u2190 ' + esc(subject) + '</button><br><br>' +
-      '<h3>' + esc(topic ? topic.topicName : '') + '</h3>' + rows;
-  }
-
-  function openHistory(subject, topicId) {
-    historySubject = subject || null;
-    historyTopicId = topicId || null;
-
-    if (historyTopicId) {
-      Modal.open(historyTasksHtml(historySubject, historyTopicId));
-      document.getElementById('assistant-history-back-chapters').addEventListener('click', function () { openHistory(historySubject, null); });
-    } else if (historySubject) {
-      Modal.open(historyChaptersHtml(historySubject));
-      document.getElementById('assistant-history-back-subjects').addEventListener('click', function () { openHistory(null, null); });
-      document.querySelectorAll('.assistant-history-chapter-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () { openHistory(historySubject, btn.dataset.topicId); });
-      });
-    } else {
-      Modal.open(historySubjectsHtml());
-      wireBack();
-      document.querySelectorAll('.assistant-history-subject-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () { openHistory(btn.dataset.subject, null); });
-      });
-    }
-  }
-
-  // ---------- Pending / Tomorrow (§7.3) ----------
+    // ---------- Tomorrow (§7.3) ----------
 
   function taskRowHtml(t) {
     return '<div class="assistant-task-row">' + esc(t.date) + ' \u2014 ' + esc(t.topicName || t.title || PlannerData.taskLabel(t)) + '</div>';
   }
 
-  function openPending() {
-    const list = AssistantData.getPending();
-    const rows = list.length ? list.map(taskRowHtml).join('') : '<p>Nothing pending.</p>';
-    Modal.open(backBtnHtml() + '<h3>Pending</h3>' + rows);
-    wireBack();
-  }
+  
 
   function openTomorrow() {
     const list = AssistantData.getTomorrow();
