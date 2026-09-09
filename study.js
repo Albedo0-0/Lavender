@@ -733,84 +733,13 @@ function renderClock() {
     handlePrompt();
   }
 
-  function getLinks() { return State.get().studyLinks || {}; }
+  
 
-  function addLink(subject, url, note) {
-    const links = Object.assign({}, getLinks());
-    const id = 'link_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-    links[id] = { linkId: id, subject: subject, url: url.trim(), note: note || '' };
-    State.set({ studyLinks: links });
-  }
-
-  function deleteLink(linkId) {
-    const links = Object.assign({}, getLinks());
-    delete links[linkId];
-    State.set({ studyLinks: links });
-  }
-
-  function getLinksBySubject(subject) {
-    const links = getLinks();
-    return Object.keys(links).map(function (id) { return links[id]; }).filter(function (l) { return l.subject === subject; });
-  }
-
-  function renderLinksIcon() {
-    const btn = document.getElementById('study-links-icon');
-    if (btn) btn.onclick = function () { openLinksModal(); };
-  }
-
-  function openLinksModal(activeSubject) {
-    const subject = activeSubject || PlannerData.SUBJECTS[0];
-    const tabsHtml = PlannerData.SUBJECTS.map(function (s) {
-      return '<button class="study-links-tab-btn' + (s === subject ? ' active' : '') + '" data-subject="' + s + '">' + s + '</button>';
-    }).join('');
-
-    const list = getLinksBySubject(subject);
-    const listHtml = list.length === 0
-      ? '<p class="planner-empty">No links yet for ' + subject + '.</p>'
-      : list.map(function (l) {
-          return '<div class="study-link-row">' +
-            '<a href="' + l.url + '" target="_blank" rel="noopener">' + l.url + '</a>' +
-            (l.note ? '<div class="study-link-note">' + l.note + '</div>' : '') +
-            '<button class="study-link-delete" data-link-id="' + l.linkId + '">Remove</button>' +
-          '</div>';
-        }).join('');
-
-    Modal.open(
-      '<h3>Links</h3>' +
-      '<div class="study-links-tabs">' + tabsHtml + '</div>' +
-      '<div class="study-links-list">' + listHtml + '</div>' +
-      '<div class="study-links-form">' +
-        '<input type="url" id="study-link-url" placeholder="YouTube URL">' +
-        '<textarea id="study-link-note" rows="2" placeholder="Note (optional)"></textarea>' +
-        '<button id="study-link-save">Add Link</button>' +
-      '</div>'
-    );
-
-    document.querySelectorAll('.study-links-tab-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { openLinksModal(btn.dataset.subject); });
-    });
-
-    document.querySelectorAll('.study-link-delete').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        deleteLink(btn.dataset.linkId);
-        openLinksModal(subject);
-      });
-    });
-
-    document.getElementById('study-link-save').addEventListener('click', function () {
-      const url = document.getElementById('study-link-url').value.trim();
-      if (!url) { alert('Enter a URL.'); return; }
-      const note = document.getElementById('study-link-note').value;
-      addLink(subject, url, note);
-      openLinksModal(subject);
-    });
-  }
-
+    
   function init() {
     Notify.requestPermission();
     renderClockPanel();
     renderAlarmIcon();
-    renderLinksIcon();
     renderAlarmPanel();
     lastSessionSig = null;
     setCutoffMode(isPastCutoff());
@@ -826,7 +755,6 @@ function renderClock() {
   function render() {
     renderClockPanel();
     renderAlarmIcon();
-    renderLinksIcon();
     lastSessionSig = null;
     renderAlarmPanel();
     setCutoffMode(isPastCutoff());
