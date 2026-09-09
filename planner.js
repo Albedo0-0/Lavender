@@ -258,7 +258,9 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
-    const tasks = activeTab === 'pending' ? PlannerData.getPendingTasks() : PlannerData.getTodayTasks();
+    const tasks = activeTab === 'pending' ? PlannerData.getPendingTasks()
+      : activeTab === 'upcoming' ? PlannerData.getUpcomingTasks()
+      : PlannerData.getTodayTasks();
     renderTaskList(container, tasks);
   }
 
@@ -363,8 +365,9 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     document.getElementById('planner-delete-cancel').addEventListener('click', function () { Modal.close(); });
   }
   function emptyMessage() {
-    if (activeTab === 'history') return 'No completed tasks for this chapter yet.';
+     if (activeTab === 'history') return 'No completed tasks for this chapter yet.';
     if (activeTab === 'pending') return 'Nothing pending — nice!';
+    if (activeTab === 'upcoming') return 'Nothing upcoming yet.';
     return 'Nothing scheduled for today.';
   }
 
