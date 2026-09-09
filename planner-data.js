@@ -282,6 +282,12 @@ const PlannerData = (function () {
     return sortByDate(getTasksList().filter(function (t) { return t.date < today && !t.completed; }));
   }
 
+  // Scheduled, not-yet-due incomplete tasks — same records as Today/Pending, just date > today.
+  function getUpcomingTasks() {
+    const today = todayStr();
+    return sortByDate(getTasksList().filter(function (t) { return t.date > today && !t.completed; }));
+  }
+
   function getHistoryTasks() {
     return sortByCompletedDesc(getTasksList().filter(function (t) { return t.completed; }));
   }
@@ -363,6 +369,7 @@ function slotLabel(t) {
     getTasksList: getTasksList,
     getTodayTasks: getTodayTasks,
     getPendingTasks: getPendingTasks,
+    getUpcomingTasks: getUpcomingTasks,
     getHistoryTasks: getHistoryTasks,
     getTasksForDate: getTasksForDate,
     getIncompleteTasksForDate: getIncompleteTasksForDate,
