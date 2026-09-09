@@ -188,6 +188,19 @@ const Calendar = (function () {
     document.getElementById('datehub-delete-cancel').addEventListener('click', function () { openDateHub(dateStr); });
   }
 
+  function renderTargetsSection(dateStr) {
+  const targets = TargetsData.getTargetsForDate(dateStr);
+  if (!targets || targets.length === 0) return '';
+  return '<div class="datehub-targets-section">' +
+    '<label class="datehub-label datehub-todo-heading">Targets</label>' +
+    '<ul class="datehub-targets-list">' +
+      targets.map(function (tg) {
+        return '<li>' + tg.title + ' \u2014 ' + tg.currentValue + '/' + tg.targetValue + '</li>';
+      }).join('') +
+    '</ul>' +
+  '</div>';
+  }
+  
   function openDateHub(dateStr) {
     const hub = DateHub.get(dateStr);
     const html =
@@ -196,10 +209,11 @@ const Calendar = (function () {
           '<h3>' + formatLong(dateStr) + '</h3>' +
           '<button id="datehub-close" class="datehub-close">&times;</button>' +
         '</div>' +
-        '<div class="datehub-todo-section">' +
+         '<div class="datehub-todo-section">' +
           '<label class="datehub-label datehub-todo-heading">To Do</label>' +
           renderTodoList(dateStr) +
         '</div>' +
+        (typeof TargetsData !== 'undefined' ? renderTargetsSection(dateStr) : '') +
         '<label class="datehub-label">note</label>' +
         '<textarea id="datehub-note" rows="4">' + (hub.note || '') + '</textarea>' +
         '<label class="datehub-label">important date</label>' +
@@ -262,7 +276,7 @@ const Calendar = (function () {
     document.getElementById('datehub-goto-planner').addEventListener('click', function () {
       Modal.close();
       if (typeof Planner !== 'undefined' && Planner.openDate) Planner.openDate(dateStr);
-      Nav.switchTo('planner');
+      Nav.switchTo('library');
     });
   }
 
