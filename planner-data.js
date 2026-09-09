@@ -86,6 +86,14 @@ const PlannerData = (function () {
     return true;
   }
 
+  function updateTopicMeta(topicId, meta) {
+    const topics = Object.assign({}, getAllTopics());
+    if (!topics[topicId]) return false;
+    topics[topicId] = Object.assign({}, topics[topicId], meta);
+    State.set({ topics: topics });
+    return true;
+  }
+
   function deleteTopic(topicId) {
     if (getTasksForTopic(topicId).length > 0) return false;
     const topics = Object.assign({}, getAllTopics());
@@ -337,6 +345,7 @@ function slotLabel(t) {
   return {
 
     SUBJECTS: SUBJECTS,
+    updateTopicMeta: updateTopicMeta,
     getAllTopics: getAllTopics,
     getOrCreateTopic: getOrCreateTopic,
     findTopic: findTopic,
