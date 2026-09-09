@@ -154,8 +154,7 @@ const Library = (function () {
     });
 
     document.getElementById('library-action-planner').addEventListener('click', function () {
-      Planner.openDate(todayStr());
-      if (Planner.render) Planner.render();
+      Planner.openForTopic(activeSubject, activeTopicId);
     });
     document.getElementById('library-action-history').addEventListener('click', function () {
       Planner.openHistory(activeSubject, activeTopicId);
