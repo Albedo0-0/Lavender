@@ -228,7 +228,7 @@ const AssistantData = (function () {
       });
     }
 
-    getNotes().forEach(function (n) {
+    
 
     getNotes().forEach(function (n) {
       if (n.text.toLowerCase().indexOf(q) !== -1) {
