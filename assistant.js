@@ -232,7 +232,28 @@ const Assistant = (function () {
   // ---------- Global Search (§7.3) ----------
 
   function resultRowHtml(r) {
-    return '<div class="assistant-search-row"><strong>' + esc(r.type) + '</strong> (' + esc(r.date) + ') \u2014 ' + esc(r.text) + '</div>';
+    const ref = r.ref || {};
+    return '<div class="assistant-search-row assistant-search-result" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
+      '<strong>' + esc(r.type) + '</strong> (' + esc(r.date) + ') \u2014 ' + esc(r.text) + '</div>';
+  }
+
+  function navigateToResult(ds) {
+    if (ds.kind === 'task') {
+      const task = PlannerData.getAllTasks()[ds.taskId];
+      if (!task) return;
+      Modal.close();
+      if (task.completed && Planner.openHistory) Planner.openHistory(task.subject, task.topicId);
+      else if (Planner.openDate) Planner.openDate(task.date);
+      Nav.switchTo('library');
+    } else if (ds.kind === 'topic') {
+      Modal.close();
+      if (Planner.openForTopic) Planner.openForTopic(ds.subject, ds.topicId);
+      Nav.switchTo('library');
+    } else if (ds.kind === 'journal') {
+      Modal.close();
+      if (typeof Journal !== 'undefined' && Journal.openDate) Journal.openDate(ds.date);
+      Nav.switchTo('journal');
+    }
   }
 
   function openSearch() {
@@ -243,6 +264,9 @@ const Assistant = (function () {
     function runSearch() {
       const results = AssistantData.search(document.getElementById('assistant-search-input').value);
       document.getElementById('assistant-search-results').innerHTML = results.length ? results.map(resultRowHtml).join('') : '<p>No matches.</p>';
+      document.querySelectorAll('.assistant-search-result').forEach(function (el) {
+        el.addEventListener('click', function () { navigateToResult(el.dataset); });
+      });
     }
     document.getElementById('assistant-search-btn').addEventListener('click', runSearch);
     document.getElementById('assistant-search-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') runSearch(); });
