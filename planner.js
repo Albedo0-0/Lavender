@@ -412,10 +412,25 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   // Entry point for Assistant's History shortcut (§7.3/§6.1-style reuse) — jumps straight into
   // this existing view instead of building a second one. Only sets state; caller (Assistant) is
   // responsible for switching to the Planner tab, which triggers render() via Nav.
+function openForTopic(subject, topicId) {
+    const grouped = PlannerData.getTopicsBySubject();
+    const topics = grouped[subject] || [];
+    const topic = topics.find(function (t) { return t.topicId === topicId; });
+    if (!topic) return;
+    activeTab = 'today';
+    pendingOpenDate = null;
+    renderForm();
+    const subjectEl = document.getElementById('planner-subject');
+    const topicEl = document.getElementById('planner-topic');
+    if (subjectEl) { subjectEl.value = subject; updateTopicOptions(); }
+    if (topicEl) topicEl.value = topic.topicName;
+    renderSidePanel();
+  }
+
   function openHistory(subject, topicId) {
     activeTab = 'history';
     historyTopicId = topicId || null;
     renderSidePanel();
-  }
-  return { init: init, render: function () { renderForm(); renderSidePanel(); }, openHistory: openHistory, openDate: openDate };
+  }  
+  return { init: init, render: function () { renderForm(); renderSidePanel(); }, openHistory: openHistory, openDate: openDate, openForTopic: openForTopic };
 })();
