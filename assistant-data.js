@@ -207,7 +207,14 @@ const AssistantData = (function () {
 
     PlannerData.getTasksList().forEach(function (t) {
       const hay = [t.topicName, t.title, t.note].filter(Boolean).join(' ').toLowerCase();
-      if (hay.indexOf(q) !== -1) results.push({ type: 'Planner task', text: t.topicName || t.title || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
+      if (hay.indexOf(q) !== -1) results.push({ type: t.completed ? 'Study history' : 'Planner task', text: t.topicName || t.title || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
+    });
+
+    PlannerData.getAllTopics && Object.keys(PlannerData.getAllTopics()).forEach(function (id) {
+      const topic = PlannerData.getAllTopics()[id];
+      const tags = Array.isArray(topic.tags) ? topic.tags.join(' ') : '';
+      const hay = [topic.topicName, tags, topic.notes].filter(Boolean).join(' ').toLowerCase();
+      if (hay.indexOf(q) !== -1) results.push({ type: 'Library topic', text: topic.topicName, date: '', ref: { kind: 'topic', subject: topic.subject, topicId: topic.topicId } });
     });
 
     // Journal text — respects the lock; locked entries are never surfaced by search.
@@ -221,10 +228,7 @@ const AssistantData = (function () {
       });
     }
 
-    PlannerData.getHistoryTasks().forEach(function (t) {
-      const hay = [t.topicName, t.note].filter(Boolean).join(' ').toLowerCase();
-      if (hay.indexOf(q) !== -1) results.push({ type: 'Study history', text: t.topicName || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
-    });
+    getNotes().forEach(function (n) {
 
     getNotes().forEach(function (n) {
       if (n.text.toLowerCase().indexOf(q) !== -1) {
