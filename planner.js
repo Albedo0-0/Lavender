@@ -29,16 +29,15 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     if (!container) return;
 
     container.innerHTML =
-      '<label class="planner-field-label">Date</label>' +
-      '<input type="date" id="planner-date">' +
-      '<div class="planner-slot-row">' +
-        '<div><label class="planner-field-label">Start</label><input type="time" id="planner-start-time"></div>' +
-        '<div><label class="planner-field-label">Stop</label><input type="time" id="planner-stop-time"></div>' +
+      '<div class="planner-compact-row">' +
+        '<input type="date" id="planner-date" title="Date">' +
+        '<input type="time" id="planner-start-time" title="Start">' +
+        '<input type="time" id="planner-stop-time" title="End">' +
       '</div>' +
-      '<div class="planner-addmode-tabs">' +
-        '<button class="planner-addmode-btn" data-mode="subject">Subject/Chapter</button>' +
-        '<button class="planner-addmode-btn" data-mode="custom">Custom</button>' +
-        '<button class="planner-addmode-btn" data-mode="suggested">Suggested</button>' +
+      '<div class="planner-addmode-arrow-row">' +
+        '<button id="planner-mode-prev">&#8592;</button>' +
+        '<span id="planner-mode-label">Subject/Chapter</span>' +
+        '<button id="planner-mode-next">&#8594;</button>' +
       '</div>' +
       '<div id="planner-addmode-body"></div>';
 
@@ -53,15 +52,24 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     renderAddModeBody();
   }
 
+  const ADD_MODES = ['subject', 'custom', 'suggested'];
+  const ADD_MODE_LABELS = { subject: 'Subject/Chapter', custom: 'Custom', suggested: 'Suggested' };
+
   function renderAddModeTabs() {
-    document.querySelectorAll('.planner-addmode-btn').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.mode === addMode);
-      btn.addEventListener('click', function () {
-        addMode = btn.dataset.mode;
-        renderAddModeTabs();
-        renderAddModeBody();
-      });
-    });
+    const label = document.getElementById('planner-mode-label');
+    if (label) label.textContent = ADD_MODE_LABELS[addMode] || addMode;
+    const prev = document.getElementById('planner-mode-prev');
+    const next = document.getElementById('planner-mode-next');
+    if (prev) { prev.onclick = function () {
+      const i = ADD_MODES.indexOf(addMode);
+      addMode = ADD_MODES[(i - 1 + ADD_MODES.length) % ADD_MODES.length];
+      renderAddModeTabs(); renderAddModeBody();
+    }; }
+    if (next) { next.onclick = function () {
+      const i = ADD_MODES.indexOf(addMode);
+      addMode = ADD_MODES[(i + 1) % ADD_MODES.length];
+      renderAddModeTabs(); renderAddModeBody();
+    }; }
   }
 
   function renderAddModeBody() {
@@ -74,20 +82,19 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
 
   function renderSubjectModeBody(body) {
     body.innerHTML =
-      '<label class="planner-field-label">Subject</label>' +
-      '<select id="planner-subject">' +
-        '<option value="Biology">Biology</option>' +
-        '<option value="Chemistry">Chemistry</option>' +
-        '<option value="Physics">Physics</option>' +
-      '</select>' +
-      '<label class="planner-field-label">Topic</label>' +
-      '<input type="text" id="planner-topic" list="planner-topic-options" placeholder="e.g. Cell, Genetics">' +
-      '<datalist id="planner-topic-options"></datalist>' +
-      '<label class="planner-field-label">Task Type</label>' +
+      '<div class="planner-compact-row">' +
+        '<select id="planner-subject" title="Subject">' +
+          '<option value="Biology">Bio</option>' +
+          '<option value="Chemistry">Chem</option>' +
+          '<option value="Physics">Phys</option>' +
+        '</select>' +
+        '<input type="text" id="planner-topic" list="planner-topic-options" placeholder="Topic">' +
+        '<datalist id="planner-topic-options"></datalist>' +
+      '</div>' +
       '<div class="planner-tasktype-row">' +
-        '<label><input type="radio" name="planner-tasktype" value="revision" checked> Repeated Revision (6-cycle)</label>' +
+        '<label><input type="radio" name="planner-tasktype" value="revision" checked> Revision</label>' +
         '<label><input type="radio" name="planner-tasktype" value="theory"> Theory</label>' +
-        '<label><input type="radio" name="planner-tasktype" value="questions"> Questions</label>' +
+        '<label><input type="radio" name="planner-tasktype" value="questions"> Qs</label>' +
       '</div>' +
       '<label class="planner-field-label">Note (optional)</label>' +
       '<textarea id="planner-note" rows="3"></textarea>' +
