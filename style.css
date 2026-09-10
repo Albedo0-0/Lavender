@@ -924,7 +924,8 @@ body {
   flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
-  transition: flex 0.2s;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Collapsed: library-left becomes full width, switches to row so planner sits right of library */
@@ -953,10 +954,10 @@ body {
   overflow-y: auto;
   border-bottom: 1px solid #eee;
   padding: 8px;
+  overflow: hidden auto;
 }
 #planner-side {
   flex: 0 0 220px;
-  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   border-top: 1px solid #eee;
