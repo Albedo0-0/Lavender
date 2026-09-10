@@ -33,6 +33,21 @@ const Nav = (function () {
       });
     });
 
+    const utilBtn = document.getElementById('utility-menu-btn');
+const utilDrawer = document.getElementById('utility-drawer');
+if (utilBtn && utilDrawer) {
+  utilBtn.addEventListener('click', function () {
+    utilDrawer.style.display = utilDrawer.style.display === 'none' ? 'flex' : 'none';
+  });
+}
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener('click', function () {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  });
+}
+    
     const startScreen = State.get().currentScreen || 'calendar';
     switchTo(startScreen);
   }
