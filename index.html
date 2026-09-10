@@ -8,33 +8,45 @@
 </head>
 <body>
 
-  <nav id="main-nav">
-    <button class="nav-btn" data-screen="calendar">Calendar</button>
-    <button class="nav-btn" data-screen="journal">Journal</button>
-    <button class="nav-btn" data-screen="library">Library</button>
-    <button class="nav-btn" data-screen="study">Study</button>
-    <button class="nav-btn" data-screen="progress">Progress</button>
-  </nav>
-  <button id="journal-lock-toggle" title="Journal lock" aria-label="Toggle journal lock" style="display:none">&#128275;</button>
-  <button id="global-break-btn" title="Take a break" aria-label="Take a break">Break</button>
-  <button id="water-icon" title="Log water" aria-label="Log water">&#128167;</button>
-  
-  <button id="notepad-icon" title="Notepad" aria-label="Open Notepad">&#128221;</button>
-  <button id="unrecorded-study-icon" title="Unrecorded Study" aria-label="Log unrecorded study">&#128221;&#43;</button>
-  <button id="assistant-icon" title="Assistant" aria-label="Open Assistant">&#128203;</button>
-  <button id="settings-icon" title="Settings" aria-label="Open Settings">&#9881;</button>
-  <div id="global-break-takeover" style="display:none"></div>
-
-  <div id="top-meter-bar">
-    <div id="productivity-bar-wrap" title="Productivity">
-      <div id="productivity-bar-fill"></div>
-      <span id="productivity-bar-label"></span>
-    </div>
-    <div id="exp-bar-wrap" title="EXP">
-      <div id="exp-bar-fill"></div>
-      <span id="exp-bar-label"></span>
-    </div>
+  <header id="app-header">
+  <div id="app-header-left">
+    <span id="app-title">Lavender</span>
   </div>
+  <div id="app-header-right">
+    <div id="top-meter-bar">
+      <div id="productivity-bar-wrap" title="Productivity">
+        <div id="productivity-bar-fill"></div>
+        <span id="productivity-bar-label"></span>
+      </div>
+      <div id="exp-bar-wrap" title="EXP">
+        <div id="exp-bar-fill"></div>
+        <span id="exp-bar-label"></span>
+      </div>
+    </div>
+    <button id="utility-menu-btn" title="Utilities">&#9776;</button>
+  </div>
+</header>
+
+<div id="utility-drawer" style="display:none">
+  <button id="global-break-btn" title="Take a break">Break</button>
+  <button id="water-icon" title="Log water">&#128167;</button>
+  <button id="notepad-icon" title="Notepad">&#128221;</button>
+  <button id="unrecorded-study-icon" title="Unrecorded Study">&#128221;+</button>
+  <button id="assistant-icon" title="Assistant">&#128203;</button>
+  <button id="settings-icon" title="Settings">&#9881;</button>
+  <button id="fullscreen-btn" title="Fullscreen">&#9974;</button>
+</div>
+
+<button id="journal-lock-toggle" title="Journal lock" style="display:none">&#128275;</button>
+<div id="global-break-takeover" style="display:none"></div>
+
+<nav id="main-nav">
+  <button class="nav-btn" data-screen="library">Library</button>
+  <button class="nav-btn" data-screen="calendar">Calendar</button>
+  <button class="nav-btn" data-screen="journal">Journal</button>
+  <button class="nav-btn" data-screen="study">Study</button>
+  <button class="nav-btn" data-screen="progress">Progress</button>
+</nav>
 
   <main>
     <section id="screen-calendar" class="screen">
