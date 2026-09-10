@@ -905,10 +905,19 @@ body {
   background: #d8b98c;
 }
 
+#screen-library {
+  height: calc(100vh - 80px);
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 #library-layout {
   display: flex;
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   gap: 0;
+  transition: all 0.2s;
 }
 #library-left {
   display: flex;
@@ -917,18 +926,41 @@ body {
   min-width: 0;
   transition: flex 0.2s;
 }
+
+/* Collapsed: library-left becomes full width, switches to row so planner sits right of library */
+#library-layout.panel-collapsed #library-left {
+  flex: 1 1 100%;
+  flex-direction: row;
+}
+#library-layout.panel-collapsed #library-main {
+  flex: 1 1 0;
+  min-height: 0;
+  border-bottom: none;
+  border-right: 1px solid #eee;
+  overflow-y: auto;
+}
+#library-layout.panel-collapsed #planner-side {
+  flex: 0 0 50%;
+  max-height: none;
+  height: 100%;
+  overflow-y: auto;
+  border-top: none;
+  border-left: none;
+}
 #library-main {
   flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   border-bottom: 1px solid #eee;
   padding: 8px;
 }
 #planner-side {
-  flex: 0 0 auto;
-  max-height: 45vh;
+  flex: 0 0 220px;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   border-top: 1px solid #eee;
+  box-sizing: border-box;
 }
 #library-right-panel {
   width: 280px;
@@ -939,10 +971,7 @@ body {
   transition: width 0.2s, flex 0.2s;
   overflow: hidden;
 }
-#library-right-panel[style*="display: none"] ~ #library-left,
-#library-layout:has(#library-panel-expand[style*="display: block"]) #library-left {
-  flex: 1 1 100%;
-}
+
 #library-right-header {
   display: flex;
   align-items: center;
