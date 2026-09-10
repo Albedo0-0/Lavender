@@ -214,6 +214,12 @@ const Calendar = (function () {
           renderTodoList(dateStr) +
         '</div>' +
         (typeof TargetsData !== 'undefined' ? renderTargetsSection(dateStr) : '') +
+        '<label class="datehub-label">Events</label>' +
+        '<div id="datehub-events-list"></div>' +
+        '<div class="datehub-event-add-row">' +
+          '<input type="text" id="datehub-event-input" placeholder="Add event...">' +
+          '<button id="datehub-event-add-btn">Add</button>' +
+        '</div>' +
         '<label class="datehub-label">note</label>' +
         '<textarea id="datehub-note" rows="4">' + (hub.note || '') + '</textarea>' +
         '<label class="datehub-label">important date</label>' +
@@ -234,6 +240,36 @@ const Calendar = (function () {
 
     document.getElementById('datehub-close').addEventListener('click', Modal.close);
 
+    function renderEventsList() {
+      const hub = DateHub.get(dateStr);
+      const evts = hub.events || [];
+      const listEl = document.getElementById('datehub-events-list');
+      if (!listEl) return;
+      listEl.innerHTML = evts.length ? evts.map(function (ev, i) {
+        return '<div class="datehub-event-row">' + escDatehub(ev) +
+          ' <button class="datehub-event-del" data-idx="' + i + '">&times;</button></div>';
+      }).join('') : '<span class="datehub-empty">None</span>';
+      listEl.querySelectorAll('.datehub-event-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const hub2 = DateHub.get(dateStr);
+          const evts2 = (hub2.events || []).slice();
+          evts2.splice(Number(btn.dataset.idx), 1);
+          DateHub.update(dateStr, { events: evts2 });
+          renderEventsList();
+        });
+      });
+    }
+    function escDatehub(s) { return String(s || '').replace(/[<>&]/g, function(c){ return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;'; }); }
+    renderEventsList();
+    document.getElementById('datehub-event-add-btn').addEventListener('click', function () {
+      const val = document.getElementById('datehub-event-input').value.trim();
+      if (!val) return;
+      const hub = DateHub.get(dateStr);
+      const evts = (hub.events || []).concat([val]);
+      DateHub.update(dateStr, { events: evts });
+      document.getElementById('datehub-event-input').value = '';
+      renderEventsList();
+    });
     document.querySelectorAll('.datehub-todo-check').forEach(function (cb) {
       cb.addEventListener('change', function () {
         PlannerData.toggleComplete(cb.dataset.taskId);
@@ -328,6 +364,20 @@ const Calendar = (function () {
       '</div>';
   }
 
+  function openAllEventsModal() {
+    const hubs = DateHub.getAll();
+    const today = todayStr();
+    const rows = Object.keys(hubs)
+      .filter(function (d) { return d >= today && (hubs[d].events || []).length > 0; })
+      .sort()
+      .map(function (d) {
+        return hubs[d].events.map(function (ev) {
+          return '<div class="datehub-event-row"><strong>' + formatLong(d) + '</strong> \u2014 ' + ev + '</div>';
+        }).join('');
+      }).join('');
+    Modal.open('<h3>Upcoming Events</h3>' + (rows || '<p>No events added yet.</p>'));
+  }
+
   function next() {
     viewMonth++;
     if (viewMonth > 11) { viewMonth = 0; viewYear++; }
@@ -349,6 +399,8 @@ const prevBtn = document.getElementById('calendar-prev');
     const nextBtn = document.getElementById('calendar-next');
     if (prevBtn) prevBtn.addEventListener('click', prev);
     if (nextBtn) nextBtn.addEventListener('click', next);
+    const evtBtn = document.getElementById('calendar-events-btn');
+    if (evtBtn) evtBtn.addEventListener('click', openAllEventsModal);
 
     initialized = true;
     render();
