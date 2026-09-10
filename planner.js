@@ -31,8 +31,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     container.innerHTML =
       '<div class="planner-compact-row">' +
         '<input type="date" id="planner-date" title="Date">' +
-        '<input type="time" id="planner-start-time" title="Start">' +
-        '<input type="time" id="planner-stop-time" title="End">' +
+        '<input type="time" id="planner-start-time" title="Start" placeholder="Start">' +
+'<input type="time" id="planner-stop-time" title="End" placeholder="End">' +
       '</div>' +
       '<div class="planner-addmode-arrow-row">' +
         '<button id="planner-mode-prev">&#8592;</button>' +
