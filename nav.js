@@ -37,7 +37,7 @@ const Nav = (function () {
 const utilDrawer = document.getElementById('utility-drawer');
 if (utilBtn && utilDrawer) {
   utilBtn.addEventListener('click', function () {
-    utilDrawer.style.display = utilDrawer.style.display === 'none' ? 'flex' : 'none';
+    utilDrawer.classList.toggle('utility-drawer-hidden');
   });
 }
 const fullscreenBtn = document.getElementById('fullscreen-btn');
