@@ -332,15 +332,18 @@ const Library = (function () {
       panelTabIdx = (panelTabIdx + 1) % PANEL_TABS.length;
       renderRightPanel();
     });
+    const layout = document.getElementById('library-layout');
     if (collapseBtn) collapseBtn.addEventListener('click', function () {
       panelCollapsed = true;
       if (rightPanel) rightPanel.style.display = 'none';
       if (expandBtn) expandBtn.style.display = 'block';
+      if (layout) layout.classList.add('panel-collapsed');
     });
     if (expandBtn) expandBtn.addEventListener('click', function () {
       panelCollapsed = false;
       if (rightPanel) rightPanel.style.display = '';
       if (expandBtn) expandBtn.style.display = 'none';
+      if (layout) layout.classList.remove('panel-collapsed');
       renderRightPanel();
     });
   }
