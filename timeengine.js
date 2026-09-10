@@ -487,7 +487,7 @@ const TimeEngine = (function () {
   // schedule shift, since the time already passed.
   function logUnrecordedBreak(minutes, note) {
     const ms = Math.max(1, minutes || 1) * 60 * 1000;
-    pushBreak(todayStr(), 'unrecorded', ms, note);
+    pushBreak(todayStr(), 'unrecorded', ms, note || '');
     notify();
 }
 
@@ -701,7 +701,7 @@ const TimeEngine = (function () {
 
   function getBreaksForDate(dateStr) {
     return (State.get().timeEngineBreaks || []).filter(function(b){ return b.date === (dateStr || todayStr()); });
-  }
+}
   
   return {
     init: init,
