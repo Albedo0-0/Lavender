@@ -424,7 +424,7 @@ const TimeEngine = (function () {
     return true;
   }
   
-  function startGlobalBreak(minutes) {
+  function startGlobalBreak(minutes, note) {
     const engine = getEngine();
     if (engine.globalBreak && engine.globalBreak.active) return false;
     const breakMs = Math.max(1, minutes || 1) * 60 * 1000;
@@ -440,7 +440,7 @@ const TimeEngine = (function () {
     // Only log a standalone break entry when there's no paused session to track it instead —
     // if we just paused the active session, its own breakMs (finalized on resume) already
     // covers this time in getDayStats, and pushBreak here would double-count it.
-    const breakId = pausedActiveSession ? null : pushBreak(todayStr(), 'global', breakMs);
+    const breakId = pausedActiveSession ? null : pushBreak(todayStr(), 'global', breakMs, note || '');
     setEngine({ prompt: shiftedPrompt, globalBreak: { active: true, resumeAt: Date.now() + breakMs, startedAt: Date.now(), pausedActiveSession: pausedActiveSession, breakId: breakId, plannedMs: breakMs } });
     notify();
     return true;
