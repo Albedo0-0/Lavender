@@ -545,19 +545,23 @@ function renderClock() {
     const defaultMin = (State.get().settings || {}).defaultBreakDuration;
     Modal.open(
       '<h3>Take a break</h3>' +
-      '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes"' + (defaultMin ? ' value="' + defaultMin + '"' : '') + '>' +
-      '<button id="global-break-confirm">Start Break</button>' +
-      '<hr>' +
-      '<h4>Already took a break?</h4>' +
-      '<input type="number" id="unrecorded-break-minutes" min="1" placeholder="Minutes">' +
-      '<button id="unrecorded-break-confirm">Log it</button>'
+'<input type="number" id="global-break-minutes" min="1" placeholder="Minutes"' + (defaultMin ? ' value="' + defaultMin + '"' : '') + '>' +
+'<input type="text" id="global-break-note" placeholder="Note (optional)">' +
+'<button id="global-break-confirm">Start Break</button>' +
+'<button id="break-timeline-toggle" style="margin-left:8px">Timeline</button>' +
+'<hr>' +
+'<h4>Already took a break?</h4>' +
+'<input type="number" id="unrecorded-break-minutes" min="1" placeholder="Minutes">' +
+'<input type="text" id="unrecorded-break-note" placeholder="Note (optional)">' +
+'<button id="unrecorded-break-confirm">Log it</button>'
     );
     document.getElementById('global-break-confirm').addEventListener('click', function () {
       const minutes = parseInt(document.getElementById('global-break-minutes').value, 10);
       if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
       breakInputOpen = false;
       Modal.close();
-      TimeEngine.startGlobalBreak(minutes);
+      const note = document.getElementById('global-break-note').value.trim();
+TimeEngine.startGlobalBreak(minutes, note);
       renderBreakStatus();
       renderBreakTakeover();
     });
