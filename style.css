@@ -20,13 +20,6 @@ body {
 #app-title { font-weight: bold; font-size: 16px; }
 #app-header-right { display: flex; align-items: center; gap: 8px; }
 #top-meter-bar { padding: 0; cursor: pointer; min-width: 160px; }
-#utility-drawer {
-  display: flex;
-  gap: 6px;
-  padding: 6px 12px;
-  border-bottom: 1px solid #eee;
-  flex-wrap: wrap;
-}
 #main-nav {
   display: flex;
   gap: 8px;
