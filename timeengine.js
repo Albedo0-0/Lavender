@@ -84,10 +84,10 @@ const TimeEngine = (function () {
     return Object.keys(r).map(function (id) { return r[id]; }).filter(function (rec) { return rec.date === dateStr; });
   }
 
-  function pushBreak(dateStr, type, durationMs) {
+  function pushBreak(dateStr, type, durationMs, note) {
     const list = (State.get().timeEngineBreaks || []).slice();
     const id = genId('brk');
-    list.push({ id: id, date: dateStr, type: type, durationMs: durationMs, startedAt: Date.now() });
+    list.push({ id: id, date: dateStr, type: type, durationMs: durationMs, startedAt: Date.now(), note: note || '' });
     State.set({ timeEngineBreaks: list });
     return id;
   }
@@ -485,11 +485,11 @@ const TimeEngine = (function () {
   // §2.4 — unrecorded break: retroactive entry for break time taken outside the app. Same
   // timeEngineBreaks source as live breaks (feeds the same stats); no live countdown, no
   // schedule shift, since the time already passed.
-  function logUnrecordedBreak(minutes) {
+  function logUnrecordedBreak(minutes, note) {
     const ms = Math.max(1, minutes || 1) * 60 * 1000;
-    pushBreak(todayStr(), 'unrecorded', ms);
+    pushBreak(todayStr(), 'unrecorded', ms, note);
     notify();
-  }
+}
 
   function getGlobalBreak() { return getEngine().globalBreak; }
 
@@ -699,6 +699,10 @@ const TimeEngine = (function () {
     if (!tickHandle) tickHandle = setInterval(tick, 1000);
   }
 
+  function getBreaksForDate(dateStr) {
+    return (State.get().timeEngineBreaks || []).filter(function(b){ return b.date === (dateStr || todayStr()); });
+  }
+  
   return {
     init: init,
     subscribe: subscribe,
@@ -733,6 +737,7 @@ const TimeEngine = (function () {
     pushLog: pushLog,
     getLogForDate: getLogForDate,
     safeElapsed: safeElapsed,
-    safeMs: safeMs
+    safeMs: safeMs,
+    getBreaksForDate: getBreaksForDate
   };
 })();
