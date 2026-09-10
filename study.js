@@ -568,10 +568,14 @@ TimeEngine.startGlobalBreak(minutes, note);
     document.getElementById('unrecorded-break-confirm').addEventListener('click', function () {
       const minutes = parseInt(document.getElementById('unrecorded-break-minutes').value, 10);
       if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
-      TimeEngine.logUnrecordedBreak(minutes);
+      const note = document.getElementById('unrecorded-break-note').value.trim();
+TimeEngine.logUnrecordedBreak(minutes, note);
       breakInputOpen = false;
       Modal.close();
     });
+    document.getElementById('break-timeline-toggle').addEventListener('click', function() {
+    openBreakTimelinePanel();
+});
   }
 
   function promptTokenFor(prompt) {
@@ -738,7 +742,22 @@ TimeEngine.startGlobalBreak(minutes, note);
   }
 
   
-
+function openBreakTimelinePanel() {
+    const breaks = TimeEngine.getBreaksForDate();
+    if (!breaks.length) { Modal.open('<h3>Break Timeline</h3><p>No breaks recorded today.</p>'); return; }
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+    function fmtTime(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+    function fmtMin(ms) { return Math.round(ms / 60000) + 'min'; }
+    const rows = breaks.map(function(b) {
+        return '<div class="break-timeline-row">' +
+            '<span class="break-timeline-time">' + fmtTime(b.startedAt) + '</span>' +
+            '<span class="break-timeline-type">' + b.type + '</span>' +
+            '<span class="break-timeline-dur">' + fmtMin(b.durationMs) + '</span>' +
+            (b.note ? '<span class="break-timeline-note">' + b.note + '</span>' : '') +
+        '</div>';
+    }).join('');
+    Modal.open('<h3>Break Timeline</h3><div class="break-timeline">' + rows + '</div>');
+}
     
   function init() {
     Notify.requestPermission();
