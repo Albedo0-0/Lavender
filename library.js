@@ -333,17 +333,20 @@ const Library = (function () {
       renderRightPanel();
     });
     const layout = document.getElementById('library-layout');
+    const plannerSide = document.getElementById('planner-side');
     if (collapseBtn) collapseBtn.addEventListener('click', function () {
       panelCollapsed = true;
       if (rightPanel) rightPanel.style.display = 'none';
       if (expandBtn) expandBtn.style.display = 'block';
-      if (layout) layout.classList.add('panel-collapsed');
+      if (plannerSide && layout) layout.appendChild(plannerSide);
+      plannerSide.style.cssText = 'flex:0 0 50%;border-left:1px solid #eee;border-top:none;overflow-y:auto;padding:8px;box-sizing:border-box;';
     });
     if (expandBtn) expandBtn.addEventListener('click', function () {
       panelCollapsed = false;
       if (rightPanel) rightPanel.style.display = '';
-      if (expandBtn) expandBtn.style.display = 'none';
-      if (layout) layout.classList.remove('panel-collapsed');
+      expandBtn.style.display = 'none';
+      const libraryLeft = document.getElementById('library-left');
+      if (plannerSide && libraryLeft) { libraryLeft.appendChild(plannerSide); plannerSide.style.cssText = ''; }
       renderRightPanel();
     });
   }
