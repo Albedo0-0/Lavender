@@ -18,8 +18,9 @@
   <button id="journal-lock-toggle" title="Journal lock" aria-label="Toggle journal lock" style="display:none">&#128275;</button>
   <button id="global-break-btn" title="Take a break" aria-label="Take a break">Break</button>
   <button id="water-icon" title="Log water" aria-label="Log water">&#128167;</button>
-  <button id="sleep-icon" title="Sleep tracker" aria-label="Sleep tracker">&#128564;</button>
+  
   <button id="notepad-icon" title="Notepad" aria-label="Open Notepad">&#128221;</button>
+  <button id="unrecorded-study-icon" title="Unrecorded Study" aria-label="Log unrecorded study">&#128221;&#43;</button>
   <button id="assistant-icon" title="Assistant" aria-label="Open Assistant">&#128203;</button>
   <button id="settings-icon" title="Settings" aria-label="Open Settings">&#9881;</button>
   <div id="global-break-takeover" style="display:none"></div>
@@ -43,28 +44,36 @@
         <button id="calendar-next">next &gt;</button>
       </div>
       <div id="calendar-grid"></div>
-      <div id="calendar-countdown"></div>
+      <div id="calendar-countdown-row">
+        <div id="calendar-countdown"></div>
+        <button id="calendar-events-btn" title="All important dates &amp; events">Events</button>
+      </div>
       <div id="calendar-streak"></div>
     </section>
     <section id="screen-journal" class="screen"></section>
     <section id="screen-library" class="screen">
       <div id="library-layout">
-        <div id="library-main">
-          <div id="library-body"></div>
-        </div>
-        <div id="planner-side">
-          <div id="planner-main">
-            <h3>New Study Task</h3>
-            <div id="planner-form"></div>
+        <div id="library-left">
+          <div id="library-main">
+            <div id="library-body"></div>
           </div>
-          <div id="planner-tabs">
-            <button class="planner-tab-btn active" data-tab="today">Today</button>
-            <button class="planner-tab-btn" data-tab="pending">Pending</button>
-            <button class="planner-tab-btn" data-tab="history">History</button>
-            <button class="planner-tab-btn" data-tab="upcoming">Upcoming</button>
+          <div id="planner-side">
+            <div id="planner-main">
+              <h3>New Task</h3>
+              <div id="planner-form"></div>
+            </div>
           </div>
-          <div id="planner-tab-content"></div>
         </div>
+        <div id="library-right-panel">
+          <div id="library-right-header">
+            <button id="library-panel-prev">&#8592;</button>
+            <span id="library-panel-tab-label">Today</span>
+            <button id="library-panel-next">&#8594;</button>
+            <button id="library-panel-collapse" title="Collapse panel">&#10006;</button>
+          </div>
+          <div id="library-panel-content"></div>
+        </div>
+        <button id="library-panel-expand" style="display:none" title="Show panel">&#9776;</button>
       </div>
     </section>
     <section id="screen-study" class="screen">
@@ -122,7 +131,7 @@
     State.init();
     Nav.init();
     Modal.init();
-    Sleep.init();
+    
     Water.init();
     Alarm.init();
     TimeEngine.init();
