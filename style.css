@@ -925,7 +925,7 @@ body {
 }
 
 #screen-library {
-  height: calc(100vh - 80px);
+  height: calc(100vh - 120px);
   padding: 0;
   overflow: hidden;
   display: flex;
