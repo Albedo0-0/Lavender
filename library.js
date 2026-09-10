@@ -5,7 +5,9 @@ const Library = (function () {
   let view = 'subjects'; // 'subjects' | 'chapters' | 'chapter'
   let activeSubject = null;
   let activeTopicId = null;
-
+  const PANEL_TABS = ['today', 'pending', 'history', 'upcoming'];
+  let panelTabIdx = 0;
+  let panelCollapsed = false;
   function todayStr() {
     const t = new Date();
     const pad = function (n) { return n < 10 ? '0' + n : '' + n; };
@@ -135,9 +137,20 @@ const Library = (function () {
     const topic = topics.find(function (t) { return t.topicId === activeTopicId; });
     const chapterName = topic ? topic.topicName : '';
 
+    const topicMeta = PlannerData.getAllTopics()[activeTopicId] || {};
+    const tags = topicMeta.tags || [];
+    const tagsHtml = '<div class="library-topic-tags">' +
+      tags.map(function (tag, i) {
+        return '<span class="library-tag">' + tag + ' <button class="library-tag-del" data-idx="' + i + '">&times;</button></span>';
+      }).join('') +
+      '<input type="text" id="library-tag-input" placeholder="Add tag..." style="width:80px">' +
+      '<button id="library-tag-add">+</button>' +
+    '</div>';
+
     container.innerHTML =
       '<button class="planner-history-back">&lt; ' + activeSubject + '</button>' +
       '<h4 class="planner-history-heading">' + chapterName + '</h4>' +
+      tagsHtml +
       '<div class="library-topic-actions">' +
         '<button id="library-action-planner">Planner</button>' +
         '<button id="library-action-history">History</button>' +
@@ -177,6 +190,23 @@ const Library = (function () {
       if (!ok) { alert('Cannot remove a chapter with scheduled or completed tasks. Archiving arrives in Feature 8.'); return; }
       view = 'chapters';
       render();
+    });
+
+    document.getElementById('library-tag-add').addEventListener('click', function () {
+      const val = document.getElementById('library-tag-input').value.trim();
+      if (!val) return;
+      const meta = PlannerData.getAllTopics()[activeTopicId] || {};
+      const newTags = (meta.tags || []).concat([val]);
+      PlannerData.updateTopicMeta(activeTopicId, { tags: newTags });
+      render();
+    });
+    container.querySelectorAll('.library-tag-del').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const meta = PlannerData.getAllTopics()[activeTopicId] || {};
+        const newTags = (meta.tags || []).filter(function (_, i) { return i !== Number(btn.dataset.idx); });
+        PlannerData.updateTopicMeta(activeTopicId, { tags: newTags });
+        render();
+      });
     });
   }
 
@@ -262,7 +292,57 @@ const Library = (function () {
     });
   }
 
-  function init() { render(); }
+  function renderRightPanel() {
+    const label = document.getElementById('library-panel-tab-label');
+    const content = document.getElementById('library-panel-content');
+    if (!label || !content) return;
+    const tab = PANEL_TABS[panelTabIdx];
+    label.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
+    let tasks;
+    if (tab === 'today') tasks = PlannerData.getTodayTasks();
+    else if (tab === 'pending') tasks = PlannerData.getPendingTasks();
+    else if (tab === 'upcoming') tasks = PlannerData.getUpcomingTasks();
+    else tasks = PlannerData.getHistoryTasks();
+    if (!tasks.length) { content.innerHTML = '<p class="planner-empty">Nothing here.</p>'; return; }
+    content.innerHTML = tasks.map(function (t) {
+      const meta = t.taskType === 'custom' ? t.title : (t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t));
+      const slot = PlannerData.slotLabel(t);
+      return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
+        '<div class="planner-task-meta">' + meta + '</div>' +
+        '<div class="planner-task-sub">' + t.date + (slot ? ' \u00B7 ' + slot : '') + '</div>' +
+      '</div>';
+    }).join('');
+  }
 
+  function init() {
+    render();
+    renderRightPanel();
+
+    const prevBtn = document.getElementById('library-panel-prev');
+    const nextBtn = document.getElementById('library-panel-next');
+    const collapseBtn = document.getElementById('library-panel-collapse');
+    const expandBtn = document.getElementById('library-panel-expand');
+    const rightPanel = document.getElementById('library-right-panel');
+
+    if (prevBtn) prevBtn.addEventListener('click', function () {
+      panelTabIdx = (panelTabIdx - 1 + PANEL_TABS.length) % PANEL_TABS.length;
+      renderRightPanel();
+    });
+    if (nextBtn) nextBtn.addEventListener('click', function () {
+      panelTabIdx = (panelTabIdx + 1) % PANEL_TABS.length;
+      renderRightPanel();
+    });
+    if (collapseBtn) collapseBtn.addEventListener('click', function () {
+      panelCollapsed = true;
+      if (rightPanel) rightPanel.style.display = 'none';
+      if (expandBtn) expandBtn.style.display = 'block';
+    });
+    if (expandBtn) expandBtn.addEventListener('click', function () {
+      panelCollapsed = false;
+      if (rightPanel) rightPanel.style.display = '';
+      if (expandBtn) expandBtn.style.display = 'none';
+      renderRightPanel();
+    });
+  }
   return { init: init, render: render, openTopic: openTopic };
 })();
