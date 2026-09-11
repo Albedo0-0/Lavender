@@ -31,6 +31,7 @@ const Targets = (function () {
           '<strong>' + esc(t.title) + '</strong>' +
         '</label>' +
         '<span class="targets-row-meta">' + t.timeframe + ' \u00B7 ' + t.currentValue + '/' + t.targetValue + ' (' + pct(t) + '%)</span>' +
+        '<button class="targets-archive-btn" data-target-id="' + t.targetId + '">Archive</button>' +
         '<button class="targets-delete-btn" data-target-id="' + t.targetId + '">Delete</button>' +
       '</div>' +
       subsHtml +
@@ -65,12 +66,27 @@ const Targets = (function () {
     '</div>';
   }
 
+  function archivedListHtml() {
+    const list = TargetsData.getArchivedTargetsList();
+    if (list.length === 0) return '<p class="planner-empty">No archived targets.</p>';
+    return list.map(function (t) {
+      return '<div class="targets-row" data-target-id="' + t.targetId + '">' +
+        '<div class="targets-row-header">' +
+          '<strong>' + esc(t.title) + '</strong>' +
+          '<span class="targets-row-meta">' + t.timeframe + ' \u00B7 Archived: ' + t.archivedAt + '</span>' +
+          '<button class="targets-unarchive-btn" data-target-id="' + t.targetId + '">Unarchive</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
   function html() {
     return '<h3>Targets</h3>' +
       formHtml() +
       '<div class="targets-section"><h4>Daily</h4>' + listHtml('daily') + '</div>' +
       '<div class="targets-section"><h4>Weekly</h4>' + listHtml('weekly') + '</div>' +
-      '<div class="targets-section"><h4>Monthly</h4>' + listHtml('monthly') + '</div>';
+      '<div class="targets-section"><h4>Monthly</h4>' + listHtml('monthly') + '</div>' +
+      '<div class="targets-section"><h4>Archived</h4>' + archivedListHtml() + '</div>';
   }
 
   function wire() {
@@ -94,6 +110,20 @@ const Targets = (function () {
     document.querySelectorAll('.targets-delete-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         TargetsData.deleteTarget(btn.dataset.targetId);
+        open();
+      });
+    });
+
+    document.querySelectorAll('.targets-archive-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        TargetsData.archiveTarget(btn.dataset.targetId);
+        open();
+      });
+    });
+
+    document.querySelectorAll('.targets-unarchive-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        TargetsData.unarchiveTarget(btn.dataset.targetId);
         open();
       });
     });
