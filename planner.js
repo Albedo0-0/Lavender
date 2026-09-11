@@ -165,8 +165,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
           '<option value="monthly">Monthly</option>' +
         '</select>' +
         '<select id="planner-target-type">' +
-          '<option value="custom">Custom</option>' +
-          '<option value="hours">Hours</option>' +
+          '<option value="checkoff">Custom</option>' +
+          '<option value="studyHours">Hours</option>' +
           '<option value="questions">Questions</option>' +
         '</select>' +
         '<input type="number" id="planner-target-value" placeholder="Value" min="1" value="1">' +
