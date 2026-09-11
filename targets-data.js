@@ -52,7 +52,8 @@ const TargetsData = (function () {
       targetValue: typeof input.targetValue === 'number' && input.targetValue > 0 ? input.targetValue : 1,
       currentValue: 0,
       completed: false,
-      subtargets: []
+      subtargets: [],
+      topicId: input.topicId || null
     };
     targets[targetId] = target;
     State.set({ targets: targets });
@@ -251,9 +252,7 @@ const TargetsData = (function () {
   }
 
   function getTargetsForTopic(topicId) {
-    // Targets are not topic-scoped in this initial build (dateKey/timeframe scoped only).
-    // Reserved for future Library per-topic Target association if needed.
-    return [];
+    return getAllTargetsList().filter(function (t) { return t.topicId === topicId; });
   }
 
   return {
