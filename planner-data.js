@@ -234,7 +234,10 @@ const PlannerData = (function () {
     const nowCompleted = !task.completed;
     const updated = Object.assign({}, task, {
       completed: nowCompleted,
-      completedDate: nowCompleted ? todayStr() : null
+      completedDate: nowCompleted ? todayStr() : null,
+      // Completing a task frees its slot so it stops blocking hasSlotConflict checks for new/rescheduled tasks.
+      startTime: nowCompleted ? null : task.startTime,
+      stopTime: nowCompleted ? null : task.stopTime
     });
     tasks[taskId] = updated;
     State.set({ tasks: tasks });
