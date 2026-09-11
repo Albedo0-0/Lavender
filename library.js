@@ -5,7 +5,7 @@ const Library = (function () {
   let view = 'subjects'; // 'subjects' | 'chapters' | 'chapter'
   let activeSubject = null;
   let activeTopicId = null;
-  const PANEL_TABS = ['today', 'pending', 'history', 'upcoming', 'targets'];
+  const PANEL_TABS = ['today', 'pending', 'history', 'upcoming', 'targets', 'archived'];
   let panelTabIdx = 0;
   let panelCollapsed = false;
   let historyFilterTopicId = null; // set when History is opened from a chapter's action row
@@ -201,7 +201,7 @@ const Library = (function () {
     });
     document.getElementById('library-action-remove').addEventListener('click', function () {
       const ok = PlannerData.deleteTopic(activeTopicId);
-      if (!ok) { alert('Cannot remove a chapter with scheduled or completed tasks. Archiving arrives in Feature 8.'); return; }
+      if (!ok) { alert('Cannot remove a chapter with active (non-archived) tasks. Archive its tasks first.'); return; }
       view = 'chapters';
       render();
     });
@@ -351,6 +351,45 @@ const Library = (function () {
     const tab = PANEL_TABS[panelTabIdx];
     label.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
 
+    if (tab === 'archived') {
+      const archivedTasks = PlannerData.getArchivedTasks();
+      const archivedTargets = TargetsData.getArchivedTargetsList();
+      if (!archivedTasks.length && !archivedTargets.length) { content.innerHTML = '<p class="planner-empty">Nothing archived.</p>'; return; }
+
+      const taskRows = archivedTasks.map(function (t) {
+        const meta = t.taskType === 'custom' ? t.title : (t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t));
+        return '<div class="planner-task-row" data-task-id="' + t.taskId + '">' +
+          '<span class="planner-task-meta">' + meta + '</span>' +
+          '<div class="planner-task-sub">Archived: ' + t.archivedAt + '</div>' +
+          '<button class="library-unarchive-task-btn" data-task-id="' + t.taskId + '">Unarchive</button>' +
+        '</div>';
+      }).join('');
+
+      const targetRows = archivedTargets.map(function (tg) {
+        return '<div class="planner-task-row" data-target-id="' + tg.targetId + '">' +
+          '<span class="planner-task-meta">' + tg.title + '</span>' +
+          '<div class="planner-task-sub">Archived: ' + tg.archivedAt + '</div>' +
+          '<button class="library-unarchive-target-btn" data-target-id="' + tg.targetId + '">Unarchive</button>' +
+        '</div>';
+      }).join('');
+
+      content.innerHTML = taskRows + targetRows;
+
+      content.querySelectorAll('.library-unarchive-task-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          PlannerData.unarchiveTask(btn.dataset.taskId);
+          renderRightPanel();
+        });
+      });
+      content.querySelectorAll('.library-unarchive-target-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          TargetsData.unarchiveTarget(btn.dataset.targetId);
+          renderRightPanel();
+        });
+      });
+      return;
+    }
+
     if (tab === 'targets') {
       const targets = TargetsData.getAllTargetsList();
       if (!targets.length) { content.innerHTML = '<p class="planner-empty">No targets yet.</p>'; return; }
@@ -376,6 +415,7 @@ const Library = (function () {
             '<span class="planner-task-meta">' + tg.title + '</span>' +
             valueInput +
             (subs.length > 0 ? '<button class="library-target-subs-toggle" data-target-id="' + tg.targetId + '" style="font-size:11px;padding:1px 4px">&#9660;</button>' : '') +
+            '<button class="library-archive-target-btn" data-target-id="' + tg.targetId + '" style="font-size:11px;padding:1px 4px">Archive</button>' +
           '</div>' +
           '<div class="planner-task-sub">' + tg.timeframe + ' \u00B7 ' + tg.currentValue + '/' + tg.targetValue + (tg.type !== 'custom' ? ' ' + tg.type : '') + '</div>' +
           subsHtml +
@@ -407,6 +447,13 @@ const Library = (function () {
         });
       });
 
+      content.querySelectorAll('.library-archive-target-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          TargetsData.archiveTarget(btn.dataset.targetId);
+          renderRightPanel();
+        });
+      });
+
       return;
     }
 
@@ -432,6 +479,7 @@ const Library = (function () {
         '</label>' +
         '<div class="planner-task-sub">' + t.date + (slot ? ' \u00B7 ' + slot : '') + '</div>' +
         startBtn +
+        '<button class="library-archive-task-btn" data-task-id="' + t.taskId + '">Archive</button>' +
       '</div>';
     }).join('');
 
@@ -444,6 +492,12 @@ const Library = (function () {
     content.querySelectorAll('.library-panel-start-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         if (typeof Study !== 'undefined' && Study.startTaskSession) Study.startTaskSession(btn.dataset.taskId);
+      });
+    });
+    content.querySelectorAll('.library-archive-task-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        PlannerData.archiveTask(btn.dataset.taskId);
+        renderRightPanel();
       });
     });
   }
