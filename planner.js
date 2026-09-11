@@ -214,13 +214,20 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     });
 
     document.getElementById('planner-save-target').addEventListener('click', function () {
-      const title = document.getElementById('planner-target-title').value.trim();
+      const titleEl = document.getElementById('planner-target-title');
+      const dateEl = document.getElementById('planner-date');
+      const timeframeEl = document.getElementById('planner-target-timeframe');
+      const typeEl = document.getElementById('planner-target-type');
+      const valueEl = document.getElementById('planner-target-value');
+      const topicEl = document.getElementById('planner-target-topic');
+      if (!titleEl || !timeframeEl || !typeEl || !valueEl) return;
+      const title = titleEl.value.trim();
       if (!title) { alert('Please enter a title.'); return; }
-      const dateStr = document.getElementById('planner-date').value || todayStr();
-      const timeframe = document.getElementById('planner-target-timeframe').value;
-      const type = document.getElementById('planner-target-type').value;
-      const targetValue = Number(document.getElementById('planner-target-value').value) || 1;
-      const topicId = document.getElementById('planner-target-topic').value || null;
+      const dateStr = (dateEl && dateEl.value) || todayStr();
+      const timeframe = timeframeEl.value;
+      const type = typeEl.value;
+      const targetValue = Number(valueEl.value) || 1;
+      const topicId = (topicEl && topicEl.value) || null;
 
       const target = TargetsData.createTarget({
         title: title, timeframe: timeframe, type: type, targetValue: targetValue, dateKey: dateStr, topicId: topicId
@@ -231,7 +238,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       });
 
       pendingSubtargets = [];
-      renderTargetModeBody(body);
+      renderAddModeBody();
     });
   }
 
