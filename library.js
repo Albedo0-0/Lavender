@@ -345,19 +345,59 @@ const Library = (function () {
     if (tab === 'targets') {
       const targets = TargetsData.getAllTargetsList();
       if (!targets.length) { content.innerHTML = '<p class="planner-empty">No targets yet.</p>'; return; }
+
       content.innerHTML = targets.map(function (tg) {
-        return '<div class="planner-task-row' + (tg.completed ? ' planner-task-done' : '') + '">' +
-          '<label><input type="checkbox" class="library-target-check" data-target-id="' + tg.targetId + '" ' + (tg.completed ? 'checked' : '') + '> ' +
-          tg.title + '</label>' +
-          '<div class="planner-task-sub">' + tg.timeframe + ' \u00B7 ' + tg.currentValue + '/' + tg.targetValue + '</div>' +
+        const subs = TargetsData.getSubtargetsForTarget(tg.targetId);
+        const valueInput = (tg.type === 'hours' || tg.type === 'questions') && !tg.completed
+          ? '<input type="number" class="library-target-value-input" data-target-id="' + tg.targetId + '" min="0" max="' + tg.targetValue + '" value="' + tg.currentValue + '" style="width:52px;margin-left:4px">'
+          : '';
+        const subsHtml = subs.length === 0 ? '' :
+          '<div class="library-target-subs" style="display:none">' +
+            subs.map(function (s) {
+              return '<label class="library-topic-subtarget-row">' +
+                '<input type="checkbox" class="library-target-sub-check" data-subtarget-id="' + s.subtargetId + '" data-parent-id="' + tg.targetId + '" ' + (s.completed ? 'checked' : '') + '> ' +
+                s.title + ' (' + s.currentValue + '/' + s.targetValue + ')' +
+              '</label>';
+            }).join('') +
+          '</div>';
+
+        return '<div class="planner-task-row' + (tg.completed ? ' planner-task-done' : '') + '" data-target-id="' + tg.targetId + '">' +
+          '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' +
+            '<input type="checkbox" class="library-target-check" data-target-id="' + tg.targetId + '" ' + (tg.completed ? 'checked' : '') + '>' +
+            '<span class="planner-task-meta">' + tg.title + '</span>' +
+            valueInput +
+            (subs.length > 0 ? '<button class="library-target-subs-toggle" data-target-id="' + tg.targetId + '" style="font-size:11px;padding:1px 4px">&#9660;</button>' : '') +
+          '</div>' +
+          '<div class="planner-task-sub">' + tg.timeframe + ' \u00B7 ' + tg.currentValue + '/' + tg.targetValue + (tg.type !== 'custom' ? ' ' + tg.type : '') + '</div>' +
+          subsHtml +
         '</div>';
       }).join('');
+
       content.querySelectorAll('.library-target-check').forEach(function (cb) {
         cb.addEventListener('click', function () {
-          TargetsData.toggleTargetComplete(cb.dataset.targetId);
+          const tid = cb.dataset.targetId;
+          const valInput = content.querySelector('.library-target-value-input[data-target-id="' + tid + '"]');
+          const recorded = valInput ? Number(valInput.value) : undefined;
+          TargetsData.toggleTargetComplete(tid, recorded);
           renderRightPanel();
         });
       });
+
+      content.querySelectorAll('.library-target-subs-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const row = content.querySelector('.planner-task-row[data-target-id="' + btn.dataset.targetId + '"]');
+          const subsDiv = row && row.querySelector('.library-target-subs');
+          if (subsDiv) subsDiv.style.display = subsDiv.style.display === 'none' ? 'block' : 'none';
+        });
+      });
+
+      content.querySelectorAll('.library-target-sub-check').forEach(function (cb) {
+        cb.addEventListener('click', function () {
+          TargetsData.toggleSubtargetComplete(cb.dataset.subtargetId);
+          renderRightPanel();
+        });
+      });
+
       return;
     }
 
