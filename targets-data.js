@@ -54,7 +54,9 @@ const TargetsData = (function () {
       subtargets: [],
       topicId: input.topicId || null,
       note: input.note || '',
-      completedNote: ''
+      completedNote: '',
+      archived: false,
+      archivedAt: null
     };
     targets[targetId] = target;
     State.set({ targets: targets });
@@ -78,6 +80,23 @@ const TargetsData = (function () {
     (targets[targetId].subtargets || []).forEach(function (sid) { delete subtargets[sid]; });
     delete targets[targetId];
     State.set({ targets: targets, subtargets: subtargets });
+  }
+
+  // Soft-hide, not deletion — subtargets are untouched and the record stays fully recoverable.
+  function archiveTarget(targetId) {
+    const target = getTarget(targetId);
+    if (!target || target.archived) return;
+    updateTarget(targetId, { archived: true, archivedAt: todayStr() });
+  }
+
+  function unarchiveTarget(targetId) {
+    const target = getTarget(targetId);
+    if (!target || !target.archived) return;
+    updateTarget(targetId, { archived: false, archivedAt: null });
+  }
+
+  function getArchivedTargetsList() {
+    return getAllTargetsList().filter(function (t) { return t.archived; });
   }
 
   // ---------- Subtargets: CRUD ----------
@@ -243,13 +262,14 @@ const TargetsData = (function () {
   }
 
   function getTargetsByTimeframe(timeframe) {
-    return getAllTargetsList().filter(function (t) { return t.timeframe === timeframe; });
+    return getAllTargetsList().filter(function (t) { return t.timeframe === timeframe && !t.archived; });
   }
 
   // Used by calendar.js's renderTargetsSection(dateStr) — daily targets whose dateKey matches,
   // plus weekly/monthly targets whose dateKey falls within the relevant period for dateStr.
   function getTargetsForDate(dateStr) {
     return getAllTargetsList().filter(function (t) {
+      if (t.archived) return false;
       if (t.timeframe === 'daily') return t.dateKey === dateStr;
       if (t.timeframe === 'weekly') return isSameWeek(t.dateKey, dateStr);
       if (t.timeframe === 'monthly') return isSameMonth(t.dateKey, dateStr);
@@ -275,13 +295,16 @@ const TargetsData = (function () {
   }
 
   function getTargetsForTopic(topicId) {
-    return getAllTargetsList().filter(function (t) { return t.topicId === topicId; });
+    return getAllTargetsList().filter(function (t) { return t.topicId === topicId && !t.archived; });
   }
 
   return {
     createTarget: createTarget,
     updateTarget: updateTarget,
     deleteTarget: deleteTarget,
+    archiveTarget: archiveTarget,
+    unarchiveTarget: unarchiveTarget,
+    getArchivedTargetsList: getArchivedTargetsList,
     getTarget: getTarget,
     getAllTargetsList: getAllTargetsList,
     getTargetsByTimeframe: getTargetsByTimeframe,
