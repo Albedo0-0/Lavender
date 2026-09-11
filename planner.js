@@ -146,8 +146,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   }
 
   let pendingSubtargets = []; // in-progress subtarget drafts for the Target form, cleared on save
-
-  let pendingSubtargets = [];
+let pendingSubtargets = [];
 
   function renderTargetModeBody(body) {
     const grouped = PlannerData.getTopicsBySubject();
@@ -230,15 +229,12 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       const type = typeEl.value;
       const targetValue = Number(valueEl.value) || 1;
       const topicId = (topicEl && topicEl.value) || null;
-
       const target = TargetsData.createTarget({
         title: title, timeframe: timeframe, type: type, targetValue: targetValue, dateKey: dateStr, topicId: topicId
       });
-
       pendingSubtargets.forEach(function (s) {
         TargetsData.createSubtarget(target.targetId, { title: s.title, targetValue: s.targetValue, type: type });
       });
-
       pendingSubtargets = [];
       renderAddModeBody();
     });
