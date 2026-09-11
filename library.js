@@ -29,6 +29,12 @@ const Library = (function () {
     else renderSubjects(container);
   }
 
+  function openSubject(subject) {
+    activeSubject = subject;
+    view = 'chapters';
+    render();
+  }
+  
   function renderSubjects(container) {
     const favIds = State.get().favoriteTopics || [];
     const allTopics = PlannerData.getAllTopics();
@@ -453,5 +459,5 @@ const Library = (function () {
       renderRightPanel();
     });
   }
-  return { init: init, render: render, openTopic: openTopic };
+  return { init: init, render: render, openTopic: openTopic, openSubject: openSubject };
 })();
