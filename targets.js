@@ -56,8 +56,8 @@ const Targets = (function () {
         '<option value="monthly">Monthly</option>' +
       '</select>' +
       '<select id="targets-new-type">' +
-        '<option value="checkoff">Checkoff</option>' +
-        '<option value="studyHours">Study Hours</option>' +
+        '<option value="custom">Custom</option>' +
+        '<option value="hours">Hours</option>' +
         '<option value="questions">Questions</option>' +
       '</select>' +
       '<input type="number" id="targets-new-value" placeholder="Target value" min="1" value="1">' +
