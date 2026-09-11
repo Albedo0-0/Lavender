@@ -159,10 +159,10 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<label class="planner-field-label">Title</label>' +
       '<input type="text" id="planner-target-title" placeholder="e.g. Solve 20 questions">' +
       '<div class="planner-compact-row">' +
-        '<select id="planner-target-timeframe">' +
-          '<option value="daily">Daily</option>' +
-          '<option value="weekly">Weekly</option>' +
-          '<option value="monthly">Monthly</option>' +
+        '<select id="planner-target-type">' +
+          '<option value="custom">Custom</option>' +
+          '<option value="hours">Hours</option>' +
+          '<option value="questions">Questions</option>' +
         '</select>' +
         '<select id="planner-target-type">' +
           '<option value="checkoff">Checkoff</option>' +
