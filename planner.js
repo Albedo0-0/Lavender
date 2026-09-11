@@ -145,7 +145,16 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     });
   }
 
+  let pendingSubtargets = []; // in-progress subtarget drafts for the Target form, cleared on save
+
   function renderTargetModeBody(body) {
+    const grouped = PlannerData.getTopicsBySubject();
+    const subjectOptions = Object.keys(grouped).map(function (subj) {
+      return '<optgroup label="' + subj + '">' + grouped[subj].map(function (t) {
+        return '<option value="' + t.topicId + '">' + t.topicName + '</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+
     body.innerHTML =
       '<label class="planner-field-label">Title</label>' +
       '<input type="text" id="planner-target-title" placeholder="e.g. Solve 20 questions">' +
@@ -162,7 +171,47 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
         '</select>' +
         '<input type="number" id="planner-target-value" placeholder="Value" min="1" value="1">' +
       '</div>' +
+      '<label class="planner-field-label">Link to topic (optional)</label>' +
+      '<select id="planner-target-topic">' +
+        '<option value="">\u2014 None \u2014</option>' +
+        subjectOptions +
+      '</select>' +
+      '<label class="planner-field-label">Subtargets (optional)</label>' +
+      '<div id="planner-target-subtargets-list"></div>' +
+      '<div class="planner-compact-row">' +
+        '<input type="text" id="planner-target-subtitle" placeholder="Subtarget title">' +
+        '<input type="number" id="planner-target-subvalue" placeholder="Value" min="1" value="1" style="max-width:70px">' +
+        '<button id="planner-target-subadd-btn" type="button">+</button>' +
+      '</div>' +
       '<button id="planner-save-target">Add Target</button>';
+
+    function renderSubtargetDrafts() {
+      const list = document.getElementById('planner-target-subtargets-list');
+      if (!list) return;
+      list.innerHTML = pendingSubtargets.length === 0
+        ? '<p class="planner-empty">No subtargets added.</p>'
+        : pendingSubtargets.map(function (s, i) {
+            return '<div class="planner-task-row"><div class="planner-task-meta">' + s.title + ' (' + s.targetValue + ')</div>' +
+              '<button class="planner-target-subdraft-del" data-idx="' + i + '" type="button">&times;</button></div>';
+          }).join('');
+      list.querySelectorAll('.planner-target-subdraft-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          pendingSubtargets.splice(Number(btn.dataset.idx), 1);
+          renderSubtargetDrafts();
+        });
+      });
+    }
+    renderSubtargetDrafts();
+
+    document.getElementById('planner-target-subadd-btn').addEventListener('click', function () {
+      const title = document.getElementById('planner-target-subtitle').value.trim();
+      if (!title) return;
+      const val = Number(document.getElementById('planner-target-subvalue').value) || 1;
+      pendingSubtargets.push({ title: title, targetValue: val });
+      document.getElementById('planner-target-subtitle').value = '';
+      document.getElementById('planner-target-subvalue').value = '1';
+      renderSubtargetDrafts();
+    });
 
     document.getElementById('planner-save-target').addEventListener('click', function () {
       const title = document.getElementById('planner-target-title').value.trim();
@@ -171,8 +220,18 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       const timeframe = document.getElementById('planner-target-timeframe').value;
       const type = document.getElementById('planner-target-type').value;
       const targetValue = Number(document.getElementById('planner-target-value').value) || 1;
-      TargetsData.createTarget({ title: title, timeframe: timeframe, type: type, targetValue: targetValue, dateKey: dateStr });
-      document.getElementById('planner-target-title').value = '';
+      const topicId = document.getElementById('planner-target-topic').value || null;
+
+      const target = TargetsData.createTarget({
+        title: title, timeframe: timeframe, type: type, targetValue: targetValue, dateKey: dateStr, topicId: topicId
+      });
+
+      pendingSubtargets.forEach(function (s) {
+        TargetsData.createSubtarget(target.targetId, { title: s.title, targetValue: s.targetValue, type: type });
+      });
+
+      pendingSubtargets = [];
+      renderTargetModeBody(body);
     });
   }
 
