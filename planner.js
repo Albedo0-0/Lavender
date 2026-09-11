@@ -13,6 +13,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
   }
 
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, function(c) { return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]; }); }
   // Called by Calendar's Date Hub (or anywhere else) to make the next render() open on a specific
   // date instead of defaulting to today. One-shot: consumed by renderForm(), so normal Planner
   // navigation afterwards is unaffected.
@@ -421,6 +422,10 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       btn.addEventListener('click', function () { openRescheduleModal(btn.dataset.taskId); });
     });
 
+    container.querySelectorAll('.planner-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { openEditModal(btn.dataset.taskId); });
+    });
+    
     container.querySelectorAll('.planner-delete-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { confirmDeleteTask(btn.dataset.taskId); });
     });
@@ -451,6 +456,46 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     });
   }
 
+  function openEditModal(taskId) {
+    const task = PlannerData.getAllTasks()[taskId];
+    if (!task) return;
+    const isCustom = task.taskType === 'custom';
+    Modal.open(
+      '<h3>Edit Task</h3>' +
+      (isCustom ? '<label class="planner-field-label">Title</label><input type="text" id="planner-edit-title" value="' + esc(task.title || '') + '">' : '') +
+      '<label class="planner-field-label">Note</label><input type="text" id="planner-edit-note" value="' + esc(task.note || '') + '">' +
+      '<label class="planner-field-label">Date</label><input type="date" id="planner-edit-date" value="' + (task.date || '') + '">' +
+      '<div class="planner-slot-row">' +
+        '<div><label class="planner-field-label">Start</label><input type="time" id="planner-edit-start" value="' + (task.startTime || '') + '"></div>' +
+        '<div><label class="planner-field-label">Stop</label><input type="time" id="planner-edit-stop" value="' + (task.stopTime || '') + '"></div>' +
+      '</div>' +
+      '<button id="planner-edit-confirm">Save</button>'
+    );
+    document.getElementById('planner-edit-confirm').addEventListener('click', function () {
+      const dateVal = document.getElementById('planner-edit-date').value;
+      const startVal = document.getElementById('planner-edit-start').value;
+      const stopVal = document.getElementById('planner-edit-stop').value;
+      const noteVal = document.getElementById('planner-edit-note').value.trim();
+      if (!dateVal) { alert('Pick a date.'); return; }
+      if (!PlannerData.isValidSlot(startVal, stopVal)) { alert('End time must be after start time. Leave both blank for no time slot.'); return; }
+      if (PlannerData.hasSlotConflict(dateVal, startVal, stopVal, taskId)) { alert('That slot overlaps another task on ' + dateVal + '.'); return; }
+      PlannerData.rescheduleTask(taskId, dateVal, startVal, stopVal);
+      const tasks = State.get().tasks;
+      const existing = tasks[taskId];
+      if (existing) {
+        const updated = Object.assign({}, tasks);
+        updated[taskId] = Object.assign({}, existing, { note: noteVal });
+        if (isCustom) {
+          const titleVal = document.getElementById('planner-edit-title').value.trim();
+          if (titleVal) updated[taskId].title = titleVal;
+        }
+        State.set({ tasks: updated });
+      }
+      Modal.close();
+      renderSidePanel();
+    });
+  }
+  
   function confirmDeleteTask(taskId) {
     Modal.open(
       '<h3>Delete task?</h3>' +
@@ -489,6 +534,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const reschedBtn = !t.completed
       ? '<button class="planner-reschedule-btn" data-task-id="' + t.taskId + '">Reschedule</button>'
       : '';
+    
+    const editBtn = '<button class="planner-edit-btn" data-task-id="' + t.taskId + '">Edit</button>';
     const deleteBtn = '<button class="planner-delete-btn" data-task-id="' + t.taskId + '">Delete</button>';
 
     return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
@@ -498,7 +545,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      studyBtn + reschedBtn + deleteBtn +
+      studyBtn + reschedBtn + editBtn + deleteBtn +
     '</div>';
   }
 
