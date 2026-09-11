@@ -422,12 +422,12 @@ const Library = (function () {
     content.innerHTML = tasks.map(function (t) {
       const meta = t.taskType === 'custom' ? t.title : (t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t));
       const slot = PlannerData.slotLabel(t);
-      const startBtn = (tab === 'upcoming' && !t.completed)
+      const startBtn = (tab !== 'history' && !t.completed)
         ? '<button class="library-panel-start-btn" data-task-id="' + t.taskId + '"' + (sessionActive ? ' disabled' : '') + '>Start now</button>'
         : '';
       return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
         '<label class="planner-task-check-label">' +
-          '<input type="checkbox" class="library-panel-task-check" data-task-id="' + t.taskId + '"' + (t.completed ? ' checked' : '') + (tab === 'history' ? ' disabled' : '') + '>' +
+          '<input type="checkbox" class="library-panel-task-check" data-task-id="' + t.taskId + '"' + (t.completed ? ' checked' : '') + '>' +
           '<span class="planner-task-meta">' + meta + '</span>' +
         '</label>' +
         '<div class="planner-task-sub">' + t.date + (slot ? ' \u00B7 ' + slot : '') + '</div>' +
