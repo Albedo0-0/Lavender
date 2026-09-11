@@ -89,7 +89,9 @@ const ProgressData = (function () {
     if (!all || all.length === 0) return null;
     const completed = all.filter(function (t) { return t.completed; }).length;
     return Math.round((completed / all.length) * 100);
-  }
+ }
+
+  function productivityValue(entry, dateStr) {
     if (!dateStr || typeof ProductivityData === 'undefined') return null;
     const result = ProductivityData.getScore(dateStr);
     return result ? result.score : null;
