@@ -95,7 +95,7 @@ const PlannerData = (function () {
   }
 
   function deleteTopic(topicId) {
-    if (getTasksForTopic(topicId).length > 0) return false;
+    if (getTasksForTopic(topicId).some(function (t) { return !t.archived; })) return false;
     const topics = Object.assign({}, getAllTopics());
     delete topics[topicId];
     State.set({ topics: topics });
@@ -125,7 +125,9 @@ const PlannerData = (function () {
       completedDate: null,
       note: '',
       revisionNumber: null,
-      cycleId: null
+      cycleId: null,
+      archived: false,
+      archivedAt: null
     }, overrides);
   }
 
@@ -224,6 +226,30 @@ const PlannerData = (function () {
     delete tasks[taskId];
     State.set({ tasks: tasks });
   }
+
+  // ---------- Tasks: archive ----------
+  // Archiving is a soft-hide flag, not deletion — archived tasks stay in State.tasks with their
+  // ID intact and remain fully recoverable via unarchiveTask. They're excluded from the active
+  // Today/Pending/Upcoming/History queries below but retrievable via getArchivedTasks.
+  function archiveTask(taskId) {
+    const tasks = Object.assign({}, State.get().tasks || {});
+    const task = tasks[taskId];
+    if (!task || task.archived) return;
+    tasks[taskId] = Object.assign({}, task, { archived: true, archivedAt: todayStr() });
+    State.set({ tasks: tasks });
+  }
+
+  function unarchiveTask(taskId) {
+    const tasks = Object.assign({}, State.get().tasks || {});
+    const task = tasks[taskId];
+    if (!task || !task.archived) return;
+    tasks[taskId] = Object.assign({}, task, { archived: false, archivedAt: null });
+    State.set({ tasks: tasks });
+  }
+
+  function getArchivedTasks() {
+    return sortByDate(getTasksList().filter(function (t) { return t.archived; }));
+  }
   // ---------- Tasks: completion ----------
   // ---------- Tasks: completion ----------
 
@@ -276,23 +302,23 @@ const PlannerData = (function () {
 
   function getTodayTasks() {
     const today = todayStr();
-    return sortByDate(getTasksList().filter(function (t) { return t.date === today && !t.completed; }));
+    return sortByDate(getTasksList().filter(function (t) { return t.date === today && !t.completed && !t.archived; }));
   }
 
   // Incomplete tasks whose date has already passed — today's undone work lands here once the day ends.
   function getPendingTasks() {
     const today = todayStr();
-    return sortByDate(getTasksList().filter(function (t) { return t.date < today && !t.completed; }));
+    return sortByDate(getTasksList().filter(function (t) { return t.date < today && !t.completed && !t.archived; }));
   }
 
   // Scheduled, not-yet-due incomplete tasks — same records as Today/Pending, just date > today.
   function getUpcomingTasks() {
     const today = todayStr();
-    return sortByDate(getTasksList().filter(function (t) { return t.date > today && !t.completed; }));
+    return sortByDate(getTasksList().filter(function (t) { return t.date > today && !t.completed && !t.archived; }));
   }
 
   function getHistoryTasks() {
-    return sortByCompletedDesc(getTasksList().filter(function (t) { return t.completed; }));
+    return sortByCompletedDesc(getTasksList().filter(function (t) { return t.completed && !t.archived; }));
   }
 
   function getTasksForDate(dateStr) {
@@ -367,6 +393,9 @@ function slotLabel(t) {
     createCustomTask: createCustomTask,
     rescheduleTask: rescheduleTask,
     deleteTask: deleteTask,
+    archiveTask: archiveTask,
+    unarchiveTask: unarchiveTask,
+    getArchivedTasks: getArchivedTasks,
     toggleComplete: toggleComplete,
     getAllTasks: getAllTasks,
     getTasksList: getTasksList,
