@@ -147,6 +147,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
 
   let pendingSubtargets = []; // in-progress subtarget drafts for the Target form, cleared on save
 
+  let pendingSubtargets = [];
+
   function renderTargetModeBody(body) {
     const grouped = PlannerData.getTopicsBySubject();
     const subjectOptions = Object.keys(grouped).map(function (subj) {
@@ -159,14 +161,14 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<label class="planner-field-label">Title</label>' +
       '<input type="text" id="planner-target-title" placeholder="e.g. Solve 20 questions">' +
       '<div class="planner-compact-row">' +
+        '<select id="planner-target-timeframe">' +
+          '<option value="daily">Daily</option>' +
+          '<option value="weekly">Weekly</option>' +
+          '<option value="monthly">Monthly</option>' +
+        '</select>' +
         '<select id="planner-target-type">' +
           '<option value="custom">Custom</option>' +
           '<option value="hours">Hours</option>' +
-          '<option value="questions">Questions</option>' +
-        '</select>' +
-        '<select id="planner-target-type">' +
-          '<option value="checkoff">Checkoff</option>' +
-          '<option value="studyHours">Study Hours</option>' +
           '<option value="questions">Questions</option>' +
         '</select>' +
         '<input type="number" id="planner-target-value" placeholder="Value" min="1" value="1">' +
@@ -185,6 +187,62 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</div>' +
       '<button id="planner-save-target">Add Target</button>';
 
+    function renderSubtargetDrafts() {
+      const list = document.getElementById('planner-target-subtargets-list');
+      if (!list) return;
+      list.innerHTML = pendingSubtargets.length === 0
+        ? '<p class="planner-empty">No subtargets added.</p>'
+        : pendingSubtargets.map(function (s, i) {
+            return '<div class="planner-task-row"><div class="planner-task-meta">' + s.title + ' (' + s.targetValue + ')</div>' +
+              '<button class="planner-target-subdraft-del" data-idx="' + i + '" type="button">&times;</button></div>';
+          }).join('');
+      list.querySelectorAll('.planner-target-subdraft-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          pendingSubtargets.splice(Number(btn.dataset.idx), 1);
+          renderSubtargetDrafts();
+        });
+      });
+    }
+    renderSubtargetDrafts();
+
+    document.getElementById('planner-target-subadd-btn').addEventListener('click', function () {
+      const title = document.getElementById('planner-target-subtitle').value.trim();
+      if (!title) return;
+      const val = Number(document.getElementById('planner-target-subvalue').value) || 1;
+      pendingSubtargets.push({ title: title, targetValue: val });
+      document.getElementById('planner-target-subtitle').value = '';
+      document.getElementById('planner-target-subvalue').value = '1';
+      renderSubtargetDrafts();
+    });
+
+    document.getElementById('planner-save-target').addEventListener('click', function () {
+      const titleEl = document.getElementById('planner-target-title');
+      const dateEl = document.getElementById('planner-date');
+      const timeframeEl = document.getElementById('planner-target-timeframe');
+      const typeEl = document.getElementById('planner-target-type');
+      const valueEl = document.getElementById('planner-target-value');
+      const topicEl = document.getElementById('planner-target-topic');
+      if (!titleEl || !timeframeEl || !typeEl || !valueEl) return;
+      const title = titleEl.value.trim();
+      if (!title) { alert('Please enter a title.'); return; }
+      const dateStr = (dateEl && dateEl.value) || todayStr();
+      const timeframe = timeframeEl.value;
+      const type = typeEl.value;
+      const targetValue = Number(valueEl.value) || 1;
+      const topicId = (topicEl && topicEl.value) || null;
+
+      const target = TargetsData.createTarget({
+        title: title, timeframe: timeframe, type: type, targetValue: targetValue, dateKey: dateStr, topicId: topicId
+      });
+
+      pendingSubtargets.forEach(function (s) {
+        TargetsData.createSubtarget(target.targetId, { title: s.title, targetValue: s.targetValue, type: type });
+      });
+
+      pendingSubtargets = [];
+      renderAddModeBody();
+    });
+  }
     function renderSubtargetDrafts() {
       const list = document.getElementById('planner-target-subtargets-list');
       if (!list) return;
