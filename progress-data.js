@@ -83,7 +83,13 @@ const ProgressData = (function () {
   // Delegates to ProductivityData — the single canonical Productivity Score calculation shared
   // with Gamification (per unified spec). Progress never computes its own separate value here;
   // it only reads the same score Gamification's meter reads.
-  function productivityValue(entry, dateStr) {
+  function targetsValue(entry, dateStr) {
+    if (typeof TargetsData === 'undefined') return null;
+    const all = TargetsData.getTargetsForDate(dateStr);
+    if (!all || all.length === 0) return null;
+    const completed = all.filter(function (t) { return t.completed; }).length;
+    return Math.round((completed / all.length) * 100);
+  }
     if (!dateStr || typeof ProductivityData === 'undefined') return null;
     const result = ProductivityData.getScore(dateStr);
     return result ? result.score : null;
@@ -302,7 +308,8 @@ const ProgressData = (function () {
     weatherValue: weatherValue,
     studyHoursValue: studyHoursValue,
     questionsValue: questionsValue,
-    productivityValue: productivityValue,
+    targets: targetsValue,
+    productivity: productivityValue,
     hydrationValue: hydrationValue,
     sleepValue: sleepValue,
 
