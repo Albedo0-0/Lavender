@@ -181,6 +181,8 @@ const Library = (function () {
     document.getElementById('library-action-target').addEventListener('click', function () {
       Targets.open();
     });
+
+    renderTopicTargetsChecklist(container, activeTopicId);
     document.getElementById('library-action-edit').addEventListener('click', function () {
       const name = prompt('Rename chapter:', chapterName);
       if (name && name.trim()) {
@@ -208,6 +210,44 @@ const Library = (function () {
         const meta = PlannerData.getAllTopics()[activeTopicId] || {};
         const newTags = (meta.tags || []).filter(function (_, i) { return i !== Number(btn.dataset.idx); });
         PlannerData.updateTopicMeta(activeTopicId, { tags: newTags });
+        render();
+      });
+    });
+  }
+
+  function renderTopicTargetsChecklist(container, topicId) {
+    const targets = TargetsData.getTargetsForTopic(topicId);
+    if (targets.length === 0) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'library-topic-targets-dropdown';
+    wrap.innerHTML =
+      '<button class="library-topic-targets-toggle" type="button">Subtargets \u25BE</button>' +
+      '<div class="library-topic-targets-body" style="display:none">' +
+        targets.map(function (tg) {
+          const subs = TargetsData.getSubtargetsForTarget(tg.targetId);
+          if (subs.length === 0) return '';
+          return '<div class="library-topic-target-group"><strong>' + tg.title + '</strong>' +
+            subs.map(function (s) {
+              return '<label class="library-topic-subtarget-row">' +
+                '<input type="checkbox" class="library-topic-subtarget-check" data-subtarget-id="' + s.subtargetId + '" ' + (s.completed ? 'checked' : '') + '> ' +
+                s.title + ' (' + s.currentValue + '/' + s.targetValue + ')' +
+              '</label>';
+            }).join('') +
+          '</div>';
+        }).join('') +
+      '</div>';
+
+    container.appendChild(wrap);
+
+    wrap.querySelector('.library-topic-targets-toggle').addEventListener('click', function () {
+      const body = wrap.querySelector('.library-topic-targets-body');
+      body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    });
+
+    wrap.querySelectorAll('.library-topic-subtarget-check').forEach(function (cb) {
+      cb.addEventListener('click', function () {
+        TargetsData.toggleSubtargetComplete(cb.dataset.subtargetId);
         render();
       });
     });
