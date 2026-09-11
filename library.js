@@ -8,6 +8,7 @@ const Library = (function () {
   const PANEL_TABS = ['today', 'pending', 'history', 'upcoming', 'targets'];
   let panelTabIdx = 0;
   let panelCollapsed = false;
+  let historyFilterTopicId = null; // set when History is opened from a chapter's action row
   function todayStr() {
     const t = new Date();
     const pad = function (n) { return n < 10 ? '0' + n : '' + n; };
@@ -176,7 +177,9 @@ const Library = (function () {
       Planner.openForTopic(activeSubject, activeTopicId);
     });
     document.getElementById('library-action-history').addEventListener('click', function () {
-      Planner.openHistory(activeSubject, activeTopicId);
+      historyFilterTopicId = activeTopicId;
+      panelTabIdx = PANEL_TABS.indexOf('history');
+      expandRightPanel();
     });
     document.getElementById('library-action-upcoming').addEventListener('click', function () {
       openUpcomingModal(activeTopicId);
@@ -407,20 +410,53 @@ const Library = (function () {
       return;
     }
 
-    let tasks;
+      let tasks;
     if (tab === 'today') tasks = PlannerData.getTodayTasks();
     else if (tab === 'pending') tasks = PlannerData.getPendingTasks();
     else if (tab === 'upcoming') tasks = PlannerData.getUpcomingTasks();
-    else tasks = PlannerData.getHistoryTasks();
+    else tasks = historyFilterTopicId
+      ? PlannerData.getHistoryTasks().filter(function (t) { return t.topicId === historyFilterTopicId; })
+      : PlannerData.getHistoryTasks();
     if (!tasks.length) { content.innerHTML = '<p class="planner-empty">Nothing here.</p>'; return; }
+    const sessionActive = typeof Study !== 'undefined' && Study.isSessionActive && Study.isSessionActive();
     content.innerHTML = tasks.map(function (t) {
       const meta = t.taskType === 'custom' ? t.title : (t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t));
       const slot = PlannerData.slotLabel(t);
+      const startBtn = (tab === 'upcoming' && !t.completed)
+        ? '<button class="library-panel-start-btn" data-task-id="' + t.taskId + '"' + (sessionActive ? ' disabled' : '') + '>Start now</button>'
+        : '';
       return '<div class="planner-task-row' + (t.completed ? ' planner-task-done' : '') + '">' +
-        '<div class="planner-task-meta">' + meta + '</div>' +
+        '<label class="planner-task-check-label">' +
+          '<input type="checkbox" class="library-panel-task-check" data-task-id="' + t.taskId + '"' + (t.completed ? ' checked' : '') + (tab === 'history' ? ' disabled' : '') + '>' +
+          '<span class="planner-task-meta">' + meta + '</span>' +
+        '</label>' +
         '<div class="planner-task-sub">' + t.date + (slot ? ' \u00B7 ' + slot : '') + '</div>' +
+        startBtn +
       '</div>';
     }).join('');
+
+    content.querySelectorAll('.library-panel-task-check').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        PlannerData.toggleComplete(cb.dataset.taskId);
+        renderRightPanel();
+      });
+    });
+    content.querySelectorAll('.library-panel-start-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (typeof Study !== 'undefined' && Study.startTaskSession) Study.startTaskSession(btn.dataset.taskId);
+      });
+    });
+  }
+  function expandRightPanel() {
+    panelCollapsed = false;
+    const rightPanel = document.getElementById('library-right-panel');
+    const expandBtn = document.getElementById('library-panel-expand');
+    const plannerSide = document.getElementById('planner-side');
+    const libraryLeft = document.getElementById('library-left');
+    if (rightPanel) rightPanel.style.display = '';
+    if (expandBtn) expandBtn.style.display = 'none';
+    if (plannerSide && libraryLeft) { libraryLeft.appendChild(plannerSide); plannerSide.style.cssText = ''; }
+    renderRightPanel();
   }
 
   function init() {
@@ -450,14 +486,9 @@ const Library = (function () {
       if (plannerSide && layout) layout.appendChild(plannerSide);
       plannerSide.style.cssText = 'flex:0 0 50%;border-left:1px solid #eee;border-top:none;overflow-y:auto;padding:8px;box-sizing:border-box;';
     });
-    if (expandBtn) expandBtn.addEventListener('click', function () {
-      panelCollapsed = false;
-      if (rightPanel) rightPanel.style.display = '';
-      expandBtn.style.display = 'none';
-      const libraryLeft = document.getElementById('library-left');
-      if (plannerSide && libraryLeft) { libraryLeft.appendChild(plannerSide); plannerSide.style.cssText = ''; }
-      renderRightPanel();
-    });
+        if (expandBtn) expandBtn.addEventListener('click', expandRightPanel);
+    if (prevBtn) prevBtn.addEventListener('click', function () { historyFilterTopicId = null; });
+    if (nextBtn) nextBtn.addEventListener('click', function () { historyFilterTopicId = null; });
   }
   return { init: init, render: render, openTopic: openTopic, openSubject: openSubject };
 })();
