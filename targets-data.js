@@ -212,15 +212,17 @@ const TargetsData = (function () {
     const sub = subtargets[subtargetId];
     if (!sub) return null;
     const nowCompleted = !sub.completed;
-    return updateSubtarget(subtargetId, {
+    const updatedSub = updateSubtarget(subtargetId, {
       completed: nowCompleted,
-      currentValue: nowCompleted ? value : 0
+      currentValue: nowCompleted ? sub.targetValue : 0
     });
     if (typeof GamificationData !== 'undefined') {
-      const updated = targets[targetId];
-      if (nowCompleted) GamificationData.awardTargetCompleted(updated);
-      else GamificationData.retractTargetCompleted(updated);
-    });
+      const parentTarget = getTarget(updatedSub.parentTargetId);
+      if (parentTarget && parentTarget.completed !== (nowCompleted && false)) {
+        // subtarget toggle — no direct parent EXP award; rollup handles parent state
+      }
+    }
+    return updatedSub;
   }
 
   function setProgressValue(targetId, value) {
