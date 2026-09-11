@@ -115,6 +115,22 @@ const GamificationData = (function () {
     awardLive(dateStr, label, -taskExpValue(task), { taskId: task.taskId, kind: 'task-retract' });
   }
 
+  function targetExpValue(target) {
+    if (target.timeframe === 'monthly') return 500;
+    if (target.timeframe === 'weekly') return 250;
+    return 150; // daily
+  }
+
+  function awardTargetCompleted(target) {
+    const dateStr = todayStr();
+    awardLive(dateStr, 'Target completed: ' + target.title, targetExpValue(target), { targetId: target.targetId, kind: 'target' });
+  }
+
+  function retractTargetCompleted(target) {
+    const dateStr = todayStr();
+    awardLive(dateStr, 'Target uncompleted: ' + target.title, -targetExpValue(target), { targetId: target.targetId, kind: 'target-retract' });
+  }
+  
   // Called from Study.commitSegment for every committed Stopwatch/Timer segment — 100 EXP/hour,
   // proportional, logged even for very short segments (min 1 EXP so a 1-minute segment ~= 1-2 EXP
   // never rounds away to nothing).
@@ -214,6 +230,8 @@ const GamificationData = (function () {
     maybeSettle: maybeSettle,
     awardTaskCompleted: awardTaskCompleted,
     retractTaskCompleted: retractTaskCompleted,
-    awardStudyTime: awardStudyTime
+    awardStudyTime: awardStudyTime,
+    awardTargetCompleted: awardTargetCompleted,
+    retractTargetCompleted: retractTargetCompleted
   };
 })();
