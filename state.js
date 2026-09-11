@@ -27,7 +27,9 @@ const State = (function () {
     assistantNotes: {}, // Assistant (§B.7): id -> { id, text, createdAt, promotedToTaskId } — merged Notepad/Quick Capture
     gamification: { totalExp: 0, lastSettledDate: null, streakBonusAwardedForRun: false }, // §B.8.3/8.4 — level is derived, never stored
     expLedger: [], // §B.8.3: append-only [{ id, date, label, exp, doubled, at }], settled once/day at cutoff
-    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '' }, // Settings (§B.9): breakWallpaper/defaultBreakDuration/notification toggles read since B.2/B.3; assistantName + Settings UI itself added in §B.9
+    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '' },
+    targets: {},
+    subtargets: {},
   };
   let data = Object.assign({}, defaultState);
 
