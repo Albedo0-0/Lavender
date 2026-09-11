@@ -10,13 +10,13 @@ const Progress = (function () {
     { key: 'productivity', label: 'Productivity' },
     { key: 'hydration', label: 'Hydration' },
     { key: 'sleep', label: 'Sleep' },
+    { key: 'targets', label: 'Targets' },
     { key: 'other', label: 'Other Stats' }
   ];
 
   let activeSection = 'mood';
   // Remembers the last chosen period per graph section so switching sections doesn't reset it.
-  let activePeriod = { mood: 'weekly', weather: 'weekly', studyHours: 'weekly', questions: 'weekly', productivity: 'weekly', hydration: 'weekly', sleep: 'weekly' };
-
+  let activePeriod = { mood: 'weekly', weather: 'weekly', studyHours: 'weekly', questions: 'weekly', productivity: 'weekly', hydration: 'weekly', sleep: 'weekly', targets: 'weekly' };
   // ---------- Layout shell ----------
 
   function renderShell() {
@@ -60,6 +60,7 @@ const Progress = (function () {
     if (metricKey === 'weather') return 4;
     if (metricKey === 'productivity') return 10;
     if (metricKey === 'hydration') return 10;
+    if (metricKey === 'targets') return 100;
     const nums = values.filter(function (v) { return v !== null && v !== undefined; });
     const max = nums.length ? Math.max.apply(null, nums) : 0;
     return Math.max(1, Math.ceil(max));
@@ -177,6 +178,8 @@ const Progress = (function () {
       renderGraphSection(main, 'Hydration', 'hydration');
     } else if (activeSection === 'sleep') {
       renderGraphSection(main, 'Sleep', 'sleep');
+    } else if (activeSection === 'targets') {
+      renderGraphSection(main, 'Targets (% completed)', 'targets');
     } else if (activeSection === 'other') {
       renderOtherStats(main);
     }
