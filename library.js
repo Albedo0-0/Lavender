@@ -156,7 +156,7 @@ const Library = (function () {
         '<button id="library-action-history">History</button>' +
         '<button id="library-action-upcoming">Upcoming</button>' +
         '<button id="library-action-links">Links</button>' +
-        '<button id="library-action-target" disabled title="Coming with Cleanup 6 / Feature 5">Target</button>' +
+        '<button id="library-action-target">Target</button>' +
         '<button id="library-action-edit">Edit</button>' +
         '<button id="library-action-remove">Remove</button>' +
       '</div>';
@@ -177,6 +177,9 @@ const Library = (function () {
     });
     document.getElementById('library-action-links').addEventListener('click', function () {
       openLinksModal(activeTopicId);
+    });
+    document.getElementById('library-action-target').addEventListener('click', function () {
+      Targets.open();
     });
     document.getElementById('library-action-edit').addEventListener('click', function () {
       const name = prompt('Rename chapter:', chapterName);
