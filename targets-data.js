@@ -192,8 +192,7 @@ const TargetsData = (function () {
     });
 
     if (allComplete) archiveTarget(targetId);
-    else unarchiveTarget(targetId);
-  }
+    // Do not auto-unarchive — manual archives must survive partial completion state.
 
   function toggleTargetComplete(targetId, recordedValue) {
     const target = getTarget(targetId);
