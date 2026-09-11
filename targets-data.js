@@ -6,8 +6,7 @@
 //                                                        dayAssigned, type, targetValue,
 //                                                        currentValue, completed} }
 // timeframe: 'daily' | 'weekly' | 'monthly'
-// type: 'studyHours' | 'questions' | 'checkoff'
-// Custom Day Goals = a Target with timeframe:'daily', type:'checkoff' — no separate model.
+// type: 'custom' (free-text note, checkbox completion) | 'hours' (numeric, logs to study hours) | 'questions' (numeric, logs count)
 //
 // Subtarget completion rollup rule (documented per LAVENDER_MASTER §5, Feature 5):
 // a parent's currentValue/completion % is the average of its subtargets' completion percentages
@@ -48,12 +47,14 @@ const TargetsData = (function () {
       timeframe: input.timeframe || 'daily',
       dateKey: input.dateKey || todayStr(),
       title: (input.title || '').trim(),
-      type: input.type || 'checkoff',
+      type: input.type || 'custom',
       targetValue: typeof input.targetValue === 'number' && input.targetValue > 0 ? input.targetValue : 1,
       currentValue: 0,
       completed: false,
       subtargets: [],
-      topicId: input.topicId || null
+      topicId: input.topicId || null,
+      note: input.note || '',
+      completedNote: ''
     };
     targets[targetId] = target;
     State.set({ targets: targets });
@@ -172,16 +173,32 @@ const TargetsData = (function () {
     });
   }
 
-  function toggleTargetComplete(targetId) {
+  function toggleTargetComplete(targetId, recordedValue) {
     const target = getTarget(targetId);
     if (!target) return null;
-    // Targets with subtargets derive completion from their subtargets — toggle each subtarget instead.
-    if (target.subtargets && target.subtargets.length > 0) return target;
-
     const nowCompleted = !target.completed;
+
+    // For targets with subtargets, toggling the parent toggles all subtargets
+    if (target.subtargets && target.subtargets.length > 0) {
+      target.subtargets.forEach(function (sid) {
+        const sub = getAllSubtargets()[sid];
+        if (!sub) return;
+        updateSubtarget(sid, {
+          completed: nowCompleted,
+          currentValue: nowCompleted ? sub.targetValue : 0
+        });
+      });
+      recomputeParentCompletion(targetId);
+      return getTarget(targetId);
+    }
+
+    const value = (target.type === 'hours' || target.type === 'questions')
+      ? (typeof recordedValue === 'number' ? recordedValue : target.targetValue)
+      : (nowCompleted ? target.targetValue : 0);
+
     const updated = updateTarget(targetId, {
       completed: nowCompleted,
-      currentValue: nowCompleted ? target.targetValue : 0
+      currentValue: nowCompleted ? value : 0
     });
 
     if (typeof GamificationData !== 'undefined' && GamificationData.awardTargetCompleted) {
@@ -190,7 +207,6 @@ const TargetsData = (function () {
     }
     return updated;
   }
-
   function toggleSubtargetComplete(subtargetId) {
     const subtargets = getAllSubtargets();
     const sub = subtargets[subtargetId];
