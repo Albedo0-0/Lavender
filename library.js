@@ -274,7 +274,7 @@ const Library = (function () {
 
   function openUpcomingModal(topicId) {
     const today = todayStr();
-    const tasks = PlannerData.getTasksForTopic(topicId).filter(function (t) { return !t.completed && t.date >= today; });
+    const tasks = PlannerData.getTasksForTopic(topicId).filter(function (t) { return !t.completed && t.date > today; });
     const html = tasks.length === 0
       ? '<p class="planner-empty">Nothing upcoming for this chapter.</p>'
       : tasks.map(function (t) {
