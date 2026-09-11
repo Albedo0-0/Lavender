@@ -214,7 +214,12 @@ const TargetsData = (function () {
     const nowCompleted = !sub.completed;
     return updateSubtarget(subtargetId, {
       completed: nowCompleted,
-      currentValue: nowCompleted ? sub.targetValue : 0
+      currentValue: nowCompleted ? value : 0
+    });
+    if (typeof GamificationData !== 'undefined') {
+      const updated = targets[targetId];
+      if (nowCompleted) GamificationData.awardTargetCompleted(updated);
+      else GamificationData.retractTargetCompleted(updated);
     });
   }
 
