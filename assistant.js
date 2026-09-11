@@ -44,7 +44,11 @@ const Assistant = (function () {
   function openMain() {
     Modal.open(mainHtml());
     document.querySelectorAll('.assistant-subject-card').forEach(function (card) {
-      card.addEventListener('click', function () { openSubject(card.dataset.subject); });
+      card.addEventListener('click', function () {
+        Modal.close();
+        Nav.switchTo('library');
+        if (typeof Library !== 'undefined' && Library.openSubject) Library.openSubject(card.dataset.subject);
+      });
     });
     document.querySelectorAll('#assistant-menu button').forEach(function (btn) {
       btn.addEventListener('click', function () { routeTo(btn.dataset.go); });
@@ -63,29 +67,6 @@ const Assistant = (function () {
 
   function backBtnHtml() { return '<button id="assistant-back-btn">\u2190 Back</button><br><br>'; }
   function wireBack() { document.getElementById('assistant-back-btn').addEventListener('click', openMain); }
-
-  // ---------- §7.2 Subject drill-down ----------
-
-  function openSubject(subject) {
-    const topics = AssistantData.getSubjectTopicsToday(subject);
-    const rows = topics.length ? topics.map(function (t) {
-      return '<div class="assistant-topic-row">' +
-        '<strong>' + esc(t.topicName) + '</strong> \u2014 ' + fmtMs(t.studyMs) + ' \u00b7 ' + t.questionsSolved + ' questions' +
-        (t.note ? '<div class="assistant-topic-note">' + esc(t.note) + '</div>' : '') +
-        '<button class="assistant-topic-history-btn" data-topic="' + t.topicId + '" data-subject="' + esc(subject) + '">View history</button>' +
-      '</div>';
-    }).join('') : '<p>Nothing studied in ' + esc(subject) + ' today yet.</p>';
-
-    Modal.open(backBtnHtml() + '<h3>' + esc(subject) + ' \u2014 Today</h3>' + rows);
-    wireBack();
-    document.querySelectorAll('.assistant-topic-history-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        Modal.close();
-        if (typeof Planner !== 'undefined' && Planner.openHistory) Planner.openHistory(btn.dataset.subject, btn.dataset.topic);
-        Nav.switchTo('library');
-      });
-    });
-  }
 
  
 
