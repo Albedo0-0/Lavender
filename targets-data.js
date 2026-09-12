@@ -67,7 +67,17 @@ const TargetsData = (function () {
     const targets = Object.assign({}, getAllTargets());
     const existing = targets[targetId];
     if (!existing) return null;
-    const updated = Object.assign({}, existing, patch);
+    const safePatch = Object.assign({}, patch);
+    if ('targetValue' in safePatch) {
+      const tv = parseFloat(safePatch.targetValue);
+      safePatch.targetValue = (!isNaN(tv) && tv >= 1) ? tv : existing.targetValue;
+    }
+    if ('currentValue' in safePatch) {
+      const cv = parseFloat(safePatch.currentValue);
+      const maxVal = ('targetValue' in safePatch) ? safePatch.targetValue : existing.targetValue;
+      safePatch.currentValue = isNaN(cv) ? existing.currentValue : Math.max(0, Math.min(maxVal, cv));
+    }
+    const updated = Object.assign({}, existing, safePatch);
     targets[targetId] = updated;
     State.set({ targets: targets });
     return updated;
@@ -144,7 +154,17 @@ const TargetsData = (function () {
     const subtargets = Object.assign({}, getAllSubtargets());
     const existing = subtargets[subtargetId];
     if (!existing) return null;
-    const updated = Object.assign({}, existing, patch);
+    const safePatch = Object.assign({}, patch);
+    if ('targetValue' in safePatch) {
+      const tv = parseFloat(safePatch.targetValue);
+      safePatch.targetValue = (!isNaN(tv) && tv >= 1) ? tv : existing.targetValue;
+    }
+    if ('currentValue' in safePatch) {
+      const cv = parseFloat(safePatch.currentValue);
+      const maxVal = ('targetValue' in safePatch) ? safePatch.targetValue : existing.targetValue;
+      safePatch.currentValue = isNaN(cv) ? existing.currentValue : Math.max(0, Math.min(maxVal, cv));
+    }
+    const updated = Object.assign({}, existing, safePatch);
     subtargets[subtargetId] = updated;
     State.set({ subtargets: subtargets });
     recomputeParentCompletion(existing.parentTargetId);
@@ -160,8 +180,11 @@ const TargetsData = (function () {
     const targets = Object.assign({}, getAllTargets());
     const parent = targets[existing.parentTargetId];
     if (parent) {
+      const remaining = (parent.subtargets || []).filter(function (id) { return id !== subtargetId; });
       targets[existing.parentTargetId] = Object.assign({}, parent, {
-        subtargets: (parent.subtargets || []).filter(function (id) { return id !== subtargetId; })
+        subtargets: remaining,
+        currentValue: remaining.length === 0 ? 0 : parent.currentValue,
+        completed: remaining.length === 0 ? false : parent.completed
       });
     }
 
@@ -193,6 +216,7 @@ const TargetsData = (function () {
 
     if (allComplete) archiveTarget(targetId);
     // Do not auto-unarchive — manual archives must survive partial completion state.
+  }
 
   function toggleTargetComplete(targetId, recordedValue) {
     const target = getTarget(targetId);
@@ -216,7 +240,7 @@ const TargetsData = (function () {
     }
 
     const value = (target.type === 'hours' || target.type === 'questions')
-      ? (typeof recordedValue === 'number' ? recordedValue : target.targetValue)
+      ? (typeof recordedValue === 'number' && !isNaN(recordedValue) && recordedValue >= 0 ? recordedValue : target.targetValue)
       : (nowCompleted ? target.targetValue : 0);
 
     const updated = updateTarget(targetId, {
@@ -254,7 +278,9 @@ const TargetsData = (function () {
   function setProgressValue(targetId, value) {
     const target = getTarget(targetId);
     if (!target) return null;
-    const clamped = Math.max(0, Math.min(target.targetValue, value));
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return null;
+    const clamped = Math.max(0, Math.min(target.targetValue, parsed));
     return updateTarget(targetId, {
       currentValue: clamped,
       completed: clamped >= target.targetValue
