@@ -191,12 +191,16 @@ const Calendar = (function () {
   function renderTargetsSection(dateStr) {
   const targets = TargetsData.getTargetsForDate(dateStr);
   if (!targets || targets.length === 0) return '';
+  function escTg(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function(c) { return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; }); }
   return '<div class="datehub-targets-section">' +
     '<label class="datehub-label datehub-todo-heading">Targets</label>' +
     '<ul class="datehub-targets-list">' +
       targets.map(function (tg) {
+        if (tg.subtargets && tg.subtargets.length > 0) {
+          return '<li><span>' + escTg(tg.title) + ' \u2014 ' + tg.currentValue + '/' + tg.targetValue + '</span></li>';
+        }
         return '<li><label><input type="checkbox" class="datehub-target-check" data-target-id="' + tg.targetId + '" ' + (tg.completed ? 'checked' : '') + '> ' +
-          tg.title + ' \u2014 ' + tg.currentValue + '/' + tg.targetValue + '</label></li>';
+          escTg(tg.title) + ' \u2014 ' + tg.currentValue + '/' + tg.targetValue + '</label></li>';
       }).join('') +
     '</ul>' +
   '</div>';
