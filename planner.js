@@ -149,6 +149,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   let pendingSubtargets = []; // in-progress subtarget drafts for the Target form, cleared on save
 
   function renderTargetModeBody(body) {
+    pendingSubtargets = [];
     const grouped = PlannerData.getTopicsBySubject();
     const subjectOptions = Object.keys(grouped).map(function (subj) {
       return '<optgroup label="' + subj + '">' + grouped[subj].map(function (t) {
@@ -166,8 +167,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
           '<option value="monthly">Monthly</option>' +
         '</select>' +
         '<select id="planner-target-type">' +
-          '<option value="checkoff">Custom</option>' +
-          '<option value="studyHours">Hours</option>' +
+          '<option value="custom">Custom</option>' +
+          '<option value="hours">Hours</option>' +
           '<option value="questions">Questions</option>' +
         '</select>' +
         '<input type="number" id="planner-target-value" placeholder="Value" min="1" value="1">' +
@@ -192,7 +193,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       list.innerHTML = pendingSubtargets.length === 0
         ? '<p class="planner-empty">No subtargets added.</p>'
         : pendingSubtargets.map(function (s, i) {
-            return '<div class="planner-task-row"><div class="planner-task-meta">' + s.title + ' (' + s.targetValue + ')</div>' +
+            return '<div class="planner-task-row"><div class="planner-task-meta">' + esc(s.title) + ' (' + s.targetValue + ')</div>' +
               '<button class="planner-target-subdraft-del" data-idx="' + i + '" type="button">&times;</button></div>';
           }).join('');
       list.querySelectorAll('.planner-target-subdraft-del').forEach(function (btn) {
