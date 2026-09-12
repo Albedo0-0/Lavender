@@ -248,10 +248,11 @@ const Library = (function () {
                 esc(s.title) + ' (' + s.currentValue + '/' + s.targetValue + ')' +
               '</label>';
             }).join('') +
-          '</div>';
+           '</div>';
+        }).join('') +
+      '</div>';
 
     container.appendChild(wrap);
-
     wrap.querySelector('.library-topic-targets-toggle').addEventListener('click', function () {
       const body = wrap.querySelector('.library-topic-targets-body');
       body.style.display = body.style.display === 'none' ? 'block' : 'none';
