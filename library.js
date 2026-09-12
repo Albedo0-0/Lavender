@@ -16,6 +16,8 @@ const Library = (function () {
     return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
   }
 
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function(c) { return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c]; }); }
+
   function toggleFavoriteTopic(topicId) {
     const favs = State.get().favoriteTopics || [];
     const idx = favs.indexOf(topicId);
@@ -239,16 +241,14 @@ const Library = (function () {
         targets.map(function (tg) {
           const subs = TargetsData.getSubtargetsForTarget(tg.targetId);
           if (subs.length === 0) return '';
-          return '<div class="library-topic-target-group"><strong>' + tg.title + '</strong>' +
+          return '<div class="library-topic-target-group"><strong>' + esc(tg.title) + '</strong>' +
             subs.map(function (s) {
               return '<label class="library-topic-subtarget-row">' +
                 '<input type="checkbox" class="library-topic-subtarget-check" data-subtarget-id="' + s.subtargetId + '" ' + (s.completed ? 'checked' : '') + '> ' +
-                s.title + ' (' + s.currentValue + '/' + s.targetValue + ')' +
+                esc(s.title) + ' (' + s.currentValue + '/' + s.targetValue + ')' +
               '</label>';
             }).join('') +
           '</div>';
-        }).join('') +
-      '</div>';
 
     container.appendChild(wrap);
 
@@ -408,7 +408,7 @@ const Library = (function () {
 
       const targetRows = archivedTargets.map(function (tg) {
         return '<div class="planner-task-row" data-target-id="' + tg.targetId + '">' +
-          '<span class="planner-task-meta">' + tg.title + '</span>' +
+          '<span class="planner-task-meta">' + esc(tg.title) + '</span>' +
           '<div class="planner-task-sub">Archived: ' + tg.archivedAt + '</div>' +
           '<button class="library-unarchive-target-btn" data-target-id="' + tg.targetId + '">Unarchive</button>' +
         '</div>';
@@ -445,7 +445,7 @@ const Library = (function () {
             subs.map(function (s) {
               return '<label class="library-topic-subtarget-row">' +
                 '<input type="checkbox" class="library-target-sub-check" data-subtarget-id="' + s.subtargetId + '" data-parent-id="' + tg.targetId + '" ' + (s.completed ? 'checked' : '') + '> ' +
-                s.title + ' (' + s.currentValue + '/' + s.targetValue + ')' +
+                esc(s.title) + ' (' + s.currentValue + '/' + s.targetValue + ')' +
               '</label>';
             }).join('') +
           '</div>';
@@ -453,7 +453,7 @@ const Library = (function () {
         return '<div class="planner-task-row' + (tg.completed ? ' planner-task-done' : '') + '" data-target-id="' + tg.targetId + '">' +
           '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' +
             '<input type="checkbox" class="library-target-check" data-target-id="' + tg.targetId + '" ' + (tg.completed ? 'checked' : '') + '>' +
-            '<span class="planner-task-meta">' + tg.title + '</span>' +
+            '<span class="planner-task-meta">' + esc(tg.title) + '</span>' +
             valueInput +
             (subs.length > 0 ? '<button class="library-target-subs-toggle" data-target-id="' + tg.targetId + '" style="font-size:11px;padding:1px 4px">&#9660;</button>' : '') +
             '<button class="library-archive-target-btn" data-target-id="' + tg.targetId + '" style="font-size:11px;padding:1px 4px">Archive</button>' +
