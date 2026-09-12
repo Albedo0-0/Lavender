@@ -148,9 +148,15 @@ const Alarm = (function () {
 
   function handleIconClick() { openList(); }
 
+  let _iconBtnRef = null;
+
   function init() {
     const btn = document.getElementById('alarm-icon');
-    if (btn) btn.addEventListener('click', handleIconClick);
+    if (btn) {
+      if (_iconBtnRef) _iconBtnRef.removeEventListener('click', handleIconClick);
+      btn.addEventListener('click', handleIconClick);
+      _iconBtnRef = btn;
+    }
     // Single-heartbeat migration (Feature 11): ride TimeEngine's tick instead of our own
     // setInterval. Passing the stable id 'alarm' means calling init() again (re-render/reopen)
     // replaces this callback in TimeEngine's registry rather than accumulating a second one.
