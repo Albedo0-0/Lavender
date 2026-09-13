@@ -1196,11 +1196,12 @@ body {
 #notepad-hanging-tab-btn { position: absolute; top: 8px; right: -30px; width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; z-index: 10; }
 
 #notepad-hanging-panel {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  margin-left: 16px;
-  width: calc(50vw + 184px);
+  position: fixed;
+  top: 4vh;
+  bottom: 4vh;
+  left: calc(50vw - 204px);
+  right: 20px;
+  width: auto;
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
@@ -1211,7 +1212,7 @@ body {
   overflow-y: auto;
 }
 @media (max-width: 700px) {
-  #notepad-hanging-panel { left: 0; margin-left: 0; top: 44px; width: 100%; }
+  #notepad-hanging-panel { left: 0; right: 0; top: auto; bottom: 0; width: 100%; }
 }
 #modal-content { transition: transform 0.2s ease; }
 @media (min-width: 701px) {
