@@ -385,7 +385,9 @@ const Notepad = (function () {
       renderComposer();
     });
 
-    document.querySelectorAll('.notepad-hanging-folder-btn').forEach(function (btn) {
+    const hangPanel = document.getElementById('notepad-hanging-panel') || document;
+
+    hangPanel.querySelectorAll('.notepad-hanging-folder-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const f = btn.dataset.folder;
         hangingPanelOpenFolder = (hangingPanelOpenFolder === f) ? null : f;
@@ -393,14 +395,14 @@ const Notepad = (function () {
       });
     });
 
-    document.querySelectorAll('.notepad-hanging-edit-btn').forEach(function (btn) {
+    hangPanel.querySelectorAll('.notepad-hanging-edit-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         beginEditNote(btn.dataset.id);
       });
     });
 
-    document.querySelectorAll('.notepad-hanging-delete-btn').forEach(function (btn) {
+    hangPanel.querySelectorAll('.notepad-hanging-delete-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         removeNote(btn.dataset.id);
@@ -408,7 +410,7 @@ const Notepad = (function () {
       });
     });
 
-    document.querySelectorAll('.notepad-hanging-checklist-toggle').forEach(function (cb) {
+    hangPanel.querySelectorAll('.notepad-hanging-checklist-toggle').forEach(function (cb) {
       cb.addEventListener('click', function (e) { e.stopPropagation(); });
       cb.addEventListener('change', function () {
         toggleChecklistItem(cb.dataset.noteId, cb.dataset.itemId);
@@ -416,14 +418,14 @@ const Notepad = (function () {
       });
     });
 
-    const prevBtn = document.getElementById('notepad-hanging-prev');
+    const prevBtn = hangPanel.querySelector('#notepad-hanging-prev');
     if (prevBtn) prevBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       hangingPanelPage -= 1;
       renderComposer();
     });
 
-    const nextBtn = document.getElementById('notepad-hanging-next');
+    const nextBtn = hangPanel.querySelector('#notepad-hanging-next');
     if (nextBtn) nextBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       hangingPanelPage += 1;
@@ -492,7 +494,6 @@ const Notepad = (function () {
   function openSavedNotes() {
     savedPanelOpen = true;
     currentFolder = null;
-    setModalShift(false);
     Modal.open(savedFoldersHtml());
     attachSavedFoldersListeners();
   }
@@ -508,7 +509,6 @@ const Notepad = (function () {
 
   function openFolder(folder) {
     currentFolder = folder;
-    setModalShift(false);
     Modal.open(savedFolderNotesHtml(folder));
     attachFolderNotesListeners(folder);
   }
