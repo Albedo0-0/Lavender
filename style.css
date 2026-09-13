@@ -1189,3 +1189,98 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+
+.notepad-checklist-done { text-decoration: line-through; color: #999; }
+
+#notepad-modal { position: relative; overflow: visible; }
+#notepad-hanging-tab-btn { position: absolute; top: 8px; right: -30px; width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; z-index: 10; }
+
+#notepad-hanging-panel {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: -30px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 16px 12px 12px;
+  z-index: 9;
+  box-shadow: 2px 4px 10px rgba(0,0,0,0.12);
+  max-height: 420px;
+  overflow-y: auto;
+}
+#notepad-hanging-panel-inner { position: relative; padding-top: 6px; }
+.notepad-hanging-rod {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #b39ddb;
+  border-radius: 2px;
+}
+.notepad-hanging-columns {
+  display: flex;
+  gap: 24px;
+  padding-top: 10px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.notepad-hanging-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  max-width: 140px;
+}
+.notepad-hanging-flag-wrap { position: relative; }
+.notepad-hanging-folder-btn {
+  background: #f0e6ff;
+  border: 1px solid #d0bdf0;
+  border-radius: 0 0 6px 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+.notepad-hanging-folder-btn.notepad-hanging-folder-open {
+  background: #b39ddb;
+  color: #fff;
+  border-color: #b39ddb;
+}
+.notepad-hanging-drop-line {
+  width: 2px;
+  height: 12px;
+  background: #d0bdf0;
+}
+.notepad-hanging-folder-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.notepad-hanging-note-row {
+  border: 1px solid #e6dcf5;
+  border-radius: 6px;
+  padding: 6px;
+  background: #fbf9ff;
+  font-size: 11px;
+}
+.notepad-hanging-note-top { display: flex; align-items: center; gap: 4px; }
+.notepad-hanging-note-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notepad-hanging-fav-mark { font-size: 11px; }
+.notepad-hanging-edit-btn, .notepad-hanging-delete-btn { border: none; background: none; cursor: pointer; padding: 0 2px; font-size: 13px; flex-shrink: 0; }
+.notepad-hanging-empty { font-size: 11px; color: #aaa; }
+.notepad-hanging-checklist { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.notepad-hanging-checklist-item { display: flex; align-items: center; gap: 4px; font-size: 10px; cursor: pointer; }
+.notepad-hanging-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+.notepad-hanging-nav button { border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; padding: 2px 8px; }
+.notepad-hanging-nav button:disabled { opacity: 0.4; cursor: default; }
+.notepad-hanging-page-label { font-size: 11px; color: #666; }
+
+.notepad-favorite-btn { border: none; background: none; cursor: pointer; font-size: 14px; opacity: 0.4; padding: 0 2px; }
+.notepad-favorite-btn.notepad-favorite-active { opacity: 1; }
