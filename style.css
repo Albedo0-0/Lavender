@@ -1201,7 +1201,7 @@ body {
   bottom: 4vh;
   left: calc(50vw - 208px) !important;
   right: auto !important;
-  width: 320px !important;
+  width: calc(50vw + 188px) !important;
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
