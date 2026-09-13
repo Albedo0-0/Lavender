@@ -25,7 +25,8 @@ const State = (function () {
     generalAlarms: {}, // General Alarm (§B.6): alarmId -> { id, text, time, recurrence, enabled, lastFiredDate, snoozedUntil }
     assistantNotes: {}, // Notepad (relocated from Assistant, §B.7): id -> { id, text, createdAt, promotedToTaskId,
                         //   folder: string (default 'General'), type: 'text'|'checklist' (default 'text'),
-                        //   checklistItems: [{ id, text, done }] (used when type === 'checklist') }
+                        //   checklistItems: [{ id, text, done }], favorite: boolean }
+    notepadFolders: [], // Notepad: explicit folder name list (persists empty folders independent of notes)
     gamification: { totalExp: 0, lastSettledDate: null, streakBonusAwardedForRun: false }, // §B.8.3/8.4 — level is derived, never stored
     expLedger: [], // §B.8.3: append-only [{ id, date, label, exp, doubled, at }], settled once/day at cutoff
     settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '' },
