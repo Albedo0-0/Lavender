@@ -22,6 +22,10 @@ const Notepad = (function () {
 
   function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'; }); }
 
+  function setModalShift(active) {
+    const mc = document.getElementById('modal-content');
+    if (mc) mc.classList.toggle('notepad-shifted', !!active);
+  }
   function uid() { return 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
   // ---- data helpers (direct State access — assistantNotes is Notepad-owned per state.js) ----
@@ -144,7 +148,7 @@ const Notepad = (function () {
           '<select id="notepad-folder-select">' + folderOptions + '</select>' +
           (newFolderInputOpen ? '<input type="text" id="notepad-new-folder-input" placeholder="Folder name">' : '') +
         '</div>' +
-        '<button id="notepad-note-add-btn">' + (editingNoteId ? 'Save' : 'Add') + '</button>' +
+                '<button id="notepad-note-add-btn" class="notepad-save-btn">' + (editingNoteId ? 'Save Changes' : 'Save Note') + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -154,6 +158,7 @@ const Notepad = (function () {
     Modal.open(composerHtml());
     attachComposerListeners();
     attachHangingPanelListeners();
+    setModalShift(hangingPanelOpen);
   }
 
   function attachComposerListeners() {
@@ -470,6 +475,7 @@ const Notepad = (function () {
   function openSavedNotes() {
     savedPanelOpen = true;
     currentFolder = null;
+    setModalShift(false);
     Modal.open(savedFoldersHtml());
     attachSavedFoldersListeners();
   }
@@ -485,6 +491,7 @@ const Notepad = (function () {
 
   function openFolder(folder) {
     currentFolder = folder;
+    setModalShift(false);
     Modal.open(savedFolderNotesHtml(folder));
     attachFolderNotesListeners(folder);
   }
