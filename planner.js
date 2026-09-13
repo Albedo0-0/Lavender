@@ -288,6 +288,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     document.getElementById('planner-note').value = '';
     updateTopicOptions();
     renderSidePanel();
+    if (typeof Library !== 'undefined' && Library.render) Library.render();
   }
 
   function handleSaveCustomTask() {
@@ -317,6 +318,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     document.getElementById('planner-custom-title').value = '';
     document.getElementById('planner-custom-note').value = '';
     renderSidePanel();
+    if (typeof Library !== 'undefined' && Library.render) Library.render();
   }
 
   function handleUseSuggestion(taskId) {
