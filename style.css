@@ -142,7 +142,8 @@ body {
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0,0,0,0.4);
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-left: 20px;
   z-index: 1000;
 }
 #modal-content {
@@ -1198,27 +1199,23 @@ body {
 
 #notepad-hanging-panel {
   position: fixed;
-top: 10vh;
-left: 160px;
-margin-left: 0;
-  width: calc(100vw - 180px);
+  top: 4vh;
+  left: 400px;
+  margin-left: 0;
+  width: calc(100vw - 420px);
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 18px 16px 16px;
   z-index: 9;
   box-shadow: 4px 6px 16px rgba(0,0,0,0.15);
-  max-height: min(95vh, 860px);
+  max-height: 92vh;
   overflow-y: auto;
 }
 @media (max-width: 700px) {
   #notepad-hanging-panel { left: 0; margin-left: 0; top: 44px; width: 100%; }
 }
 #modal-content { transition: transform 0.2s ease; }
-@media (min-width: 701px) {
-  #modal-content.notepad-shifted { transform: translateX(-400px); }
-}
-
 #notepad-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 #notepad-folder-row { display: flex; align-items: center; gap: 6px; flex: 1; }
 #notepad-folder-select { flex: 1; max-width: 180px; padding: 5px 6px; border-radius: 6px; border: 1px solid #d0bdf0; background: #fbf9ff; font-size: 12px; }
