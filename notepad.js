@@ -314,7 +314,7 @@ const Notepad = (function () {
 
       // ---- hanging-folder thin side panel (lives inside the composer modal) ----
 
-  const HANGING_PAGE_SIZE = 3;
+  const HANGING_PAGE_SIZE = 5;
 
   function hangingNoteRowHtml(n) {
     const label = n.type === 'checklist' ? ('(checklist) ' + (n.checklistItems || []).length + ' items') : n.text;
