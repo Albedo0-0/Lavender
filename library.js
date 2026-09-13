@@ -622,5 +622,6 @@ const Library = (function () {
     if (prevBtn) prevBtn.addEventListener('click', function () { historyFilterTopicId = null; });
     if (nextBtn) nextBtn.addEventListener('click', function () { historyFilterTopicId = null; });
   }
-  return { init: init, render: render, openTopic: openTopic, openSubject: openSubject };
+  function renderPanel() { renderRightPanel(); }
+  return { init: init, render: render, renderPanel: renderPanel, openTopic: openTopic, openSubject: openSubject };
 })();
