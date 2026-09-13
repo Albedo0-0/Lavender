@@ -15,6 +15,7 @@ const Notepad = (function () {
   let editingNoteId = null;   // note currently being edited in the composer (null = new note)
   let hangingPanelOpen = false;      // whether the thin hanging-folder side panel is expanded
   let hangingPanelOpenFolder = null; // which folder is expanded inside the hanging panel (null = none)
+  let hangingPanelPage = 0;          // which page of folders is shown (paginated left/right)
   let draftFolderNames = [];  // multiple new-folder names queued from the folder-selection flow
   let draftEditText = '';     // preserves text-note content being edited across re-renders
 
@@ -293,31 +294,67 @@ const Notepad = (function () {
     renderComposer();
   }
 
-   // ---- hanging-folder thin side panel (lives inside the composer modal) ----
+      // ---- hanging-folder thin side panel (lives inside the composer modal) ----
+
+  const HANGING_PAGE_SIZE = 3;
+
+  function hangingNoteRowHtml(n) {
+    const label = n.type === 'checklist' ? ('(checklist) ' + (n.checklistItems || []).length + ' items') : n.text;
+    const checklistHtml = n.type === 'checklist' ? (
+      '<div class="notepad-hanging-checklist">' +
+        (n.checklistItems || []).map(function (it) {
+          return '<label class="notepad-hanging-checklist-item">' +
+            '<input type="checkbox" class="notepad-hanging-checklist-toggle" data-note-id="' + n.id + '" data-item-id="' + it.id + '"' + (it.done ? ' checked' : '') + '>' +
+            '<span class="' + (it.done ? 'notepad-checklist-done' : '') + '">' + esc(it.text) + '</span>' +
+          '</label>';
+        }).join('') +
+      '</div>'
+    ) : '';
+    return '<div class="notepad-hanging-note-row" data-id="' + n.id + '">' +
+      '<div class="notepad-hanging-note-top">' +
+        (n.favorite ? '<span class="notepad-hanging-fav-mark" title="Favourite">&#11088;</span>' : '') +
+        '<span class="notepad-hanging-note-label">' + esc(n.type === 'checklist' ? label : n.text) + '</span>' +
+        '<button class="notepad-hanging-edit-btn" data-id="' + n.id + '" title="Edit">&#9999;&#65039;</button>' +
+        '<button class="notepad-hanging-delete-btn" data-id="' + n.id + '" title="Delete">&#128465;&#65039;</button>' +
+      '</div>' +
+      checklistHtml +
+    '</div>';
+  }
 
   function hangingPanelHtml() {
     const folders = getFolders();
     const notes = getNotesArray();
 
-    const folderBlocks = folders.map(function (f) {
-      const isOpen = hangingPanelOpenFolder === f;
-      const folderNotes = notes.filter(function (n) { return (n.folder || 'General') === f; });
-      const noteRows = isOpen ? folderNotes.map(function (n) {
-        const label = n.type === 'checklist' ? ('(checklist) ' + (n.checklistItems || []).length + ' items') : n.text;
-        return '<div class="notepad-hanging-note-row" data-id="' + n.id + '">' +
-          '<span class="notepad-hanging-note-label">' + esc(label) + '</span>' +
-          '<button class="notepad-hanging-edit-btn" data-id="' + n.id + '" title="Edit">&#9999;&#65039;</button>' +
-          '<button class="notepad-hanging-delete-btn" data-id="' + n.id + '" title="Delete">&#128465;&#65039;</button>' +
-        '</div>';
-      }).join('') : '';
+    const totalPages = Math.max(1, Math.ceil(folders.length / HANGING_PAGE_SIZE));
+    if (hangingPanelPage >= totalPages) hangingPanelPage = totalPages - 1;
+    if (hangingPanelPage < 0) hangingPanelPage = 0;
+    const pageFolders = folders.slice(hangingPanelPage * HANGING_PAGE_SIZE, hangingPanelPage * HANGING_PAGE_SIZE + HANGING_PAGE_SIZE);
 
-      return '<div class="notepad-hanging-folder-block">' +
-        '<button class="notepad-hanging-folder-btn" data-folder="' + esc(f) + '">' + esc(f) + '</button>' +
-        (isOpen ? '<div class="notepad-hanging-folder-notes">' + (noteRows || '<span class="notepad-hanging-empty">No notes</span>') + '</div>' : '') +
+    const folderBlocks = pageFolders.map(function (f) {
+      const isOpen = hangingPanelOpenFolder === f;
+      let folderNotes = notes.filter(function (n) { return (n.folder || 'General') === f; });
+      folderNotes = folderNotes.slice().sort(function (a, b) { return (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0); });
+      const noteRows = isOpen ? folderNotes.map(hangingNoteRowHtml).join('') : '';
+
+      return '<div class="notepad-hanging-column">' +
+        '<div class="notepad-hanging-flag-wrap">' +
+          '<button class="notepad-hanging-folder-btn' + (isOpen ? ' notepad-hanging-folder-open' : '') + '" data-folder="' + esc(f) + '">' + esc(f) + '</button>' +
+        '</div>' +
+        (isOpen ? '<div class="notepad-hanging-drop-line"></div><div class="notepad-hanging-folder-notes">' + (noteRows || '<span class="notepad-hanging-empty">No notes</span>') + '</div>' : '') +
       '</div>';
     }).join('');
 
-    return '<div id="notepad-hanging-panel-inner">' + folderBlocks + '</div>';
+    const navHtml = '<div class="notepad-hanging-nav">' +
+      '<button id="notepad-hanging-prev" ' + (hangingPanelPage <= 0 ? 'disabled' : '') + '>&#8592;</button>' +
+      '<span class="notepad-hanging-page-label">' + (hangingPanelPage + 1) + ' / ' + totalPages + '</span>' +
+      '<button id="notepad-hanging-next" ' + (hangingPanelPage >= totalPages - 1 ? 'disabled' : '') + '>&#8594;</button>' +
+    '</div>';
+
+    return '<div id="notepad-hanging-panel-inner">' +
+      '<div class="notepad-hanging-rod"></div>' +
+      '<div class="notepad-hanging-columns">' + folderBlocks + '</div>' +
+      (folders.length > HANGING_PAGE_SIZE ? navHtml : '') +
+    '</div>';
   }
 
   function attachHangingPanelListeners() {
@@ -348,6 +385,28 @@ const Notepad = (function () {
         removeNote(btn.dataset.id);
         renderComposer();
       });
+    });
+
+    document.querySelectorAll('.notepad-hanging-checklist-toggle').forEach(function (cb) {
+      cb.addEventListener('click', function (e) { e.stopPropagation(); });
+      cb.addEventListener('change', function () {
+        toggleChecklistItem(cb.dataset.noteId, cb.dataset.itemId);
+        renderComposer();
+      });
+    });
+
+    const prevBtn = document.getElementById('notepad-hanging-prev');
+    if (prevBtn) prevBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      hangingPanelPage -= 1;
+      renderComposer();
+    });
+
+    const nextBtn = document.getElementById('notepad-hanging-next');
+    if (nextBtn) nextBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      hangingPanelPage += 1;
+      renderComposer();
     });
   }
 
@@ -466,6 +525,7 @@ const Notepad = (function () {
     draftEditText = '';
     draftFolderNames = [];
     hangingPanelOpenFolder = null;
+    hangingPanelPage = 0;
     renderComposer();
   }
 
