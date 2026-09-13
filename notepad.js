@@ -16,7 +16,8 @@ const Notepad = (function () {
   let hangingPanelOpen = false;      // whether the thin hanging-folder side panel is expanded
   let hangingPanelOpenFolder = null; // which folder is expanded inside the hanging panel (null = none)
   let hangingPanelPage = 0;          // which page of folders is shown (paginated left/right)
-  let draftFolderNames = [];  // multiple new-folder names queued from the folder-selection flow
+  let composerFolder = null;      // folder currently selected for the note being composed
+  let newFolderInputOpen = false; // whether the inline "new folder" field is showing
   let draftEditText = '';     // preserves text-note content being edited across re-renders
 
   function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'; }); }
@@ -111,14 +112,10 @@ const Notepad = (function () {
     }).join('');
 
     const folders = getFolders();
+    const activeFolder = composerFolder || (editingNoteId && getNotes()[editingNoteId] ? getNotes()[editingNoteId].folder : null) || folders[0] || 'General';
     const folderOptions = folders.map(function (f) {
-      return '<option value="' + esc(f) + '">' + esc(f) + '</option>';
-    }).join('');
-
-    const queuedFolderRows = draftFolderNames.map(function (name, idx) {
-      return '<span class="notepad-queued-folder" data-idx="' + idx + '">' + esc(name) +
-        ' <button class="notepad-queued-folder-remove" data-idx="' + idx + '" title="Remove">&#10006;</button></span>';
-    }).join(' ');
+      return '<option value="' + esc(f) + '"' + (f === activeFolder ? ' selected' : '') + '>' + esc(f) + '</option>';
+    }).join('') + '<option value="__new__">+ New folder…</option>';
 
     return '<div id="notepad-modal">' +
       '<button id="notepad-hanging-tab-btn" title="Folders">&#128193;</button>' +
@@ -143,12 +140,10 @@ const Notepad = (function () {
       '</div>' +
 
        '<div id="notepad-composer-footer">' +
-        '<label for="notepad-folder-select">Folder:</label> ' +
-        '<select id="notepad-folder-select">' + folderOptions + '</select> ' +
-        '<input type="text" id="notepad-new-folder-input" placeholder="New folder name">' +
-        '<button id="notepad-add-folder-btn" type="button">+ Add Folder</button>' +
-        '<div id="notepad-queued-folders">' + queuedFolderRows + '</div>' +
-        '<br>' +
+        '<div id="notepad-folder-row">' +
+          '<select id="notepad-folder-select">' + folderOptions + '</select>' +
+          (newFolderInputOpen ? '<input type="text" id="notepad-new-folder-input" placeholder="Folder name">' : '') +
+        '</div>' +
         '<button id="notepad-note-add-btn">' + (editingNoteId ? 'Save' : 'Add') + '</button>' +
       '</div>' +
     '</div>';
@@ -175,20 +170,31 @@ const Notepad = (function () {
     const savedBtn = document.getElementById('notepad-saved-btn');
     if (savedBtn) savedBtn.addEventListener('click', function () { openSavedNotes(); });
 
-    const addFolderBtn = document.getElementById('notepad-add-folder-btn');
-    if (addFolderBtn) addFolderBtn.addEventListener('click', function () {
-      const input = document.getElementById('notepad-new-folder-input');
-      const name = input ? input.value.trim() : '';
-      if (name && draftFolderNames.indexOf(name) === -1) draftFolderNames.push(name);
-      renderComposer();
+    const folderSelect = document.getElementById('notepad-folder-select');
+    if (folderSelect) folderSelect.addEventListener('change', function () {
+      if (folderSelect.value === '__new__') {
+        newFolderInputOpen = true;
+        renderComposer();
+        const input = document.getElementById('notepad-new-folder-input');
+        if (input) input.focus();
+      } else {
+        composerFolder = folderSelect.value;
+      }
     });
 
-    document.querySelectorAll('.notepad-queued-folder-remove').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        draftFolderNames.splice(Number(btn.dataset.idx), 1);
+    const newFolderInput = document.getElementById('notepad-new-folder-input');
+    if (newFolderInput) {
+      const commitNewFolder = function () {
+        const name = newFolderInput.value.trim();
+        newFolderInputOpen = false;
+        if (name) { addFolders([name]); composerFolder = name; }
         renderComposer();
+      };
+      newFolderInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); commitNewFolder(); }
       });
-    });
+      newFolderInput.addEventListener('blur', commitNewFolder);
+    }
 
     if (composerType === 'checklist') {
       const addItemBtn = document.getElementById('notepad-add-item-btn');
@@ -218,22 +224,10 @@ const Notepad = (function () {
   }
 
   function resolveFolder() {
-    if (draftFolderNames.length) addFolders(draftFolderNames);
-
-    const newFolderInput = document.getElementById('notepad-new-folder-input');
-    const newFolderVal = newFolderInput ? newFolderInput.value.trim() : '';
-    if (newFolderVal) {
-      addFolders([newFolderVal]);
-      draftFolderNames = [];
-      return newFolderVal;
-    }
-
-    const chosen = draftFolderNames.length ? draftFolderNames[draftFolderNames.length - 1] : null;
-    draftFolderNames = [];
-    if (chosen) return chosen;
-
     const select = document.getElementById('notepad-folder-select');
-    return (select && select.value) ? select.value : 'General';
+    const val = select ? select.value : null;
+    if (val && val !== '__new__') return val;
+    return composerFolder || 'General';
   }
 
   function handleAddNote() {
@@ -273,9 +267,11 @@ const Notepad = (function () {
       });
     }
 
-    editingNoteId = null;
-    draftEditText = '';
-    draftChecklist = [];
+    editingNoteId = noteId;
+    composerType = note.type === 'checklist' ? 'checklist' : 'text';
+    draftEditText = note.text || '';
+    composerFolder = note.folder || 'General';
+    newFolderInputOpen = false;
     composerType = 'text';
     renderComposer();
   }
@@ -336,11 +332,14 @@ const Notepad = (function () {
       folderNotes = folderNotes.slice().sort(function (a, b) { return (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0); });
       const noteRows = isOpen ? folderNotes.map(hangingNoteRowHtml).join('') : '';
 
-      return '<div class="notepad-hanging-column">' +
+      return '<div class="notepad-hanging-column' + (isOpen ? ' notepad-hanging-column-open' : '') + '">' +
         '<div class="notepad-hanging-flag-wrap">' +
-          '<button class="notepad-hanging-folder-btn' + (isOpen ? ' notepad-hanging-folder-open' : '') + '" data-folder="' + esc(f) + '">' + esc(f) + '</button>' +
+          '<button class="notepad-hanging-folder-btn' + (isOpen ? ' notepad-hanging-folder-open' : '') + '" data-folder="' + esc(f) + '">' +
+            '<span class="notepad-hanging-folder-name">' + esc(f) + '</span>' +
+            '<span class="notepad-hanging-folder-count">' + folderNotes.length + '</span>' +
+          '</button>' +
         '</div>' +
-        (isOpen ? '<div class="notepad-hanging-drop-line"></div><div class="notepad-hanging-folder-notes">' + (noteRows || '<span class="notepad-hanging-empty">No notes</span>') + '</div>' : '') +
+        (isOpen ? '<div class="notepad-hanging-drop-line"></div><div class="notepad-hanging-folder-notes">' + (noteRows || '<span class="notepad-hanging-empty">No notes yet</span>') + '</div>' : '') +
       '</div>';
     }).join('');
 
@@ -523,7 +522,8 @@ const Notepad = (function () {
     composerType = 'text';
     editingNoteId = null;
     draftEditText = '';
-    draftFolderNames = [];
+    composerFolder = null;
+    newFolderInputOpen = false;
     hangingPanelOpenFolder = null;
     hangingPanelPage = 0;
     renderComposer();
