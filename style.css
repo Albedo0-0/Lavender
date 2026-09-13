@@ -1199,8 +1199,8 @@ body {
   position: fixed;
   top: 4vh;
   bottom: 4vh;
-  left: calc(50vw - 184px);
-  right: 20px;
+  left: calc(50vw + 20px);
+  right: 16px;
   width: auto;
   background: #fff;
   border: 1px solid #ccc;
