@@ -25,6 +25,9 @@ const Notepad = (function () {
   function setModalShift(active) {
     const mc = document.getElementById('modal-content');
     if (mc) mc.classList.toggle('notepad-shifted', !!active);
+    const panel = document.getElementById('notepad-hanging-panel');
+    const overlay = document.getElementById('modal-overlay');
+    if (panel && overlay && panel.parentElement !== overlay) overlay.appendChild(panel);
   }
   function uid() { return 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
@@ -123,7 +126,7 @@ const Notepad = (function () {
 
     return '<div id="notepad-modal">' +
       '<button id="notepad-hanging-tab-btn" title="Folders">&#128193;</button>' +
-      '<div id="notepad-hanging-panel" style="display:' + (hangingPanelOpen ? 'block' : 'none') + '">' + hangingPanelHtml() + '</div>' +
+      '' +
       '<div id="notepad-top-row">' +
         '<h3>' + (editingNoteId ? 'Edit Note' : 'Notepad') + '</h3>' +
         '<button id="notepad-saved-btn" title="Saved notes">&#128193; Saved Notes</button>' +
