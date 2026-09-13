@@ -59,19 +59,21 @@ const Calendar = (function () {
       dayNum.textContent = day;
       cell.appendChild(dayNum);
 
-      let cellHasTask = false;
+         let cellHasTask = false;
+      let cellHasRevision = false;
       let cellHasTarget = false;
       if (typeof PlannerData !== 'undefined') {
         cellHasTask = PlannerData.getIncompleteTasksForDate(dateStr).length > 0;
+        cellHasRevision = PlannerData.getTasksForDate(dateStr).some(function (t) { return t.taskType === 'revision'; });
       }
       if (typeof TargetsData !== 'undefined') {
         const dayTargets = TargetsData.getTargetsForDate(dateStr) || [];
         cellHasTarget = dayTargets.some(function (t) { return !t.completed; });
       }
-      if (cellHasTask || cellHasTarget) {
+      if (cellHasTask || cellHasRevision || cellHasTarget) {
         const activityDot = document.createElement('span');
         activityDot.className = 'cal-activity-dot';
-        activityDot.title = cellHasTask && cellHasTarget ? 'Task & Target due' : (cellHasTask ? 'Task due' : 'Target due');
+        activityDot.title = 'Something due today';
         cell.appendChild(activityDot);
       }
 
