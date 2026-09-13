@@ -1201,14 +1201,14 @@ body {
   top: 0;
   left: 100%;
   margin-left: 16px;
-  width: min(80vw, 700px);
+  width: min(94vw, 920px);
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 18px 16px 16px;
   z-index: 9;
   box-shadow: 4px 6px 16px rgba(0,0,0,0.15);
-  max-height: min(88vh, 670px);
+  max-height: min(95vh, 860px);
   overflow-y: auto;
 }
 @media (max-width: 700px) {
@@ -1216,7 +1216,7 @@ body {
 }
 #modal-content { transition: transform 0.2s ease; }
 @media (min-width: 701px) {
-  #modal-content.notepad-shifted { transform: translateX(-170px); }
+  #modal-content.notepad-shifted { transform: translateX(-270px); }
 }
 
 #notepad-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
@@ -1248,7 +1248,7 @@ body {
   max-width: 160px;
   transition: max-width 0.15s ease;
 }
-.notepad-hanging-column-open { max-width: 320px; }
+.notepad-hanging-column-open { max-width: 460px; }
 .notepad-hanging-flag-wrap { position: relative; }
 .notepad-hanging-folder-btn {
   display: flex;
@@ -1284,9 +1284,9 @@ body {
 }
 .notepad-hanging-note-row {
   border: none;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: rgba(179, 157, 219, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  background: rgba(179, 157, 219, 0.22);
   font-size: 11px;
 }
 .notepad-hanging-note-top { display: flex; align-items: center; gap: 4px; }
@@ -1294,7 +1294,7 @@ body {
 .notepad-hanging-fav-mark { font-size: 11px; }
 .notepad-hanging-edit-btn, .notepad-hanging-delete-btn { border: none; background: none; cursor: pointer; padding: 0 2px; font-size: 13px; flex-shrink: 0; }
 .notepad-hanging-empty { font-size: 11px; color: #aaa; }
-.notepad-hanging-checklist { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.notepad-hanging-checklist { margin-top: 6px; padding: 6px 8px; background: rgba(179, 157, 219, 0.22); border-radius: 6px; display: flex; flex-direction: column; gap: 4px; }
 .notepad-hanging-checklist-item { display: flex; align-items: center; gap: 4px; font-size: 10px; cursor: pointer; }
 .notepad-hanging-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .notepad-hanging-nav button { border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; padding: 2px 8px; }
