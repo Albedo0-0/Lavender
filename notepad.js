@@ -120,18 +120,9 @@ const Notepad = (function () {
     }).join(' ');
 
     return '<div id="notepad-modal">' +
-      '<div id="notepad-hanging-tab-wrap">' +
-        '<button id="notepad-hanging-tab-btn" title="Folders">&#128193;</button>' +
-      '</div>' +
-      '<div id="notepad-hanging-panel" style="display:' + (hangingPanelOpen ? 'block' : 'none') + '">' + hangingPanelHtml() + '</div>' +
+            '<div id="notepad-hanging-panel" style="display:' + (hangingPanelOpen ? 'block' : 'none') + '">' + hangingPanelHtml() + '</div>' +
       '<div id="notepad-top-row">' +
         '<h3>' + (editingNoteId ? 'Edit Note' : 'Notepad') + '</h3>' +
-        '<button id="notepad-saved-btn" title="Saved notes">&#128193; Saved Notes</button>' +
-      '</div>' +
-
-    return '<div id="notepad-modal">' +
-      '<div id="notepad-top-row">' +
-        '<h3>Notepad</h3>' +
         '<button id="notepad-saved-btn" title="Saved notes">&#128193; Saved Notes</button>' +
       '</div>' +
 
