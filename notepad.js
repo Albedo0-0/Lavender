@@ -12,6 +12,11 @@ const Notepad = (function () {
   let composerType = 'text';  // 'text' | 'checklist' — format of the note currently being composed
   let draftChecklist = [];    // in-progress checklist items while composing
   let savedPanelOpen = false; // whether the Saved Notes panel is showing over the composer
+  let editingNoteId = null;   // note currently being edited in the composer (null = new note)
+  let hangingPanelOpen = false;      // whether the thin hanging-folder side panel is expanded
+  let hangingPanelOpenFolder = null; // which folder is expanded inside the hanging panel (null = none)
+  let draftFolderNames = [];  // multiple new-folder names queued from the folder-selection flow
+  let draftEditText = '';     // preserves text-note content being edited across re-renders
 
   function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'; }); }
 
@@ -32,14 +37,42 @@ const Notepad = (function () {
     return Object.keys(notes).map(function (id) { return notes[id]; });
   }
 
+  function getStoredFolderList() {
+    return (State.get().notepadFolders || []).slice();
+  }
+
+  function saveStoredFolderList(list) {
+    const unique = [];
+    list.forEach(function (f) { if (f && unique.indexOf(f) === -1) unique.push(f); });
+    State.set({ notepadFolders: unique });
+  }
+
+  function addFolders(names) {
+    const existing = getStoredFolderList();
+    names.forEach(function (n) {
+      const name = String(n || '').trim();
+      if (name && existing.indexOf(name) === -1) existing.push(name);
+    });
+    saveStoredFolderList(existing);
+  }
+
   function getFolders() {
     const arr = getNotesArray();
     const set = {};
+    getStoredFolderList().forEach(function (f) { set[f] = true; });
     arr.forEach(function (n) { set[n.folder || 'General'] = true; });
     const folders = Object.keys(set);
     if (!folders.length) folders.push('General');
     folders.sort(function (a, b) { return a.localeCompare(b); });
     return folders;
+  }
+
+  function toggleFavorite(noteId) {
+    const notes = Object.assign({}, getNotes());
+    const note = notes[noteId];
+    if (!note) return;
+    notes[noteId] = Object.assign({}, note, { favorite: !note.favorite });
+    saveNotes(notes);
   }
 
   function addNote(record) {
@@ -68,6 +101,7 @@ const Notepad = (function () {
   // ---- composer (default view on open) ----
 
   function composerHtml() {
+    const draftTextValue = editingNoteId ? (draftEditText || '') : '';
     const checklistRows = draftChecklist.map(function (item, idx) {
       return '<div class="notepad-draft-item" data-idx="' + idx + '">' +
         '<input type="text" class="notepad-draft-item-input" data-idx="' + idx + '" placeholder="Checklist item" value="' + esc(item) + '">' +
@@ -80,6 +114,21 @@ const Notepad = (function () {
       return '<option value="' + esc(f) + '">' + esc(f) + '</option>';
     }).join('');
 
+    const queuedFolderRows = draftFolderNames.map(function (name, idx) {
+      return '<span class="notepad-queued-folder" data-idx="' + idx + '">' + esc(name) +
+        ' <button class="notepad-queued-folder-remove" data-idx="' + idx + '" title="Remove">&#10006;</button></span>';
+    }).join(' ');
+
+    return '<div id="notepad-modal">' +
+      '<div id="notepad-hanging-tab-wrap">' +
+        '<button id="notepad-hanging-tab-btn" title="Folders">&#128193;</button>' +
+      '</div>' +
+      '<div id="notepad-hanging-panel" style="display:' + (hangingPanelOpen ? 'block' : 'none') + '">' + hangingPanelHtml() + '</div>' +
+      '<div id="notepad-top-row">' +
+        '<h3>' + (editingNoteId ? 'Edit Note' : 'Notepad') + '</h3>' +
+        '<button id="notepad-saved-btn" title="Saved notes">&#128193; Saved Notes</button>' +
+      '</div>' +
+
     return '<div id="notepad-modal">' +
       '<div id="notepad-top-row">' +
         '<h3>Notepad</h3>' +
@@ -91,21 +140,23 @@ const Notepad = (function () {
         '<button class="notepad-format-btn' + (composerType === 'checklist' ? ' notepad-format-active' : '') + '" data-type="checklist">Checklist</button>' +
       '</div>' +
 
-      '<div id="notepad-composer-body">' +
+         '<div id="notepad-composer-body">' +
         (composerType === 'text'
-          ? '<textarea id="notepad-note-input" placeholder="Capture anything — a note, a to-do, a thought..."></textarea>'
+          ? '<textarea id="notepad-note-input" placeholder="Capture anything — a note, a to-do, a thought...">' + esc(draftTextValue) + '</textarea>'
           : '<div id="notepad-checklist-draft">' +
               checklistRows +
               '<button id="notepad-add-item-btn">+ Add item</button>' +
             '</div>') +
       '</div>' +
 
-      '<div id="notepad-composer-footer">' +
+       '<div id="notepad-composer-footer">' +
         '<label for="notepad-folder-select">Folder:</label> ' +
         '<select id="notepad-folder-select">' + folderOptions + '</select> ' +
-        '<input type="text" id="notepad-new-folder-input" placeholder="New folder name (optional)">' +
-        '<br><br>' +
-        '<button id="notepad-note-add-btn">Add</button>' +
+        '<input type="text" id="notepad-new-folder-input" placeholder="New folder name">' +
+        '<button id="notepad-add-folder-btn" type="button">+ Add Folder</button>' +
+        '<div id="notepad-queued-folders">' + queuedFolderRows + '</div>' +
+        '<br>' +
+        '<button id="notepad-note-add-btn">' + (editingNoteId ? 'Save' : 'Add') + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -114,11 +165,14 @@ const Notepad = (function () {
     savedPanelOpen = false;
     Modal.open(composerHtml());
     attachComposerListeners();
+    attachHangingPanelListeners();
   }
 
   function attachComposerListeners() {
     document.querySelectorAll('.notepad-format-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        const textInput = document.getElementById('notepad-note-input');
+        if (textInput) draftEditText = textInput.value;
         composerType = btn.dataset.type;
         if (composerType === 'checklist' && draftChecklist.length === 0) draftChecklist = [''];
         renderComposer();
@@ -127,6 +181,21 @@ const Notepad = (function () {
 
     const savedBtn = document.getElementById('notepad-saved-btn');
     if (savedBtn) savedBtn.addEventListener('click', function () { openSavedNotes(); });
+
+    const addFolderBtn = document.getElementById('notepad-add-folder-btn');
+    if (addFolderBtn) addFolderBtn.addEventListener('click', function () {
+      const input = document.getElementById('notepad-new-folder-input');
+      const name = input ? input.value.trim() : '';
+      if (name && draftFolderNames.indexOf(name) === -1) draftFolderNames.push(name);
+      renderComposer();
+    });
+
+    document.querySelectorAll('.notepad-queued-folder-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        draftFolderNames.splice(Number(btn.dataset.idx), 1);
+        renderComposer();
+      });
+    });
 
     if (composerType === 'checklist') {
       const addItemBtn = document.getElementById('notepad-add-item-btn');
@@ -156,25 +225,38 @@ const Notepad = (function () {
   }
 
   function resolveFolder() {
+    if (draftFolderNames.length) addFolders(draftFolderNames);
+
     const newFolderInput = document.getElementById('notepad-new-folder-input');
     const newFolderVal = newFolderInput ? newFolderInput.value.trim() : '';
-    if (newFolderVal) return newFolderVal;
+    if (newFolderVal) {
+      addFolders([newFolderVal]);
+      draftFolderNames = [];
+      return newFolderVal;
+    }
+
+    const chosen = draftFolderNames.length ? draftFolderNames[draftFolderNames.length - 1] : null;
+    draftFolderNames = [];
+    if (chosen) return chosen;
+
     const select = document.getElementById('notepad-folder-select');
     return (select && select.value) ? select.value : 'General';
   }
 
   function handleAddNote() {
     const folder = resolveFolder();
+    const existing = editingNoteId ? getNotes()[editingNoteId] : null;
 
     if (composerType === 'text') {
       const input = document.getElementById('notepad-note-input');
       const text = input ? input.value.trim() : '';
       if (!text) return;
       addNote({
-        id: uid(),
+        id: existing ? existing.id : uid(),
         text: text,
-        createdAt: Date.now(),
-        promotedToTaskId: null,
+        createdAt: existing ? existing.createdAt : Date.now(),
+        promotedToTaskId: existing ? existing.promotedToTaskId : null,
+        favorite: existing ? !!existing.favorite : false,
         folder: folder,
         type: 'text',
         checklistItems: []
@@ -187,19 +269,94 @@ const Notepad = (function () {
         .map(function (t) { return { id: uid(), text: t, done: false }; });
       if (!items.length) return;
       addNote({
-        id: uid(),
+        id: existing ? existing.id : uid(),
         text: '',
-        createdAt: Date.now(),
-        promotedToTaskId: null,
+        createdAt: existing ? existing.createdAt : Date.now(),
+        promotedToTaskId: existing ? existing.promotedToTaskId : null,
+        favorite: existing ? !!existing.favorite : false,
         folder: folder,
         type: 'checklist',
         checklistItems: items
       });
     }
 
+    editingNoteId = null;
+    draftEditText = '';
     draftChecklist = [];
     composerType = 'text';
     renderComposer();
+  }
+
+  function beginEditNote(noteId) {
+    const note = getNotes()[noteId];
+    if (!note) return;
+    editingNoteId = noteId;
+    composerType = note.type === 'checklist' ? 'checklist' : 'text';
+    draftEditText = note.text || '';
+    draftChecklist = note.type === 'checklist'
+      ? (note.checklistItems || []).map(function (it) { return it.text; })
+      : [];
+    if (composerType === 'checklist' && !draftChecklist.length) draftChecklist = [''];
+    hangingPanelOpen = false;
+    renderComposer();
+  }
+
+   // ---- hanging-folder thin side panel (lives inside the composer modal) ----
+
+  function hangingPanelHtml() {
+    const folders = getFolders();
+    const notes = getNotesArray();
+
+    const folderBlocks = folders.map(function (f) {
+      const isOpen = hangingPanelOpenFolder === f;
+      const folderNotes = notes.filter(function (n) { return (n.folder || 'General') === f; });
+      const noteRows = isOpen ? folderNotes.map(function (n) {
+        const label = n.type === 'checklist' ? ('(checklist) ' + (n.checklistItems || []).length + ' items') : n.text;
+        return '<div class="notepad-hanging-note-row" data-id="' + n.id + '">' +
+          '<span class="notepad-hanging-note-label">' + esc(label) + '</span>' +
+          '<button class="notepad-hanging-edit-btn" data-id="' + n.id + '" title="Edit">&#9999;&#65039;</button>' +
+          '<button class="notepad-hanging-delete-btn" data-id="' + n.id + '" title="Delete">&#128465;&#65039;</button>' +
+        '</div>';
+      }).join('') : '';
+
+      return '<div class="notepad-hanging-folder-block">' +
+        '<button class="notepad-hanging-folder-btn" data-folder="' + esc(f) + '">' + esc(f) + '</button>' +
+        (isOpen ? '<div class="notepad-hanging-folder-notes">' + (noteRows || '<span class="notepad-hanging-empty">No notes</span>') + '</div>' : '') +
+      '</div>';
+    }).join('');
+
+    return '<div id="notepad-hanging-panel-inner">' + folderBlocks + '</div>';
+  }
+
+  function attachHangingPanelListeners() {
+    const tabBtn = document.getElementById('notepad-hanging-tab-btn');
+    if (tabBtn) tabBtn.addEventListener('click', function () {
+      hangingPanelOpen = !hangingPanelOpen;
+      renderComposer();
+    });
+
+    document.querySelectorAll('.notepad-hanging-folder-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const f = btn.dataset.folder;
+        hangingPanelOpenFolder = (hangingPanelOpenFolder === f) ? null : f;
+        renderComposer();
+      });
+    });
+
+    document.querySelectorAll('.notepad-hanging-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        beginEditNote(btn.dataset.id);
+      });
+    });
+
+    document.querySelectorAll('.notepad-hanging-delete-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        removeNote(btn.dataset.id);
+        renderComposer();
+      });
+    });
   }
 
   // ---- saved notes panel (folders -> notes list, reached only via the corner button) ----
@@ -238,13 +395,15 @@ const Notepad = (function () {
             '</label>' +
           '</div>';
         }).join('');
-        return '<div class="assistant-note-row" data-id="' + n.id + '">' +
+         return '<div class="assistant-note-row" data-id="' + n.id + '">' +
           '<div class="notepad-checklist-view">' + items + '</div>' +
+          '<button class="notepad-favorite-btn' + (n.favorite ? ' notepad-favorite-active' : '') + '" data-id="' + n.id + '" title="Favourite">&#11088;</button>' +
           '<button class="assistant-note-delete-btn" data-id="' + n.id + '">Delete</button>' +
         '</div>';
       }
       return '<div class="assistant-note-row" data-id="' + n.id + '">' +
         '<span class="assistant-note-text">' + esc(n.text) + '</span> ' +
+        '<button class="notepad-favorite-btn' + (n.favorite ? ' notepad-favorite-active' : '') + '" data-id="' + n.id + '" title="Favourite">&#11088;</button>' +
         '<button class="assistant-note-delete-btn" data-id="' + n.id + '">Delete</button>' +
       '</div>';
     }).join('') : '<p>No notes in this folder yet.</p>';
@@ -297,6 +456,13 @@ const Notepad = (function () {
         openFolder(folder);
       });
     });
+
+    document.querySelectorAll('.notepad-favorite-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        toggleFavorite(btn.dataset.id);
+        openFolder(folder);
+      });
+    });
   }
 
   // ---- entry points ----
@@ -304,6 +470,10 @@ const Notepad = (function () {
   function open() {
     draftChecklist = [];
     composerType = 'text';
+    editingNoteId = null;
+    draftEditText = '';
+    draftFolderNames = [];
+    hangingPanelOpenFolder = null;
     renderComposer();
   }
 
