@@ -160,7 +160,6 @@ const Notepad = (function () {
     savedPanelOpen = false;
     Modal.open(composerHtml());
     attachComposerListeners();
-    attachHangingPanelListeners();
     // Rebuild hanging panel in modal-overlay (outside modal-content to escape transform)
     const overlay = document.getElementById('modal-overlay');
     let panel = document.getElementById('notepad-hanging-panel');
@@ -175,6 +174,7 @@ const Notepad = (function () {
       panel.style.display = hangingPanelOpen ? 'block' : 'none';
       panel.innerHTML = hangingPanelHtml();
     }
+    attachHangingPanelListeners();
     setModalShift(hangingPanelOpen);
   }
 
