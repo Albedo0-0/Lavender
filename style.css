@@ -1199,16 +1199,15 @@ body {
   position: fixed;
   top: 4vh;
   bottom: 4vh;
-  left: calc(50vw - 204px);
+  left: calc(50vw - 184px);
   right: 20px;
   width: auto;
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 18px 16px 16px;
-  z-index: 9;
+  z-index: 1100;
   box-shadow: 4px 6px 16px rgba(0,0,0,0.15);
-  max-height: 92vh;
   overflow-y: auto;
 }
 @media (max-width: 700px) {
