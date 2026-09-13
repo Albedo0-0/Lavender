@@ -1201,14 +1201,14 @@ body {
   top: 0;
   left: 100%;
   margin-left: 16px;
-  width: min(72vw, 600px);
+  width: min(80vw, 700px);
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
   padding: 18px 16px 16px;
   z-index: 9;
   box-shadow: 4px 6px 16px rgba(0,0,0,0.15);
-  max-height: min(86vh, 620px);
+  max-height: min(88vh, 670px);
   overflow-y: auto;
 }
 @media (max-width: 700px) {
@@ -1245,10 +1245,10 @@ body {
   flex-direction: column;
   align-items: center;
   min-width: 100px;
-  max-width: 140px;
+  max-width: 160px;
   transition: max-width 0.15s ease;
 }
-.notepad-hanging-column-open { max-width: 260px; }
+.notepad-hanging-column-open { max-width: 320px; }
 .notepad-hanging-flag-wrap { position: relative; }
 .notepad-hanging-folder-btn {
   display: flex;
