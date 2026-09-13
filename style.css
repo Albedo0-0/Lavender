@@ -113,15 +113,14 @@ body {
 
 .cal-activity-dot {
   position: absolute;
-  top: 2px;
-  left: 2px;
+  bottom: 2px;
+  right: 8px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3fae4a;
+  background: #1f6b2c;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
 }
-
 .cal-important-chip {
   margin-top: 3px;
   font-size: 8px;
