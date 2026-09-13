@@ -161,6 +161,20 @@ const Notepad = (function () {
     Modal.open(composerHtml());
     attachComposerListeners();
     attachHangingPanelListeners();
+    // Rebuild hanging panel in modal-overlay (outside modal-content to escape transform)
+    const overlay = document.getElementById('modal-overlay');
+    let panel = document.getElementById('notepad-hanging-panel');
+    if (!panel && overlay) {
+      panel = document.createElement('div');
+      panel.id = 'notepad-hanging-panel';
+      overlay.appendChild(panel);
+    } else if (panel && overlay && panel.parentElement !== overlay) {
+      overlay.appendChild(panel);
+    }
+    if (panel) {
+      panel.style.display = hangingPanelOpen ? 'block' : 'none';
+      panel.innerHTML = hangingPanelHtml();
+    }
     setModalShift(hangingPanelOpen);
   }
 
