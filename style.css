@@ -1197,11 +1197,11 @@ body {
 #notepad-hanging-tab-btn { position: absolute; top: 8px; right: -30px; width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; z-index: 10; }
 
 #notepad-hanging-panel {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  margin-left: 16px;
-  width: calc(100vw - 40px);
+  position: fixed;
+top: 10vh;
+left: 160px;
+margin-left: 0;
+  width: calc(100vw - 180px);
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
