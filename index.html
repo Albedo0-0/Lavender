@@ -28,9 +28,8 @@
   .notepad-checklist-view { display: flex; flex-direction: column; gap: 4px; }
   .notepad-checklist-view-item label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
     .notepad-checklist-done { text-decoration: line-through; color: #999; }
-  #notepad-modal { position: relative; }
-  #notepad-hanging-tab-wrap { position: absolute; top: 8px; right: -32px; z-index: 10; }
-  #notepad-hanging-tab-btn { width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; }
+ #notepad-modal { position: relative; overflow: visible; }
+  #notepad-hanging-tab-btn { position: absolute; top: 8px; right: -30px; width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; z-index: 10; }
   #notepad-hanging-panel { position: absolute; top: 0; right: -220px; width: 200px; background: #fff; border: 1px solid #ccc; border-radius: 0 8px 8px 0; padding: 8px; z-index: 9; max-height: 400px; overflow-y: auto; box-shadow: 2px 2px 6px rgba(0,0,0,0.1); }
   .notepad-hanging-folder-block { margin-bottom: 6px; }
   .notepad-hanging-folder-btn { width: 100%; text-align: left; padding: 4px 6px; background: #f0e6ff; border: 1px solid #d0bdf0; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -41,7 +40,7 @@
   .notepad-hanging-empty { font-size: 11px; color: #aaa; }
   .notepad-favorite-btn { border: none; background: none; cursor: pointer; font-size: 14px; opacity: 0.4; padding: 0 2px; }
   .notepad-favorite-btn.notepad-favorite-active { opacity: 1; }
-  #notepad-modal { overflow: visible; }
+
 </style>
 </head>
 <body>
