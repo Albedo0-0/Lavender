@@ -1233,7 +1233,7 @@ body {
 }
 .notepad-hanging-columns {
   display: flex;
-  gap: 24px;
+  gap: 10px;
   padding-top: 10px;
   align-items: flex-start;
   justify-content: flex-start;
@@ -1242,8 +1242,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 100px;
-  max-width: 160px;
+  min-width: 56px;
+  max-width: 68px;
   transition: max-width 0.15s ease;
 }
 .notepad-hanging-column-open { max-width: 460px; }
@@ -1255,10 +1255,10 @@ body {
   background: #f0e6ff;
   border: 1px solid #d0bdf0;
   border-radius: 0 0 6px 6px;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 5px 6px;
+  font-size: 11px;
   cursor: pointer;
-  max-width: 200px;
+  max-width: 68px;
 }
 .notepad-hanging-folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notepad-hanging-folder-count { font-size: 9px; opacity: 0.7; background: rgba(255,255,255,0.6); border-radius: 8px; padding: 1px 5px; flex-shrink: 0; }
@@ -1294,7 +1294,7 @@ body {
 .notepad-hanging-empty { font-size: 11px; color: #aaa; }
 .notepad-hanging-checklist { margin-top: 6px; padding: 6px 8px; background: rgba(179, 157, 219, 0.22); border-radius: 6px; display: flex; flex-direction: column; gap: 4px; }
 .notepad-hanging-checklist-item { display: flex; align-items: center; gap: 4px; font-size: 10px; cursor: pointer; }
-.notepad-hanging-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+.notepad-hanging-nav { position: absolute; bottom: 8px; right: 10px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 0; }
 .notepad-hanging-nav button { border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; padding: 2px 8px; }
 .notepad-hanging-nav button:disabled { opacity: 0.4; cursor: default; }
 .notepad-hanging-page-label { font-size: 11px; color: #666; }
