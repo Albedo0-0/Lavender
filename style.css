@@ -1201,7 +1201,7 @@ body {
   top: 0;
   left: 100%;
   margin-left: 16px;
-  width: calc(100vw - 180px);
+  width: calc(100vw - 40px);
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 10px;
@@ -1216,7 +1216,7 @@ body {
 }
 #modal-content { transition: transform 0.2s ease; }
 @media (min-width: 701px) {
-  #modal-content.notepad-shifted { transform: translateX(-120px); }
+  #modal-content.notepad-shifted { transform: translateX(-400px); }
 }
 
 #notepad-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
