@@ -19,6 +19,7 @@ const Player = (function () {
   let currentObjectUrl = null;
   let shuffleOrder = null;
   let shuffleOn = false;
+  let autoplayOn = true;
   let currentTrackId = null;
   let musicPlaying = false;
   let skipGuard = 0;
@@ -38,7 +39,7 @@ const Player = (function () {
     musicAudioEl.id = 'music-audio-el';
     musicAudioEl.style.display = 'none';
     document.body.appendChild(musicAudioEl);
-    musicAudioEl.addEventListener('ended', function () { next(); });
+    musicAudioEl.addEventListener('ended', function () { if (autoplayOn) next(); });
     musicAudioEl.addEventListener('timeupdate', updateProgressUi);
     return musicAudioEl;
   }
@@ -293,7 +294,8 @@ const Player = (function () {
       '<button id="music-prev-btn">Prev</button> ' +
       '<button id="music-playpause-btn">' + (musicPlaying ? 'Pause' : 'Play') + '</button> ' +
       '<button id="music-next-btn">Next</button> ' +
-      '<button id="music-shuffle-btn">' + (shuffleOn ? 'Shuffle: On' : 'Shuffle: Off') + '</button>' +
+      '<button id=\"music-shuffle-btn\">' + (shuffleOn ? 'Shuffle: On' : 'Shuffle: Off') + '</button> ' +
+      '<button id=\"music-autoplay-btn\">' + (autoplayOn ? 'Autoplay: On' : 'Autoplay: Off') + '</button>' +
       '</div>' +
       '<button id="music-playlist-btn">Playlist</button> ' +
       '<button id="player-back-btn">Back</button>';
@@ -311,6 +313,7 @@ const Player = (function () {
     document.getElementById('music-next-btn').addEventListener('click', next);
     document.getElementById('music-playpause-btn').addEventListener('click', togglePlayPause);
     document.getElementById('music-shuffle-btn').addEventListener('click', function () { toggleShuffle(); openMusicModal(); });
+    document.getElementById('music-autoplay-btn').addEventListener('click', function () { autoplayOn = !autoplayOn; openMusicModal(); });
     document.getElementById('music-playlist-btn').addEventListener('click', openPlaylistModal);
     document.getElementById('player-back-btn').addEventListener('click', openChooser);
     document.getElementById('music-seek-bar').addEventListener('change', function (e) { seekMusic(Number(e.target.value)); });
