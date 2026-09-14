@@ -301,7 +301,8 @@ const Player = (function () {
       r.addEventListener('click', function () {
         console.log('[radio] direct row click, id =', r.dataset.id);
         currentStationId = r.dataset.id;
-        openRadioModal();
+        _rows.forEach(function (x) { x.classList.remove('radio-station-active'); });
+        r.classList.add('radio-station-active');
       });
     });
     if (!window.__radioDelegationBound) {
