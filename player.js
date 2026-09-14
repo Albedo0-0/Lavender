@@ -29,6 +29,12 @@ const Player = (function () {
     radioAudioEl = document.createElement('audio');
     radioAudioEl.id = 'radio-audio-el';
     radioAudioEl.style.display = 'none';
+    radioAudioEl.addEventListener('error', function () {
+      console.error('[radio] audio element error:', radioAudioEl.error);
+    });
+    radioAudioEl.addEventListener('stalled', function () { console.log('[radio] stalled'); });
+    radioAudioEl.addEventListener('waiting', function () { console.log('[radio] waiting/buffering'); });
+    radioAudioEl.addEventListener('playing', function () { console.log('[radio] playing event fired'); });
     document.body.appendChild(radioAudioEl);
     return radioAudioEl;
   }
@@ -121,23 +127,31 @@ const Player = (function () {
   }
 
   function playStation(id) {
+    console.log('[radio] playStation id =', id);
     const station = RadioData.getById(id);
-    if (!station || !station.url) return;
+    console.log('[radio] station lookup =', station);
+    if (!station || !station.url) { console.log('[radio] abort: no station/url'); return; }
     stopMusic();
     ensureRadioAudio();
     currentStationId = id;
     if (loadedStationId !== id) {
       if (hls) { hls.destroy(); hls = null; }
       loadedStationId = id;
-      if (radioAudioEl.canPlayType('application/vnd.apple.mpegurl')) {
+      const nativeSupport = radioAudioEl.canPlayType('application/vnd.apple.mpegurl');
+      console.log('[radio] native canPlayType =', JSON.stringify(nativeSupport));
+      if (nativeSupport) {
         radioAudioEl.src = station.url;
       } else {
+        console.log('[radio] entering loadHlsScript');
         loadHlsScript(function () {
+          console.log('[radio] loadHlsScript callback fired, window.Hls =', typeof window.Hls);
           hls = new Hls();
           hls.on(Hls.Events.ERROR, function (event, data) { console.error('Radio HLS error:', data); });
           hls.loadSource(station.url);
           hls.attachMedia(radioAudioEl);
-          radioAudioEl.play().catch(function (err) { console.error('Radio play() rejected:', err); });
+          radioAudioEl.play().then(function () {
+            console.log('[radio] play() resolved');
+          }).catch(function (err) { console.error('Radio play() rejected:', err); });
           radioPlaying = true;
         });
         return;
@@ -284,6 +298,7 @@ const Player = (function () {
       row.addEventListener('click', function () { currentStationId = row.dataset.id; openRadioModal(); });
     });
     document.getElementById('radio-play-btn').addEventListener('click', function () {
+      console.log('[radio] play clicked, currentStationId =', currentStationId);
       if (currentStationId) playStation(currentStationId);
     });
     document.getElementById('radio-pause-btn').addEventListener('click', pauseRadio);
