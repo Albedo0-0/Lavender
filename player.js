@@ -9,6 +9,7 @@ const Player = (function () {
   let musicAudioEl = null;
   let hls = null;
   let currentStationId = null;
+  let loadedStationId = null;
   let radioPlaying = false;
 
   let ytPlayer = null;
@@ -118,9 +119,10 @@ const Player = (function () {
     if (!station || !station.url) return;
     stopMusic();
     ensureRadioAudio();
-    if (currentStationId !== id) {
+    currentStationId = id;
+    if (loadedStationId !== id) {
       if (hls) { hls.destroy(); hls = null; }
-      currentStationId = id;
+      loadedStationId = id;
       if (radioAudioEl.canPlayType('application/vnd.apple.mpegurl')) {
         radioAudioEl.src = station.url;
       } else {
@@ -272,7 +274,7 @@ const Player = (function () {
   function openRadioModal() {
     Modal.open(radioHtml());
     document.querySelectorAll('.radio-station-row').forEach(function (row) {
-      row.addEventListener('click', function () { currentStationId = row.dataset.id; playStation(row.dataset.id); openRadioModal(); });
+      row.addEventListener('click', function () { currentStationId = row.dataset.id; openRadioModal(); });
     });
     document.getElementById('radio-play-btn').addEventListener('click', function () {
       if (currentStationId) playStation(currentStationId);
