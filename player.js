@@ -300,6 +300,7 @@ const Player = (function () {
       document.addEventListener('click', function (e) {
         const row = e.target.closest('.radio-station-row');
         if (!row) return;
+        console.log('[radio] row click delegated, id =', row.dataset.id);
         currentStationId = row.dataset.id;
         openRadioModal();
       });
