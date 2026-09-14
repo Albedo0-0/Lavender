@@ -6,6 +6,9 @@
 // This module never touches TimeEngine/Study/Alarm audio — fully isolated.
 const Player = (function () {
   console.log('[radio] player.js LOADED — build check v2');
+  document.addEventListener('click', function (e) {
+    console.log('[radio] ANY click, target =', e.target.tagName, e.target.className);
+  }, true);
   let radioAudioEl = null;
   let musicAudioEl = null;
   let hls = null;
