@@ -294,9 +294,16 @@ const Player = (function () {
   }
   function openRadioModal() {
     Modal.open(radioHtml());
-    document.querySelectorAll('.radio-station-row').forEach(function (row) {
-      row.addEventListener('click', function () { currentStationId = row.dataset.id; openRadioModal(); });
-    });
+    const radioListEl = document.getElementById('modal-content');
+    if (radioListEl && !radioListEl.dataset.radioDelegated) {
+      radioListEl.dataset.radioDelegated = 'true';
+      radioListEl.addEventListener('click', function (e) {
+        const row = e.target.closest('.radio-station-row');
+        if (!row) return;
+        currentStationId = row.dataset.id;
+        openRadioModal();
+      });
+    }
     document.getElementById('radio-play-btn').addEventListener('click', function () {
       console.log('[radio] play clicked, currentStationId =', currentStationId);
       if (currentStationId) playStation(currentStationId);
