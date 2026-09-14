@@ -129,15 +129,16 @@ const Player = (function () {
       } else {
         loadHlsScript(function () {
           hls = new Hls();
+          hls.on(Hls.Events.ERROR, function (event, data) { console.error('Radio HLS error:', data); });
           hls.loadSource(station.url);
           hls.attachMedia(radioAudioEl);
-          radioAudioEl.play().catch(function () {});
+          radioAudioEl.play().catch(function (err) { console.error('Radio play() rejected:', err); });
           radioPlaying = true;
         });
         return;
       }
     }
-    radioAudioEl.play().catch(function () {});
+    radioAudioEl.play().catch(function (err) { console.error('Radio play() rejected:', err); });
     radioPlaying = true;
   }
   function pauseRadio() { stopRadio(); }
