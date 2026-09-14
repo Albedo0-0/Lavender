@@ -56,6 +56,11 @@ const Player = (function () {
       window.__hlsLoadQueue.forEach(function (fn) { fn(); });
       window.__hlsLoadQueue = [];
     };
+    s.onerror = function () {
+      window.__hlsLoading = false;
+      window.__hlsLoadQueue = [];
+      console.error('Radio: hls.js failed to load from CDN — script blocked or unreachable');
+    };
     document.body.appendChild(s);
   }
 
