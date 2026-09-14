@@ -294,10 +294,9 @@ const Player = (function () {
   }
   function openRadioModal() {
     Modal.open(radioHtml());
-    const radioListEl = document.getElementById('modal-content');
-    if (radioListEl && !radioListEl.dataset.radioDelegated) {
-      radioListEl.dataset.radioDelegated = 'true';
-      radioListEl.addEventListener('click', function (e) {
+    if (!window.__radioDelegationBound) {
+      window.__radioDelegationBound = true;
+      document.addEventListener('click', function (e) {
         const row = e.target.closest('.radio-station-row');
         if (!row) return;
         currentStationId = row.dataset.id;
