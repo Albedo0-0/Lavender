@@ -295,6 +295,7 @@ const Player = (function () {
   }
   function openRadioModal() {
     Modal.open(radioHtml());
+    console.log('[radio] rows found in DOM =', document.querySelectorAll('.radio-station-row').length);
     if (!window.__radioDelegationBound) {
       window.__radioDelegationBound = true;
       document.addEventListener('click', function (e) {
