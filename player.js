@@ -5,6 +5,7 @@
 // Radio and Music Player are mutually exclusive: starting one always stops the other.
 // This module never touches TimeEngine/Study/Alarm audio — fully isolated.
 const Player = (function () {
+  console.log('[radio] player.js LOADED — build check v2');
   let radioAudioEl = null;
   let musicAudioEl = null;
   let hls = null;
