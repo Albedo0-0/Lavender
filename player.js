@@ -295,7 +295,15 @@ const Player = (function () {
   }
   function openRadioModal() {
     Modal.open(radioHtml());
-    console.log('[radio] rows found in DOM =', document.querySelectorAll('.radio-station-row').length);
+    const _rows = document.querySelectorAll('.radio-station-row');
+    console.log('[radio] rows found in DOM =', _rows.length);
+    _rows.forEach(function (r) {
+      r.addEventListener('click', function () {
+        console.log('[radio] direct row click, id =', r.dataset.id);
+        currentStationId = r.dataset.id;
+        openRadioModal();
+      });
+    });
     if (!window.__radioDelegationBound) {
       window.__radioDelegationBound = true;
       document.addEventListener('click', function (e) {
