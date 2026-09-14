@@ -368,6 +368,7 @@ const Player = (function () {
   let _btnRef = null;
   function handleBtnClick() { openChooser(); }
   function init() {
+    loadHlsScript(function () {});
     const list = MusicData.getPlaylist();
     let changed = false;
     const cleaned = list.map(function (t) {
