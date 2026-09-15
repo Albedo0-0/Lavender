@@ -113,14 +113,12 @@ body {
   background-image:
     repeating-linear-gradient(90deg,
       rgba(90,112,61,0.13) 0px, rgba(90,112,61,0.13) 14px,
-      transparent 14px, transparent 18px,
-      rgba(169,134,90,0.11) 18px, rgba(169,134,90,0.11) 22px,
-      transparent 22px, transparent 96px),
+      rgba(169,134,90,0.11) 14px, rgba(169,134,90,0.11) 18px,
+      transparent 18px, transparent 96px),
     repeating-linear-gradient(0deg,
       rgba(90,112,61,0.13) 0px, rgba(90,112,61,0.13) 14px,
-      transparent 14px, transparent 18px,
-      rgba(169,134,90,0.11) 18px, rgba(169,134,90,0.11) 22px,
-      transparent 22px, transparent 96px),
+      rgba(169,134,90,0.11) 14px, rgba(169,134,90,0.11) 18px,
+      transparent 18px, transparent 96px),
     linear-gradient(135deg, var(--color-cream-200), var(--color-cream-100) 60%, var(--color-sage-100));
   background-blend-mode: multiply, multiply, normal;
   -webkit-font-smoothing: antialiased;
