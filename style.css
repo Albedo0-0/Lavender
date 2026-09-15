@@ -112,23 +112,17 @@ body {
   background-color: var(--color-bg);
   background-image:
     repeating-linear-gradient(90deg,
-      rgba(90,112,61,0.16) 0px, rgba(90,112,61,0.16) 14px,
+      rgba(90,112,61,0.13) 0px, rgba(90,112,61,0.13) 14px,
       transparent 14px, transparent 18px,
-      rgba(169,134,90,0.14) 18px, rgba(169,134,90,0.14) 22px,
+      rgba(169,134,90,0.11) 18px, rgba(169,134,90,0.11) 22px,
       transparent 22px, transparent 96px),
     repeating-linear-gradient(0deg,
-      rgba(90,112,61,0.16) 0px, rgba(90,112,61,0.16) 14px,
+      rgba(90,112,61,0.13) 0px, rgba(90,112,61,0.13) 14px,
       transparent 14px, transparent 18px,
-      rgba(169,134,90,0.14) 18px, rgba(169,134,90,0.14) 22px,
+      rgba(169,134,90,0.11) 18px, rgba(169,134,90,0.11) 22px,
       transparent 22px, transparent 96px),
-    repeating-linear-gradient(90deg,
-      rgba(63,79,42,0.10) 0px, rgba(63,79,42,0.10) 2px,
-      transparent 2px, transparent 48px),
-    repeating-linear-gradient(0deg,
-      rgba(63,79,42,0.10) 0px, rgba(63,79,42,0.10) 2px,
-      transparent 2px, transparent 48px),
     linear-gradient(135deg, var(--color-cream-200), var(--color-cream-100) 60%, var(--color-sage-100));
-  background-blend-mode: multiply, multiply, multiply, multiply, normal;
+  background-blend-mode: multiply, multiply, normal;
   -webkit-font-smoothing: antialiased;
 }
 
