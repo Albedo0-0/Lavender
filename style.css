@@ -99,6 +99,7 @@
 }
 
 html {
+  color-scheme: light only;
   scrollbar-width: thin;
   scrollbar-color: var(--color-kraft-400) transparent;
 }
