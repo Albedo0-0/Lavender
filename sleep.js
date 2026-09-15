@@ -23,37 +23,7 @@ const Sleep = (function () {
     return h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
   }
 
-  function open(dateStr) {
-    const rec = SleepData.getRecord(dateStr);
-    Modal.open(formHtml(rec));
+  function init() {}
 
-    document.getElementById('sleep-save-btn').addEventListener('click', function () {
-      const sleepTime = document.getElementById('sleep-bedtime-input').value;
-      const wakeTime = document.getElementById('sleep-waketime-input').value;
-      if (!sleepTime || !wakeTime) { document.getElementById('sleep-skip-btn').click(); return; }
-      SleepData.saveRecord(dateStr, { sleepTime: sleepTime, wakeTime: wakeTime });
-      Modal.close();
-    });
-
-    document.getElementById('sleep-skip-btn').addEventListener('click', function () {
-      SleepData.dismiss(dateStr);
-      Modal.close();
-    });
-  }
-
-  // §5.2 — checked once at startup; only opens if today's record isn't completed/dismissed yet.
-  function maybeAutoPrompt() {
-    const today = SleepData.todayStr();
-    if (autoPromptedFor === today) return;
-    if (SleepData.isPromptDue(today)) {
-      autoPromptedFor = today;
-      open(today);
-    }
-  }
-
-  function init() {
-    maybeAutoPrompt();
-  }
-
-  return { init: init, open: open };
+  return { init: init };
 })();
