@@ -55,6 +55,11 @@
   --color-primary: var(--color-sage-600);
   --color-primary-hover: var(--color-sage-700);
   --color-accent: var(--color-kraft-500);
+  --color-btn-primary-bg: var(--color-sage-800);
+  --color-btn-primary-bg-hover: #34401f;
+  --color-btn-primary-text: var(--color-cream-050);
+  --color-btn-secondary-bg: var(--color-sage-100);
+  --color-btn-secondary-border: var(--color-sage-300);
 
   /* Radius */
   --radius-sm: 6px;
@@ -106,8 +111,24 @@ body {
   color: var(--color-text);
   background-color: var(--color-bg);
   background-image:
-    repeating-linear-gradient(90deg, rgba(107,138,74,0.07) 0px, rgba(107,138,74,0.07) 2px, transparent 2px, transparent 40px),
-    repeating-linear-gradient(0deg, rgba(107,138,74,0.07) 0px, rgba(107,138,74,0.07) 2px, transparent 2px, transparent 40px);
+    repeating-linear-gradient(90deg,
+      rgba(90,112,61,0.16) 0px, rgba(90,112,61,0.16) 14px,
+      transparent 14px, transparent 18px,
+      rgba(169,134,90,0.14) 18px, rgba(169,134,90,0.14) 22px,
+      transparent 22px, transparent 96px),
+    repeating-linear-gradient(0deg,
+      rgba(90,112,61,0.16) 0px, rgba(90,112,61,0.16) 14px,
+      transparent 14px, transparent 18px,
+      rgba(169,134,90,0.14) 18px, rgba(169,134,90,0.14) 22px,
+      transparent 22px, transparent 96px),
+    repeating-linear-gradient(90deg,
+      rgba(63,79,42,0.10) 0px, rgba(63,79,42,0.10) 2px,
+      transparent 2px, transparent 48px),
+    repeating-linear-gradient(0deg,
+      rgba(63,79,42,0.10) 0px, rgba(63,79,42,0.10) 2px,
+      transparent 2px, transparent 48px),
+    linear-gradient(135deg, var(--color-cream-200), var(--color-cream-100) 60%, var(--color-sage-100));
+  background-blend-mode: multiply, multiply, multiply, multiply, normal;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -135,9 +156,9 @@ a:hover {
 button {
   font-family: var(--font-body);
   font-size: var(--text-sm);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  color: var(--color-btn-primary-text);
+  background: var(--color-btn-primary-bg);
+  border: 1px solid var(--color-btn-primary-bg);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
@@ -145,7 +166,8 @@ button {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
 }
 button:hover {
-  border-color: var(--color-primary);
+  background: var(--color-btn-primary-bg-hover);
+  border-color: var(--color-btn-primary-bg-hover);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -158,6 +180,25 @@ button:disabled {
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
+}
+button.btn-secondary,
+button.nav-btn,
+button.planner-addmode-btn,
+button.planner-tab-btn,
+button.progress-nav-btn,
+button.progress-period-btn {
+  color: var(--color-text);
+  background: var(--color-btn-secondary-bg);
+  border: 1px solid var(--color-btn-secondary-border);
+}
+button.btn-secondary:hover,
+button.nav-btn:hover,
+button.planner-addmode-btn:hover,
+button.planner-tab-btn:hover,
+button.progress-nav-btn:hover,
+button.progress-period-btn:hover {
+  background: var(--color-sage-200);
+  border-color: var(--color-primary);
 }
 
 input, select, textarea {
