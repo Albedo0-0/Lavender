@@ -289,7 +289,9 @@ const Player = (function () {
     const stations = RadioData.getStations();
     const rows = stations.map(function (s) {
       const active = s.id === currentStationId;
-      return '<div class="radio-station-row' + (active ? ' radio-station-active' : '') + '" data-id="' + s.id + '">' + s.name + '</div>';
+      const baseStyle = 'display:block;padding:10px 12px;margin:6px 0;border-radius:8px;border:1px solid #ccc;cursor:pointer;';
+      const activeStyle = active ? 'background:#b39ddb;color:#fff;border-color:#b39ddb;font-weight:bold;' : 'background:#f7f7f7;';
+      return '<div class="radio-station-row' + (active ? ' radio-station-active' : '') + '" data-id="' + s.id + '" style="' + baseStyle + activeStyle + '">' + s.name + (active ? ' ✓' : '') + '</div>';
     }).join('');
     return '<h3>Radio</h3>' + rows +
       '<div id="radio-controls">' +
