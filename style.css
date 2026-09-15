@@ -1207,6 +1207,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   gap: 0;
   transition: all 0.2s;
 }
+#library-left button,
+#library-left [class*="subject"],
+#library-left [class*="topic-header"],
+#library-left [class*="folder"] {
+  color: var(--color-btn-primary-text) !important;
+}
 #library-left {
   display: flex;
   flex-direction: column;
