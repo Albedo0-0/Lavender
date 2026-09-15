@@ -248,6 +248,14 @@ const Library = (function () {
     document.getElementById('library-action-remove').addEventListener('click', function () {
       const ok = PlannerData.deleteTopic(activeTopicId);
       if (!ok) { alert('Cannot remove a chapter with active (non-archived) tasks. Archive its tasks first.'); return; }
+      const favs = (State.get().favoriteTopics || []).filter(function (id) { return id !== activeTopicId; });
+      State.set({ favoriteTopics: favs });
+      getLinksByTopic(activeTopicId).forEach(function (l) { deleteLink(l.linkId); });
+      if (typeof TargetsData !== 'undefined') {
+        TargetsData.getAllTargetsList().filter(function (t) { return t.topicId === activeTopicId; }).forEach(function (t) {
+          TargetsData.deleteTarget(t.targetId);
+        });
+      }
       view = 'chapters';
       render();
     });
