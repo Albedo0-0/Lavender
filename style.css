@@ -1208,13 +1208,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   gap: 0;
   transition: all 0.2s;
 }
-#library-left button,
-#library-left [class*="subject"],
-#library-left [class*="topic-header"],
-#library-left [class*="folder"] {
-  color: #f7f3e8 !important;
-  background-color: #4a5a30 !important;
-  -webkit-text-fill-color: #f7f3e8 !important;
+#library-left > button {
+  color: #f8f4e6;
+  background: linear-gradient(135deg, #5c6f3a, #4a5a2e);
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  margin-bottom: 6px;
+}
+#library-left > button:hover {
+  background: linear-gradient(135deg, #67794a, #556238);
+  box-shadow: var(--shadow-sm);
 }
 #library-left {
   display: flex;
