@@ -1212,7 +1212,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 #library-left [class*="subject"],
 #library-left [class*="topic-header"],
 #library-left [class*="folder"] {
-  color: var(--color-btn-primary-text) !important;
+  color: #f7f3e8 !important;
+  background-color: #4a5a30 !important;
+  -webkit-text-fill-color: #f7f3e8 !important;
 }
 #library-left {
   display: flex;
