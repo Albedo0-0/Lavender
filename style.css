@@ -469,9 +469,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes modalOverlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 @keyframes modalContentIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalContentOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(6px); }
 }
 
 #modal-overlay {
@@ -483,8 +491,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   -webkit-backdrop-filter: blur(2px);
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  animation: modalOverlayIn var(--transition-base) var(--ease-soft);
+z-index: 1000;
+  animation: modalOverlayIn 200ms ease-out;
+}
+#modal-overlay.modal-closing {
+  animation: modalOverlayOut 180ms ease-in forwards;
 }
 
 #modal-content {
@@ -502,7 +513,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   width: 90%;
   max-height: 86vh;
   overflow-y: auto;
-  animation: modalContentIn 0.22s var(--ease-soft);
+  animation: modalContentIn 200ms ease-out;
+}
+#modal-content.modal-closing {
+  animation: modalContentOut 180ms ease-in forwards;
 }
 #modal-content.modal-sm { max-width: 300px; }
 #modal-content.modal-md { max-width: 440px; }
