@@ -1374,8 +1374,8 @@ button.planner-history-fav-toggle.active {
   flex-flow: row wrap;
   align-content: flex-start;
   gap: 6px 16px;
-  max-width: 720px;
-  margin: 20px auto;
+  max-width: 960px;
+  margin: 20px 0 20px 32px;
   padding: 30px 30px 26px 40px;
   background: var(--color-cream-050);
   background-image:
@@ -1419,10 +1419,7 @@ button.planner-history-fav-toggle.active {
 @keyframes journal-page-turn {
   0% {
     opacity: 0;
-    transform: rotateY(-8deg) translateX(-8px);
-  }
-  60% {
-    opacity: 1;
+    transform: rotateY(-5deg) translateX(-10px);
   }
   100% {
     opacity: 1;
@@ -1438,8 +1435,15 @@ button.planner-history-fav-toggle.active {
 .journal-manifestation,
 .journal-save-row {
   transform-origin: left center;
-  animation: journal-page-turn 0.4s ease-out;
+  animation: journal-page-turn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.journal-morning { animation-delay: 0.03s; }
+.journal-row { animation-delay: 0.06s; }
+.journal-diary { animation-delay: 0.09s; }
+.journal-photos { animation-delay: 0.12s; }
+.journal-manifestation { animation-delay: 0.15s; }
+.journal-save-row { animation-delay: 0.18s; }
 
 #screen-journal > .journal-topbar { order: 1; flex: 1 1 100%; }
 #screen-journal > .journal-morning { order: 2; flex: 1 1 100%; }
