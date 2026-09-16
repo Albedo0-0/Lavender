@@ -820,6 +820,8 @@ input[type="color"] {
   align-items: center;
   gap: var(--space-1);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .list-row-compact {
   padding: 6px var(--space-2);
