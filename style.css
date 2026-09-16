@@ -954,6 +954,10 @@ input[type="color"] {
   font-weight: bold;
 }
 
+/* ==========================================================================
+   Styling Phase 4 — Library + Planner
+   ========================================================================== */
+
 /* Planner */
 
 #planner-layout {
@@ -970,14 +974,15 @@ input[type="color"] {
 #planner-side {
   flex: 1 1 280px;
   min-width: 240px;
-  border-left: 1px solid #ddd;
-  padding-left: 16px;
 }
 
 .planner-field-label {
   display: block;
-  font-size: 12px;
-  margin-top: 10px;
+  font-family: var(--font-hand);
+  font-size: var(--text-sm);
+  color: var(--color-brown-600);
+  margin-top: var(--space-3);
+  margin-bottom: 2px;
 }
 
 #planner-form select,
@@ -989,7 +994,7 @@ input[type="color"] {
 
 .planner-slot-row {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   margin-top: 4px;
 }
 
@@ -999,170 +1004,280 @@ input[type="color"] {
 
 .planner-addmode-tabs {
   display: flex;
-  gap: 6px;
-  margin: 10px 0;
+  gap: var(--space-1);
+  margin: var(--space-3) 0;
+  background: var(--color-cream-200);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
 }
 
 .planner-addmode-btn {
   flex: 1;
   padding: 6px 4px;
   cursor: pointer;
-  border: 1px solid #ddd;
-  background: #fff;
-  font-size: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+.planner-addmode-btn:hover {
+  background: var(--color-surface);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .planner-addmode-btn.active {
-  font-weight: bold;
-  border-color: #6b8a4a;
+  font-weight: 700;
+  color: var(--color-cream-050);
+  background: var(--color-sage-600);
+  border-color: var(--color-sage-600);
+  box-shadow: var(--shadow-sm);
 }
 
 .planner-suggested-group {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .planner-suggested-group-title {
-  font-size: 12px;
-  font-weight: bold;
-  color: #666;
-  margin-bottom: 6px;
+  font-family: var(--font-hand);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-brown-600);
+  margin-bottom: var(--space-2);
 }
 
 .planner-suggested-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
-.planner-suggested-btn {
+button.planner-suggested-btn {
   text-align: left;
-  padding: 8px 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  box-shadow: var(--shadow-sm);
 }
 
-.planner-suggested-btn:hover {
-  border-color: #6b8a4a;
+button.planner-suggested-btn:hover {
+  border-color: var(--color-sage-300);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
 }
 
 .planner-tasktype-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
-#planner-save-task {
-  margin-top: 12px;
-  padding: 8px 12px;
-  cursor: pointer;
+#planner-save-task,
+#planner-save-custom,
+#planner-save-target {
+  margin-top: var(--space-3);
+  width: 100%;
+  font-weight: 600;
 }
 
 #planner-tabs {
   display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
 }
 
 .planner-tab-btn {
   flex: 1;
   padding: 6px 8px;
   cursor: pointer;
-  border: 1px solid #ddd;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
 }
 
 .planner-tab-btn.active {
-  font-weight: bold;
-  border-color: #6b8a4a;
+  font-weight: 700;
+  color: var(--color-cream-050);
+  background: var(--color-sage-600);
+  border-color: var(--color-sage-600);
 }
 
 .planner-history-filter-row select {
   width: 100%;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-3);
 }
 
 .planner-history-subject-list,
 .planner-history-chapter-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.planner-history-subject-btn,
-.planner-history-chapter-btn {
+button.planner-history-subject-btn,
+button.planner-history-chapter-btn {
   text-align: left;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
+  font-weight: 400;
+  box-shadow: var(--shadow-sm);
 }
 
-.planner-history-subject-btn:hover,
-.planner-history-chapter-btn:hover {
-  border-color: #6b8a4a;
+button.planner-history-subject-btn:hover,
+button.planner-history-chapter-btn:hover {
+  border-color: var(--color-sage-300);
+  box-shadow: var(--shadow-md);
 }
+
+.planner-history-chapter-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.planner-history-chapter-item .planner-history-chapter-btn { flex: 1; }
 
 .planner-history-back {
   background: none;
   border: none;
-  color: #6b8a4a;
+  color: var(--color-sage-700);
   cursor: pointer;
-  font-size: 13px;
-  padding: 0 0 8px 0;
+  font-size: var(--text-sm);
+  font-family: var(--font-hand);
+  padding: 0 0 var(--space-2) 0;
   display: block;
+  box-shadow: none;
+}
+.planner-history-back:hover {
+  box-shadow: none;
+  transform: none;
+  text-decoration: underline;
+  background: none;
 }
 
 .planner-history-heading {
-  margin: 0 0 10px 0;
+  margin: 0 0 var(--space-3) 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--color-brown-700);
 }
 
+.planner-history-favorites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+button.planner-history-fav-btn {
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-sage-100);
+  color: var(--color-sage-800);
+  border: 1px solid var(--color-sage-300);
+  box-shadow: none;
+}
+button.planner-history-fav-btn:hover {
+  background: var(--color-sage-200);
+  box-shadow: none;
+  transform: none;
+}
+
+button.planner-history-fav-toggle {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  box-shadow: none;
+  padding: 4px 8px;
+  font-size: var(--text-sm);
+}
+button.planner-history-fav-toggle:hover {
+  box-shadow: none;
+  transform: none;
+  border-color: var(--color-kraft-400);
+}
+button.planner-history-fav-toggle.active {
+  background: var(--color-kraft-300);
+  border-color: var(--color-kraft-500);
+  color: var(--color-brown-800);
+}
+
+/* Task rows — compact paper-card treatment. Background must span the full
+   row including trailing action buttons (see panel bug note). */
 .planner-task-row {
-  border: 1px solid #eee;
-  padding: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
 }
 
 .planner-task-done {
-  opacity: 0.7;
+  opacity: 0.65;
+}
+.planner-task-done .planner-task-meta {
+  text-decoration: line-through;
+  text-decoration-color: var(--color-sage-500);
 }
 
 .planner-task-check-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   cursor: pointer;
 }
 
 .planner-task-meta {
-  font-weight: bold;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .planner-task-sub {
-  font-size: 11px;
-  color: #777;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   margin-top: 2px;
 }
 
 .planner-task-note {
-  font-size: 12px;
-  color: #444;
-  margin-top: 4px;
-  font-style: italic;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+  margin-top: var(--space-1);
+  font-family: var(--font-hand);
+  font-style: normal;
 }
 
 .planner-empty {
-  font-size: 13px;
-  color: #888;
+  font-family: var(--font-hand);
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-4) var(--space-2);
 }
+
+
+  
+
+
+ 
 
 /* Date Hub — To Do section (Planner tasks due that date) */
 
