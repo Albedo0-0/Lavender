@@ -1576,9 +1576,17 @@ button.planner-history-fav-toggle.active {
 }
 
 .journal-locked-placeholder {
-  font-size: 14px;
-  color: #888;
-  padding: 24px 0;
+  max-width: 480px;
+  margin: 40px auto;
+  padding: 32px 24px;
+  font-family: var(--font-hand);
+  font-size: 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  background: var(--color-cream-050);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(63, 47, 33, 0.10);
 }
 
 .journal-topbar {
@@ -1635,16 +1643,22 @@ button.planner-history-fav-toggle.active {
 }
 
 .journal-important-tag {
+  font-family: var(--font-hand);
   font-size: 11px;
-  color: #c0392b;
-  border: 1px solid #c0392b;
-  padding: 2px 6px;
-  border-radius: 4px;
+  color: var(--color-accent-rust);
+  border: 1px solid var(--color-accent-rust-soft);
+  background: var(--color-cream-100);
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 .journal-change-pass-btn {
   margin-left: auto;
   font-size: 11px;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  text-decoration: underline;
   cursor: pointer;
 }
 
@@ -1869,17 +1883,52 @@ button.planner-history-fav-toggle.active {
   font-weight: bold;
 }
 
+.journal-lock-modal h3 {
+  font-family: var(--font-display);
+  color: var(--color-brown-700);
+  margin-bottom: 8px;
+}
+
 .journal-lock-modal input {
   display: block;
   width: 100%;
   margin-top: 8px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.journal-lock-modal button {
+  margin-top: 12px;
 }
 
 .journal-lock-error {
   font-size: 12px;
-  color: #c0392b;
+  color: var(--color-accent-rust);
   min-height: 16px;
   margin-top: 4px;
+}
+@media (max-width: 560px) {
+  #screen-journal {
+    margin: 10px auto;
+    padding: 22px 18px 20px 30px;
+  }
+
+  #screen-journal > .journal-manifestation,
+  #screen-journal > .journal-challenge {
+    flex: 1 1 100%;
+  }
+
+  .journal-topbar {
+    margin: -22px -18px 14px -6px;
+    padding: 12px 16px 10px 12px;
+  }
+
+  .journal-topbar::after {
+    right: 20px;
+  }
 }
 
 .cal-mood {
