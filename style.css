@@ -1369,6 +1369,11 @@ button.planner-history-fav-toggle.active {
 
 #screen-journal {
   position: relative;
+  perspective: 1000px;
+  display: flex;
+  flex-flow: row wrap;
+  align-content: flex-start;
+  gap: 6px 16px;
   max-width: 720px;
   margin: 20px auto;
   padding: 30px 30px 26px 40px;
@@ -1404,6 +1409,124 @@ button.planner-history-fav-toggle.active {
   left: 15px;
   width: 6px;
   background: linear-gradient(90deg, rgba(63, 47, 33, 0.14), transparent);
+}
+
+@keyframes journal-page-turn {
+  0% {
+    opacity: 0;
+    transform: rotateY(-8deg) translateX(-8px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: rotateY(0deg) translateX(0);
+  }
+}
+
+.journal-topbar,
+.journal-morning,
+.journal-row,
+.journal-diary,
+.journal-photos,
+.journal-manifestation,
+.journal-save-row {
+  transform-origin: left center;
+  animation: journal-page-turn 0.4s ease-out;
+}
+
+#screen-journal > .journal-topbar { order: 1; flex: 1 1 100%; }
+#screen-journal > .journal-morning { order: 2; flex: 1 1 100%; }
+#screen-journal > .journal-row { order: 3; flex: 1 1 100%; }
+#screen-journal > .journal-diary { order: 4; flex: 1 1 100%; }
+#screen-journal > .journal-photos { order: 5; flex: 1 1 100%; }
+#screen-journal > .journal-manifestation { order: 6; flex: 1 1 46%; }
+#screen-journal > .journal-challenge { order: 6; flex: 1 1 46%; }
+#screen-journal > .journal-save-row { order: 7; flex: 1 1 100%; }
+#screen-journal > .journal-sleep-section { order: 8; flex: 1 1 100%; }
+
+.journal-manifestation {
+  position: relative;
+  margin-top: 0;
+  padding: 12px 14px;
+  background: linear-gradient(160deg, var(--color-sage-100), var(--color-cream-050));
+  border: 1px solid var(--color-sage-300);
+  border-radius: 4px 10px 10px 10px;
+  box-shadow: 0 4px 10px rgba(63, 47, 33, 0.10);
+}
+
+.journal-manifestation .journal-label {
+  font-family: var(--font-hand);
+  color: var(--color-sage-700);
+  margin-top: 0;
+}
+
+.journal-manifestation textarea {
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--color-sage-300);
+  padding-top: 6px;
+  font-family: var(--font-hand);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.journal-challenge {
+  position: relative;
+  overflow: hidden;
+  margin-top: 0;
+  padding: 12px 14px;
+  background: linear-gradient(160deg, var(--color-kraft-300), var(--color-cream-050));
+  border: 1px solid var(--color-kraft-500);
+  border-radius: 4px 10px 10px 10px;
+  box-shadow: 0 4px 10px rgba(63, 47, 33, 0.10);
+}
+
+.journal-challenge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-width: 0 16px 16px 0;
+  border-style: solid;
+  border-color: var(--color-cream-050) var(--color-cream-050) transparent transparent;
+  filter: drop-shadow(-1px 1px 1px rgba(63, 47, 33, 0.25));
+}
+
+.journal-sleep-section {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.journal-sleep-section .journal-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 0;
+}
+
+.journal-sleep-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.journal-sleep-row input[type="time"] {
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+}
+
+.journal-sleep-dur {
+  font-family: var(--font-hand);
+  color: var(--color-sage-700);
 }
 
 #journal-lock-toggle {
@@ -1496,11 +1619,67 @@ button.planner-history-fav-toggle.active {
   min-width: 120px;
 }
 
+.journal-weather,
+.journal-mood {
+  position: relative;
+  padding: 10px 12px 8px;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 3px 6px rgba(63, 47, 33, 0.14);
+}
+
+.journal-weather {
+  background: var(--color-sage-100);
+  border: 1px solid var(--color-sage-300);
+  border-top: none;
+}
+
+.journal-mood {
+  background: var(--color-kraft-300);
+  border: 1px solid var(--color-kraft-500);
+  border-top: none;
+}
+
+.journal-weather::before,
+.journal-mood::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+
+.journal-weather::before {
+  left: 10px;
+  border-top: 8px solid var(--color-sage-300);
+}
+
+.journal-mood::before {
+  right: 10px;
+  border-top: 8px solid var(--color-kraft-500);
+}
+
+.journal-weather .journal-label,
+.journal-mood .journal-label {
+  font-family: var(--font-hand);
+  margin-top: 0;
+}
+
 .journal-weather select,
 .journal-mood select,
 .journal-hours input,
 .journal-questions input {
   width: 100%;
+}
+
+.journal-weather select,
+.journal-mood select {
+  border: none;
+  background: transparent;
+  font-family: var(--font-hand);
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .journal-photo-list {
