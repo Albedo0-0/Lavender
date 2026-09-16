@@ -52,7 +52,10 @@ const Calendar = (function () {
       const cell = document.createElement('div');
       cell.className = 'cal-cell';
       if (dateStr === today) cell.classList.add('cal-today');
-      if (hub.color) cell.style.backgroundColor = hub.color;
+      if (hub.color) {
+        cell.classList.add('cal-colored');
+        cell.style.setProperty('--cal-user-color', hub.color);
+      }
 
       const dayNum = document.createElement('div');
       dayNum.className = 'cal-day-num';
