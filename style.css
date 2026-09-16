@@ -2457,3 +2457,181 @@ button.notepad-format-btn.notepad-format-active {
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
+
+/* ==========================================================================
+   Styling Phase 5 — Calendar + Date Hub + Targets-in-Calendar
+   ========================================================================== */
+
+#screen-calendar { position: relative; padding-bottom: var(--space-6); }
+#screen-calendar::after {
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: 8px;
+  height: 0;
+  border-top: 2px dashed var(--color-kraft-400);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+#calendar-header {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+#calendar-header::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 24px;
+  width: 64px;
+  height: 22px;
+  background: var(--color-sage-300);
+  opacity: 0.55;
+  transform: rotate(-4deg);
+  box-shadow: var(--shadow-sm);
+  border-radius: 2px;
+  pointer-events: none;
+}
+#calendar-month-label {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-brown-700);
+}
+#calendar-header button { font-size: var(--text-xs); }
+
+#calendar-grid {
+  gap: 6px;
+  padding: var(--space-2);
+  background: var(--color-cream-200);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.cal-head {
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  padding-bottom: 4px;
+}
+
+.cal-cell {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  min-height: 76px;
+  padding: 5px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 150ms var(--ease-soft), box-shadow 150ms var(--ease-soft), border-color 150ms var(--ease-soft);
+}
+.cal-cell:not(.cal-blank):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 138, 74, 0.22);
+  border-color: var(--color-sage-300);
+}
+.cal-cell:not(.cal-blank):active { transform: translateY(0); }
+.cal-cell:not(.cal-blank):focus-visible {
+  outline: none;
+  border-color: var(--color-sage-500);
+  box-shadow: 0 0 0 3px rgba(107, 138, 74, 0.22);
+}
+
+.cal-blank { border-color: transparent; background: transparent; box-shadow: none; }
+
+.cal-today {
+  border-color: var(--color-sage-600);
+  box-shadow: 0 0 0 1px var(--color-sage-500), var(--shadow-sm);
+}
+.cal-today .cal-day-num::after {
+  content: ' •';
+  font-family: var(--font-hand);
+  color: var(--color-sage-600);
+}
+
+.cal-colored {
+  background: color-mix(in srgb, var(--cal-user-color) 32%, var(--color-cream-050));
+  border-color: color-mix(in srgb, var(--cal-user-color) 55%, var(--color-border));
+}
+.cal-colored.cal-today {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cal-user-color) 70%, var(--color-sage-600)), var(--shadow-sm);
+}
+
+.cal-day-num {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.cal-note-preview {
+  font-family: var(--font-hand);
+  font-size: 10px;
+  color: var(--color-brown-600);
+  background: rgba(255, 253, 248, 0.7);
+  border-left: 2px solid var(--color-kraft-500);
+  border-radius: 2px;
+  margin-top: 3px;
+  padding: 1px 3px;
+}
+
+.cal-activity-dot { background: var(--color-sage-600); box-shadow: 0 0 0 1px var(--color-cream-050); }
+.cal-important-chip { font-family: var(--font-body); background: var(--color-accent-rust); border-radius: var(--radius-pill); }
+.cal-revision-dot { background: var(--color-kraft-500); }
+.cal-todo-snippet { color: var(--color-sage-700); }
+
+.cal-cell:not(.cal-blank):nth-child(7n+1),
+.cal-cell:not(.cal-blank):nth-child(7n) {
+  background-image: linear-gradient(0deg, rgba(169,134,90,0.04), rgba(169,134,90,0.04));
+}
+
+.datehub-header {
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px dashed var(--color-border);
+}
+.datehub-header h3, .datehub-header .modal-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-brown-700);
+}
+.datehub-close { font-family: var(--font-hand); font-size: 22px; color: var(--color-ink-soft); }
+.datehub-close:hover { color: var(--color-accent-rust); }
+.datehub-label { font-family: var(--font-hand); font-size: var(--text-sm); color: var(--color-ink-soft); margin-top: var(--space-3); }
+.datehub-quicknav { margin-top: var(--space-3); }
+.datehub-important-row {
+  background: var(--color-cream-200);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+#calendar-countdown {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-kraft-400);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.countdown-label { font-family: var(--font-hand); font-size: var(--text-base); color: var(--color-brown-700); }
+.countdown-date { color: var(--color-text-muted); }
+.countdown-days { color: var(--color-sage-700); font-weight: 600; }
+
+#calendar-streak { font-family: var(--font-hand); color: var(--color-ink-soft); }
+.streak-current { color: var(--color-sage-700); }
+
+.datehub-todo-section { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
+.datehub-todo-heading { font-family: var(--font-display); color: var(--color-brown-700); }
+.datehub-todo-subject { margin-top: var(--space-3); }
+.datehub-todo-subject-name { font-family: var(--font-hand); font-size: var(--text-sm); color: var(--color-brown-600); }
+.datehub-todo-item { font-size: var(--text-sm); color: var(--color-text); }
+.datehub-todo-item-done { color: var(--color-text-muted); }
+
+.cal-target-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-accent-rust-soft); display: inline-block; }
+.datehub-targets-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
+.datehub-target-row { font-family: var(--font-hand); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); }
