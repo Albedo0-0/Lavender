@@ -313,7 +313,12 @@ function renderPhotos() {
     entry.photos.forEach(function (id) {
       JournalData.getPhotoURL(id).then(function (url) {
         const img = list.querySelector('img[data-photo-id="' + id + '"]');
-        if (img && url) img.src = url;
+        if (img && url) {
+          img.src = url;
+          img.addEventListener('click', function () {
+            Modal.open('<div class="journal-polaroid-preview"><img src="' + url + '" class="journal-polaroid-preview-img"></div>');
+          });
+        }
       });
     });
 
