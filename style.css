@@ -1411,6 +1411,11 @@ button.planner-history-fav-toggle.active {
   background: linear-gradient(90deg, rgba(63, 47, 33, 0.14), transparent);
 }
 
+#screen-journal > .journal-diary {
+  border-left: 1px dashed var(--color-border);
+  padding-left: 10px;
+}
+
 @keyframes journal-page-turn {
   0% {
     opacity: 0;
@@ -1529,6 +1534,36 @@ button.planner-history-fav-toggle.active {
   color: var(--color-sage-700);
 }
 
+.journal-manifestation {
+  transform: rotate(-0.6deg);
+}
+
+.journal-challenge {
+  transform: rotate(0.6deg);
+}
+
+.journal-save-row {
+  position: relative;
+}
+
+.journal-save-row:has(#journal-edit-btn)::after {
+  content: 'saved';
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-accent-rust);
+  border: 2px solid var(--color-accent-rust);
+  border-radius: 4px;
+  padding: 1px 8px;
+  transform: rotate(-6deg);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 #journal-lock-toggle {
   position: fixed;
   top: 12px;
@@ -1547,6 +1582,7 @@ button.planner-history-fav-toggle.active {
 }
 
 .journal-topbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1555,6 +1591,19 @@ button.planner-history-fav-toggle.active {
   border-bottom: 1px solid var(--color-border);
   border-radius: 0 12px 0 0;
   background: linear-gradient(180deg, var(--color-cream-100), var(--color-cream-050));
+}
+
+.journal-topbar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 34px;
+  width: 16px;
+  height: 46px;
+  background: var(--color-accent-rust-soft);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  box-shadow: 0 2px 4px rgba(63, 47, 33, 0.2);
+  pointer-events: none;
 }
 
 .journal-topbar #journal-prev-date,
@@ -1568,10 +1617,17 @@ button.planner-history-fav-toggle.active {
 }
 
 .journal-date-label {
+  display: inline-block;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 17px;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   color: var(--color-brown-700);
+  padding: 3px 10px;
+  border: 1px solid var(--color-brown-700);
+  border-radius: 999px;
+  transform: rotate(-2deg);
 }
 
 .journal-bluefire {
