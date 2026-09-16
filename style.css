@@ -1244,6 +1244,7 @@ button.planner-history-fav-toggle.active {
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
+  width: 100%;
 }
 
 .planner-task-meta {
@@ -1255,6 +1256,7 @@ button.planner-history-fav-toggle.active {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   margin-top: 2px;
+  width: 100%;
 }
 
 .planner-task-note {
@@ -1263,6 +1265,23 @@ button.planner-history-fav-toggle.active {
   margin-top: var(--space-1);
   font-family: var(--font-hand);
   font-style: normal;
+  width: 100%;
+}
+
+/* Start in Study / Reschedule / Edit / Delete are plain sibling <button>s
+   with no wrapper — group them flush right on their own wrapped flex line.
+   Background stays on .planner-task-row itself, so it spans under all of
+   them regardless of how many render. */
+.planner-task-row > button {
+  font-size: var(--text-xs);
+  padding: 3px 10px;
+  box-shadow: none;
+}
+.planner-task-row > button:first-of-type {
+  margin-left: auto;
+}
+.planner-task-row > button:hover {
+  transform: none;
 }
 
 .planner-empty {
