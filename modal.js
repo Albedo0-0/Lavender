@@ -9,6 +9,8 @@ const Modal = (function () {
     const content = document.getElementById('modal-content');
     if (!overlay || !content) return;
     lastFocused = document.activeElement;
+    overlay.classList.remove('modal-closing');
+    content.classList.remove('modal-closing');
     content.innerHTML = html;
     overlay.style.display = 'flex';
     // Move focus into the modal so screen readers announce it and Escape/Tab work immediately,
@@ -19,7 +21,15 @@ const Modal = (function () {
 
   function close() {
     const overlay = document.getElementById('modal-overlay');
-    if (overlay) overlay.style.display = 'none';
+    const content = document.getElementById('modal-content');
+    if (!overlay || overlay.style.display === 'none') return;
+    overlay.classList.add('modal-closing');
+    if (content) content.classList.add('modal-closing');
+    window.setTimeout(function () {
+      overlay.style.display = 'none';
+      overlay.classList.remove('modal-closing');
+      if (content) content.classList.remove('modal-closing');
+    }, 180);
     if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus({ preventScroll: true });
     lastFocused = null;
   }
