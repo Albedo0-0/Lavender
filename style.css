@@ -1600,9 +1600,48 @@ button.planner-history-fav-toggle.active {
 }
 
 .journal-morning input,
-.journal-diary textarea,
 .journal-manifestation textarea {
   width: 100%;
+}
+
+.journal-diary textarea {
+  width: 100%;
+  font-family: var(--font-hand);
+  font-size: 17px;
+  line-height: 28px;
+  color: var(--color-ink);
+  padding: 4px 2px 4px 4px;
+  border: none;
+  border-radius: 2px;
+  background: var(--color-cream-050);
+  background-image: repeating-linear-gradient(
+    var(--color-cream-050) 0px,
+    var(--color-cream-050) 27px,
+    var(--color-border) 27px,
+    var(--color-border) 28px
+  );
+  resize: vertical;
+  caret-color: var(--color-brown-700);
+}
+
+.journal-diary textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-sage-300);
+}
+
+.journal-morning input {
+  font-family: var(--font-hand);
+  font-size: 15px;
+  color: var(--color-ink-soft);
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--color-border);
+  padding: 4px 2px;
+}
+
+.journal-morning input:focus {
+  outline: none;
+  border-bottom-color: var(--color-sage-500);
 }
 
 .journal-row {
