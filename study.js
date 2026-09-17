@@ -865,6 +865,16 @@ function openBreakTimelinePanel() {
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
     syncFullscreenBtn();
+    if (typeof StudyWallpaper !== 'undefined' && !document.body.dataset.studyWpVisBound) {
+      document.body.dataset.studyWpVisBound = '1';
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) StudyWallpaper.pauseVideo();
+        else {
+          const screenEl = document.getElementById('screen-study');
+          if (screenEl && !screenEl.classList.contains('screen-hidden') && screenEl.offsetParent !== null) StudyWallpaper.resumeVideo();
+        }
+      });
+    }
     renderClockPanel();
     renderAlarmIcon();
     renderAlarmPanel();
