@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Kalam:wght@300;400;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#11142b">
 <style>
   #notepad-modal { min-width: 260px; }
   #notepad-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
@@ -232,9 +234,11 @@
     Gamification.init();
     BackupUI.init();
     Settings.init();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    }
   </script>
 
 </body>
 </html>
-
 
