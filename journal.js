@@ -7,8 +7,6 @@ const Journal = (function () {
   let openedViaCalendar = false;
   let timerInterval = null;
   let journalHasRenderedOnce = false;
-  let journalTurnOutHandler = null;
-  let journalTurnInHandler = null;
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
@@ -141,14 +139,26 @@ const Journal = (function () {
 
   // ---------- Main render ----------
 
+  function getPageContentEl(el) {
+    let wrap = document.getElementById('journal-page-content');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'journal-page-content';
+      wrap.className = 'journal-page-content';
+      el.appendChild(wrap);
+    }
+    return wrap;
+  }
+
   function renderContent() {
     const el = document.getElementById('screen-journal');
     if (!el) return;
+    const content = getPageContentEl(el);
 
     updateLockButton();
 
     if (JournalData.isLocked()) {
-      el.innerHTML = '<div class="journal-locked-placeholder">Journal is locked. Use the lock icon to unlock.</div>';
+      content.innerHTML = '<div class="journal-locked-placeholder">Journal is locked. Use the lock icon to unlock.</div>';
       return;
     }
 
@@ -160,7 +170,7 @@ const Journal = (function () {
     const readOnly = !!entry.saved;
     const dis = readOnly ? ' disabled' : '';
 
-    el.innerHTML =
+    content.innerHTML =
       '<div class="journal-topbar">' +
         (blueFire ? '<span class="journal-bluefire">\uD83D\uDD35</span>' : '') +
         '<button id="journal-prev-date">&lt;</button>' +
@@ -233,36 +243,24 @@ const Journal = (function () {
   function render() {
     const el = document.getElementById('screen-journal');
     if (!el) return;
+    const content = getPageContentEl(el);
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (!journalHasRenderedOnce) {
+    if (!journalHasRenderedOnce || reduceMotion || !content.innerHTML) {
       journalHasRenderedOnce = true;
       renderContent();
       return;
     }
 
-    if (journalTurnOutHandler) { el.removeEventListener('animationend', journalTurnOutHandler); journalTurnOutHandler = null; }
-    if (journalTurnInHandler) { el.removeEventListener('animationend', journalTurnInHandler); journalTurnInHandler = null; }
-    el.classList.remove('journal-page-turning-out', 'journal-page-turning-in');
-    void el.offsetWidth;
-    el.classList.add('journal-page-turning-out');
+    const overlay = document.createElement('div');
+    overlay.className = 'journal-page-overlay';
+    overlay.innerHTML = content.innerHTML;
+    el.appendChild(overlay);
+    overlay.addEventListener('animationend', function () {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, { once: true });
 
-    journalTurnOutHandler = function (e) {
-      if (e.target !== el) return;
-      el.removeEventListener('animationend', journalTurnOutHandler);
-      journalTurnOutHandler = null;
-      el.classList.remove('journal-page-turning-out');
-      renderContent();
-      void el.offsetWidth;
-      el.classList.add('journal-page-turning-in');
-      journalTurnInHandler = function (e2) {
-        if (e2.target !== el) return;
-        el.removeEventListener('animationend', journalTurnInHandler);
-        journalTurnInHandler = null;
-        el.classList.remove('journal-page-turning-in');
-      };
-      el.addEventListener('animationend', journalTurnInHandler);
-    };
-    el.addEventListener('animationend', journalTurnOutHandler);
+    renderContent();
   }
 
   function weatherOption(label, current) {
