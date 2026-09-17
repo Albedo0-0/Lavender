@@ -78,6 +78,9 @@ const Study = (function () {
 
   function startClock(mode, timerTotalMs) {
     setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, elapsedMs: 0, awaitingDecision: false });
+    if ((State.get().settings || {}).studyAutoFullscreen && !isBrowserFullscreen()) {
+      requestBrowserFullscreen().catch(function () {});
+    }
     renderClockPanel();
   }
   function startStopwatch() { startClock('stopwatch', 0); }
@@ -836,6 +839,13 @@ function openBreakTimelinePanel() {
     const wpNext = document.getElementById('study-wallpaper-next');
     if (wpPrev) wpPrev.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.prev(); });
     if (wpNext) wpNext.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.next(); });
+    const autoFsToggle = document.getElementById('study-autofs-toggle');
+    if (autoFsToggle) {
+      autoFsToggle.checked = !!(State.get().settings || {}).studyAutoFullscreen;
+      autoFsToggle.addEventListener('change', function () {
+        State.patch('settings', { studyAutoFullscreen: autoFsToggle.checked });
+      });
+    }
     const fsBtn = document.getElementById('fullscreen-btn');
     if (fsBtn) fsBtn.addEventListener('click', toggleBrowserFullscreen);
     function onFullscreenChange() {
