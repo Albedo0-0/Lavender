@@ -145,7 +145,7 @@ const Settings = (function () {
       studyWallpaperInput.addEventListener('change', function (e) {
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
-        Promise.all(files.map(function (f) { return resizeImageFile(f, 1280, 0.72); })).then(function (dataUrls) {
+       Promise.all(files.map(function (f) { return resizeImageFile(f, 1920, 0.9); })).then(function (dataUrls) {
           const cur = settings().studyWallpapers || [];
           State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
           open();
