@@ -2178,6 +2178,101 @@ button.planner-history-fav-toggle.active {
   margin: 24px 0;
 }
 
+/* Study §7 (v2) — cozy night wallpaper layer, nav, fullscreen-on-session */
+
+#study-layout {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  min-height: 480px;
+  background: linear-gradient(180deg, #1b1f3a 0%, #11142b 70%, #0b0d1f 100%);
+}
+#study-layout > *:not(#study-wallpaper-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+#study-wallpaper-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 900ms ease-in-out;
+}
+
+.study-wallpaper-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(20,24,44,0.35);
+  color: #f2efe6;
+  cursor: pointer;
+}
+.study-wallpaper-nav:hover { background: rgba(20,24,44,0.55); }
+#study-wallpaper-prev { left: 10px; }
+#study-wallpaper-next { right: 10px; }
+
+/* Fullscreen takeover while a session/clock is running — same pattern as #global-break-takeover */
+.study-wallpaper-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 940;
+  border-radius: 0 !important;
+  min-height: 100vh !important;
+}
+.study-wallpaper-fullscreen .study-wallpaper-nav { z-index: 941; }
+
+/* Auto clock contrast — study-wallpaper.js toggles these on #study-layout after sampling brightness */
+.study-clock-on-dark .study-clock-display,
+.study-clock-on-dark .study-focus-clock {
+  color: #f5f3ea;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.55), 0 0 18px rgba(0,0,0,0.35);
+}
+.study-clock-on-light .study-clock-display,
+.study-clock-on-light .study-focus-clock {
+  color: #241f33;
+  text-shadow: 0 1px 6px rgba(255,255,255,0.55), 0 0 18px rgba(255,255,255,0.35);
+}
+
+.settings-wallpaper-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.settings-wallpaper-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+.settings-wallpaper-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+.settings-study-wallpaper-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
 /* Study §7 — Cozy Night control area (sits above study-environment.js's scene layer) */
 
 #study-header {
