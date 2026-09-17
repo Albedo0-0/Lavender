@@ -835,10 +835,16 @@ function openBreakTimelinePanel() {
   function init() {
     Notify.requestPermission();
     if (typeof StudyTemplatesData !== 'undefined') StudyTemplatesData.seedDefaultIfMissing();
-    const wpPrev = document.getElementById('study-wallpaper-prev');
-    const wpNext = document.getElementById('study-wallpaper-next');
-    if (wpPrev) wpPrev.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.prev(); });
-    if (wpNext) wpNext.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.next(); });
+    const wpLayout = document.getElementById('study-layout');
+    if (wpLayout && !wpLayout.dataset.wpNavBound) {
+      wpLayout.dataset.wpNavBound = '1';
+      wpLayout.addEventListener('click', function (e) {
+        const btn = e.target.closest('#study-wallpaper-prev, #study-wallpaper-next');
+        if (!btn || typeof StudyWallpaper === 'undefined') return;
+        if (btn.id === 'study-wallpaper-prev') StudyWallpaper.prev();
+        else StudyWallpaper.next();
+      });
+    }
     const autoFsToggle = document.getElementById('study-autofs-toggle');
     if (autoFsToggle) {
       autoFsToggle.checked = !!(State.get().settings || {}).studyAutoFullscreen;
