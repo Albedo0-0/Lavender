@@ -25,9 +25,6 @@ const Settings = (function () {
     return (
       '<div class="modal-header"><h3 class="modal-title">Settings</h3></div>' +
 
-      '<div class="form-row"><label for="settings-break-duration">Default break duration (minutes)</label>' +
-      '<input type="number" min="1" id="settings-break-duration" value="' + (cur.defaultBreakDuration != null ? cur.defaultBreakDuration : '') + '"></div>' +
-
       '<div class="form-row"><label for="settings-wallpaper-input">Break wallpaper</label>' +
       '<input type="file" id="settings-wallpaper-input" accept="image/*">' +
       (cur.breakWallpaper
@@ -35,6 +32,24 @@ const Settings = (function () {
           '<button id="settings-wallpaper-remove" class="btn-secondary">Remove wallpaper</button>'
         : '<span id="settings-wallpaper-status" class="micro-label"></span>') +
       '</div>' +
+
+      '<hr class="divider">' +
+
+      '<div class="form-row"><label for="settings-study-wallpaper-input">Study wallpapers</label>' +
+      '<input type="file" id="settings-study-wallpaper-input" accept="image/*" multiple>' +
+      '<div id="settings-study-wallpaper-grid" class="settings-wallpaper-grid">' +
+      (cur.studyWallpapers || []).map(function (url, i) {
+        return '<div class="settings-wallpaper-thumb">' +
+          '<img src="' + url + '">' +
+          '<button class="settings-study-wallpaper-remove" data-index="' + i + '" title="Remove">&times;</button>' +
+        '</div>';
+      }).join('') +
+      '</div></div>' +
+
+      '<div class="form-row"><label><input type="checkbox" id="settings-study-slideshow-enabled"' +
+      (((cur.studyWallpaperSlideshow || {}).enabled) ? ' checked' : '') + '> Auto slideshow</label>' +
+      ' <input type="number" min="1" id="settings-study-slideshow-interval" value="' +
+      (((cur.studyWallpaperSlideshow || {}).intervalMin) || 5) + '" style="width:60px;"> min</div>' +
 
       '<hr class="divider">' +
 
@@ -123,6 +138,47 @@ const Settings = (function () {
     const wallpaperRemove = document.getElementById('settings-wallpaper-remove');
     if (wallpaperRemove) {
       wallpaperRemove.addEventListener('click', function () { saveWallpaper(null); });
+    }
+
+    const studyWallpaperInput = document.getElementById('settings-study-wallpaper-input');
+    if (studyWallpaperInput) {
+      studyWallpaperInput.addEventListener('change', function (e) {
+        const files = Array.prototype.slice.call(e.target.files || []);
+        if (!files.length) return;
+        Promise.all(files.map(function (f) { return resizeImageFile(f, 1280, 0.72); })).then(function (dataUrls) {
+          const cur = settings().studyWallpapers || [];
+          State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
+          open();
+        }).catch(function (err) {
+          alert(err.message || "Couldn't use those images.");
+        });
+      });
+    }
+    document.querySelectorAll('.settings-study-wallpaper-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = parseInt(btn.dataset.index, 10);
+        const cur = (settings().studyWallpapers || []).slice();
+        cur.splice(idx, 1);
+        const curIndex = settings().studyWallpaperIndex || 0;
+        State.patch('settings', { studyWallpapers: cur, studyWallpaperIndex: Math.min(curIndex, Math.max(0, cur.length - 1)) });
+        open();
+      });
+    });
+    const slideshowEnabled = document.getElementById('settings-study-slideshow-enabled');
+    const slideshowInterval = document.getElementById('settings-study-slideshow-interval');
+    if (slideshowEnabled && slideshowInterval) {
+      function saveSlideshowSettings() {
+        const minutes = parseInt(slideshowInterval.value, 10);
+        State.patch('settings', {
+          studyWallpaperSlideshow: {
+            enabled: slideshowEnabled.checked,
+            intervalMin: (!minutes || minutes <= 0) ? 5 : minutes
+          }
+        });
+        if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.refreshSlideshow();
+      }
+      slideshowEnabled.addEventListener('change', saveSlideshowSettings);
+      slideshowInterval.addEventListener('change', saveSlideshowSettings);
     }
 
     document.getElementById('settings-export-btn').addEventListener('click', function () {
