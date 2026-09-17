@@ -799,6 +799,32 @@ function openBreakTimelinePanel() {
     Modal.open('<h3>Break Timeline</h3><div class="break-timeline">' + rows + '</div>');
 }
     
+  function isBrowserFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+  }
+  function requestBrowserFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (!req) return Promise.reject(new Error('Fullscreen API unavailable'));
+    return req.call(el);
+  }
+  function exitBrowserFullscreen() {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (!exit) return Promise.reject(new Error('Fullscreen API unavailable'));
+    return exit.call(document);
+  }
+  function syncFullscreenBtn() {
+    const btn = document.getElementById('fullscreen-btn');
+    if (btn) btn.classList.toggle('is-fullscreen-active', isBrowserFullscreen());
+  }
+  function toggleBrowserFullscreen() {
+    if (isBrowserFullscreen()) {
+      exitBrowserFullscreen().catch(function () {});
+    } else {
+      requestBrowserFullscreen().catch(function () {});
+    }
+  }
+
   function init() {
     Notify.requestPermission();
     if (typeof StudyTemplatesData !== 'undefined') StudyTemplatesData.seedDefaultIfMissing();
@@ -806,6 +832,14 @@ function openBreakTimelinePanel() {
     const wpNext = document.getElementById('study-wallpaper-next');
     if (wpPrev) wpPrev.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.prev(); });
     if (wpNext) wpNext.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.next(); });
+    const fsBtn = document.getElementById('fullscreen-btn');
+    if (fsBtn) fsBtn.addEventListener('click', toggleBrowserFullscreen);
+    document.addEventListener('fullscreenchange', function () {
+      syncFullscreenBtn();
+      State.patch('settings', { userExitedFullscreen: !isBrowserFullscreen() });
+    });
+    document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
+    syncFullscreenBtn();
     renderClockPanel();
     renderAlarmIcon();
     renderAlarmPanel();
@@ -822,8 +856,12 @@ function openBreakTimelinePanel() {
     if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) {
       TimeEngine.subscribe(onEngineTick, 'study');
     }
+    const s = State.get().settings || {};
+    if (!s.hasSeenFullscreenPrompt && !s.userExitedFullscreen) {
+      State.patch('settings', { hasSeenFullscreenPrompt: true });
+      requestBrowserFullscreen().catch(function () {});
+    }
   }
-
   function render() {
     renderClockPanel();
     renderAlarmIcon();
