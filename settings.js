@@ -36,11 +36,15 @@ const Settings = (function () {
       '<hr class="divider">' +
 
       '<div class="form-row"><label for="settings-study-wallpaper-input">Study wallpapers</label>' +
-      '<input type="file" id="settings-study-wallpaper-input" accept="image/*" multiple>' +
+      '<input type="file" id="settings-study-wallpaper-input" accept="image/*,video/mp4,video/webm" multiple>' +
       '<div id="settings-study-wallpaper-grid" class="settings-wallpaper-grid">' +
-      (cur.studyWallpapers || []).map(function (url, i) {
+      (cur.studyWallpapers || []).map(function (item, i) {
+        const isVideo = item && typeof item === 'object' && item.type === 'video';
+        const url = (item && typeof item === 'object') ? item.url : item;
         return '<div class="settings-wallpaper-thumb">' +
-          '<img src="' + url + '">' +
+          (isVideo
+            ? '<video src="' + url + '" muted loop playsinline></video>'
+            : '<img src="' + url + '">') +
           '<button class="settings-study-wallpaper-remove" data-index="' + i + '" title="Remove">&times;</button>' +
         '</div>';
       }).join('') +
@@ -108,6 +112,15 @@ const Settings = (function () {
     });
   }
 
+  function readFileAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('Could not read that file.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function saveWallpaper(dataUrl) {
     State.patch('settings', { breakWallpaper: dataUrl });
     open(); // re-render so the preview/remove button reflect the new state
@@ -159,12 +172,16 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       studyWallpaperInput.addEventListener('change', function (e) {
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
-       Promise.all(files.map(function (f) { return resizeImageFile(f, 2560, 0.95); })).then(function (dataUrls) {
+        Promise.all(files.map(function (f) {
+          if (/^video\//.test(f.type)) return readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'video' }; });
+          if (f.type === 'image/gif') return readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'gif' }; });
+          return resizeImageFile(f, 2560, 0.95).then(function (url) { return { url: url, type: 'image' }; });
+        })).then(function (items) {
           const cur = settings().studyWallpapers || [];
-          State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
+          State.patch('settings', { studyWallpapers: cur.concat(items) });
           window.location.reload();
         }).catch(function (err) {
-          alert(err.message || "Couldn't use those images.");
+          alert(err.message || "Couldn't use those files.");
         });
       });
     }
