@@ -43,7 +43,7 @@ const Settings = (function () {
         const url = (item && typeof item === 'object') ? item.url : item;
         return '<div class="settings-wallpaper-thumb">' +
           (isVideo
-            ? '<video src="' + url + '" muted loop playsinline></video>'
+                  ? '<video src="' + url + '" muted loop playsinline autoplay></video>'
             : '<img src="' + url + '">') +
           '<button class="settings-study-wallpaper-remove" data-index="' + i + '" title="Remove">&times;</button>' +
         '</div>';
@@ -180,11 +180,11 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
             : isAnimated ? readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'gif' }; })
             : resizeImageFile(f, 2560, 0.95).then(function (url) { return { url: url, type: 'image' }; });
           return task.catch(function () { return null; });
-        })).then(function (items) {
+         })).then(function (items) {
           const valid = items.filter(Boolean);
           if (!valid.length) { alert("Couldn't use those files."); return; }
           const cur = settings().studyWallpapers || [];
-          State.patch('settings', { studyWallpapers: cur.concat(valid) });
+          State.patch('settings', { studyWallpapers: cur.concat(valid), studyWallpaperIndex: cur.length });
           window.location.reload();
         }).catch(function (err) {
           alert(err.message || "Couldn't use those files.");
