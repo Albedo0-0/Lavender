@@ -856,12 +856,7 @@ function openBreakTimelinePanel() {
     if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) {
       TimeEngine.subscribe(onEngineTick, 'study');
     }
-    const s = State.get().settings || {};
-    if (!s.hasSeenFullscreenPrompt && !s.userExitedFullscreen) {
-      State.patch('settings', { hasSeenFullscreenPrompt: true });
-      requestBrowserFullscreen().catch(function () {});
     }
-  }
   function render() {
     renderClockPanel();
     renderAlarmIcon();
