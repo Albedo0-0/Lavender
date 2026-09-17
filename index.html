@@ -144,6 +144,9 @@
     </section>
     <section id="screen-study" class="screen">
       <div id="study-layout">
+        <div id="study-wallpaper-layer"></div>
+        <button id="study-wallpaper-prev" class="study-wallpaper-nav" title="Previous wallpaper">&#8592;</button>
+        <button id="study-wallpaper-next" class="study-wallpaper-nav" title="Next wallpaper">&#8594;</button>
         <div id="study-header">
           <h3>Study</h3>
           <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
@@ -187,6 +190,7 @@
   <script src="planner.js"></script>
   <script src="library.js"></script>
   <script src="study-templates-data.js"></script>
+  <script src="study-wallpaper.js"></script>
   <script src="study.js"></script>
   <script src="study-environment.js"></script>
   <script src="gamification-data.js"></script>
@@ -220,6 +224,7 @@
     Targets.init();
     Library.init();
     Study.init();
+    StudyWallpaper.init();
     StudyEnvironment.init();
     Progress.init();
     Assistant.init();
