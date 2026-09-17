@@ -3146,6 +3146,18 @@ button.notepad-format-btn.notepad-format-active {
   background-position: center;
   transition: background-image 900ms ease-in-out;
 }
+#study-wallpaper-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: none;
+}
+#study-wallpaper-video.is-active {
+  display: block;
+}
 
 .study-wallpaper-nav {
   position: absolute;
