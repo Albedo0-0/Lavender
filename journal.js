@@ -6,6 +6,9 @@ const Journal = (function () {
   let currentDate = null;
   let openedViaCalendar = false;
   let timerInterval = null;
+  let journalHasRenderedOnce = false;
+  let journalTurnOutHandler = null;
+  let journalTurnInHandler = null;
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
@@ -138,13 +141,9 @@ const Journal = (function () {
 
   // ---------- Main render ----------
 
-  function render() {
+  function renderContent() {
     const el = document.getElementById('screen-journal');
     if (!el) return;
-
-    el.classList.remove('journal-page-turning');
-    void el.offsetWidth;
-    el.classList.add('journal-page-turning');
 
     updateLockButton();
 
@@ -229,6 +228,41 @@ const Journal = (function () {
     renderPhotos();
     renderChallengeSection();
     renderSleepSection();
+  }
+
+  function render() {
+    const el = document.getElementById('screen-journal');
+    if (!el) return;
+
+    if (!journalHasRenderedOnce) {
+      journalHasRenderedOnce = true;
+      renderContent();
+      return;
+    }
+
+    if (journalTurnOutHandler) { el.removeEventListener('animationend', journalTurnOutHandler); journalTurnOutHandler = null; }
+    if (journalTurnInHandler) { el.removeEventListener('animationend', journalTurnInHandler); journalTurnInHandler = null; }
+    el.classList.remove('journal-page-turning-out', 'journal-page-turning-in');
+    void el.offsetWidth;
+    el.classList.add('journal-page-turning-out');
+
+    journalTurnOutHandler = function (e) {
+      if (e.target !== el) return;
+      el.removeEventListener('animationend', journalTurnOutHandler);
+      journalTurnOutHandler = null;
+      el.classList.remove('journal-page-turning-out');
+      renderContent();
+      void el.offsetWidth;
+      el.classList.add('journal-page-turning-in');
+      journalTurnInHandler = function (e2) {
+        if (e2.target !== el) return;
+        el.removeEventListener('animationend', journalTurnInHandler);
+        journalTurnInHandler = null;
+        el.classList.remove('journal-page-turning-in');
+      };
+      el.addEventListener('animationend', journalTurnInHandler);
+    };
+    el.addEventListener('animationend', journalTurnOutHandler);
   }
 
   function weatherOption(label, current) {
