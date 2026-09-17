@@ -132,9 +132,17 @@ const Settings = (function () {
 
     const wallpaperInput = document.getElementById('settings-wallpaper-input');
     if (wallpaperInput) {
+      let _fsWasActive = false;
+function _isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+      wallpaperInput.addEventListener('click', function () { _fsWasActive = _isFs(); });
       wallpaperInput.addEventListener('change', function (e) {
         const file = e.target.files[0];
         if (!file) return;
+        if (_fsWasActive && !_isFs()) {
+          const el = document.documentElement;
+          const req = el.requestFullscreen || el.webkitRequestFullscreen;
+          if (req) req.call(el).catch(function () {});
+        }
         resizeImageFile(file, 1280, 0.72).then(saveWallpaper).catch(function (err) {
           alert(err.message || "Couldn't use that image.");
         });
@@ -147,12 +155,18 @@ const Settings = (function () {
 
     const studyWallpaperInput = document.getElementById('settings-study-wallpaper-input');
     if (studyWallpaperInput) {
+      studyWallpaperInput.addEventListener('click', function () { _fsWasActive = _isFs(); });
       studyWallpaperInput.addEventListener('change', function (e) {
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
        Promise.all(files.map(function (f) { return resizeImageFile(f, 2560, 0.95); })).then(function (dataUrls) {
           const cur = settings().studyWallpapers || [];
           State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
+         if (_fsWasActive && !document.fullscreenElement) {
+            const el = document.documentElement;
+            const req = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (req) req.call(el).catch(function () {});
+         }
           open();
         }).catch(function (err) {
           alert(err.message || "Couldn't use those images.");
