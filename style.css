@@ -3169,6 +3169,73 @@ button.notepad-format-btn.notepad-format-active {
   font-size: 12px;
 }
 
+/* Study wallpaper — background layer, corner nav, true fullscreen-on-session */
+
+#study-layout {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  min-height: 480px;
+  background: #11142b;
+}
+#study-layout > *:not(#study-wallpaper-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+#study-wallpaper-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 900ms ease-in-out;
+}
+
+.study-wallpaper-nav {
+  position: absolute;
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(20,24,44,0.18);
+  color: #f2efe6;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.study-wallpaper-nav:hover { background: rgba(20,24,44,0.4); }
+#study-wallpaper-prev { top: 10px; left: 10px; }
+#study-wallpaper-next { top: 10px; right: 10px; }
+
+/* True fullscreen takeover while a session/clock is running — breaks out of
+   #study-layout's parent flow entirely, same tier as #global-break-takeover,
+   so it covers header/utility-drawer too. */
+.study-wallpaper-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  z-index: 9500;
+}
+.study-wallpaper-fullscreen .study-wallpaper-nav { z-index: 9501; }
+
+.study-clock-on-dark .study-clock-display,
+.study-clock-on-dark .study-focus-clock {
+  color: #f5f3ea;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.55), 0 0 18px rgba(0,0,0,0.35);
+}
+.study-clock-on-light .study-clock-display,
+.study-clock-on-light .study-focus-clock {
+  color: #241f33;
+  text-shadow: 0 1px 6px rgba(255,255,255,0.55), 0 0 18px rgba(255,255,255,0.35);
+}
+
 /* ==========================================================================
    Styling Phase 5 — Calendar + Date Hub + Targets-in-Calendar
    ========================================================================== */
