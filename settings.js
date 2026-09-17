@@ -84,6 +84,8 @@ const Settings = (function () {
         const img = new Image();
         img.onload = function () {
           let w = img.width, h = img.height;
+          // Never upscale — only downscale when the source exceeds maxDim, so
+          // already-high-quality images aren't degraded.
           if (w > maxDim || h > maxDim) {
             const scale = maxDim / Math.max(w, h);
             w = Math.round(w * scale);
@@ -92,7 +94,10 @@ const Settings = (function () {
           const canvas = document.createElement('canvas');
           canvas.width = w;
           canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', quality));
         };
         img.onerror = function () { reject(new Error('Could not read that image.')); };
@@ -145,7 +150,7 @@ const Settings = (function () {
       studyWallpaperInput.addEventListener('change', function (e) {
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
-       Promise.all(files.map(function (f) { return resizeImageFile(f, 1920, 0.9); })).then(function (dataUrls) {
+       Promise.all(files.map(function (f) { return resizeImageFile(f, 2560, 0.95); })).then(function (dataUrls) {
           const cur = settings().studyWallpapers || [];
           State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
           open();
