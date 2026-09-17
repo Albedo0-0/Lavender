@@ -234,6 +234,21 @@
     Gamification.init();
     BackupUI.init();
     Settings.init();
+    (function () {
+      const s = State.get().settings || {};
+      if (!s.hasSeenFullscreenPrompt && !s.userExitedFullscreen) {
+        const triggerOnce = function () {
+          document.removeEventListener('click', triggerOnce);
+          document.removeEventListener('keydown', triggerOnce);
+          State.patch('settings', { hasSeenFullscreenPrompt: true });
+          const el = document.documentElement;
+          const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+          if (req) req.call(el).catch(function () {});
+        };
+        document.addEventListener('click', triggerOnce);
+        document.addEventListener('keydown', triggerOnce);
+      }
+    })();
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(function () {});
     }
