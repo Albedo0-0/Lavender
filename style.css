@@ -2178,6 +2178,152 @@ button.planner-history-fav-toggle.active {
   margin: 24px 0;
 }
 
+/* Study §7 — Cozy Night control area (sits above study-environment.js's scene layer) */
+
+#study-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 4px;
+}
+#study-header h3 {
+  color: #f2efe6;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+#study-alarm-icon {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  color: #f2efe6;
+  cursor: pointer;
+}
+#study-alarm-icon:hover { background: rgba(255,255,255,0.16); }
+
+#study-clock-panel {
+  max-width: 420px;
+  margin: 12px auto 0;
+  padding: 16px 18px 18px;
+  background: rgba(20,24,44,0.42);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  backdrop-filter: blur(2px);
+  text-align: center;
+}
+
+.study-clock-modes {
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.study-mode-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.06);
+  color: #e8e5da;
+  cursor: pointer;
+}
+.study-mode-btn.active {
+  background: rgba(255,224,140,0.18);
+  border-color: rgba(255,224,140,0.5);
+  color: #ffe08c;
+}
+
+.study-template-rail {
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.study-template-btn, #study-template-add {
+  padding: 5px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  color: #cfcdbf;
+  font-size: 12px;
+  cursor: pointer;
+}
+.study-template-del { margin-left: 6px; opacity: 0.7; }
+
+#study-timer-setup { margin-bottom: 10px; }
+#study-timer-minutes {
+  width: 100px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: #f2efe6;
+  text-align: center;
+}
+
+.study-clock-display {
+  font-size: 2.6rem;
+  font-variant-numeric: tabular-nums;
+  color: #f2efe6;
+  margin: 6px 0 14px;
+}
+
+.study-clock-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.study-clock-controls button {
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,224,140,0.14);
+  color: #ffe9b8;
+  cursor: pointer;
+}
+.study-clock-controls button:hover {
+  background: rgba(255,224,140,0.24);
+  border-color: rgba(255,224,140,0.5);
+}
+#study-clock-save {
+  background: rgba(140,200,255,0.14);
+  color: #bfe0ff;
+}
+#study-clock-save:hover {
+  background: rgba(140,200,255,0.24);
+  border-color: rgba(140,200,255,0.5);
+}
+
+#study-session-panel {
+  max-width: 420px;
+  margin: 14px auto 0;
+  text-align: center;
+  color: #e8e5da;
+}
+.study-active-label { color: #e8e5da; }
+#study-start-now {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,224,140,0.4);
+  background: rgba(255,224,140,0.14);
+  color: #ffe9b8;
+  cursor: pointer;
+}
+
+#study-log-panel {
+  max-width: 260px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 18px auto 0;
+  padding: 10px 12px;
+  background: rgba(20,24,44,0.42);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 12px;
+  font-size: 12px;
+  color: #cfcdbf;
+}
+#study-log-panel strong { color: #e8e5da; }
+
 #global-break-takeover {
   position: fixed;
   inset: 0;
