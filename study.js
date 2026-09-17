@@ -114,11 +114,12 @@ const Study = (function () {
     if (c.running) total += commitSegment();
     if (total > 0) TimeEngine.pushLog(todayStr(), c.mode === 'timer' ? 'Timer' : 'Stopwatch', total, 'min');
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+    State.patch('settings', { userExitedFullscreen: false });
     renderClockPanel();
     clockCompleting = false;
   }
 
-  // Timer hit its target — commit whatever tail segment wasn't committed by an earlier pause
+  // Timer hit its target
   // yet, log the full originally-entered duration exactly once, and reset immediately. No
   // freeze, no separate decision step: natural completion behaves like an automatic Save.
   function autoCompleteTimer() {
@@ -137,11 +138,12 @@ const Study = (function () {
     // Stop everything about this run — mode/running/startedAt/timerTotalMs all reset together so
     // any stale/delayed callback that still fires afterward reads a dead run and is a no-op.
     setClock({ mode: 'stopwatch', running: false, startedAt: null, timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+    State.patch('settings', { userExitedFullscreen: false });
     renderClockPanel();
     clockCompleting = false;
   }
 
-  // While a Stopwatch/Timer run (or the end-of-timer decision) is active, it takes over the
+  // While a Stopwatch/Timer run
   // whole Study tab like a session: big clock, everything else hidden.
   function applyClockFocusUI(active) {
     const sessionPanel = document.getElementById('study-session-panel');
