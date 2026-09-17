@@ -166,9 +166,11 @@ const Study = (function () {
     const alarmIcon = document.getElementById('study-alarm-icon');
     const linksIcon = document.getElementById('study-links-icon');
     const breakBtn = document.getElementById('global-break-btn');
+    const autofsRow = document.getElementById('study-autofs-toggle-row');
     if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
     if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
     if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
+    if (autofsRow) autofsRow.style.display = active ? 'none' : '';
   }
   function currentClockMs() {
     const c = getClock();
