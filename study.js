@@ -144,6 +144,8 @@ const Study = (function () {
     const clockPanel = document.getElementById('study-clock-panel');
     if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
     if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
+    const layout = document.getElementById('study-layout');
+    if (layout) layout.classList.toggle('study-wallpaper-fullscreen', !!active || !!TimeEngine.getActiveSession());
     applyChromeVisibility();
   }
   function isClockActive(c) {
@@ -405,6 +407,8 @@ function renderClock() {
     const container = document.getElementById('study-session-panel');
     if (!container) return;
     const active = TimeEngine.getActiveSession();
+    const layout = document.getElementById('study-layout');
+    if (layout) layout.classList.toggle('study-wallpaper-fullscreen', !!active || isClockActive(getClock()));
 
     if (active) { renderFocusMode(active); return; }
     exitFocusMode();
@@ -798,6 +802,10 @@ function openBreakTimelinePanel() {
   function init() {
     Notify.requestPermission();
     if (typeof StudyTemplatesData !== 'undefined') StudyTemplatesData.seedDefaultIfMissing();
+    const wpPrev = document.getElementById('study-wallpaper-prev');
+    const wpNext = document.getElementById('study-wallpaper-next');
+    if (wpPrev) wpPrev.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.prev(); });
+    if (wpNext) wpNext.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.next(); });
     renderClockPanel();
     renderAlarmIcon();
     renderAlarmPanel();
