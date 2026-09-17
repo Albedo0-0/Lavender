@@ -78,7 +78,8 @@ const Study = (function () {
 
   function startClock(mode, timerTotalMs) {
     setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, elapsedMs: 0, awaitingDecision: false });
-    if ((State.get().settings || {}).studyAutoFullscreen && !isBrowserFullscreen()) {
+    const _s = State.get().settings || {};
+    if (_s.studyAutoFullscreen && !isBrowserFullscreen() && !_s.userExitedFullscreen) {
       requestBrowserFullscreen().catch(function () {});
     }
     renderClockPanel();
@@ -856,7 +857,8 @@ function openBreakTimelinePanel() {
     if (fsBtn) fsBtn.addEventListener('click', toggleBrowserFullscreen);
     function onFullscreenChange() {
       syncFullscreenBtn();
-      State.patch('settings', { userExitedFullscreen: !isBrowserFullscreen() });
+      const _wasFs = isBrowserFullscreen();
+      State.patch('settings', { userExitedFullscreen: !_wasFs });
     }
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
