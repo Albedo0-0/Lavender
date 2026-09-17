@@ -2201,22 +2201,7 @@ button.planner-history-fav-toggle.active {
   transition: background-image 900ms ease-in-out;
 }
 
-.study-wallpaper-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(20,24,44,0.35);
-  color: #f2efe6;
-  cursor: pointer;
-}
-.study-wallpaper-nav:hover { background: rgba(20,24,44,0.55); }
-#study-wallpaper-prev { left: 10px; }
-#study-wallpaper-next { right: 10px; }
+
 
 /* Fullscreen takeover while a session/clock is running — same pattern as #global-break-takeover */
 .study-wallpaper-fullscreen {
