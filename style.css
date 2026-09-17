@@ -2273,6 +2273,10 @@ button.planner-history-fav-toggle.active {
   letter-spacing: 0.3px;
 }
 #study-alarm-icon {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 3;
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: 50%;
@@ -3190,8 +3194,8 @@ button.notepad-format-btn.notepad-format-active {
   backdrop-filter: blur(2px);
 }
 .study-wallpaper-nav:hover { background: rgba(20,24,44,0.4); }
-button#study-wallpaper-prev { position: absolute !important; top: 10px !important; left: 10px !important; right: auto !important; }
-button#study-wallpaper-next { position: absolute !important; top: 10px !important; right: 10px !important; left: auto !important; }
+button#study-wallpaper-prev { position: absolute !important; top: 10px !important; left: 10px !important; right: auto !important; z-index: 3; }
+button#study-wallpaper-next { position: absolute !important; top: 10px !important; right: 10px !important; left: auto !important; z-index: 3; }
 /* True fullscreen takeover while a session/clock is running — breaks out of
    #study-layout's parent flow entirely, same tier as #global-break-takeover,
    so it covers header/utility-drawer too. */
@@ -3208,6 +3212,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   z-index: 9500;
 }
 .study-wallpaper-fullscreen .study-wallpaper-nav { z-index: 9501; }
+.study-wallpaper-fullscreen #study-alarm-icon { z-index: 9501; }
 
 .study-clock-on-dark .study-clock-display,
 .study-clock-on-dark .study-focus-clock {
