@@ -162,7 +162,6 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
        Promise.all(files.map(function (f) { return resizeImageFile(f, 2560, 0.95); })).then(function (dataUrls) {
           const cur = settings().studyWallpapers || [];
           State.patch('settings', { studyWallpapers: cur.concat(dataUrls) });
-          if (typeof Storage !== 'undefined' && typeof State.flush === 'function') State.flush();
           window.location.reload();
         }).catch(function (err) {
           alert(err.message || "Couldn't use those images.");
