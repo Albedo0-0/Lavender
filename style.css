@@ -3368,3 +3368,56 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 .cal-target-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-accent-rust-soft); display: inline-block; }
 .datehub-targets-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); }
 .datehub-target-row { font-family: var(--font-hand); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); }
+
+
+/* Study — Auto fullscreen toggle */
+#study-autofs-toggle-row {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--lav-border, #d8cdea);
+  font-family: inherit;
+  font-size: 0.75rem;
+  color: var(--lav-text, #4a3f5c);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  user-select: none;
+}
+#study-autofs-toggle-row input#study-autofs-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  background: #cfc3e0;
+  position: relative;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+#study-autofs-toggle-row input#study-autofs-toggle::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+#study-autofs-toggle-row input#study-autofs-toggle:checked {
+  background: var(--lav-accent, #9b7fd4);
+}
+#study-autofs-toggle-row input#study-autofs-toggle:checked::before {
+  transform: translateX(14px);
+}
