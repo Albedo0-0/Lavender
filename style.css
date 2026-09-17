@@ -1416,25 +1416,43 @@ button.planner-history-fav-toggle.active {
   padding-left: 10px;
 }
 
-@keyframes journal-page-turn {
+@keyframes journal-page-turn-out {
   0% {
-    opacity: 0.55;
-    transform: rotateY(-6deg);
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+
+@keyframes journal-page-turn-in {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.94);
   }
   100% {
     opacity: 1;
-    transform: rotateY(0deg);
+    transform: scaleX(1);
   }
 }
 
-#screen-journal.journal-page-turning {
+#screen-journal.journal-page-turning-out {
   transform-origin: left center;
   backface-visibility: hidden;
-  animation: journal-page-turn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: journal-page-turn-out 0.26s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+#screen-journal.journal-page-turning-in {
+  transform-origin: left center;
+  backface-visibility: hidden;
+  animation: journal-page-turn-in 0.26s cubic-bezier(0, 0, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #screen-journal.journal-page-turning {
+  #screen-journal.journal-page-turning-out,
+  #screen-journal.journal-page-turning-in {
     animation: none;
   }
 }
