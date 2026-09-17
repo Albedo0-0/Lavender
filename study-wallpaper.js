@@ -16,10 +16,17 @@ const StudyWallpaper = (function () {
     const idx = settings().studyWallpaperIndex || 0;
     return Math.max(0, Math.min(idx, list.length - 1));
   }
-  function currentUrl() {
+  function currentItem() {
     const list = wallpapers();
-    return list.length ? list[currentIndex()] : null;
+    if (!list.length) return null;
+    const raw = list[currentIndex()];
+    return (raw && typeof raw === 'object') ? raw : { url: raw, type: 'image' };
   }
+  function currentUrl() {
+    const item = currentItem();
+    return item ? item.url : null;
+  }
+  function isVideoItem(item) { return !!item && item.type === 'video'; }
 
   function setIndex(idx) {
     const list = wallpapers();
@@ -59,9 +66,17 @@ const StudyWallpaper = (function () {
   }
 
   function sampleAndNotify() {
-    const url = currentUrl();
+    const item = currentItem();
+    const url = item ? item.url : null;
     if (url === lastSampledUrl) { applyToDom(); return; }
     lastSampledUrl = url;
+    if (isVideoItem(item)) {
+      // Skip pixel sampling for video — cheap fallback brightness so text stays readable
+      // without paying for canvas/videoframe sampling on every wallpaper switch.
+      lastBrightness = 'dark';
+      applyToDom();
+      return;
+    }
     sampleBrightness(url, function (brightness) {
       lastBrightness = brightness;
       applyToDom();
@@ -69,9 +84,24 @@ const StudyWallpaper = (function () {
   }
 
   function applyToDom() {
-    const url = currentUrl();
+    const item = currentItem();
+    const url = item ? item.url : null;
+    const isVideo = isVideoItem(item);
     const layer = document.getElementById('study-wallpaper-layer');
-    if (layer) layer.style.backgroundImage = url ? 'url(' + url + ')' : 'none';
+    const video = document.getElementById('study-wallpaper-video');
+    if (layer) layer.style.backgroundImage = (url && !isVideo) ? 'url(' + url + ')' : 'none';
+    if (video) {
+      if (isVideo) {
+        if (video.getAttribute('src') !== url) video.setAttribute('src', url);
+        video.classList.add('is-active');
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(function () {});
+      } else {
+        video.classList.remove('is-active');
+        if (!video.paused) video.pause();
+        if (video.getAttribute('src')) video.removeAttribute('src');
+      }
+    }
     const layout = document.getElementById('study-layout');
     if (layout) {
       layout.classList.toggle('study-clock-on-dark', lastBrightness === 'light');
@@ -100,12 +130,28 @@ const StudyWallpaper = (function () {
     startSlideshow();
   }
 
+  function pauseVideo() {
+    const video = document.getElementById('study-wallpaper-video');
+    if (video && !video.paused) video.pause();
+  }
+  function resumeVideo() {
+    const item = currentItem();
+    if (!isVideoItem(item)) return;
+    const video = document.getElementById('study-wallpaper-video');
+    if (video) {
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(function () {});
+    }
+  }
+
   return {
     init: init,
     next: next,
     prev: prev,
     currentUrl: currentUrl,
     refreshSlideshow: refreshSlideshow,
-    stopSlideshow: stopSlideshow
+    stopSlideshow: stopSlideshow,
+    pauseVideo: pauseVideo,
+    resumeVideo: resumeVideo
   };
 })();
