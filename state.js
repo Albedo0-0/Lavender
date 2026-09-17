@@ -29,7 +29,7 @@ const State = (function () {
     notepadFolders: [], // Notepad: explicit folder name list (persists empty folders independent of notes)
     gamification: { totalExp: 0, lastSettledDate: null, streakBonusAwardedForRun: false }, // §B.8.3/8.4 — level is derived, never stored
     expLedger: [], // §B.8.3: append-only [{ id, date, label, exp, doubled, at }], settled once/day at cutoff
-    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '' },
+    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '', studyWallpapers: [], studyWallpaperIndex: 0, studyWallpaperSlideshow: { enabled: false, intervalMin: 5 } },
     targets: {},
     subtargets: {},
     tags: {},
