@@ -1,0 +1,10 @@
+{
+  "name": "Lavender",
+  "short_name": "Lavender",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#11142b",
+  "theme_color": "#11142b",
+  "icons": []
+}
+
