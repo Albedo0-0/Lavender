@@ -173,12 +173,18 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
         Promise.all(files.map(function (f) {
-          if (/^video\//.test(f.type)) return readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'video' }; });
-          if (f.type === 'image/gif') return readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'gif' }; });
-          return resizeImageFile(f, 2560, 0.95).then(function (url) { return { url: url, type: 'image' }; });
+          const name = (f.name || '').toLowerCase();
+          const isVideo = /^video\//.test(f.type) || /\.(mp4|webm|mov)$/.test(name);
+          const isAnimated = f.type === 'image/gif' || f.type === 'image/webp' || /\.(gif|webp)$/.test(name);
+          const task = isVideo ? readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'video' }; })
+            : isAnimated ? readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'gif' }; })
+            : resizeImageFile(f, 2560, 0.95).then(function (url) { return { url: url, type: 'image' }; });
+          return task.catch(function () { return null; });
         })).then(function (items) {
+          const valid = items.filter(Boolean);
+          if (!valid.length) { alert("Couldn't use those files."); return; }
           const cur = settings().studyWallpapers || [];
-          State.patch('settings', { studyWallpapers: cur.concat(items) });
+          State.patch('settings', { studyWallpapers: cur.concat(valid) });
           window.location.reload();
         }).catch(function (err) {
           alert(err.message || "Couldn't use those files.");
