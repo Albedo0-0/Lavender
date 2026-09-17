@@ -40,13 +40,7 @@ if (utilBtn && utilDrawer) {
     utilDrawer.classList.toggle('utility-drawer-hidden');
   });
 }
-const fullscreenBtn = document.getElementById('fullscreen-btn');
-if (fullscreenBtn) {
-  fullscreenBtn.addEventListener('click', function () {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
-  });
-}
+
     
     const startScreen = State.get().currentScreen || 'calendar';
     switchTo(startScreen);
