@@ -3190,8 +3190,8 @@ button.notepad-format-btn.notepad-format-active {
   backdrop-filter: blur(2px);
 }
 .study-wallpaper-nav:hover { background: rgba(20,24,44,0.4); }
-#study-wallpaper-prev { top: 10px; left: 10px; right: auto; }
-#study-wallpaper-next { top: 10px; right: 10px; left: auto; }
+button#study-wallpaper-prev { position: absolute !important; top: 10px !important; left: 10px !important; right: auto !important; }
+button#study-wallpaper-next { position: absolute !important; top: 10px !important; right: 10px !important; left: auto !important; }
 /* True fullscreen takeover while a session/clock is running — breaks out of
    #study-layout's parent flow entirely, same tier as #global-break-takeover,
    so it covers header/utility-drawer too. */
