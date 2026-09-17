@@ -3190,6 +3190,8 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   z-index: 9500;
 }
 .study-wallpaper-fullscreen .study-wallpaper-nav { z-index: 9501; }
+.study-wallpaper-fullscreen button#study-wallpaper-prev,
+.study-wallpaper-fullscreen button#study-wallpaper-next { z-index: 9501 !important; }
 .study-wallpaper-fullscreen #study-alarm-icon { z-index: 9501; }
 
 .study-clock-on-dark .study-clock-display,
