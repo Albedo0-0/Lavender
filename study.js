@@ -817,11 +817,15 @@ function openBreakTimelinePanel() {
     const btn = document.getElementById('fullscreen-btn');
     if (btn) btn.classList.toggle('is-fullscreen-active', isBrowserFullscreen());
   }
+  let fullscreenPending = false;
   function toggleBrowserFullscreen() {
+    if (fullscreenPending) return;
+    fullscreenPending = true;
+    const done = function () { fullscreenPending = false; };
     if (isBrowserFullscreen()) {
-      exitBrowserFullscreen().catch(function () {});
+      exitBrowserFullscreen().then(done).catch(done);
     } else {
-      requestBrowserFullscreen().catch(function () {});
+      requestBrowserFullscreen().then(done).catch(done);
     }
   }
 
@@ -834,11 +838,12 @@ function openBreakTimelinePanel() {
     if (wpNext) wpNext.addEventListener('click', function () { if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.next(); });
     const fsBtn = document.getElementById('fullscreen-btn');
     if (fsBtn) fsBtn.addEventListener('click', toggleBrowserFullscreen);
-    document.addEventListener('fullscreenchange', function () {
+    function onFullscreenChange() {
       syncFullscreenBtn();
       State.patch('settings', { userExitedFullscreen: !isBrowserFullscreen() });
-    });
-    document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
     syncFullscreenBtn();
     renderClockPanel();
     renderAlarmIcon();
