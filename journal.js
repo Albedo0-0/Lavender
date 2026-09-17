@@ -142,6 +142,10 @@ const Journal = (function () {
     const el = document.getElementById('screen-journal');
     if (!el) return;
 
+    el.classList.remove('journal-page-turning');
+    void el.offsetWidth;
+    el.classList.add('journal-page-turning');
+
     updateLockButton();
 
     if (JournalData.isLocked()) {
