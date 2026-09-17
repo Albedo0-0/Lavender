@@ -2178,40 +2178,6 @@ button.planner-history-fav-toggle.active {
   margin: 24px 0;
 }
 
-/* Study §7 (v2) — cozy night wallpaper layer, nav, fullscreen-on-session */
-
-#study-layout {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  min-height: 480px;
-  background: linear-gradient(180deg, #1b1f3a 0%, #11142b 70%, #0b0d1f 100%);
-}
-#study-layout > *:not(#study-wallpaper-layer) {
-  position: relative;
-  z-index: 1;
-}
-
-#study-wallpaper-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-size: cover;
-  background-position: center;
-  transition: background-image 900ms ease-in-out;
-}
-
-
-
-/* Fullscreen takeover while a session/clock is running — same pattern as #global-break-takeover */
-.study-wallpaper-fullscreen {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 940;
-  border-radius: 0 !important;
-  min-height: 100vh !important;
-}
-.study-wallpaper-fullscreen .study-wallpaper-nav { z-index: 941; }
 
 /* Auto clock contrast — study-wallpaper.js toggles these on #study-layout after sampling brightness */
 .study-clock-on-dark .study-clock-display,
