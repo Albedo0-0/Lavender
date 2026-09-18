@@ -12,15 +12,15 @@ const UnrecordedStudy = (function () {
     const dateStr = todayStr();
     const entry = JournalData.getEntry(dateStr);
     Modal.open(
-      '<h3>Unrecorded Study</h3>' +
-      '<p style="font-size:12px;opacity:0.7;">Hours and questions not tracked by the Study timer.</p>' +
-      '<label>Hours studied&nbsp;' +
-        '<input type="number" id="unrecorded-hours" min="0" step="0.5" value="' + (entry.hoursStudied || 0) + '">' +
-      '</label><br><br>' +
-      '<label>Questions solved&nbsp;' +
-        '<input type="number" id="unrecorded-questions" min="0" step="1" value="' + (entry.questionsSolved || 0) + '">' +
-      '</label><br><br>' +
-      '<button id="unrecorded-save">Save</button>'
+      '<div class="unrecorded-slip">' +
+      '<h3 class="modal-title">Unrecorded Study</h3>' +
+      '<p class="micro-label">Hours and questions not tracked by the Study timer.</p>' +
+      '<div class="form-row"><label for="unrecorded-hours">Hours studied</label>' +
+        '<input type="number" id="unrecorded-hours" class="input" min="0" step="0.5" value="' + (entry.hoursStudied || 0) + '"></div>' +
+      '<div class="form-row"><label for="unrecorded-questions">Questions solved</label>' +
+        '<input type="number" id="unrecorded-questions" class="input" min="0" step="1" value="' + (entry.questionsSolved || 0) + '"></div>' +
+      '<button id="unrecorded-save" class="btn-primary">Save</button>' +
+      '</div>'
     );
     document.getElementById('unrecorded-save').addEventListener('click', function () {
       const hours = document.getElementById('unrecorded-hours').value;
