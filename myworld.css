@@ -7,57 +7,85 @@
  * `.myworld-root` (see ensureDom() in myworld.js). Does not touch, or
  * assume anything about, index.html / style.css / any other screen.
  *
- * Namespacing: all custom properties are prefixed `--mw-` (not the
- * app's global token names) so this file is fully self-sufficient on
- * its own for now. When My World is later integrated and the app's
- * Phase 0 global tokens exist, these can be reconciled/aliased to them
- * without a rewrite — that reconciliation is deliberately NOT done here.
+ * Namespacing: all custom properties are prefixed `--mw-` so this file
+ * stays self-sufficient until a later integration reconciles it with
+ * the app's Phase 0 global tokens.
  *
- * Design intent: a quiet illustrated natural scene, not a dashboard.
- * No card grid, no drop-shadowed panels, no HUD-style overlays, no
- * numeric readouts, no "level up" visual language anywhere. The tree
- * is the only real focal point; everything else stays soft and out of
- * the way. Motion is minimal and slow — nothing pulses, bounces, or
- * calls attention to itself.
+ * Design intent: a quiet, magical nighttime forest — moonlit, layered,
+ * slightly wild. Not a dashboard: no card grid, no HUD overlays, no
+ * numeric readouts, no "level up" language. The tree is the focal
+ * point; ambient life (stars, moon, distant hills, fireflies, motes)
+ * stays quietly in the background. Motion is minimal and slow.
+ *
+ * Tuning quick-reference (range → current):
+ *   star count / twinkle opacity   8–16 / 0.6–0.95   → 12 stars / 0.65–0.95
+ *   moon size (% of scene width)   10–18%             → 13%
+ *   moon glow blur                 16–40px            → 26px / 60px
+ *   firefly count                  5–10               → 7
+ *   firefly glow radius            4–8px              → 6px
+ *   firefly cycle duration         18–34s             → 20–29s (per spot)
+ *   particle count                 2–6                → 4
+ *   particle cycle duration        28–44s             → 31–40s (per spot)
+ *   canopy sway duration           16–28s             → 17–27s (by maturity)
+ *   canopy sway amplitude          0.3–0.7deg         → 0.4deg
+ *   mist drift duration            45–75s             → 60s
+ *   hill drift duration            150–260s           → 200–240s
+ *   bird crossing cycle            70–120s            → 95s
+ *   vignette strength (alpha)      0.30–0.50          → 0.42
+ *   tree max width (desktop)       560–760px          → 680px
  * ----------------------------------------------------------------------
  */
 
 .myworld-root {
-  /* ---- local tokens (namespaced; safe to reconcile with app tokens later) ---- */
-  --mw-sky-top: #eae6f6;
-  --mw-sky-mid: #f1e9ee;
-  --mw-sky-bottom: #f6ecdf;
-  --mw-ground-near: #b9d3a0;
-  --mw-ground-far: #a3c489;
-  --mw-ground-line: rgba(60, 74, 48, 0.18);
-  --mw-mist: rgba(255, 255, 255, 0.35);
-  --mw-vignette: rgba(48, 40, 58, 0.10);
+  --mw-sky-top: #171b3a;
+  --mw-sky-mid: #232a52;
+  --mw-sky-bottom: #3c3667;
+  --mw-horizon: #4b3f6b;
 
-  --mw-trunk-fill: #8a6f57;
-  --mw-trunk-shade: #6f5744;
-  --mw-branch-stroke: #7c6249;
-  --mw-root-stroke: #7c6249;
+  --mw-star: #f4f1ff;
+  --mw-moon-base: #d9d6e8;
+  --mw-moon-bright: #fbfaff;
+  --mw-moon-glow: rgba(226, 220, 255, 0.55);
+  --mw-moon-glow-soft: rgba(226, 220, 255, 0.22);
+  --mw-moon-wash: rgba(150, 150, 210, 0.22);
 
-  --mw-radius-scene: 22px;
+  --mw-hill-far: #232a4e;
+  --mw-hill-near: #1a2038;
+  --mw-grove: #171c34;
+
+  --mw-ground-near: #202c28;
+  --mw-ground-far: #16201f;
+  --mw-ground-line: rgba(10, 16, 14, 0.5);
+  --mw-grass-blade: rgba(140, 176, 140, 0.28);
+
+  --mw-mist: rgba(180, 190, 230, 0.18);
+  --mw-vignette: rgba(6, 8, 20, 0.42);
+  --mw-tree-shadow: rgba(4, 6, 14, 0.4);
+
+  --mw-trunk-fill: #5c4a3d;
+  --mw-trunk-shade: #382c24;
+  --mw-trunk-highlight: #8d7a68;
+  --mw-branch-stroke: #4a3b30;
+  --mw-root-stroke: #4a3b30;
+
+  --mw-firefly: #f4e29a;
+  --mw-firefly-glow: rgba(244, 226, 154, 0.85);
+  --mw-particle: rgba(230, 232, 255, 0.55);
+  --mw-bird: rgba(10, 12, 22, 0.55);
+
+  --mw-radius-scene: 0px;
   --mw-transition-slow: 900ms ease;
 
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  max-height: 70vh;
+  height: 100%;
+  min-height: 480px;
+  flex: 1 1 auto;
   overflow: hidden;
   border-radius: var(--mw-radius-scene);
-  background: var(--mw-sky-bottom);
+  background: var(--mw-sky-top);
   isolation: isolate;
   user-select: none;
-}
-
-/* Fallback for environments without aspect-ratio support: keep a
-   sensible minimum height so the scene never collapses to 0px. */
-@supports not (aspect-ratio: 4 / 3) {
-  .myworld-root {
-    min-height: 320px;
-  }
 }
 
 /* ------------------------------------------------------------------
@@ -76,40 +104,70 @@
   z-index: 0;
 }
 
-/* Empty placeholder layers today (stars/clouds are future systems —
-   see myworld-assets.js STAR_FIELD_CONFIG / future cloud config).
-   Sized and positioned now so future content drops in without any
-   layout shift. */
-.myworld-stars-layer,
-.myworld-clouds-layer {
+.myworld-stars-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.myworld-stars-layer {
   z-index: 1;
-  opacity: 0; /* future: fade in for night/weather states */
-  transition: opacity var(--mw-transition-slow);
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 18%, var(--mw-star), transparent 100%),
+    radial-gradient(1.2px 1.2px at 24% 9%, var(--mw-star), transparent 100%),
+    radial-gradient(1.8px 1.8px at 38% 22%, var(--mw-star), transparent 100%),
+    radial-gradient(1.2px 1.2px at 52% 7%, var(--mw-star), transparent 100%),
+    radial-gradient(1.4px 1.4px at 66% 16%, var(--mw-star), transparent 100%),
+    radial-gradient(1.1px 1.1px at 78% 6%, var(--mw-star), transparent 100%),
+    radial-gradient(1.7px 1.7px at 88% 20%, var(--mw-star), transparent 100%),
+    radial-gradient(1.3px 1.3px at 8% 32%, var(--mw-star), transparent 100%),
+    radial-gradient(1.2px 1.2px at 45% 30%, var(--mw-star), transparent 100%),
+    radial-gradient(1.5px 1.5px at 70% 33%, var(--mw-star), transparent 100%),
+    radial-gradient(1.1px 1.1px at 93% 34%, var(--mw-star), transparent 100%),
+    radial-gradient(1.3px 1.3px at 30% 4%, var(--mw-star), transparent 100%);
+  background-repeat: no-repeat;
+  opacity: 0.8;
+  animation: myworld-star-twinkle 7s ease-in-out infinite;
 }
 
-.myworld-clouds-layer {
+.myworld-moon {
+  position: absolute;
+  top: 10%;
+  right: 14%;
+  width: 13%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--mw-moon-bright), var(--mw-moon-base) 70%);
+  box-shadow: 0 0 26px 6px var(--mw-moon-glow), 0 0 60px 18px var(--mw-moon-glow-soft);
   z-index: 2;
+  pointer-events: none;
 }
 
-/* A very soft, slow-drifting mist band across the horizon — the only
-   ambient motion in the foundation, kept subtle and cheap. */
+/* Soft moonlight wash cascading down from roughly the moon's position. */
+.myworld-sky::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 65% 55% at 76% 28%, var(--mw-moon-wash), transparent 72%);
+  opacity: 0.5;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* A very soft, slow-drifting mist band across the horizon. */
 .myworld-sky::after {
   content: '';
   position: absolute;
   left: -10%;
   right: -10%;
-  bottom: 26%;
-  height: 14%;
+  bottom: 24%;
+  height: 16%;
   background: radial-gradient(ellipse at center, var(--mw-mist), transparent 70%);
   opacity: 0.5;
-  animation: myworld-mist-drift 60s ease-in-out infinite;
   z-index: 1;
+  animation: myworld-mist-drift 60s ease-in-out infinite;
+}
+
+@keyframes myworld-star-twinkle {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 0.95; }
 }
 
 @keyframes myworld-mist-drift {
@@ -119,7 +177,74 @@
 }
 
 /* ------------------------------------------------------------------
- * Scene (ground + tree + future environment layer)
+ * Backdrop — distant hills/groves behind the tree, for depth.
+ * Static silhouettes; only the faintest drift so they read as
+ * "quietly there" rather than actively moving.
+ * ---------------------------------------------------------------- */
+
+.myworld-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.myworld-hill {
+  position: absolute;
+  left: 50%;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  transform: translateX(-50%);
+}
+
+.myworld-hill--far {
+  width: 140%;
+  height: 22%;
+  bottom: 24%;
+  background: var(--mw-hill-far);
+  opacity: 0.55;
+  filter: blur(2px);
+  animation: myworld-hill-drift 200s ease-in-out infinite;
+}
+
+.myworld-hill--near {
+  width: 120%;
+  height: 16%;
+  bottom: 22%;
+  background: var(--mw-hill-near);
+  opacity: 0.7;
+  filter: blur(1px);
+  animation: myworld-hill-drift 240s ease-in-out infinite reverse;
+}
+
+.myworld-grove {
+  position: absolute;
+  bottom: 22%;
+  width: 22%;
+  height: 30%;
+  background: var(--mw-grove);
+  opacity: 0.5;
+  filter: blur(2.5px);
+  border-radius: 40% 60% 0 0 / 100% 100% 0 0;
+}
+
+.myworld-grove--left {
+  left: -4%;
+  transform: scaleX(1.1);
+}
+
+.myworld-grove--right {
+  right: -6%;
+  transform: scaleX(-1.1);
+}
+
+@keyframes myworld-hill-drift {
+  0%   { transform: translateX(-50%) translateX(-0.4%); }
+  50%  { transform: translateX(-50%) translateX(0.4%); }
+  100% { transform: translateX(-50%) translateX(-0.4%); }
+}
+
+/* ------------------------------------------------------------------
+ * Scene (ground + tree + ambient layer)
  * ---------------------------------------------------------------- */
 
 .myworld-scene {
@@ -157,140 +282,12 @@
     radial-gradient(140px 18px at 78% 100%, #000 98%, transparent 100%);
 }
 
-.myworld-tree-layer {
+/* Faint grass-blade texture along the ground's top edge — one layered
+   background pattern rather than per-blade DOM nodes. */
+.myworld-grass {
   position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Reserved for future flowers/grass/bushes/rocks/fireflies/birds —
-   sits above the ground, below nothing yet on top of the tree.
-   Intentionally unstyled beyond positioning until that system exists. */
-.myworld-environment-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-}
-
-/* Soft overall vignette so the scene reads as one cohesive
-   illustration rather than flat layers. */
-.myworld-root::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  box-shadow: inset 0 0 60px var(--mw-vignette);
-  border-radius: inherit;
-}
-
-/* ------------------------------------------------------------------
- * The tree
- * ---------------------------------------------------------------- */
-
-.myworld-tree-svg {
-  width: 78%;
-  height: 92%;
-  max-width: 420px;
-  overflow: visible;
-  transition: filter var(--mw-transition-slow);
-}
-
-.myworld-trunk {
-  fill: var(--mw-trunk-fill);
-  stroke: var(--mw-trunk-shade);
-  stroke-width: 0.6;
-  stroke-linejoin: round;
-}
-
-.myworld-branch {
-  fill: none;
-  stroke: var(--mw-branch-stroke);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  opacity: 0.9;
-}
-
-.myworld-canopy {
-  transform-origin: 50% 100%;
-  animation: myworld-canopy-sway 14s ease-in-out infinite;
-}
-
-@keyframes myworld-canopy-sway {
-  0%   { transform: rotate(-0.6deg); }
-  50%  { transform: rotate(0.6deg); }
-  100% { transform: rotate(-0.6deg); }
-}
-
-.myworld-leaf-blob {
-  transition: opacity var(--mw-transition-slow);
-}
-
-.myworld-leaf-highlight {
-  mix-blend-mode: soft-light;
-}
-
-.myworld-blossom {
-  opacity: 0.95;
-}
-
-.myworld-root-flare .myworld-root {
-  fill: none;
-  stroke: var(--mw-root-stroke);
-  stroke-width: 2;
-  stroke-linecap: round;
-  opacity: 0.7;
-}
-
-/* Very early stages (seed / seed-swelling / root-thread) draw little
-   or no trunk — keep the tree layer from feeling broken/empty by
-   giving the ground a quiet focal point under where the tree will be. */
-.myworld-tree--seed {
-  filter: none;
-}
-
-/* Later stages get a faint, warm ambient glow around the canopy —
-   deliberately subtle, more "long afternoon light" than "achievement
-   unlocked". Scales up gradually across families, never appears
-   suddenly. */
-.myworld-tree--sapling .myworld-canopy {
-  filter: drop-shadow(0 0 4px rgba(255, 244, 214, 0.12));
-}
-
-.myworld-tree--tree .myworld-canopy {
-  filter: drop-shadow(0 0 8px rgba(255, 244, 214, 0.16));
-}
-
-.myworld-tree--elder .myworld-canopy {
-  filter: drop-shadow(0 0 14px rgba(255, 244, 214, 0.22));
-}
-
-/* ------------------------------------------------------------------
- * Reduced motion / performance
- * ---------------------------------------------------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-  .myworld-sky::after,
-  .myworld-canopy {
-    animation: none;
-  }
-}
-
-/* ------------------------------------------------------------------
- * Small-viewport adjustment (mirrors the app's general mobile-first
- * posture without depending on any of its existing rules).
- * ---------------------------------------------------------------- */
-
-@media (max-width: 480px) {
-  .myworld-root {
-    border-radius: calc(var(--mw-radius-scene) * 0.7);
-  }
-
-  .myworld-tree-svg {
-    width: 88%;
-  }
-}
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 12px;
+  pointer-events:
