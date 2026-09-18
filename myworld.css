@@ -1,0 +1,296 @@
+/**
+ * myworld.css
+ * ----------------------------------------------------------------------
+ * My World — visual foundation.
+ *
+ * Scope: styles ONLY the DOM structure myworld.js builds under
+ * `.myworld-root` (see ensureDom() in myworld.js). Does not touch, or
+ * assume anything about, index.html / style.css / any other screen.
+ *
+ * Namespacing: all custom properties are prefixed `--mw-` (not the
+ * app's global token names) so this file is fully self-sufficient on
+ * its own for now. When My World is later integrated and the app's
+ * Phase 0 global tokens exist, these can be reconciled/aliased to them
+ * without a rewrite — that reconciliation is deliberately NOT done here.
+ *
+ * Design intent: a quiet illustrated natural scene, not a dashboard.
+ * No card grid, no drop-shadowed panels, no HUD-style overlays, no
+ * numeric readouts, no "level up" visual language anywhere. The tree
+ * is the only real focal point; everything else stays soft and out of
+ * the way. Motion is minimal and slow — nothing pulses, bounces, or
+ * calls attention to itself.
+ * ----------------------------------------------------------------------
+ */
+
+.myworld-root {
+  /* ---- local tokens (namespaced; safe to reconcile with app tokens later) ---- */
+  --mw-sky-top: #eae6f6;
+  --mw-sky-mid: #f1e9ee;
+  --mw-sky-bottom: #f6ecdf;
+  --mw-ground-near: #b9d3a0;
+  --mw-ground-far: #a3c489;
+  --mw-ground-line: rgba(60, 74, 48, 0.18);
+  --mw-mist: rgba(255, 255, 255, 0.35);
+  --mw-vignette: rgba(48, 40, 58, 0.10);
+
+  --mw-trunk-fill: #8a6f57;
+  --mw-trunk-shade: #6f5744;
+  --mw-branch-stroke: #7c6249;
+  --mw-root-stroke: #7c6249;
+
+  --mw-radius-scene: 22px;
+  --mw-transition-slow: 900ms ease;
+
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 70vh;
+  overflow: hidden;
+  border-radius: var(--mw-radius-scene);
+  background: var(--mw-sky-bottom);
+  isolation: isolate;
+  user-select: none;
+}
+
+/* Fallback for environments without aspect-ratio support: keep a
+   sensible minimum height so the scene never collapses to 0px. */
+@supports not (aspect-ratio: 4 / 3) {
+  .myworld-root {
+    min-height: 320px;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Sky
+ * ---------------------------------------------------------------- */
+
+.myworld-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--mw-sky-top) 0%,
+    var(--mw-sky-mid) 55%,
+    var(--mw-sky-bottom) 100%
+  );
+  z-index: 0;
+}
+
+/* Empty placeholder layers today (stars/clouds are future systems —
+   see myworld-assets.js STAR_FIELD_CONFIG / future cloud config).
+   Sized and positioned now so future content drops in without any
+   layout shift. */
+.myworld-stars-layer,
+.myworld-clouds-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.myworld-stars-layer {
+  z-index: 1;
+  opacity: 0; /* future: fade in for night/weather states */
+  transition: opacity var(--mw-transition-slow);
+}
+
+.myworld-clouds-layer {
+  z-index: 2;
+}
+
+/* A very soft, slow-drifting mist band across the horizon — the only
+   ambient motion in the foundation, kept subtle and cheap. */
+.myworld-sky::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: 26%;
+  height: 14%;
+  background: radial-gradient(ellipse at center, var(--mw-mist), transparent 70%);
+  opacity: 0.5;
+  animation: myworld-mist-drift 60s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes myworld-mist-drift {
+  0%   { transform: translateX(-2%); opacity: 0.35; }
+  50%  { transform: translateX(2%);  opacity: 0.55; }
+  100% { transform: translateX(-2%); opacity: 0.35; }
+}
+
+/* ------------------------------------------------------------------
+ * Scene (ground + tree + future environment layer)
+ * ---------------------------------------------------------------- */
+
+.myworld-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.myworld-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28%;
+  background: linear-gradient(to bottom, var(--mw-ground-far) 0%, var(--mw-ground-near) 100%);
+  border-top: 1px solid var(--mw-ground-line);
+  z-index: 2;
+}
+
+/* Gentle rolling silhouette on the ground's top edge instead of a
+   hard straight line, done with a mask so it stays cheap. */
+.myworld-ground::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: var(--mw-ground-far);
+  -webkit-mask-image: radial-gradient(120px 16px at 15% 100%, #000 98%, transparent 100%),
+    radial-gradient(160px 20px at 45% 100%, #000 98%, transparent 100%),
+    radial-gradient(140px 18px at 78% 100%, #000 98%, transparent 100%);
+  mask-image: radial-gradient(120px 16px at 15% 100%, #000 98%, transparent 100%),
+    radial-gradient(160px 20px at 45% 100%, #000 98%, transparent 100%),
+    radial-gradient(140px 18px at 78% 100%, #000 98%, transparent 100%);
+}
+
+.myworld-tree-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Reserved for future flowers/grass/bushes/rocks/fireflies/birds —
+   sits above the ground, below nothing yet on top of the tree.
+   Intentionally unstyled beyond positioning until that system exists. */
+.myworld-environment-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Soft overall vignette so the scene reads as one cohesive
+   illustration rather than flat layers. */
+.myworld-root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px var(--mw-vignette);
+  border-radius: inherit;
+}
+
+/* ------------------------------------------------------------------
+ * The tree
+ * ---------------------------------------------------------------- */
+
+.myworld-tree-svg {
+  width: 78%;
+  height: 92%;
+  max-width: 420px;
+  overflow: visible;
+  transition: filter var(--mw-transition-slow);
+}
+
+.myworld-trunk {
+  fill: var(--mw-trunk-fill);
+  stroke: var(--mw-trunk-shade);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+
+.myworld-branch {
+  fill: none;
+  stroke: var(--mw-branch-stroke);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.myworld-canopy {
+  transform-origin: 50% 100%;
+  animation: myworld-canopy-sway 14s ease-in-out infinite;
+}
+
+@keyframes myworld-canopy-sway {
+  0%   { transform: rotate(-0.6deg); }
+  50%  { transform: rotate(0.6deg); }
+  100% { transform: rotate(-0.6deg); }
+}
+
+.myworld-leaf-blob {
+  transition: opacity var(--mw-transition-slow);
+}
+
+.myworld-leaf-highlight {
+  mix-blend-mode: soft-light;
+}
+
+.myworld-blossom {
+  opacity: 0.95;
+}
+
+.myworld-root-flare .myworld-root {
+  fill: none;
+  stroke: var(--mw-root-stroke);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
+/* Very early stages (seed / seed-swelling / root-thread) draw little
+   or no trunk — keep the tree layer from feeling broken/empty by
+   giving the ground a quiet focal point under where the tree will be. */
+.myworld-tree--seed {
+  filter: none;
+}
+
+/* Later stages get a faint, warm ambient glow around the canopy —
+   deliberately subtle, more "long afternoon light" than "achievement
+   unlocked". Scales up gradually across families, never appears
+   suddenly. */
+.myworld-tree--sapling .myworld-canopy {
+  filter: drop-shadow(0 0 4px rgba(255, 244, 214, 0.12));
+}
+
+.myworld-tree--tree .myworld-canopy {
+  filter: drop-shadow(0 0 8px rgba(255, 244, 214, 0.16));
+}
+
+.myworld-tree--elder .myworld-canopy {
+  filter: drop-shadow(0 0 14px rgba(255, 244, 214, 0.22));
+}
+
+/* ------------------------------------------------------------------
+ * Reduced motion / performance
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .myworld-sky::after,
+  .myworld-canopy {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Small-viewport adjustment (mirrors the app's general mobile-first
+ * posture without depending on any of its existing rules).
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+  .myworld-root {
+    border-radius: calc(var(--mw-radius-scene) * 0.7);
+  }
+
+  .myworld-tree-svg {
+    width: 88%;
+  }
+}
