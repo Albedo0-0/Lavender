@@ -163,6 +163,7 @@ const Progress = (function () {
 
     const main = document.getElementById('progress-main');
     if (!main) return;
+    main.dataset.section = activeSection; // Phase 8 styling hook only
 
     if (activeSection === 'mood') {
       renderGraphSection(main, 'Mood', 'mood');
