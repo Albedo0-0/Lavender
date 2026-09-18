@@ -72,6 +72,7 @@
   --mw-firefly-glow: rgba(244, 226, 154, 0.85);
   --mw-particle: rgba(230, 232, 255, 0.55);
   --mw-bird: rgba(10, 12, 22, 0.55);
+  --mw-tree-glow-pool: rgba(244, 226, 154, 0.08);
 
   --mw-radius-scene: 0px;
   --mw-transition-slow: 900ms ease;
