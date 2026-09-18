@@ -253,8 +253,29 @@
         document.addEventListener('keydown', triggerOnce);
       }
     })();
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    
+      if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(function (reg) {
+        reg.addEventListener('updatefound', function () {
+          // New SW installing — when it activates, reload to pick up fresh cache
+          var newSW = reg.installing;
+          if (newSW) {
+            newSW.addEventListener('statechange', function () {
+              if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+                // Only reload if this isn't the very first install
+                window.location.reload();
+              }
+            });
+          }
+        });
+      })
+      .catch(function (err) {
+        console.warn('Service worker registration failed:', err);
+      });
+  });
+}
     }
   </script>
 
