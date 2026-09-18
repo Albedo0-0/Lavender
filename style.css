@@ -2497,38 +2497,7 @@ button.planner-history-fav-toggle.active {
   text-shadow: 0 1px 6px rgba(255,255,255,0.55), 0 0 18px rgba(255,255,255,0.35);
 }
 
-.settings-wallpaper-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.settings-wallpaper-thumb {
-  position: relative;
-  width: 64px;
-  height: 64px;
-}
-.settings-wallpaper-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-}
-.settings-study-wallpaper-remove {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid #ccc;
-  background: #fff;
-  cursor: pointer;
-  font-size: 12px;
-}
+#notepad-new-folder-input { flex: 1; max-width: 140px; margin-left: 6px; }
 
 /* Study §7 — Cozy Night control area (sits above study-environment.js's scene layer) */
 
@@ -3226,7 +3195,7 @@ button.library-archive-target-btn {
 .notepad-checklist-view-item { margin-bottom: 2px; }
 .notepad-checklist-view-item:last-child { margin-bottom: 0; }
 
-#notepad-modal { position: relative; overflow: visible; }
+#notepad-modal { position: relative; overflow: visible; min-width: 260px; }
 #notepad-hanging-tab-btn { position: absolute; top: 8px; right: -30px; width: 28px; height: 28px; padding: 0; border-radius: 0 6px 6px 0; cursor: pointer; font-size: 14px; border: 1px solid #ccc; background: #f0e6ff; z-index: 10; }
 
 #notepad-hanging-panel {
@@ -3256,7 +3225,7 @@ button.library-archive-target-btn {
 /* Colors/border/font now come from the shared input primitive (style.css Phase 3
    base `select`/`input` rules) — only layout sizing stays here. */
 #notepad-folder-select { flex: 1; max-width: 180px; }
-#notepad-new-folder-input { flex: 1; max-width: 140px; }
+#notepad-new-folder-input { flex: 1; max-width: 140px; margin-left: 6px; }
 #notepad-note-input { width: 100%; min-height: 120px; resize: vertical; }
 
 /* Composer text/checklist format toggle — thin segmented control built on
