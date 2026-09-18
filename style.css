@@ -1980,64 +1980,164 @@ button.planner-history-fav-toggle.active {
   line-height: 1;
 }
 
-/* Progress tab — functional placeholder styling only; scrapbook/Ghibli polish comes later. */
+/* Styling Phase 8 — Progress (scrapbook record book). Visual only.
+   Hook: #progress-main[data-section] is set by progress.js render().
+   Tuning (current → range): sidebar width 150px (130–170) · page left padding 44px (32–52) ·
+   chart height 220px (200–260) · productivity hero chart 280px (240–320) · bar track 26px (20–30). */
 
 #progress-layout {
   display: flex;
-  gap: 16px;
+  gap: 0;
   align-items: flex-start;
 }
 
 #progress-sidebar {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   width: 150px;
   flex-shrink: 0;
-  border-right: 1px solid #ddd;
-  padding-right: 12px;
+  padding: var(--space-5) 0 0;
 }
 
-.progress-nav-btn {
+#progress-sidebar .progress-nav-btn {
+  --tab-edge: var(--color-sage-400);
   text-align: left;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  background: #fff;
+  font-family: var(--font-hand);
+  font-size: var(--text-base);
+  line-height: 1.2;
+  color: var(--color-brown-700);
+  background: var(--color-cream-200);
+  border: 1px solid var(--color-kraft-300);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  padding: 8px 8px 8px 16px;
+  margin-right: 6px;
   cursor: pointer;
-  border-radius: 4px;
+  box-shadow: inset 5px 0 0 var(--tab-edge), -2px 2px 4px rgba(63, 47, 33, 0.10);
+  transform: none;
 }
-
-.progress-nav-btn.active {
-  font-weight: bold;
-  background: #eee;
+#progress-sidebar .progress-nav-btn:nth-child(3n+2) { --tab-edge: var(--color-kraft-400); }
+#progress-sidebar .progress-nav-btn:nth-child(3n+3) { --tab-edge: var(--color-accent-rust-soft); }
+#progress-sidebar .progress-nav-btn:hover {
+  background: var(--color-sage-100);
+  transform: translateX(-3px);
+  box-shadow: inset 5px 0 0 var(--tab-edge), -3px 2px 5px rgba(63, 47, 33, 0.14);
+}
+#progress-sidebar .progress-nav-btn.active,
+#progress-sidebar .progress-nav-btn.active:hover {
+  font-weight: 700;
+  color: var(--color-brown-800);
+  background: var(--color-cream-050);
+  border-color: var(--color-border);
+  margin-right: -1px;
+  transform: none;
+  box-shadow: inset 5px 0 0 var(--tab-edge);
 }
 
 #progress-main {
+  position: relative;
   flex: 1;
   min-width: 0;
+  min-height: 420px;
+  padding: var(--space-5) var(--space-5) var(--space-5) 44px;
+  background: var(--color-cream-050);
+  background-image:
+    repeating-radial-gradient(circle at 30% 40%, rgba(122, 92, 62, 0.03) 0px, rgba(122, 92, 62, 0.03) 1px, transparent 1px, transparent 60px);
+  border: 1px solid var(--color-border);
+  border-radius: 3px 14px 14px 3px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 2px 4px rgba(63, 47, 33, 0.10),
+    0 10px 22px rgba(63, 47, 33, 0.14);
+  --fill: var(--color-sage-500);
+}
+#progress-main::before {
+  content: '';
+  position: absolute;
+  top: var(--space-5);
+  bottom: var(--space-5);
+  left: 14px;
+  width: 12px;
+  background-image: radial-gradient(circle at 6px 6px, rgba(63, 47, 33, 0.16) 0, rgba(63, 47, 33, 0.16) 4px, transparent 4.5px);
+  background-size: 12px 40px;
+  background-repeat: repeat-y;
+  pointer-events: none;
 }
 
 .progress-section-title {
-  margin-top: 0;
+  display: inline-block;
+  margin: 0 0 var(--space-4) calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  font-family: var(--font-hand);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-brown-700);
+  background: linear-gradient(transparent 58%, rgba(168, 176, 135, 0.5) 58%, rgba(168, 176, 135, 0.5) 90%, transparent 90%);
 }
 
+/* Weekly / Monthly / Yearly — small notebook tabs sitting on the chart page */
 .progress-period-tabs {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  align-items: flex-end;
+  gap: 3px;
+  margin: 0;
+  padding-left: var(--space-4);
 }
 
-.progress-period-btn {
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  background: #fff;
+#progress-main .progress-period-btn {
+  font-family: var(--font-hand);
+  font-size: var(--text-sm);
+  color: var(--color-brown-600);
+  background: var(--color-sage-200);
+  border: 1px solid var(--color-kraft-300);
+  border-bottom: none;
+  border-radius: 9px 9px 0 0;
+  padding: 4px 14px 3px;
   cursor: pointer;
-  border-radius: 4px;
+  box-shadow: none;
+  transform: none;
+}
+#progress-main .progress-period-btn:hover {
+  background: var(--color-sage-100);
+  box-shadow: none;
+  transform: none;
+}
+#progress-main .progress-period-btn.active,
+#progress-main .progress-period-btn.active:hover {
+  font-weight: 700;
+  color: var(--color-brown-800);
+  background: var(--color-cream-100);
+  padding-bottom: 7px;
+  margin-bottom: -1px;
 }
 
-.progress-period-btn.active {
-  font-weight: bold;
-  background: #eee;
+/* Chart page — pasted-in graph sheet with tape; the inner .progress-chart keeps its own horizontal scroll */
+#progress-chart-holder {
+  position: relative;
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  background: var(--color-cream-100);
+  border: 1px solid var(--color-kraft-300);
+  border-radius: 4px 12px 10px 6px;
+  box-shadow: var(--shadow-sm);
+}
+#progress-chart-holder::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  right: 32px;
+  width: 70px;
+  height: 22px;
+  background: var(--color-sage-300);
+  opacity: 0.55;
+  transform: rotate(3deg);
+  box-shadow: var(--shadow-sm);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 .progress-chart {
@@ -2045,7 +2145,8 @@ button.planner-history-fav-toggle.active {
   align-items: flex-end;
   gap: 10px;
   height: 220px;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 2px solid rgba(92, 69, 48, 0.55);
+  border-radius: 0 0 2px 6px / 0 0 1px 3px;
   padding: 8px 4px 0;
   overflow-x: auto;
 }
@@ -2061,58 +2162,263 @@ button.planner-history-fav-toggle.active {
 }
 
 .progress-bar-value {
-  font-size: 11px;
+  font-family: var(--font-hand);
+  font-size: var(--text-sm);
+  color: var(--color-brown-700);
   margin-bottom: 4px;
 }
 
+/* Track = full axis (0 → max). The ::after overlay draws pencil quarter-marks (25/50/75/100%)
+   and an outline on top of the fill without changing any bar size. */
 .progress-bar-track {
-  width: 22px;
+  position: relative;
+  width: 26px;
   height: 100%;
   display: flex;
   align-items: flex-end;
-  background: #f2f2f2;
-  border-radius: 3px 3px 0 0;
+  background: rgba(195, 169, 126, 0.16);
+  border-radius: 6px 5px 0 0 / 8px 6px 0 0;
+  --tick: rgba(92, 69, 48, 0.28);
+  --track-line: rgba(169, 134, 90, 0.45);
+}
+.progress-bar-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: repeating-linear-gradient(to top, transparent 0, transparent calc(25% - 1px), var(--tick) calc(25% - 1px), var(--tick) 25%);
+  box-shadow: inset 0 0 0 1px var(--track-line);
 }
 
+/* No border on the fill (would inflate tiny values) — crayon hatch + inset pencil edge only */
 .progress-bar-fill {
   width: 100%;
-  background: #9b8cd8;
-  border-radius: 3px 3px 0 0;
+  background-color: var(--fill, var(--color-sage-500));
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.30) 0, rgba(255, 255, 255, 0.30) 2px, transparent 2px, transparent 6px);
+  border-radius: 6px 5px 0 0 / 8px 6px 0 0;
+  box-shadow: inset 0 0 0 1px rgba(63, 47, 33, 0.35);
   min-height: 2px;
 }
 
 .progress-bar-label {
-  font-size: 10px;
+  font-family: var(--font-hand);
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
   margin-top: 6px;
   text-align: center;
   white-space: nowrap;
 }
 
+/* Calm empty note (existing hook, restyled) */
 .progress-placeholder {
-  color: #888;
+  padding: var(--space-4);
+  font-family: var(--font-hand);
+  font-size: var(--text-base);
+  color: var(--color-ink-soft);
+  text-align: center;
+  background: var(--color-cream-100);
+  border: 1.5px dashed var(--color-kraft-400);
+  border-radius: 8px;
 }
 
+/* Other Stats — mixed treatment by position (order set in progress.js renderOtherStats):
+   1 = index card (streak) · 2–5 = record slips (totals) · 6–8 = achievement cards (best records) */
 .progress-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-4) var(--space-3);
+  align-items: start;
+  padding: var(--space-2) 0;
 }
 
 .progress-stat-card {
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 12px;
+  position: relative;
+  padding: 10px 12px 12px;
+  background: var(--color-cream-100);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  box-shadow: var(--shadow-sm);
+  overflow-wrap: anywhere;
 }
 
 .progress-stat-label {
-  font-size: 12px;
-  color: #666;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
 }
 
 .progress-stat-value {
-  font-size: 20px;
-  font-weight: bold;
+  font-family: var(--font-hand);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-brown-800);
   margin-top: 4px;
+}
+.progress-stat-value small {
+  display: inline-block;
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-ink-soft);
+}
+
+/* 1 — index card */
+.progress-stat-card:nth-child(1) {
+  padding: 18px 16px 14px;
+  background-color: var(--color-cream-050);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 21px, rgba(138, 148, 104, 0.28) 21px, rgba(138, 148, 104, 0.28) 22px);
+  border-top: 3px solid var(--color-accent-rust-soft);
+  transform: rotate(-0.6deg);
+}
+.progress-stat-card:nth-child(1) .progress-stat-value { font-size: var(--text-xl); }
+
+/* 2–5 — compact record slips */
+.progress-stat-card:nth-child(n+2):nth-child(-n+5) {
+  padding: 8px 10px;
+  background: var(--color-sage-100);
+  border: 1px dashed var(--color-sage-400);
+  border-radius: 2px 6px 2px 6px;
+  box-shadow: none;
+}
+.progress-stat-card:nth-child(3),
+.progress-stat-card:nth-child(5) {
+  background: var(--color-cream-200);
+  border-color: var(--color-kraft-400);
+}
+.progress-stat-card:nth-child(2),
+.progress-stat-card:nth-child(4) { transform: rotate(0.5deg); }
+.progress-stat-card:nth-child(3),
+.progress-stat-card:nth-child(5) { transform: rotate(-0.5deg); }
+.progress-stat-card:nth-child(n+2):nth-child(-n+5) .progress-stat-value { font-size: var(--text-md); }
+
+/* 6–8 — achievement cards with a small rosette */
+.progress-stat-card:nth-child(n+6) {
+  padding: 14px 12px 14px;
+  background: linear-gradient(160deg, var(--color-cream-200), var(--color-cream-300));
+  border: 1.5px solid var(--color-kraft-500);
+  border-radius: 8px;
+  outline: 1px solid rgba(169, 134, 90, 0.5);
+  outline-offset: -5px;
+  box-shadow: var(--shadow-md);
+}
+.progress-stat-card:nth-child(n+6) .progress-stat-label { padding-right: 22px; }
+.progress-stat-card:nth-child(n+6)::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color-cream-050) 0, var(--color-cream-050) 4px, var(--color-accent-rust) 4.5px, var(--color-accent-rust) 9px, var(--color-accent-rust-soft) 9.5px, var(--color-accent-rust-soft) 13px);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+.progress-stat-card:nth-child(6) { transform: rotate(-0.8deg); }
+.progress-stat-card:nth-child(7) { transform: rotate(0.6deg); }
+.progress-stat-card:nth-child(8) { transform: rotate(-0.4deg); }
+
+@media (min-width: 701px) {
+  .progress-stat-card:nth-child(1) { grid-column: span 2; }
+}
+
+/* Per-section chart colour (hook: #progress-main[data-section]) */
+#progress-main[data-section="questions"] { --fill: var(--color-kraft-500); }
+#progress-main[data-section="sleep"] { --fill: var(--color-brown-600); }
+
+/* Productivity — hero page: ribbon title, taped double-frame sheet, larger chart, rust bars */
+#progress-main[data-section="productivity"] { --fill: var(--color-accent-rust); }
+#progress-main[data-section="productivity"] .progress-section-title {
+  margin-left: -12px;
+  padding: 2px 34px 2px 22px;
+  font-size: 30px;
+  color: var(--color-cream-050);
+  background: var(--color-accent-rust);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%);
+}
+#progress-main[data-section="productivity"] #progress-chart-holder {
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  background: var(--color-cream-050);
+  border: 2px solid var(--color-accent-rust-soft);
+  outline: 1px dashed var(--color-kraft-400);
+  outline-offset: 4px;
+  box-shadow: var(--shadow-md);
+}
+#progress-main[data-section="productivity"] #progress-chart-holder::after {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 28px;
+  width: 64px;
+  height: 22px;
+  background: var(--color-kraft-300);
+  opacity: 0.7;
+  transform: rotate(-5deg);
+  box-shadow: var(--shadow-sm);
+  border-radius: 2px;
+  pointer-events: none;
+}
+#progress-main[data-section="productivity"] .progress-chart { height: 280px; }
+#progress-main[data-section="productivity"] .progress-bar-value { font-weight: 700; }
+#progress-main[data-section="productivity"] .progress-bar-fill {
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.28) 2px, transparent 2px, transparent 6px),
+    linear-gradient(180deg, var(--color-accent-rust-soft), var(--color-accent-rust));
+}
+
+/* Targets — hand-drawn meters: rounded pencil-outlined tubes with bold quarter marks */
+#progress-main[data-section="targets"] { --fill: var(--color-sage-600); }
+#progress-main[data-section="targets"] .progress-bar-track {
+  width: 30px;
+  background: var(--color-cream-200);
+  border-radius: 15px 15px 4px 4px / 12px 12px 3px 3px;
+  --tick: rgba(92, 69, 48, 0.45);
+  --track-line: var(--color-brown-600);
+}
+#progress-main[data-section="targets"] .progress-bar-fill {
+  border-radius: 12px 12px 3px 3px / 10px 10px 2px 2px;
+}
+
+/* Narrow screens — sidebar becomes a row of tabs above the page */
+@media (max-width: 560px) {
+  #progress-layout { flex-direction: column; align-items: stretch; }
+  #progress-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 4px;
+    padding: 0 var(--space-2);
+  }
+  #progress-sidebar .progress-nav-btn {
+    border: 1px solid var(--color-kraft-300);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    margin: 0;
+    padding: 6px 10px;
+    font-size: var(--text-sm);
+    box-shadow: inset 0 4px 0 var(--tab-edge);
+  }
+  #progress-sidebar .progress-nav-btn:hover {
+    transform: none;
+    box-shadow: inset 0 4px 0 var(--tab-edge);
+  }
+  #progress-sidebar .progress-nav-btn.active,
+  #progress-sidebar .progress-nav-btn.active:hover {
+    border-color: var(--color-border);
+    border-bottom: none;
+    margin: 0 0 -1px;
+    box-shadow: inset 0 4px 0 var(--tab-edge);
+  }
+  #progress-main {
+    padding: var(--space-4) var(--space-3) var(--space-4) 30px;
+    border-radius: 6px 12px 12px 6px;
+  }
+  #progress-main::before { left: 8px; }
+  #progress-main[data-section="productivity"] .progress-section-title { font-size: var(--text-xl); }
+  #progress-main[data-section="productivity"] .progress-chart { height: 240px; }
 }
 
 /* Study §4 — Focus Mode (active/paused session view) */
