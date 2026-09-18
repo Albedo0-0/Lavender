@@ -166,26 +166,43 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       wallpaperRemove.addEventListener('click', function () { saveWallpaper(null); });
     }
 
+     // Conservative safe ceiling for a single base64 video inside localStorage: browsers commonly
+    // cap localStorage around 5-10MB for the *entire* origin, shared with every other Lavender
+    // key. Base64 also inflates raw bytes by ~33%. 3.5MB raw (~4.7MB encoded) leaves headroom for
+    // the rest of app state so one video can't take down every other saved feature.
+    const MAX_VIDEO_BYTES = 3.5 * 1024 * 1024;
     const studyWallpaperInput = document.getElementById('settings-study-wallpaper-input');
     if (studyWallpaperInput) {
       studyWallpaperInput.addEventListener('click', function () { _fsWasActive = _isFs(); });
       studyWallpaperInput.addEventListener('change', function (e) {
         const files = Array.prototype.slice.call(e.target.files || []);
         if (!files.length) return;
+        const oversizedNames = [];
         Promise.all(files.map(function (f) {
           const name = (f.name || '').toLowerCase();
           const isVideo = /^video\//.test(f.type) || /\.(mp4|webm|mov)$/.test(name);
           const isAnimated = f.type === 'image/gif' || f.type === 'image/webp' || /\.(gif|webp)$/.test(name);
+          if (isVideo && f.size > MAX_VIDEO_BYTES) { oversizedNames.push(f.name || 'video'); return Promise.resolve(null); }
           const task = isVideo ? readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'video' }; })
             : isAnimated ? readFileAsDataUrl(f).then(function (url) { return { url: url, type: 'gif' }; })
             : resizeImageFile(f, 2560, 0.95).then(function (url) { return { url: url, type: 'image' }; });
           return task.catch(function () { return null; });
          })).then(function (items) {
           const valid = items.filter(Boolean);
-          if (!valid.length) { alert("Couldn't use those files."); return; }
+          if (!valid.length) {
+            if (oversizedNames.length) alert('"' + oversizedNames.join('", "') + '" is too large to store as a wallpaper (max ~3.5MB per video). Nothing was saved for it.');
+            else alert("Couldn't use those files.");
+            return;
+          }
           const cur = settings().studyWallpapers || [];
-          State.patch('settings', { studyWallpapers: cur.concat(valid), studyWallpaperIndex: cur.length });
-          window.location.reload();
+          const ok = State.patch('settings', { studyWallpapers: cur.concat(valid), studyWallpaperIndex: cur.length });
+          if (!ok) {
+            alert("These files are too large to save permanently (storage limit reached). Nothing was saved — try a smaller video or fewer wallpapers.");
+            return;
+          }
+          if (oversizedNames.length) alert('"' + oversizedNames.join('", "') + '" is too large to store as a wallpaper (max ~3.5MB per video) and was skipped. The rest were saved.');
+          open();
+          if (typeof StudyWallpaper !== 'undefined') StudyWallpaper.refreshSlideshow();
         }).catch(function (err) {
           alert(err.message || "Couldn't use those files.");
         });
