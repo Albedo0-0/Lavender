@@ -3170,8 +3170,13 @@ button.notepad-format-btn.notepad-format-active {
   color: #f2efe6;
   cursor: pointer;
   backdrop-filter: blur(2px);
+  transition: background-color 90ms ease-out, transform 90ms ease-out, opacity 90ms ease-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
 }
 .study-wallpaper-nav:hover { background: rgba(20,24,44,0.4); }
+.study-wallpaper-nav:active { background: rgba(20,24,44,0.55); transform: scale(0.92); }
 button#study-wallpaper-prev { position: absolute !important; top: 10px !important; left: 10px !important; right: auto !important; z-index: 3; }
 button#study-wallpaper-next { position: absolute !important; top: 10px !important; right: 10px !important; left: auto !important; z-index: 3; }
 /* True fullscreen takeover while a session/clock is running — breaks out of
