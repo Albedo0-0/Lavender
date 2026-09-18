@@ -46,9 +46,11 @@ const State = (function () {
   // set() only shallow-merges at the TOP level. State.set({ settings: { foo: 1 } }) replaces the
   // whole settings object, silently dropping every other settings field — always spread the
   // current value first (Object.assign({}, State.get().settings, {...})), or use patch() below.
-  function set(partial) {
-    data = Object.assign({}, data, partial);
-    Storage.save(STORAGE_KEY, data);
+    function set(partial) {
+    const next = Object.assign({}, data, partial);
+    const ok = Storage.save(STORAGE_KEY, next);
+    if (ok) data = next;
+    return ok;
   }
 
   // Safe nested-merge helper (item 9, bug-proofing) — patch('settings', { soundEnabled: false })
@@ -59,7 +61,7 @@ const State = (function () {
     const merged = (current && typeof current === 'object' && !Array.isArray(current))
       ? Object.assign({}, current, partial)
       : partial;
-    set({ [key]: merged });
+    return set({ [key]: merged });
   }
 
   function init() {
