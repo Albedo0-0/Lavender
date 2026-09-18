@@ -522,6 +522,7 @@ const MyWorld = (function () {
       '  <div class="myworld-hill myworld-hill--near"></div>' +
       '  <div class="myworld-grove myworld-grove--left"></div>' +
       '  <div class="myworld-grove myworld-grove--right"></div>' +
+      '  <div class="myworld-haze" aria-hidden="true"></div>' +
       '</div>' +
       '<div class="myworld-scene">' +
       '  <div class="myworld-ground"><div class="myworld-grass" aria-hidden="true"></div></div>' +
@@ -531,8 +532,8 @@ const MyWorld = (function () {
       '  <div class="myworld-ambient-layer" data-myworld-layer="ambient" aria-hidden="true">' +
       buildAmbientMarkup() +
       '  </div>' +
-      '</div>';
-
+      '</div>' +
+      '<div class="myworld-vignette" aria-hidden="true"></div>';
     container.innerHTML = '';
     container.appendChild(root);
     return root;
@@ -603,6 +604,89 @@ const MyWorld = (function () {
     return getState();
   }
 
+  // -----------------------------------------------------------------
+  // Fullscreen takeover.
+  //
+  // Mirrors the app's existing full-viewport pattern
+  // (#global-break-takeover): a single fixed, full-viewport host
+  // appended to <body>, layered above the normal app shell — NOT the
+  // browser Fullscreen API, and NOT a change to init()/render() above,
+  // which still work exactly as before for non-fullscreen embedding.
+  // No nav wiring is assumed here; the caller decides when to invoke
+  // these, e.g. from a My World entry-point click handler.
+  // -----------------------------------------------------------------
+
+  const FULLSCREEN_HOST_CLASS = 'myworld-fullscreen-host';
+  let fullscreenHost = null;
+  let fullscreenOnExit = null;
+  let fullscreenKeyHandler = null;
+
+  function isFullscreen() {
+    return !!fullscreenHost;
+  }
+
+  /**
+   * Opens My World as a fullscreen takeover appended to <body>.
+   * `onExit`, if provided, runs once after teardown (e.g. so
+   * integration code can restore hidden nav/UI). Returns current
+   * world state, or null if dependencies aren't ready.
+   */
+  function openFullscreen(onExit) {
+    if (!hasData() || !hasAssets()) {
+      warnMissingDeps('openFullscreen');
+      return null;
+    }
+
+    if (fullscreenHost) {
+      render(fullscreenHost);
+      return getState();
+    }
+
+    fullscreenOnExit = (typeof onExit === 'function') ? onExit : null;
+
+    fullscreenHost = document.createElement('div');
+    fullscreenHost.className = FULLSCREEN_HOST_CLASS;
+    fullscreenHost.setAttribute('data-myworld-fullscreen', 'true');
+
+    const exitBtn = document.createElement('button');
+    exitBtn.type = 'button';
+    exitBtn.className = 'myworld-exit-btn';
+    exitBtn.setAttribute('aria-label', 'Leave My World');
+    exitBtn.textContent = '\u2715';
+    exitBtn.addEventListener('click', closeFullscreen);
+
+    document.body.appendChild(fullscreenHost);
+    render(fullscreenHost);
+    fullscreenHost.appendChild(exitBtn);
+
+    fullscreenKeyHandler = function (e) {
+      if (e.key === 'Escape') closeFullscreen();
+    };
+    document.addEventListener('keydown', fullscreenKeyHandler);
+
+    mountedContainer = fullscreenHost;
+    return getState();
+  }
+
+  /** Tears down the fullscreen takeover, if open. Idempotent. */
+  function closeFullscreen() {
+    if (!fullscreenHost) return;
+
+    if (fullscreenKeyHandler) {
+      document.removeEventListener('keydown', fullscreenKeyHandler);
+      fullscreenKeyHandler = null;
+    }
+
+    const host = fullscreenHost;
+    fullscreenHost = null;
+    if (mountedContainer === host) mountedContainer = null;
+    host.remove();
+
+    const cb = fullscreenOnExit;
+    fullscreenOnExit = null;
+    if (cb) cb();
+  }
+
   /** Reads current world state without side effects on the DOM. */
   function loadState() {
     if (!hasData()) { warnMissingDeps('loadState'); return null; }
@@ -633,6 +717,11 @@ const MyWorld = (function () {
     getState,
     save,
     refresh,
+
+    // fullscreen takeover
+    openFullscreen,
+    closeFullscreen,
+    isFullscreen,
 
     // rendering
     render,
