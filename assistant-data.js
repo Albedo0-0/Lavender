@@ -116,9 +116,9 @@ const AssistantData = (function () {
 
   function getTodayTimeline() {
     const today = todayStr();
-    const tasks = PlannerData.getAllTasks();
-    const recs = TimeEngine.getRecordsForDate(today).filter(function (r) { return r.actualStart; });
-    const breaks = (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === today; });
+    const tasks = PlannerData.getAllTasks() || {};
+    const recs = (TimeEngine.getRecordsForDate(today) || []).filter(function (r) { return r && r.actualStart; });
+    const breaks = (State.get().timeEngineBreaks || []).filter(function (b) { return b && b.date === today; });
     const items = [];
     recs.forEach(function (rec) {
       const task = rec.taskId ? tasks[rec.taskId] : null;
