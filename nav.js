@@ -1,7 +1,7 @@
 // nav.js — switches between empty screen placeholders. Loaded after state.js.
 
 const Nav = (function () {
-  const screens = ['calendar', 'journal', 'library', 'study', 'progress'];
+  const screens = ['calendar', 'journal', 'library', 'study', 'progress', 'myworld'];
   function switchTo(screenName) {
     if (screenName === 'library' && typeof Library !== 'undefined' && Library.render) Library.render();
     screens.forEach(function (name) {
@@ -25,6 +25,10 @@ const Nav = (function () {
     if (screenName === 'study' && typeof Study !== 'undefined' && Study.render) Study.render();
     if (screenName === 'journal' && typeof Journal !== 'undefined' && Journal.enterViaNav) Journal.enterViaNav();
     if (screenName === 'progress' && typeof Progress !== 'undefined' && Progress.render) Progress.render();
+    if (screenName === 'myworld' && typeof MyWorld !== 'undefined' && MyWorld.init) {
+      const mwContainer = document.getElementById('screen-myworld');
+      if (mwContainer) MyWorld.init(mwContainer);
+    }
   }
   function init() {
     document.querySelectorAll('.nav-btn').forEach(function (btn) {
