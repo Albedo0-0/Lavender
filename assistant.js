@@ -48,13 +48,19 @@ const Assistant = (function () {
   }
 
   function routeTo(key) {
-    if (key === 'store') return openStore();
-    if (key === 'timeline') return openTimeline();
-    if (key === 'tomorrow') return openTomorrow();
-    if (key === 'leftoff') return openWhereLeftOff();
-    if (key === 'search') return openSearch();
-    if (key === 'summary') return openSummary(AssistantData.todayStr());
-    if (key === 'alarms') return openAlarms();
+    try {
+      if (key === 'store') return openStore();
+      if (key === 'timeline') return openTimeline();
+      if (key === 'tomorrow') return openTomorrow();
+      if (key === 'leftoff') return openWhereLeftOff();
+      if (key === 'search') return openSearch();
+      if (key === 'summary') return openSummary(AssistantData.todayStr());
+      if (key === 'alarms') return openAlarms();
+    } catch (err) {
+      console.error('Assistant.routeTo failed for', key, err);
+      Modal.open(backBtnHtml() + '<h3 class="section-title">' + key + '</h3><div class="empty-state">Couldn\'t load this right now.</div>');
+      wireBack();
+    }
   }
 
   function backBtnHtml() { return '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>'; }
