@@ -196,6 +196,10 @@ const MyWorld = (function () {
     maxCanopyRadius: 100
   };
 
+  function trunkGradientId(params) {
+    return 'mwTrunkGrad' + ((params && params.seed) ? params.seed : '0');
+  }
+
   function buildTrunkPath(stageDef, params, rand) {
     const height = SCENE.maxTrunkHeight * stageDef.trunkHeightRatio;
     if (height <= 0) return '';
@@ -227,8 +231,8 @@ const MyWorld = (function () {
     const leftTop = topX - halfTop;
     const rightTop = topX + halfTop;
 
-    return (
-      '<path class="myworld-trunk" ' +
+    let svg =
+      '<path class="myworld-trunk" fill="url(#' + trunkGradientId(params) + ')" ' +
       'd="M ' + leftBase.toFixed(1) + ' ' + baseY.toFixed(1) +
       ' C ' + (c1x - halfBase * 0.6).toFixed(1) + ' ' + c1y.toFixed(1) +
       ' ' + (c2x - halfTop * 0.6).toFixed(1) + ' ' + c2y.toFixed(1) +
@@ -237,14 +241,34 @@ const MyWorld = (function () {
       ' C ' + (c2x + halfTop * 0.6).toFixed(1) + ' ' + c2y.toFixed(1) +
       ' ' + (c1x + halfBase * 0.6).toFixed(1) + ' ' + c1y.toFixed(1) +
       ' ' + rightBase.toFixed(1) + ' ' + baseY.toFixed(1) +
-      ' Z" />'
-    );
+      ' Z" />';
+
+    // Faint bark texture: thin, low-opacity strokes loosely following
+    // the trunk's own curve. Only once there's a real trunk to read
+    // (keeps early sprouts clean), always strokes (never fills) so
+    // there's no risk of them reading as a separate broken shape.
+    if (thickness >= 5) {
+      const barkLines = thickness >= 12 ? 2 : 1;
+      for (let i = 0; i < barkLines; i++) {
+        const side = i === 0 ? -1 : 1;
+        const off = halfBase * (0.25 + rand() * 0.2) * side;
+        const offTop = halfTop * (0.2 + rand() * 0.15) * side;
+        svg +=
+          '<path class="myworld-bark-line" d="M ' + (baseX + off).toFixed(1) + ' ' + (baseY - 3).toFixed(1) +
+          ' C ' + (c1x + off * 0.7).toFixed(1) + ' ' + c1y.toFixed(1) +
+          ' ' + (c2x + offTop * 0.7).toFixed(1) + ' ' + c2y.toFixed(1) +
+          ' ' + (topX + offTop).toFixed(1) + ' ' + (topY + 6).toFixed(1) + '" />';
+      }
+    }
+
+    return svg;
   }
 
   function buildBranches(stageDef, params, rand, topX, topY, height) {
     if (!stageDef.canopyPresent || stageDef.branchCountBase <= 0) return '';
 
     const count = Math.max(0, Math.round(stageDef.branchCountBase * params.branchDensity));
+    const addTwigs = stageDef.family === 'tree' || stageDef.family === 'elder';
     let svg = '';
 
     for (let i = 0; i < count; i++) {
@@ -266,6 +290,26 @@ const MyWorld = (function () {
         '<path class="myworld-branch" d="M ' + startX.toFixed(1) + ' ' + startY.toFixed(1) +
         ' Q ' + ctrlX.toFixed(1) + ' ' + ctrlY.toFixed(1) +
         ' ' + endX.toFixed(1) + ' ' + endY.toFixed(1) + '" />';
+
+      // Subtle maturity detail: one or two small secondary twigs off
+      // the main limb, only once the tree is mature enough that a
+      // single bare line would read as too sparse. Growth rate and
+      // thresholds are untouched — this is cosmetic only.
+      if (addTwigs) {
+        const twigCount = 1 + (i % 2);
+        for (let j = 0; j < twigCount; j++) {
+          const tw = 0.4 + rand() * 0.4;
+          const twigStartX = lerp(startX, ctrlX, tw);
+          const twigStartY = lerp(startY, ctrlY, tw);
+          const twigAngle = angle + (rand() - 0.5) * 1.1;
+          const twigLen = len * (0.2 + rand() * 0.18);
+          const twigEndX = twigStartX + Math.sin(twigAngle) * twigLen;
+          const twigEndY = twigStartY - Math.cos(twigAngle) * twigLen * 0.6;
+          svg +=
+            '<path class="myworld-twig" d="M ' + twigStartX.toFixed(1) + ' ' + twigStartY.toFixed(1) +
+            ' L ' + twigEndX.toFixed(1) + ' ' + twigEndY.toFixed(1) + '" />';
+        }
+      }
     }
 
     return svg;
@@ -285,6 +329,22 @@ const MyWorld = (function () {
     const centerY = topY - radius * (0.5 + shapeFamily.verticalBias);
 
     let svg = '<g class="myworld-canopy">';
+
+    // Depth pass: a few larger, darker, low-opacity blobs drawn first
+    // (so they sit visually behind the main canopy) to suggest
+    // interior shadow rather than a flat leaf silhouette.
+    const shadowColor = palette.shades[palette.shades.length - 1];
+    const shadowCount = Math.max(1, Math.round(blobCount * 0.4));
+    for (let i = 0; i < shadowCount; i++) {
+      const angle = (i / shadowCount) * Math.PI * 2 + rand() * 0.6;
+      const spread = radius * shapeFamily.blobSpread * (0.35 + rand() * 0.45);
+      const bx = centerX + Math.cos(angle) * spread * (0.5 + params.asymmetry * 0.2) + radius * 0.05;
+      const by = centerY + Math.sin(angle) * spread * 0.65 + radius * 0.07;
+      const br = radius * (0.3 + rand() * 0.2);
+      svg +=
+        '<circle class="myworld-leaf-shadow" cx="' + bx.toFixed(1) + '" cy="' + by.toFixed(1) +
+        '" r="' + br.toFixed(1) + '" fill="' + shadowColor + '" opacity="0.4" />';
+    }
 
     for (let i = 0; i < blobCount; i++) {
       const angle = (i / blobCount) * Math.PI * 2 + rand() * 0.6;
@@ -372,6 +432,18 @@ const MyWorld = (function () {
       '" viewBox="0 0 ' + SCENE.viewBoxWidth + ' ' + SCENE.viewBoxHeight +
       '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet">';
 
+    // Trunk gradient only — a fill clipped to the trunk's own already-
+    // proven silhouette, so there's no risk of new geometry. The id is
+    // seed-scoped so two tree instances never collide.
+    svg +=
+      '<defs>' +
+      '<linearGradient id="' + trunkGradientId(params) + '" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0%" style="stop-color:var(--mw-trunk-shade)" />' +
+      '<stop offset="42%" style="stop-color:var(--mw-trunk-fill)" />' +
+      '<stop offset="100%" style="stop-color:var(--mw-trunk-highlight)" />' +
+      '</linearGradient>' +
+      '</defs>';
+
     svg += buildRootFlare(stageDef, params, rand);
     svg += buildTrunkPath(stageDef, params, rand);
     svg += buildBranches(stageDef, params, rand, topX, topY, height);
@@ -379,6 +451,49 @@ const MyWorld = (function () {
 
     svg += '</svg>';
     return svg;
+  }
+
+  // -----------------------------------------------------------------
+  // Ambient decoration (sky/ground life). Pure atmosphere — not part
+  // of persisted world state, not tied to growth/rewards. Positions
+  // are fixed/hand-placed (no Math.random(), matching this file's
+  // determinism rule) so the scene never jitters between renders.
+  // -----------------------------------------------------------------
+
+  const FIREFLY_SPOTS = [
+    { x: 16, y: 76, delay: -2,  dur: 24, size: 1.0 },
+    { x: 30, y: 64, delay: -9,  dur: 20, size: 0.8 },
+    { x: 47, y: 82, delay: -14, dur: 27, size: 1.1 },
+    { x: 62, y: 70, delay: -4,  dur: 23, size: 0.85 },
+    { x: 76, y: 80, delay: -19, dur: 29, size: 1.0 },
+    { x: 25, y: 88, delay: -11, dur: 21, size: 0.7 },
+    { x: 84, y: 65, delay: -6,  dur: 25, size: 0.9 }
+  ];
+
+  const PARTICLE_SPOTS = [
+    { x: 38, y: 48, delay: -3,  dur: 34 },
+    { x: 57, y: 38, delay: -15, dur: 40 },
+    { x: 21, y: 54, delay: -22, dur: 31 },
+    { x: 71, y: 44, delay: -8,  dur: 37 }
+  ];
+
+  function buildAmbientMarkup() {
+    let html = '';
+    for (let i = 0; i < FIREFLY_SPOTS.length; i++) {
+      const f = FIREFLY_SPOTS[i];
+      html +=
+        '<span class="myworld-firefly" style="left:' + f.x + '%; top:' + f.y +
+        '%; --mw-fly-delay:' + f.delay + 's; --mw-fly-dur:' + f.dur +
+        's; --mw-fly-scale:' + f.size + ';"></span>';
+    }
+    for (let i = 0; i < PARTICLE_SPOTS.length; i++) {
+      const p = PARTICLE_SPOTS[i];
+      html +=
+        '<span class="myworld-particle" style="left:' + p.x + '%; top:' + p.y +
+        '%; --mw-particle-delay:' + p.delay + 's; --mw-particle-dur:' + p.dur + 's;"></span>';
+    }
+    html += '<span class="myworld-bird" aria-hidden="true"></span>';
+    return html;
   }
 
   // -----------------------------------------------------------------
@@ -400,12 +515,22 @@ const MyWorld = (function () {
     root.innerHTML =
       '<div class="myworld-sky">' +
       '  <div class="myworld-stars-layer" data-myworld-layer="stars"></div>' +
-      '  <div class="myworld-clouds-layer" data-myworld-layer="clouds"></div>' +
+      '  <div class="myworld-moon" aria-hidden="true"></div>' +
+      '</div>' +
+      '<div class="myworld-backdrop" aria-hidden="true">' +
+      '  <div class="myworld-hill myworld-hill--far"></div>' +
+      '  <div class="myworld-hill myworld-hill--near"></div>' +
+      '  <div class="myworld-grove myworld-grove--left"></div>' +
+      '  <div class="myworld-grove myworld-grove--right"></div>' +
       '</div>' +
       '<div class="myworld-scene">' +
+      '  <div class="myworld-ground"><div class="myworld-grass" aria-hidden="true"></div></div>' +
+      '  <div class="myworld-tree-shadow" aria-hidden="true"></div>' +
       '  <div class="myworld-tree-layer" data-myworld-layer="tree"></div>' +
       '  <div class="myworld-environment-layer" data-myworld-layer="environment"></div>' +
-      '  <div class="myworld-ground"></div>' +
+      '  <div class="myworld-ambient-layer" data-myworld-layer="ambient" aria-hidden="true">' +
+      buildAmbientMarkup() +
+      '  </div>' +
       '</div>';
 
     container.innerHTML = '';
@@ -421,9 +546,20 @@ const MyWorld = (function () {
       treeLayer.innerHTML = buildTreeSVG(world);
     }
 
+    // Lets CSS evolve the world's ambient lighting subtly with the
+    // tree's maturity (e.g. moon glow) without polling every render.
+    if (hasAssets()) {
+      const stageDef = MyWorldAssets.getStageByIndex(world.tree.stageIndex);
+      if (stageDef && stageDef.family) {
+        root.setAttribute('data-myworld-stage-family', stageDef.family);
+      }
+    }
+
     // Environment layer intentionally left empty for now — future
     // phases will populate it from world.environment using the
-    // structural placeholders defined in myworld-assets.js.
+    // structural placeholders defined in myworld-assets.js. Ambient
+    // sky/backdrop/ground decoration lives in the static markup from
+    // ensureDom() instead, since it isn't part of persisted state.
   }
 
   /** Renders the tree only, into a specific container (no scene chrome). */
