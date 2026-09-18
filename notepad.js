@@ -36,6 +36,43 @@ const Notepad = (function () {
     const overlay = document.getElementById('modal-overlay');
     if (panel && overlay && panel.parentElement !== overlay) overlay.appendChild(panel);
   }
+
+  // Tears the hanging panel down whenever the modal it lives inside stops being Notepad's —
+  // whether Notepad's own modal was closed (outside click / Escape) or another module opened
+  // a different modal on top without going through Notepad's own close path.
+  function closeHangingPanel() {
+    if (!hangingPanelOpen) return;
+    hangingPanelOpen = false;
+    hangingPanelOpenFolder = null;
+    const panel = document.getElementById('notepad-hanging-panel');
+    if (panel) {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+    const mc = document.getElementById('modal-content');
+    if (mc) mc.classList.remove('notepad-shifted');
+  }
+
+  let panelLifecycleObserversAttached = false;
+  function ensurePanelLifecycleObservers() {
+    if (panelLifecycleObserversAttached) return;
+    const overlay = document.getElementById('modal-overlay');
+    const content = document.getElementById('modal-content');
+    if (!overlay || !content || typeof MutationObserver === 'undefined') return;
+    panelLifecycleObserversAttached = true;
+
+    // Modal fully closed (outside click / Escape / programmatic Modal.close()).
+    new MutationObserver(function () {
+      if (overlay.style.display === 'none') closeHangingPanel();
+    }).observe(overlay, { attributes: true, attributeFilter: ['style'] });
+
+    // Modal content swapped for a different module's modal without Notepad closing first.
+    new MutationObserver(function () {
+      const stillNotepad = content.firstElementChild && content.firstElementChild.id === 'notepad-modal';
+      if (!stillNotepad) closeHangingPanel();
+    }).observe(content, { childList: true });
+  }
+
   function uid() { return 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
   // ---- data helpers (direct State access — assistantNotes is Notepad-owned per state.js) ----
@@ -570,6 +607,7 @@ const Notepad = (function () {
   function init() {
     const btn = document.getElementById('notepad-icon');
     if (btn) btn.addEventListener('click', handleIconClick);
+    ensurePanelLifecycleObservers();
   }
 
   return { init: init, open: open };
