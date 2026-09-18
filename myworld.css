@@ -290,4 +290,395 @@
   right: 0;
   top: -6px;
   height: 12px;
-  pointer-events:
+  pointer-events: none;
+  opacity: 0.7;
+  background-image: repeating-linear-gradient(
+    100deg,
+    var(--mw-grass-blade) 0px,
+    var(--mw-grass-blade) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+}
+
+/* ------------------------------------------------------------------
+ * Fullscreen takeover host
+ *
+ * Same pattern as #global-break-takeover: a fixed, full-viewport
+ * overlay above the app shell. myworld.js's openFullscreen()/
+ * closeFullscreen() toggle this class on the mount container — no
+ * browser Fullscreen API involved, purely a CSS/DOM takeover.
+ * ---------------------------------------------------------------- */
+
+.myworld-fullscreen-host {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background: var(--mw-sky-top, #171b3a);
+}
+
+.myworld-fullscreen-host .myworld-root {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.myworld-exit-btn {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  right: max(14px, env(safe-area-inset-right, 14px));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(10, 12, 26, 0.4);
+  color: var(--mw-star, #f4f1ff);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.myworld-exit-btn:hover,
+.myworld-exit-btn:focus-visible {
+  background: rgba(10, 12, 26, 0.6);
+  transform: scale(1.05);
+}
+
+.myworld-exit-btn:active {
+  transform: scale(0.96);
+}
+
+/* ------------------------------------------------------------------
+ * Atmosphere — haze layer + vignette + tree-anchored light pooling.
+ * ---------------------------------------------------------------- */
+
+.myworld-haze {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: 18%;
+  height: 30%;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 100% at 50% 100%, var(--mw-mist), transparent 75%);
+  opacity: 0.55;
+  filter: blur(1px);
+  animation: myworld-mist-drift 75s ease-in-out infinite reverse;
+}
+
+.myworld-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(ellipse 80% 90% at 50% 55%, transparent 55%, var(--mw-vignette) 100%);
+}
+
+.myworld-tree-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 26%;
+  width: 46%;
+  height: 7%;
+  z-index: 2;
+  pointer-events: none;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--mw-tree-shadow), transparent 72%);
+  filter: blur(3px);
+  transition: width var(--mw-transition-slow), opacity var(--mw-transition-slow);
+}
+
+.myworld-root[data-myworld-stage-family="seed"] .myworld-tree-shadow,
+.myworld-root[data-myworld-stage-family="sprout"] .myworld-tree-shadow {
+  width: 20%;
+  opacity: 0.5;
+}
+
+.myworld-root[data-myworld-stage-family="sapling"] .myworld-tree-shadow {
+  width: 32%;
+  opacity: 0.75;
+}
+
+.myworld-root[data-myworld-stage-family="tree"] .myworld-tree-shadow {
+  width: 46%;
+  opacity: 0.9;
+}
+
+.myworld-root[data-myworld-stage-family="elder"] .myworld-tree-shadow {
+  width: 58%;
+  opacity: 1;
+  background: radial-gradient(ellipse at center, var(--mw-tree-shadow), var(--mw-tree-glow-pool) 55%, transparent 75%);
+}
+
+/* ------------------------------------------------------------------
+ * Tree layer host + SVG-level structure/lighting.
+ * ---------------------------------------------------------------- */
+
+.myworld-tree-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.myworld-tree-svg {
+  width: min(92%, 680px);
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 0 transparent);
+  transition: filter var(--mw-transition-slow);
+}
+
+.myworld-tree--seed .myworld-tree-svg,
+.myworld-tree--sprout .myworld-tree-svg {
+  filter: drop-shadow(0 0 3px rgba(159, 196, 138, 0.12));
+}
+
+.myworld-tree--sapling .myworld-tree-svg {
+  filter: drop-shadow(0 0 5px rgba(159, 196, 138, 0.16));
+}
+
+.myworld-tree--tree .myworld-tree-svg {
+  filter: drop-shadow(0 0 9px rgba(212, 226, 170, 0.22)) drop-shadow(0 0 22px rgba(244, 226, 154, 0.10));
+  animation: myworld-tree-breathe 9s ease-in-out infinite;
+}
+
+.myworld-tree--elder .myworld-tree-svg {
+  filter: drop-shadow(0 0 12px rgba(244, 226, 154, 0.30)) drop-shadow(0 0 34px rgba(217, 199, 232, 0.16));
+  animation: myworld-tree-breathe 11s ease-in-out infinite;
+}
+
+@keyframes myworld-tree-breathe {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.035) saturate(1.05); }
+}
+
+.myworld-trunk {
+  stroke: var(--mw-trunk-shade);
+  stroke-width: 0.6;
+}
+
+.myworld-bark-line {
+  fill: none;
+  stroke: var(--mw-trunk-shade);
+  stroke-width: 0.6;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+
+.myworld-root-flare .myworld-root {
+  fill: none;
+  stroke: var(--mw-root-stroke);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.myworld-branch {
+  fill: none;
+  stroke: var(--mw-branch-stroke);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.myworld-twig {
+  fill: none;
+  stroke: var(--mw-branch-stroke);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
+.myworld-canopy {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: myworld-canopy-sway 20s ease-in-out infinite;
+}
+
+.myworld-tree--sprout .myworld-canopy { animation-duration: 17s; }
+.myworld-tree--sapling .myworld-canopy { animation-duration: 20s; }
+.myworld-tree--tree .myworld-canopy { animation-duration: 23s; }
+.myworld-tree--elder .myworld-canopy { animation-duration: 27s; }
+
+@keyframes myworld-canopy-sway {
+  0%, 100% { transform: rotate(-0.4deg); }
+  50%      { transform: rotate(0.4deg); }
+}
+
+.myworld-leaf-blob,
+.myworld-leaf-shadow,
+.myworld-leaf-highlight {
+  stroke: none;
+}
+
+.myworld-blossom {
+  stroke: none;
+  opacity: 0.9;
+}
+
+.myworld-tree--elder .myworld-canopy {
+  animation-name: myworld-canopy-sway, myworld-canopy-pulse;
+  animation-duration: 27s, 46s;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+}
+
+@keyframes myworld-canopy-pulse {
+  0%, 88%, 100% { filter: brightness(1); }
+  92%           { filter: brightness(1.08); }
+}
+
+/* ------------------------------------------------------------------
+ * Ambient layer — fireflies, floating motes, distant lights, bird.
+ * ---------------------------------------------------------------- */
+
+.myworld-ambient-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.myworld-firefly {
+  position: absolute;
+  width: calc(5px * var(--mw-fly-scale, 1));
+  height: calc(5px * var(--mw-fly-scale, 1));
+  margin: calc(-2.5px * var(--mw-fly-scale, 1)) 0 0 calc(-2.5px * var(--mw-fly-scale, 1));
+  border-radius: 50%;
+  background: var(--mw-firefly);
+  box-shadow:
+    0 0 6px 2px var(--mw-firefly-glow),
+    0 0 14px 5px rgba(244, 226, 154, 0.35);
+  opacity: 0;
+  animation: myworld-firefly-drift var(--mw-fly-dur, 24s) ease-in-out infinite;
+  animation-delay: var(--mw-fly-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@keyframes myworld-firefly-drift {
+  0%   { transform: translate(0, 0) scale(0.85); opacity: 0; }
+  8%   { opacity: 0.9; }
+  25%  { transform: translate(6px, -10px) scale(1); opacity: 0.55; }
+  42%  { transform: translate(-4px, -18px) scale(1.05); opacity: 0.95; }
+  60%  { transform: translate(9px, -8px) scale(0.9); opacity: 0.4; }
+  78%  { transform: translate(-6px, -20px) scale(1); opacity: 0.85; }
+  92%  { opacity: 0.2; }
+  100% { transform: translate(0, -26px) scale(0.85); opacity: 0; }
+}
+
+.myworld-particle {
+  position: absolute;
+  width: 2.5px;
+  height: 2.5px;
+  margin: -1.25px 0 0 -1.25px;
+  border-radius: 50%;
+  background: var(--mw-particle);
+  box-shadow: 0 0 4px 1px rgba(230, 232, 255, 0.3);
+  opacity: 0;
+  animation: myworld-particle-drift var(--mw-particle-dur, 36s) linear infinite;
+  animation-delay: var(--mw-particle-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@keyframes myworld-particle-drift {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  10%  { opacity: 0.5; }
+  50%  { transform: translate(-14px, -40px); opacity: 0.7; }
+  90%  { opacity: 0.15; }
+  100% { transform: translate(10px, -78px); opacity: 0; }
+}
+
+.myworld-firefly:nth-of-type(3n+1) {
+  filter: blur(0.2px);
+}
+
+.myworld-firefly:nth-of-type(5n) {
+  width: calc(7px * var(--mw-fly-scale, 1));
+  height: calc(7px * var(--mw-fly-scale, 1));
+  margin-left: calc(-3.5px * var(--mw-fly-scale, 1));
+  margin-top: calc(-3.5px * var(--mw-fly-scale, 1));
+  filter: blur(0.5px);
+  box-shadow:
+    0 0 10px 3px var(--mw-firefly-glow),
+    0 0 22px 8px rgba(244, 226, 154, 0.28);
+}
+
+.myworld-bird {
+  position: absolute;
+  top: 22%;
+  left: -6%;
+  width: 10px;
+  height: 4px;
+  background: transparent;
+  opacity: 0;
+  animation: myworld-bird-cross 95s linear infinite;
+  animation-delay: -30s;
+}
+
+.myworld-bird::before,
+.myworld-bird::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-top: 1.4px solid var(--mw-bird);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+.myworld-bird::before {
+  left: 0;
+  transform: rotate(-18deg);
+}
+
+.myworld-bird::after {
+  left: 4px;
+  transform: rotate(18deg) scaleX(-1);
+}
+
+@keyframes myworld-bird-cross {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  4%   { opacity: 0.6; }
+  48%  { transform: translate(60vw, -4vh); opacity: 0.6; }
+  55%  { opacity: 0; }
+  100% { transform: translate(0, 0); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .myworld-canopy,
+  .myworld-tree-svg,
+  .myworld-firefly,
+  .myworld-particle,
+  .myworld-bird,
+  .myworld-hill,
+  .myworld-sky::after,
+  .myworld-haze,
+  .myworld-stars-layer {
+    animation: none !important;
+  }
+
+  .myworld-firefly,
+  .myworld-particle {
+    opacity: 0.6;
+  }
+}
