@@ -840,12 +840,16 @@ function openBreakTimelinePanel() {
   function init() {
     Notify.requestPermission();
     if (typeof StudyTemplatesData !== 'undefined') StudyTemplatesData.seedDefaultIfMissing();
-    const wpLayout = document.getElementById('study-layout');
+     const wpLayout = document.getElementById('study-layout');
     if (wpLayout && !wpLayout.dataset.wpNavBound) {
       wpLayout.dataset.wpNavBound = '1';
+      let wpNavLock = false;
       wpLayout.addEventListener('click', function (e) {
         const btn = e.target.closest('#study-wallpaper-prev, #study-wallpaper-next');
         if (!btn || typeof StudyWallpaper === 'undefined') return;
+        if (wpNavLock) return;
+        wpNavLock = true;
+        requestAnimationFrame(function () { wpNavLock = false; });
         if (btn.id === 'study-wallpaper-prev') StudyWallpaper.prev();
         else StudyWallpaper.next();
       });
