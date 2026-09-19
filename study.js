@@ -551,26 +551,36 @@ function renderClock() {
     const container = document.getElementById('global-break-takeover');
     if (!container) return;
     const gb = TimeEngine.getGlobalBreak();
-    if (!gb || !gb.active) { container.style.display = 'none'; return; }
+    if (!gb || !gb.active) { container.style.display = 'none'; container.dataset.built = ''; return; }
     const remainingMin = Math.max(0, Math.ceil((gb.resumeAt - Date.now()) / 60000));
     const settings = State.get().settings || {};
     container.style.display = 'flex';
     container.style.backgroundImage = settings.breakWallpaper ? 'url(' + settings.breakWallpaper + ')' : 'none';
-    container.innerHTML =
-      '<div class="break-takeover-inner">' +
-        '<h2>Break</h2>' +
-        '<div class="break-takeover-remaining">' + remainingMin + 'm left</div>' +
-        '<div class="break-takeover-actions">' +
-          '<button id="break-takeover-add">Add Time</button>' +
-          '<button id="break-takeover-end">End Break</button>' +
-        '</div>' +
-      '</div>';
-    document.getElementById('break-takeover-add').addEventListener('click', openAddBreakTimeModal);
-    document.getElementById('break-takeover-end').addEventListener('click', function () {
-      TimeEngine.endGlobalBreak();
-      renderBreakTakeover();
-      renderBreakStatus();
-    });
+    // Only build the DOM once per break (guarded by dataset.built) — rebuilding every
+    // tick on innerHTML was what caused the continuous reload/glitch. Every subsequent
+    // tick just updates the remaining-time text in place.
+    if (container.dataset.built !== gb.startedAt + '') {
+      container.dataset.built = gb.startedAt + '';
+      container.innerHTML =
+        '<div class="break-takeover-inner">' +
+          '<h2>Break</h2>' +
+          '<div class="break-takeover-remaining" id="break-takeover-remaining">' + remainingMin + 'm left</div>' +
+          '<div class="break-takeover-actions">' +
+            '<button id="break-takeover-add">Add Time</button>' +
+            '<button id="break-takeover-end">End Break</button>' +
+          '</div>' +
+        '</div>';
+      document.getElementById('break-takeover-add').addEventListener('click', openAddBreakTimeModal);
+      document.getElementById('break-takeover-end').addEventListener('click', function () {
+        TimeEngine.endGlobalBreak();
+        container.dataset.built = '';
+        renderBreakTakeover();
+        renderBreakStatus();
+      });
+    } else {
+      const remainingEl = document.getElementById('break-takeover-remaining');
+      if (remainingEl) remainingEl.textContent = remainingMin + 'm left';
+    }
   }
 
   function openAddBreakTimeModal() {
