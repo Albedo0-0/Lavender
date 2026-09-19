@@ -21,6 +21,7 @@ const MyWorld = (function () {
   const EXIT_CLASS = 'myworld-exit-btn';
   const PLACEHOLDER_BG = '#232a52';
   const HORIZON_RATIO = 0.66;
+  const GROUND_RATIO = 0.74;
 
   // Sky palette keyframes by local hour (top / mid / horizon). Last key wraps to first.
   const SKY_KEYS = [
@@ -398,6 +399,338 @@ const MyWorld = (function () {
     ctx.restore();
   }
 
+  // ---------------------------------------------------------------------
+  // Terrain: far hills, mid hills + tree line, cross-section ground, pond (Phase 3)
+  // ---------------------------------------------------------------------
+  function mkPal(list) {
+    return list.map(function (p) { return [hexToRgb(p[0]), hexToRgb(p[1])]; });
+  }
+
+  const PAL_FAR = mkPal([
+    ['#7f9f8f', '#2c3a5c'], ['#5f8272', '#1f2a48'], ['#4c6c60', '#182240']
+  ]);
+
+  const PAL_MID = mkPal([
+    ['#5f9354', '#264566'], ['#4a7c48', '#1a3450'], ['#6aa652', '#22485a'],
+    ['#2c4f3a', '#122238'], ['#437250', '#1c3654']
+  ]);
+
+  const PAL_GROUND = mkPal([
+    ['#8ed05a', '#3a7a66'], ['#5fae44', '#2a6058'], ['#3f8a3a', '#1e4a4c'], ['#2f6e33', '#173e44'],
+    ['#b98452', '#5a4560'], ['#9a6a40', '#4a3852'], ['#7c5232', '#3a2c46'], ['#623f28', '#2e2338'],
+    ['#8e93a0', '#4a5078'], ['#73788a', '#3a4066'], ['#5c6174', '#2e3356'], ['#464a5e', '#232847'],
+    ['#5a3a22', '#2a1f30'], ['#a9a5a0', '#5c5a78'],
+    ['#f2c94c', '#d8b050'], ['#5cc8f0', '#5aa8e8'], ['#e88ac0', '#c878b8']
+  ]);
+
+  let terrain = null;
+  let groundY = 0;
+  let surf = null;
+  let pond = null;
+
+  function hash2(a, b) {
+    let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function vnoise(x, s, salt) {
+    const p = x / s;
+    const i = Math.floor(p);
+    const f = p - i;
+    return lerp(hash2(i, salt), hash2(i + 1, salt), f * f * (3 - 2 * f));
+  }
+
+  function newLayer() {
+    return { map: new Uint8Array(W * H), canvas: null, g: null, img: null };
+  }
+
+  function setPx(map, x, y, v) {
+    if (x >= 0 && x < W && y >= 0 && y < H) map[y * W + x] = v;
+  }
+
+  function toneIdx(xr, y) {
+    const h = hash2(Math.floor((xr + 4096) / 8) * 131 + Math.floor(y / 8), 91);
+    let t = h < 0.24 ? 0 : (h > 0.76 ? 2 : 1);
+    if (hash2(xr * 3 + y * 17, 92) < 0.06) t = t === 1 ? 2 : 1;
+    return t;
+  }
+
+  function drawTreeShape(map, tx, by, h, conifer) {
+    const y0 = by - h;
+    for (let r = 0; r < h; r++) {
+      const hw = conifer
+        ? Math.min(2, Math.floor((r + 1) / 3))
+        : Math.round((h > 5 ? 3 : 2) * Math.sin(Math.PI * (r + 0.5) / h));
+      for (let dx = -hw; dx <= hw; dx++) {
+        setPx(map, tx + dx, y0 + r, (dx === -hw && hw > 0 && r > 0 && r % 2 === 0) ? 5 : 4);
+      }
+    }
+  }
+
+  function buildHills(cx) {
+    const far = terrain.far.map;
+    const mid = terrain.mid.map;
+    const bottom = Math.min(H, groundY + 9);
+    const midTops = new Int16Array(W);
+    let prevTop = 0;
+
+    for (let x = 0; x < W; x++) {
+      const xr = x - cx;
+      const fTop = Math.round(horizonY - 6 - H * 0.16 *
+        (0.55 * vnoise(xr, 74, 11) + 0.3 * vnoise(xr, 29, 12) + 0.15 * vnoise(xr, 11, 13)));
+      const span = Math.max(1, bottom - fTop);
+      for (let y = Math.max(0, fTop); y < bottom; y++) {
+        const dep = (y - fTop) / span;
+        let v;
+        if (y === fTop || (y === fTop + 1 && fTop < prevTop)) v = 1;
+        else if (dep > 0.72 || (dep > 0.64 && ((x + y) & 1))) v = 3;
+        else v = 2;
+        far[y * W + x] = v;
+      }
+      prevTop = fTop;
+
+      const mTop = Math.round(groundY - 6 - H * 0.11 *
+        (0.6 * vnoise(xr, 48, 21) + 0.3 * vnoise(xr, 18, 22) + 0.1 * vnoise(xr, 7, 23)));
+      midTops[x] = mTop;
+      for (let y = Math.max(0, mTop); y < bottom; y++) {
+        let v = 2;
+        if (y === mTop) v = 1;
+        else if (y >= groundY - 3) v = 3;
+        else if (y === groundY - 4 && (x & 1)) v = 3;
+        else if (hash2(xr * 7 + y, 24) < 0.05) v = 1;
+        mid[y * W + x] = v;
+      }
+    }
+
+    for (let k = Math.floor(-cx / 5) - 1; k <= Math.ceil((W - cx) / 5) + 1; k++) {
+      if (hash2(k, 71) > 0.72) continue;
+      const tx = cx + k * 5 + Math.floor(hash2(k, 72) * 5);
+      if (tx < 0 || tx >= W) continue;
+      const conifer = hash2(k, 74) < 0.62;
+      let h = 4 + Math.floor(hash2(k, 73) * 6);
+      if (!conifer) h = Math.min(h, 7);
+      drawTreeShape(mid, tx, midTops[tx] + 1, h, conifer);
+    }
+  }
+
+  function buildGround(cx) {
+    const map = terrain.ground.map;
+    const bd = new Uint8Array(W);
+    surf = new Int16Array(W);
+    pond = null;
+
+    if (W >= 90) {
+      const pw = clampNum(Math.round(W * 0.17), 16, 44, 16);
+      const half = pw / 2;
+      const pcx = Math.min(W - Math.ceil(half) - 6, cx + Math.round(W * 0.29));
+      pond = { x0: Math.round(pcx - half), x1: Math.round(pcx + half), cx: pcx, half: half };
+    }
+
+    for (let x = 0; x < W; x++) {
+      const xr = x - cx;
+      let u = (vnoise(xr, 38, 31) - 0.5) * 3.2 + (vnoise(xr, 13, 32) - 0.5) * 1.8;
+      u *= smoothstep(22, 70, Math.abs(xr));
+      let dep = 0;
+      if (pond) {
+        u *= smoothstep(pond.half + 2, pond.half + 12, Math.abs(x - pond.cx));
+        const t = (x - pond.x0) / (pond.x1 - pond.x0);
+        if (t > 0 && t < 1) dep = Math.round(6 * Math.pow(Math.sin(Math.PI * t), 0.6));
+      }
+      bd[x] = dep;
+      surf[x] = groundY + Math.round(u) + dep;
+    }
+
+    const dirtBase = H * 0.115;
+    const deepStart = groundY + (H - groundY) * 0.6;
+
+    for (let x = 0; x < W; x++) {
+      const xr = x - cx;
+      const s = surf[x];
+      const wet = bd[x] > 0;
+      const gt = wet ? 1 : 3 + (hash2(xr, 81) > 0.55 ? 1 : 0) + (hash2(xr, 82) > 0.86 ? 1 : 0);
+      const dirtEnd = Math.round(dirtBase + (vnoise(xr, 9, 41) - 0.5) * 7 + (hash2(xr, 83) > 0.72 ? 1 : 0));
+
+      if (wet) {
+        for (let y = groundY; y < s; y++) {
+          let v = 19;
+          if (y === groundY) v = hash2(xr, 84) < 0.2 ? 21 : 18;
+          else if (y === s - 1) v = 20;
+          map[y * W + x] = v;
+        }
+      } else {
+        const r = hash2(xr, 85);
+        const th = r < 0.22 ? 1 : (r < 0.3 ? 2 : 0);
+        for (let i = 1; i <= th; i++) setPx(map, x, s - i, i === th ? 1 : 2);
+        if (th === 0 && hash2(xr, 87) < 0.07) setPx(map, x, s - 1, 4);
+      }
+
+      for (let y = Math.max(0, s); y < H; y++) {
+        const d = y - s;
+        let v;
+        if (d < gt) {
+          if (wet) v = 5;
+          else if (d === 0) v = 1;
+          else if (d === gt - 1) v = 3;
+          else v = hash2(xr * 3 + y, 88) < 0.14 ? 3 : 2;
+        } else if (d < dirtEnd) {
+          v = 5 + Math.min(3, toneIdx(xr, y) + (d > dirtEnd * 0.62 ? 1 : 0));
+          if (d === dirtEnd - 1 && hash2(xr, 89) < 0.5) v = 8;
+        } else {
+          let ti = toneIdx(xr, y);
+          if (y > deepStart) ti++;
+          if (y >= H - 5) ti = 3;
+          v = 9 + Math.min(3, ti);
+        }
+        map[y * W + x] = v;
+      }
+    }
+
+    for (let k = Math.floor(-cx / 11) - 1; k <= Math.ceil((W - cx) / 11) + 1; k++) {
+      if (hash2(k, 101) > 0.5) continue;
+      const x0 = cx + k * 11 + Math.floor(hash2(k, 102) * 11);
+      if (x0 < 1 || x0 >= W - 1 || bd[x0]) continue;
+      const len = 4 + Math.floor(hash2(k, 103) * 8);
+      const side = hash2(k, 105) < 0.5 ? -1 : 1;
+      const y0 = surf[x0] + 4;
+      let x = x0;
+      for (let i = 0; i < len; i++) {
+        setPx(map, x, y0 + i, 13);
+        if (i % 3 === 2) x += hash2(k * 7 + i, 104) < 0.5 ? -1 : 1;
+      }
+      if (hash2(k, 106) < 0.55) {
+        setPx(map, x0 + side, y0 + 2, 13);
+        setPx(map, x0 + side * 2, y0 + 3, 13);
+      }
+    }
+
+    const pebbles = Math.round(W / 6);
+    for (let i = 0; i < pebbles; i++) {
+      const x = Math.floor(hash2(i, 111) * (W - 2));
+      const y = surf[x] + 6 + Math.floor(hash2(i, 112) * Math.max(1, dirtBase - 8));
+      if (y >= H) continue;
+      const v = map[y * W + x];
+      if (v >= 5 && v <= 8) {
+        setPx(map, x, y, 14);
+        if (hash2(i, 113) < 0.6) setPx(map, x + 1, y, 14);
+      }
+    }
+
+    const ores = Math.round(W / 8);
+    const oreTop = groundY + Math.round(H * 0.14);
+    for (let i = 0; i < ores; i++) {
+      const x = Math.floor(hash2(i, 121) * (W - 2));
+      const y = oreTop + Math.floor(hash2(i, 122) * Math.max(1, H - oreTop - 2));
+      if (y >= H - 1) continue;
+      const v = map[y * W + x];
+      if (v < 9 || v > 12) continue;
+      const r = hash2(i, 123);
+      if (r < 0.4) { setPx(map, x, y, 15); setPx(map, x + 1, y, 15); }
+      else if (r < 0.75) { setPx(map, x, y, 16); setPx(map, x, y + 1, 16); }
+      else { setPx(map, x, y, 17); }
+    }
+  }
+
+  function buildTerrain() {
+    groundY = Math.floor(H * GROUND_RATIO);
+    const cx = Math.floor(W / 2);
+    terrain = { far: newLayer(), mid: newLayer(), ground: newLayer(), key: '' };
+    buildHills(cx);
+    buildGround(cx);
+  }
+
+  function resetTerrain() {
+    terrain = null;
+    surf = null;
+    pond = null;
+  }
+
+  function onTerrainResize() {
+    resetTerrain();
+    buildTerrain();
+  }
+
+  function terrainEnv(hour) {
+    const dawn = Math.sin(Math.PI * clampNum((hour - 4.75) / 2.5, 0, 1, 0));
+    const dusk = Math.sin(Math.PI * clampNum((hour - 17.25) / 2.75, 0, 1, 0));
+    return { nf: nightFactor(hour), dusk: Math.max(dawn, dusk), sky: skyColorsAt(hour) };
+  }
+
+  function tintPal(pal, env, haze, silh) {
+    const out = [null];
+    const hz = haze * (1 - env.dusk * 0.5);
+    for (let i = 0; i < pal.length; i++) {
+      let c = mixRgb(pal[i][0], pal[i][1], env.nf);
+      c = mixRgb(c, [58, 54, 98], silh * env.dusk);
+      c = mixRgb(c, env.sky.bot, hz);
+      out.push(quant(c));
+    }
+    return out;
+  }
+
+  function paintLayer(layer, pal) {
+    if (!layer.canvas) {
+      layer.canvas = document.createElement('canvas');
+      layer.canvas.width = W;
+      layer.canvas.height = H;
+      layer.g = layer.canvas.getContext('2d');
+      layer.img = layer.g.createImageData(W, H);
+    }
+    const d = layer.img.data;
+    const m = layer.map;
+    for (let i = 0, n = m.length; i < n; i++) {
+      const v = m[i];
+      const j = i * 4;
+      if (!v) { d[j + 3] = 0; continue; }
+      const c = pal[v];
+      d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = 255;
+    }
+    layer.g.putImageData(layer.img, 0, 0);
+  }
+
+  function paintTerrain(hour) {
+    const env = terrainEnv(hour);
+    const s = env.sky;
+    paintLayer(terrain.far, tintPal(PAL_FAR, env, 0.5, 0.4));
+    paintLayer(terrain.mid, tintPal(PAL_MID, env, 0.25, 0.55));
+    const gp = tintPal(PAL_GROUND, env, 0.04, 0.25);
+    gp.push(quant(mixRgb(s.bot, s.mid, 0.4)));
+    gp.push(quant(mixRgb(s.mid, [16, 40, 70], 0.35)));
+    gp.push(quant(mixRgb(s.top, [10, 24, 48], 0.5)));
+    gp.push(quant(mixRgb(s.bot, [255, 255, 255], 0.55)));
+    paintLayer(terrain.ground, gp);
+  }
+
+  function ensureTerrain() {
+    if (!terrain) buildTerrain();
+    const hour = getWorldHour();
+    const key = Math.floor(hour * 12) + '|' + W + 'x' + H;
+    if (key !== terrain.key) {
+      paintTerrain(hour);
+      terrain.key = key;
+    }
+  }
+
+  function drawTerrainBack() {
+    ensureTerrain();
+    ctx.drawImage(terrain.far.canvas, 0, 0);
+    ctx.drawImage(terrain.mid.canvas, 0, 0);
+  }
+
+  function drawTerrainFront() {
+    ensureTerrain();
+    ctx.drawImage(terrain.ground.canvas, 0, 0);
+  }
+
+  function getGroundY() {
+    return groundY;
+  }
+
+  function getSurfaceY(x) {
+    if (!surf) return groundY;
+    return surf[clampNum(Math.round(x), 0, W - 1, 0)];
+  }
+
   function fit() {
     if (!host || !canvas) return;
     const vw = host.clientWidth || window.innerWidth;
@@ -412,6 +745,7 @@ const MyWorld = (function () {
     ctx = canvas.getContext('2d');
     if (ctx) ctx.imageSmoothingEnabled = false;
     onSkyResize();
+    onTerrainResize();
     drawFrame(0);
   }
 
@@ -419,6 +753,8 @@ const MyWorld = (function () {
     if (!ctx) return;
     clockElapsed += dt;
     drawSky();
+    drawTerrainBack();
+    drawTerrainFront();
 
     if (isDebug()) {
       ctx.fillStyle = '#f4f1ff';
@@ -561,6 +897,7 @@ const MyWorld = (function () {
     canvas = null;
     ctx = null;
     resetSky();
+    resetTerrain();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
@@ -621,6 +958,8 @@ const MyWorld = (function () {
     closeFullscreen,
     isFullscreen,
     setDebugTime,
+    getGroundY,
+    getSurfaceY,
 
     render,
     renderTree,
