@@ -193,8 +193,7 @@
   <script src="misc-cosmetics.js"></script>
   <script src="misc-sound.js"></script>
   <script src="pressed-paper.js"></script>
-  <script src="interactive-pins.js"></script>
-  <script src="washi-tape.js"></script>
+  
   <script src="paper-pocket.js"></script>
   <script src="custom-cursor.js"></script>
   <script src="rain-ambience.js"></script>
@@ -230,8 +229,7 @@
       const ambientLayer = document.getElementById('misc-ambient-layer');
       if (typeof CustomCursor !== 'undefined') CustomCursor.init();
       if (typeof PressedPaper !== 'undefined') PressedPaper.autoInit();
-      if (typeof InteractivePins !== 'undefined') InteractivePins.init();
-      if (typeof WashiTape !== 'undefined') WashiTape.init();
+      
       if (ambientLayer) {
         if (typeof Firefly !== 'undefined') Firefly.mount(ambientLayer, { count: 6 });
         if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
@@ -247,7 +245,7 @@
         CandleLamp.mount(studyScreen);
       }
       if (objectsLayer && typeof PaperPocket !== 'undefined') {
-        PaperPocket.mount(objectsLayer, { rotation: -2, position: { position: 'absolute', left: '14px', bottom: '14px' } });
+        PaperPocket.mount(objectsLayer, { rotation: -2, position: { position: 'absolute', left: '6px', bottom: '6px' } });
       }
       const paintbrushBtn = document.getElementById('paintbrush-icon');
       if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
