@@ -28,14 +28,14 @@ const WishButterfly = (function () {
     height: 26px;
     cursor: pointer;
     z-index: 5;
-    filter: drop-shadow(0 0 0 rgba(180,150,230,0));
+    filter: drop-shadow(0 0 0 rgba(138,148,104,0));
     transition: filter 0.6s ease;
     animation: wishButterflyFloat 6.5s ease-in-out infinite;
   }
-  .wish-butterfly.is-glowing { filter: drop-shadow(0 0 6px rgba(200,170,240,0.85)); }
+  .wish-butterfly.is-glowing { filter: drop-shadow(0 0 6px rgba(138,148,104,0.85)); }
   .wish-butterfly.is-open, .wish-butterfly.is-leaving { animation-play-state: paused; }
   .wish-butterfly.is-leaving {
-    transition: transform 1.1s ease-in, opacity 1.1s ease-in;
+    transition: transform 1.6s ease-in, opacity 1.6s ease-in;
     transform: translate(60px, -90px) scale(0.6);
     opacity: 0;
   }
@@ -43,6 +43,18 @@ const WishButterfly = (function () {
   .wish-butterfly .wb-wing { transform-origin: 50% 50%; animation: wishButterflyWing 1.1s ease-in-out infinite; }
   .wish-butterfly .wb-wing-right { animation-delay: -0.55s; }
   .wish-butterfly.reduced-motion, .wish-butterfly.reduced-motion .wb-wing { animation: none; }
+  .wb-trail-dot {
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,176,135,0.9), rgba(168,176,135,0));
+    transform: translate(-50%, -50%);
+    opacity: 0.9;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .wb-trail-dot.is-fading { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
 
   @keyframes wishButterflyFloat {
     0%, 100% { transform: translate(0, 0) rotate(0deg); }
@@ -61,12 +73,13 @@ const WishButterfly = (function () {
     min-width: 190px;
     max-width: 230px;
     padding: 14px 14px 12px;
-    background: #fbf7ef;
+    background: var(--color-surface, #fffdf8);
+    border: 1px solid var(--color-border, #ddd3bd);
     border-radius: 14px 14px 14px 4px;
-    box-shadow: 0 6px 18px rgba(90,70,120,0.18);
-    font-family: inherit;
+    box-shadow: var(--shadow-md, 0 3px 10px rgba(63,47,33,0.12));
+    font-family: var(--font-hand, inherit);
     font-size: 13px;
-    color: #5b4b73;
+    color: var(--color-text, #3a3226);
     opacity: 0;
     transform: translateY(6px) scale(0.96);
     transition: opacity 0.28s ease, transform 0.28s ease;
@@ -76,28 +89,28 @@ const WishButterfly = (function () {
   .wish-bubble textarea {
     width: 100%;
     resize: none;
-    border: 1px solid #ded2ee;
+    border: 1px solid var(--color-border, #ddd3bd);
     border-radius: 8px;
     padding: 6px 8px;
     font: inherit;
     color: inherit;
-    background: #fffdf9;
+    background: var(--color-cream-050, #fffdf8);
     box-sizing: border-box;
     margin-top: 6px;
   }
   .wish-bubble .wb-label { font-size: 12px; opacity: 0.75; }
   .wish-bubble .wb-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-  .wish-bubble button { font: inherit; font-size: 12px; border: none; background: none; color: #8a76b0; cursor: pointer; padding: 4px 8px; }
-  .wish-bubble button.wb-send { background: #c9b6ef; color: #3e2f57; border-radius: 8px; }
+  .wish-bubble button { font: inherit; font-size: 12px; border: none; background: none; color: var(--color-text-muted, #6b6252); cursor: pointer; padding: 4px 8px; }
+  .wish-bubble button.wb-send { background: var(--color-sage-500, #8a9468); color: var(--color-cream-050, #fffdf8); border-radius: 8px; }
   .wish-bubble button.wb-send:disabled { opacity: 0.4; cursor: default; }
   `;
 
   function svgMarkup() {
     return (
       '<svg viewBox="0 0 34 26" xmlns="http://www.w3.org/2000/svg">' +
-      '<g class="wb-wing wb-wing-left"><path d="M16 13 C6 2, -2 4, 3 14 C6 20, 13 18, 16 13 Z" fill="#c9b6ef" opacity="0.92"/></g>' +
-      '<g class="wb-wing wb-wing-right"><path d="M18 13 C28 2, 36 4, 31 14 C28 20, 21 18, 18 13 Z" fill="#e3c9f0" opacity="0.92"/></g>' +
-      '<ellipse cx="17" cy="13" rx="1.6" ry="6" fill="#7a6a97"/>' +
+      '<g class="wb-wing wb-wing-left"><path d="M16 13 C6 2, -2 4, 3 14 C6 20, 13 18, 16 13 Z" fill="var(--color-sage-400, #a8b087)" opacity="0.92"/></g>' +
+      '<g class="wb-wing wb-wing-right"><path d="M18 13 C28 2, 36 4, 31 14 C28 20, 21 18, 18 13 Z" fill="var(--color-cream-300, #ece3cd)" opacity="0.92"/></g>' +
+      '<ellipse cx="17" cy="13" rx="1.6" ry="6" fill="var(--color-brown-700, #5c4530)"/>' +
       '</svg>'
     );
   }
@@ -173,6 +186,17 @@ const WishButterfly = (function () {
       bubble.classList.remove('is-visible');
     }
 
+    function spawnTrailDot() {
+      const r = butterfly.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      const dot = MiscCore.createEl('div', { className: 'wb-trail-dot' });
+      dot.style.left = (r.left - wr.left + r.width / 2) + 'px';
+      dot.style.top = (r.top - wr.top + r.height / 2) + 'px';
+      wrap.appendChild(dot);
+      requestAnimationFrame(function () { dot.classList.add('is-fading'); });
+      setTimeout(function () { dot.remove(); }, 850);
+    }
+
     function leave() {
       if (typeof MiscSound !== 'undefined') MiscSound.play('butterflyChime');
       butterfly.classList.add('is-glowing');
@@ -183,9 +207,11 @@ const WishButterfly = (function () {
         setTimeout(function () { wrap.remove(); }, 700);
         return;
       }
+      let trailTimer = setInterval(spawnTrailDot, 110);
       setTimeout(function () { butterfly.classList.add('is-leaving'); }, 500);
       butterfly.addEventListener('transitionend', function handler() {
         butterfly.removeEventListener('transitionend', handler);
+        clearInterval(trailTimer);
         wrap.remove();
       });
     }
