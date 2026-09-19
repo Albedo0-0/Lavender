@@ -73,9 +73,40 @@ const PaperPocket = (function () {
       '<div class="pocket-stitch"></div>';
     container.appendChild(el);
 
+    const contentsEl = el.querySelector('.pocket-contents');
+    let content = null; // { type: 'photo'|'message', value } — only one slot at a time
+
+    function clear() {
+      content = null;
+      contentsEl.innerHTML = '';
+    }
+    function setPhoto(url) {
+      clear();
+      content = { type: 'photo', value: url };
+      const img = MiscCore.createEl('img', { attrs: { src: url, alt: 'kept photo' } });
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '2px';
+      contentsEl.appendChild(img);
+    }
+    function setMessage(text) {
+      clear();
+      content = { type: 'message', value: text };
+      const note = MiscCore.createEl('div', { text: text });
+      note.style.fontFamily = 'var(--font-hand, inherit)';
+      note.style.fontSize = 'var(--text-sm, 13px)';
+      note.style.color = 'var(--color-text, #3a3226)';
+      contentsEl.appendChild(note);
+    }
+
     return {
       element: el,
-      contentsElement: el.querySelector('.pocket-contents'),
+      contentsElement: contentsEl,
+      setPhoto: setPhoto,
+      setMessage: setMessage,
+      clear: clear,
+      getContent: function () { return content; },
       destroy: function () { el.remove(); }
     };
   }
