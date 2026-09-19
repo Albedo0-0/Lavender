@@ -175,6 +175,32 @@ const Player = (function () {
     if (body) body.classList.toggle('radio-playing', radioPlaying);
   }
 
+  // Mirrors updateRadioPlayingUi's approach: updates the cassette's playing state,
+  // label, and button text in place — no Modal.open(), so play/pause/track-change
+  // never replays the cassette-body entrance/reel-spin animation.
+  function updateMusicPlayingUi() {
+    const body = document.querySelector('.cassette-body');
+    if (body) body.classList.toggle('music-playing', musicPlaying);
+    const track = MusicData.getById(currentTrackId);
+    const label = document.getElementById('music-now-playing');
+    if (label) label.textContent = track ? track.name : 'Nothing playing';
+    const playBtn = document.getElementById('music-playpause-btn');
+    if (playBtn) playBtn.textContent = musicPlaying ? 'Pause' : 'Play';
+  }
+
+  function updateMusicToggleUi() {
+    const shuffleBtn = document.getElementById('music-shuffle-btn');
+    if (shuffleBtn) {
+      shuffleBtn.classList.toggle('cassette-toggle-active', shuffleOn);
+      shuffleBtn.textContent = shuffleOn ? 'Shuffle: On' : 'Shuffle: Off';
+    }
+    const autoplayBtn = document.getElementById('music-autoplay-btn');
+    if (autoplayBtn) {
+      autoplayBtn.classList.toggle('cassette-toggle-active', autoplayOn);
+      autoplayBtn.textContent = autoplayOn ? 'Autoplay: On' : 'Autoplay: Off';
+    }
+  }
+
   function playableOrder() {
     const list = MusicData.getPlaylist();
     if (shuffleOn && shuffleOrder) return shuffleOrder.filter(function (id) { return list.some(function (t) { return t.id === id; }); });
@@ -222,7 +248,7 @@ const Player = (function () {
         musicPlaying = true;
       });
     }
-    renderMusicModal();
+    updateMusicPlayingUi();
   }
 
   function skipToAdjacent(dir) {
@@ -245,7 +271,7 @@ const Player = (function () {
       if (track.source === 'local' && musicAudioEl) { musicAudioEl.play().catch(function () {}); musicPlaying = true; }
       else if (track.source === 'youtube' && ytPlayer) { ytPlayer.playVideo(); musicPlaying = true; }
     }
-    renderMusicModal();
+    updateMusicPlayingUi();
   }
 
   function seekMusic(seconds) {
@@ -427,8 +453,8 @@ const Player = (function () {
     document.getElementById('music-prev-btn').addEventListener('click', prev);
     document.getElementById('music-next-btn').addEventListener('click', next);
     document.getElementById('music-playpause-btn').addEventListener('click', togglePlayPause);
-    document.getElementById('music-shuffle-btn').addEventListener('click', function () { toggleShuffle(); openMusicModal(); });
-    document.getElementById('music-autoplay-btn').addEventListener('click', function () { autoplayOn = !autoplayOn; openMusicModal(); });
+    document.getElementById('music-shuffle-btn').addEventListener('click', function () { toggleShuffle(); updateMusicToggleUi(); });
+    document.getElementById('music-autoplay-btn').addEventListener('click', function () { autoplayOn = !autoplayOn; updateMusicToggleUi(); });
     document.getElementById('music-playlist-btn').addEventListener('click', openPlaylistModal);
     document.getElementById('player-back-btn').addEventListener('click', openChooser);
     document.getElementById('music-seek-bar').addEventListener('change', function (e) { seekMusic(Number(e.target.value)); });
