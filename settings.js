@@ -60,6 +60,7 @@ const Settings = (function () {
       '<div class="form-row"><label><input type="checkbox" id="settings-notifications"' + (cur.notificationsEnabled !== false ? ' checked' : '') + '> Notifications</label></div>' +
       '<div class="form-row"><label><input type="checkbox" id="settings-sound"' + (cur.soundEnabled !== false ? ' checked' : '') + '> Sound</label></div>' +
       '<div class="form-row"><label><input type="checkbox" id="settings-vibration"' + (cur.vibrationEnabled !== false ? ' checked' : '') + '> Vibration</label></div>' +
+      '<div class="form-row"><label><input type="checkbox" id="settings-force-fullscreen"' + (typeof ForcedFullscreen !== 'undefined' && ForcedFullscreen.isEnabled() ? ' checked' : '') + '> Force fullscreen</label></div>' +
 
       '<div class="form-row"><label for="settings-assistant-name">Assistant name</label>' +
       '<input type="text" id="settings-assistant-name" value="' + esc(cur.assistantName || '') + '" placeholder="Assistant"></div>' +
@@ -142,6 +143,13 @@ const Settings = (function () {
     Modal.open(formHtml());
 
     document.getElementById('settings-save-btn').addEventListener('click', save);
+
+    const forceFullscreenToggle = document.getElementById('settings-force-fullscreen');
+    if (forceFullscreenToggle && typeof ForcedFullscreen !== 'undefined') {
+      forceFullscreenToggle.addEventListener('change', function () {
+        ForcedFullscreen.setEnabled(forceFullscreenToggle.checked);
+      });
+    }
 
     const wallpaperInput = document.getElementById('settings-wallpaper-input');
     if (wallpaperInput) {
