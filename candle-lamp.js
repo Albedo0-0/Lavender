@@ -47,7 +47,7 @@ const CandleLamp = (function () {
     cursor: pointer;
     transform: scale(0.32);
     transform-origin: 100% 100%;
-    transition: transform 1.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition: transform 2.2s cubic-bezier(0.16, 1, 0.3, 1);
     -webkit-tap-highlight-color: transparent;
   }
   .candle-lamp-mount.is-focused { transform: scale(1.25); z-index: 31; }
@@ -61,6 +61,7 @@ const CandleLamp = (function () {
     z-index: 30;
   }
   .candle-dim-overlay.is-active { opacity: 1; pointer-events: auto; }
+  body.candle-scroll-lock { overflow: hidden; height: 100%; }
   .candle-glow-pool {
     position: absolute;
     z-index: 0;
@@ -84,7 +85,7 @@ const CandleLamp = (function () {
   .candle-lamp-mount.is-out .candle-glow-pool { opacity: 0; }
 
   .candle-scene { position: relative; z-index: 1; width: ${CANDLE_W}px; height: ${CANDLE_H}px; overflow: hidden; }
-  .candle-riders { position: absolute; inset: 0; transition: transform 1.2s linear; }
+  .candle-riders { position: absolute; inset: 0; transition: transform 1.2s ease-out; }
   .candle-base {
     position: absolute;
     bottom: 0; left: 4px;
@@ -93,7 +94,7 @@ const CandleLamp = (function () {
     background: linear-gradient(90deg, #cdb894 0%, #f6ecd4 22%, #fffaf0 45%, #efe2c4 72%, #c7b088 100%);
     border-radius: 6px 6px 3px 3px / 8px 8px 3px 3px;
     box-shadow: inset -7px 0 12px rgba(90,64,36,0.2);
-    transition: height 1.2s linear;
+    transition: height 1.2s ease-out;
   }
   .candle-base::before {
     content: "";
@@ -112,7 +113,7 @@ const CandleLamp = (function () {
     background: linear-gradient(90deg, #efe2c4, #fffaf0 55%, #e6d6b2);
     border-radius: 0 0 6px 6px;
     box-shadow: 1px 2px 3px rgba(90,64,36,0.25);
-    transition: height 1.2s linear, opacity 0.6s ease;
+    transition: height 1.2s ease-out, opacity 0.6s ease;
   }
   .candle-blob::after {
     content: "";
@@ -193,7 +194,7 @@ const CandleLamp = (function () {
     border-radius: 50%;
     box-shadow: 0 3px 6px rgba(30,18,8,0.35);
     transform: translateX(-50%);
-    transition: width 1.2s linear, height 1.2s linear;
+    transition: width 1.2s ease-out, height 1.2s ease-out;
   }
 
   .candle-message {
@@ -290,6 +291,7 @@ if (reduced) dimOverlay.style.transition = 'none';
     function setFocused(next) {
       focused = next;
       wrap.classList.toggle('is-focused', focused);
+      document.body.classList.toggle('candle-scroll-lock', focused);
       syncDim();
     }
 
@@ -442,6 +444,7 @@ if (reduced) dimOverlay.style.transition = 'none';
         unsubscribeTick();
         document.removeEventListener('keydown', onKey);
         clearAmbientFireflies();
+        document.body.classList.remove('candle-scroll-lock');
         wrap.remove();
         dimOverlay.remove();
       }
