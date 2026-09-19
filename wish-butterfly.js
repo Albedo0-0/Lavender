@@ -118,7 +118,265 @@ const WishButterfly = (function () {
     );
   }
 
+  const CSS_FLY = `
+  .wish-butterfly.wb-fly { top: 0; left: 0; animation: none; will-change: transform; }
+  .wish-butterfly.wb-fly.is-excited .wb-wing { animation-duration: 0.28s; }
+  .wish-butterfly.wb-fly.is-glowing { filter: drop-shadow(0 0 10px rgba(200,210,160,0.95)) drop-shadow(0 0 24px rgba(168,176,135,0.7)); }
+  .wb-dim { position: absolute; inset: 0; background: rgba(8,8,20,0.5); opacity: 0; transition: opacity 2.5s ease; pointer-events: none; }
+  .wb-dim.is-on { opacity: 1; }
+  .wb-halo { position: absolute; top: 0; left: 0; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 50%; background: radial-gradient(circle, rgba(200,210,160,0.55) 0%, rgba(168,176,135,0.22) 40%, rgba(168,176,135,0) 70%); opacity: 0; transition: opacity 1.8s ease; pointer-events: none; will-change: transform; }
+  .wb-halo.is-on { opacity: 1; }
+  .wb-trail-dot.is-long { transition-duration: 7s; }
+  @media (prefers-reduced-motion: reduce) { .wb-dim, .wb-halo { transition: none; } }
+  `;
+
+  function angDiff(a, b) {
+    let d = a - b;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return d;
+  }
+
   function mount(container, options) {
+    if (!container) return null;
+    options = options || {};
+    MiscCore.injectStyle(STYLE_ID, CSS);
+    MiscCore.injectStyle(STYLE_ID + '-fly', CSS_FLY);
+    const reduced = MiscCore.prefersReducedMotion();
+    const LIFETIME_MS = options.lifetimeMs || 45000;
+
+    const wrap = MiscCore.createEl('div', { className: 'wish-butterfly-mount' });
+    wrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+    const dim = MiscCore.createEl('div', { className: 'wb-dim' });
+    wrap.appendChild(dim);
+    container.appendChild(wrap);
+
+    let spawnTimer = null;
+    let reducedTimer = null;
+    let rafId = null;
+    let live = null;
+
+    function scheduleSpawn(ms) {
+      if (spawnTimer) clearTimeout(spawnTimer);
+      spawnTimer = setTimeout(spawn, ms);
+    }
+
+    function dot(x, y, long) {
+      const d = MiscCore.createEl('div', { className: 'wb-trail-dot' + (long ? ' is-long' : '') });
+      d.style.left = x + 'px';
+      d.style.top = y + 'px';
+      wrap.appendChild(d);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { d.classList.add('is-fading'); }); });
+      setTimeout(function () { d.remove(); }, long ? 7200 : 4700);
+    }
+
+    function spawn() {
+      if (live) return;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const butterfly = MiscCore.createEl('div', {
+        className: 'wish-butterfly wb-fly is-glowing' + (reduced ? ' reduced-motion' : ''),
+        html: svgMarkup(),
+        attrs: { role: 'button', tabindex: '0', 'aria-label': 'Make a wish' }
+      });
+      const halo = MiscCore.createEl('div', { className: 'wb-halo' });
+      const bubble = MiscCore.createEl('div', { className: 'wish-bubble' });
+      bubble.innerHTML =
+        '<div class="wb-label">Make a little wish&hellip;</div>' +
+        '<textarea rows="2" maxlength="140" placeholder="whisper it here"></textarea>' +
+        '<div class="wb-actions">' +
+        '<button type="button" class="wb-cancel">not now</button>' +
+        '<button type="button" class="wb-send" disabled>let it go</button>' +
+        '</div>';
+      wrap.appendChild(halo);
+      wrap.appendChild(butterfly);
+      wrap.appendChild(bubble);
+      const textarea = bubble.querySelector('textarea');
+      const sendBtn = bubble.querySelector('.wb-send');
+      const cancelBtn = bubble.querySelector('.wb-cancel');
+
+      let x, y, th;
+      const side = MiscCore.randInt(0, 3);
+      if (reduced) { x = vw * 0.86; y = vh * 0.16; th = -Math.PI / 2; }
+      else if (side === 0) { x = -40; y = MiscCore.rand(vh * 0.2, vh * 0.8); th = 0; }
+      else if (side === 1) { x = vw + 40; y = MiscCore.rand(vh * 0.2, vh * 0.8); th = Math.PI; }
+      else if (side === 2) { x = MiscCore.rand(vw * 0.2, vw * 0.8); y = -40; th = Math.PI / 2; }
+      else { x = MiscCore.rand(vw * 0.2, vw * 0.8); y = vh + 40; th = -Math.PI / 2; }
+
+      const s = {
+        x: x, y: y, th: th,
+        phase: reduced ? 'wander' : 'enter',
+        t: 0, bias: 0, biasT: 0, trailAcc: 0,
+        open: false, hover: false,
+        last: performance.now(),
+        deadline: performance.now() + LIFETIME_MS,
+        target: { x: MiscCore.rand(vw * 0.25, vw * 0.75), y: MiscCore.rand(vh * 0.25, vh * 0.7) },
+        exitPt: null
+      };
+      const me = { s: s };
+      live = me;
+
+      function place() {
+        butterfly.style.transform = 'translate(' + (s.x - 22) + 'px,' + (s.y - 17) + 'px) rotate(' + (s.th * 180 / Math.PI + 90) + 'deg)';
+        halo.style.transform = 'translate(' + s.x + 'px,' + s.y + 'px)';
+      }
+
+      function steer(desired, rate, dt) {
+        const d = angDiff(desired, s.th);
+        s.th += Math.max(-rate * dt, Math.min(rate * dt, d));
+      }
+
+      function pickExit() {
+        const w = window.innerWidth, h = window.innerHeight;
+        const d = [s.x, w - s.x, s.y, h - s.y];
+        const m = Math.min.apply(null, d);
+        const j = MiscCore.rand(-100, 100);
+        if (m === d[0]) return { x: -140, y: s.y + j };
+        if (m === d[1]) return { x: w + 140, y: s.y + j };
+        if (m === d[2]) return { x: s.x + j, y: -140 };
+        return { x: s.x + j, y: h + 140 };
+      }
+
+      function end() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        if (reducedTimer) clearTimeout(reducedTimer);
+        butterfly.remove();
+        halo.remove();
+        bubble.remove();
+        dim.classList.remove('is-on');
+        if (live === me) live = null;
+        scheduleSpawn(MiscCore.rand(15, 25) * 60000);
+      }
+
+      function fadeEnd() {
+        butterfly.style.transition = 'opacity 0.7s ease';
+        butterfly.style.opacity = '0';
+        halo.classList.remove('is-on');
+        setTimeout(end, 750);
+      }
+
+      function frame(now) {
+        if (live !== me) return;
+        const dt = Math.min(0.05, (now - s.last) / 1000);
+        s.last = now;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let speed = 60, trailEvery = 0.2, long = false;
+        const offEdge = s.x < 90 || s.x > vw - 90 || s.y < 90 || s.y > vh - 90;
+        const toCenter = Math.atan2(vh / 2 - s.y, vw / 2 - s.x);
+        if (s.open) s.deadline += dt * 1000;
+
+        if (s.phase === 'enter') {
+          steer(Math.atan2(s.target.y - s.y, s.target.x - s.x), 2.2, dt);
+          speed = 95;
+          if (s.x > 40 && s.x < vw - 40 && s.y > 40 && s.y < vh - 40) s.phase = 'wander';
+        } else if (s.phase === 'wander') {
+          s.biasT -= dt;
+          if (s.biasT <= 0) { s.bias = MiscCore.rand(-1.2, 1.2); s.biasT = MiscCore.rand(0.8, 2); }
+          steer(offEdge ? toCenter : s.th + s.bias, 1.8, dt);
+          speed = 55 + Math.sin(now / 700) * 18;
+          if (s.hover) speed *= 0.3;
+          if (s.open) speed = 0;
+          if (!s.open && now >= s.deadline) { s.phase = 'exit'; s.exitPt = pickExit(); }
+        } else if (s.phase === 'exit') {
+          steer(Math.atan2(s.exitPt.y - s.y, s.exitPt.x - s.x), 2.4, dt);
+          speed = 140; trailEvery = 0.08; long = true;
+        } else if (s.phase === 'excited') {
+          s.t += dt; s.biasT -= dt;
+          if (s.biasT <= 0) { s.bias = MiscCore.rand(-1.9, 1.9); s.biasT = 0.22; }
+          steer(offEdge ? toCenter : s.th + s.bias, 7, dt);
+          speed = 420; trailEvery = 0.03; long = true;
+          if (s.t > 1.6) { s.phase = 'leave'; s.exitPt = pickExit(); }
+        } else if (s.phase === 'leave') {
+          steer(Math.atan2(s.exitPt.y - s.y, s.exitPt.x - s.x), 5, dt);
+          speed = 560; trailEvery = 0.03; long = true;
+        }
+
+        s.x += Math.cos(s.th) * speed * dt;
+        s.y += Math.sin(s.th) * speed * dt;
+        place();
+
+        s.trailAcc += dt;
+        if (!s.open && s.trailAcc >= trailEvery) { s.trailAcc = 0; dot(s.x, s.y, long); }
+
+        if ((s.phase === 'exit' || s.phase === 'leave') && (s.x < -60 || s.x > vw + 60 || s.y < -60 || s.y > vh + 60)) {
+          end();
+          return;
+        }
+        rafId = requestAnimationFrame(frame);
+      }
+
+      function openBubble() {
+        if (s.open || s.phase === 'excited' || s.phase === 'leave' || s.phase === 'exit') return;
+        s.open = true;
+        butterfly.classList.add('is-open');
+        bubble.style.left = MiscCore.clamp(s.x - 100, 8, window.innerWidth - 240) + 'px';
+        bubble.style.top = MiscCore.clamp(s.y + 30, 8, window.innerHeight - 170) + 'px';
+        bubble.classList.add('is-visible');
+        textarea.value = '';
+        sendBtn.disabled = true;
+        textarea.focus();
+      }
+
+      function closeBubble() {
+        s.open = false;
+        butterfly.classList.remove('is-open');
+        bubble.classList.remove('is-visible');
+      }
+
+      butterfly.addEventListener('click', openBubble);
+      butterfly.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openBubble(); }
+      });
+      butterfly.addEventListener('mouseenter', function () { s.hover = true; });
+      butterfly.addEventListener('mouseleave', function () { s.hover = false; });
+      textarea.addEventListener('input', function () { sendBtn.disabled = textarea.value.trim().length === 0; });
+      cancelBtn.addEventListener('click', function () {
+        closeBubble();
+        s.deadline = performance.now() + 20000;
+      });
+      sendBtn.addEventListener('click', function () {
+        if (textarea.value.trim().length === 0) return;
+        // The wish text is intentionally discarded — see file header.
+        textarea.value = '';
+        closeBubble();
+        if (typeof MiscSound !== 'undefined') MiscSound.play('butterflyChime');
+        if (reduced) { fadeEnd(); return; }
+        butterfly.classList.add('is-excited');
+        s.phase = 'excited';
+        s.t = 0;
+        s.biasT = 0;
+      });
+
+      place();
+      if (reduced) {
+        dim.classList.add('is-on');
+        halo.classList.add('is-on');
+        reducedTimer = setTimeout(function tryEnd() {
+          if (live !== me) return;
+          if (s.open) { reducedTimer = setTimeout(tryEnd, 5000); return; }
+          fadeEnd();
+        }, LIFETIME_MS);
+      } else {
+        requestAnimationFrame(function () { dim.classList.add('is-on'); halo.classList.add('is-on'); });
+        rafId = requestAnimationFrame(frame);
+      }
+    }
+
+    scheduleSpawn(options.firstDelayMs || 6000);
+
+    return {
+      element: wrap,
+      destroy: function () {
+        if (spawnTimer) clearTimeout(spawnTimer);
+        if (reducedTimer) clearTimeout(reducedTimer);
+        if (rafId) cancelAnimationFrame(rafId);
+        live = null;
+        wrap.remove();
+      }
+    };
+  }
+
+  function mountLegacy(container, options) {
     if (!container) return null;
     options = options || {};
     MiscCore.injectStyle(STYLE_ID, CSS);
