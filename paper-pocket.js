@@ -17,8 +17,9 @@ const PaperPocket = (function () {
   const CSS = `
   .paper-pocket {
     position: relative;
-    width: 160px;
-    height: 110px;
+    width: 96px;
+    height: 66px;
+    pointer-events: auto;
     background: #f3ead9;
     border-radius: 3px;
     box-shadow: 0 4px 10px rgba(90,70,50,0.16);
@@ -33,28 +34,28 @@ const PaperPocket = (function () {
   }
   .pocket-flap {
     position: absolute;
-    left: 8px; right: 8px; top: 0;
-    height: 34px;
+    left: 5px; right: 5px; top: 0;
+    height: 20px;
     background: #ece0ca;
     border-radius: 3px 3px 40px 40px / 3px 3px 14px 14px;
     box-shadow: inset 0 -3px 5px rgba(90,70,50,0.08);
   }
   .pocket-stitch {
     position: absolute;
-    left: 6px; right: 6px; bottom: 6px;
+    left: 4px; right: 4px; bottom: 3px;
     border-top: 1px dashed rgba(120,95,70,0.35);
   }
   .pocket-tape {
     position: absolute;
-    top: -8px; left: 50%;
-    width: 46px; height: 16px;
+    top: -5px; left: 50%;
+    width: 28px; height: 10px;
     transform: translateX(-50%) rotate(-2deg);
     background: rgba(230,210,180,0.75);
     box-shadow: 0 1px 2px rgba(90,70,50,0.15);
   }
   .pocket-contents {
     position: absolute;
-    left: 10px; right: 10px; bottom: 10px; top: 40px;
+    left: 6px; right: 6px; bottom: 6px; top: 24px;
     overflow: hidden;
   }
   `;
@@ -66,6 +67,7 @@ const PaperPocket = (function () {
 
     const el = MiscCore.createEl('div', { className: 'paper-pocket' });
     if (options.rotation !== undefined) el.style.transform = 'rotate(' + options.rotation + 'deg)';
+    if (options.position) Object.assign(el.style, options.position);
     el.innerHTML =
       '<div class="pocket-tape"></div>' +
       '<div class="pocket-flap"></div>' +
@@ -95,7 +97,8 @@ const PaperPocket = (function () {
       content = { type: 'message', value: text };
       const note = MiscCore.createEl('div', { text: text });
       note.style.fontFamily = 'var(--font-hand, inherit)';
-      note.style.fontSize = 'var(--text-sm, 13px)';
+      note.style.fontSize = '11px';
+      note.style.lineHeight = '1.2';
       note.style.color = 'var(--color-text, #3a3226)';
       contentsEl.appendChild(note);
     }
