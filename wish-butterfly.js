@@ -19,13 +19,14 @@
  */
 const WishButterfly = (function () {
   const STYLE_ID = 'misc-wish-butterfly-style';
-  const COSMETIC_ID = 'wish-butterfly-default';
+  
 
   const CSS = `
   .wish-butterfly {
     position: absolute;
-    width: 34px;
-    height: 26px;
+    width: 44px;
+    height: 34px;
+    pointer-events: auto;
     cursor: pointer;
     z-index: 5;
     filter: drop-shadow(0 0 0 rgba(138,148,104,0));
@@ -33,10 +34,11 @@ const WishButterfly = (function () {
     animation: wishButterflyFloat 6.5s ease-in-out infinite;
   }
   .wish-butterfly.is-glowing { filter: drop-shadow(0 0 6px rgba(138,148,104,0.85)); }
-  .wish-butterfly.is-open, .wish-butterfly.is-leaving { animation-play-state: paused; }
+  .wish-butterfly.is-open { animation-play-state: paused; }
   .wish-butterfly.is-leaving {
-    transition: transform 1.6s ease-in, opacity 1.6s ease-in;
-    transform: translate(60px, -90px) scale(0.6);
+    animation: none;
+    transition: transform 7s cubic-bezier(0.25, 0.1, 0.35, 1), opacity 7s ease-in;
+    transform: translate(-34vw, -10vh) scale(0.5) rotate(-10deg);
     opacity: 0;
   }
   .wish-butterfly svg { width: 100%; height: 100%; display: block; }
@@ -45,12 +47,13 @@ const WishButterfly = (function () {
   .wish-butterfly.reduced-motion, .wish-butterfly.reduced-motion .wb-wing { animation: none; }
   .wb-trail-dot {
     position: absolute;
-    width: 6px; height: 6px;
+    width: 8px; height: 8px;
+    box-shadow: 0 0 8px rgba(168,176,135,0.9);
     border-radius: 50%;
     background: radial-gradient(circle, rgba(168,176,135,0.9), rgba(168,176,135,0));
     transform: translate(-50%, -50%);
     opacity: 0.9;
-    transition: opacity 0.8s ease, transform 0.8s ease;
+    transition: opacity 4.5s ease, transform 4.5s ease;
     pointer-events: none;
     z-index: 5;
   }
@@ -119,14 +122,11 @@ const WishButterfly = (function () {
     if (!container) return null;
     options = options || {};
     MiscCore.injectStyle(STYLE_ID, CSS);
-    if (typeof MiscCosmetics !== 'undefined') {
-      MiscCosmetics.register(COSMETIC_ID, { category: 'butterfly', label: 'Wish Butterfly' });
-      if (!MiscCosmetics.isActive(COSMETIC_ID)) return null;
-    }
+    
 
     const reduced = MiscCore.prefersReducedMotion();
     const wrap = MiscCore.createEl('div', { className: 'wish-butterfly-mount' });
-    wrap.style.position = 'relative';
+    wrap.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
 
     const top = options.top || '10%';
     const left = options.left || '80%';
@@ -148,7 +148,7 @@ const WishButterfly = (function () {
       '<button type="button" class="wb-send" disabled>let it go</button>' +
       '</div>';
     bubble.style.top = 'calc(' + top + ' + 34px)';
-    bubble.style.left = left;
+    bubble.style.left = 'min(' + left + ', calc(100% - 250px))';
 
     wrap.appendChild(butterfly);
     wrap.appendChild(bubble);
@@ -157,10 +157,11 @@ const WishButterfly = (function () {
     // Occasional idle glow, independent of hover/click.
     let glowTimer = null;
     function scheduleGlow() {
-      if (reduced) return;
+      if (reduced || !wrap.isConnected) return;
       glowTimer = setTimeout(function () {
         butterfly.classList.add('is-glowing');
         setTimeout(function () {
+          if (butterfly.dataset.leaving) return;
           butterfly.classList.remove('is-glowing');
           scheduleGlow();
         }, 1200);
@@ -194,11 +195,12 @@ const WishButterfly = (function () {
       dot.style.top = (r.top - wr.top + r.height / 2) + 'px';
       wrap.appendChild(dot);
       requestAnimationFrame(function () { dot.classList.add('is-fading'); });
-      setTimeout(function () { dot.remove(); }, 850);
+      setTimeout(function () { dot.remove(); }, 4700);
     }
 
     function leave() {
       if (typeof MiscSound !== 'undefined') MiscSound.play('butterflyChime');
+      butterfly.dataset.leaving = '1';
       butterfly.classList.add('is-glowing');
       closeBubble();
       if (glowTimer) clearTimeout(glowTimer);
