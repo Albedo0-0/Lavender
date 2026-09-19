@@ -47,8 +47,9 @@
     <button id="water-icon" title="Log water">&#128167;</button>
   </div>
   <div class="utility-drawer-divider"></div>
-  <div class="utility-drawer-group" data-group="personal">
+<div class="utility-drawer-group" data-group="personal">
     <button id="notepad-icon" title="Notepad">&#128221;</button>
+    <button id="paintbrush-icon" title="Cosmetics">&#128396;</button>
   </div>
   <div class="utility-drawer-divider"></div>
   <div class="utility-drawer-group" data-group="system">
@@ -63,6 +64,7 @@
 
 <button id="journal-lock-toggle" title="Journal lock" style="display:none">&#128275;</button>
 <div id="global-break-takeover" style="display:none"></div>
+<div id="misc-ambient-layer" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2;"></div>
 
 <nav id="main-nav">
   <button class="nav-btn" data-screen="library">Library</button>
@@ -186,6 +188,20 @@
   <script src="backup.js"></script>
   <script src="backup-ui.js"></script>
   <script src="settings.js"></script>
+  <script src="misc-core.js"></script>
+  <script src="misc-cosmetics.js"></script>
+  <script src="misc-sound.js"></script>
+  <script src="pressed-paper.js"></script>
+  <script src="interactive-pins.js"></script>
+  <script src="washi-tape.js"></script>
+  <script src="paper-pocket.js"></script>
+  <script src="custom-cursor.js"></script>
+  <script src="rain-ambience.js"></script>
+  <script src="sunlight-ambience.js"></script>
+  <script src="wish-butterfly.js"></script>
+  <script src="firefly.js"></script>
+  <script src="ladybug.js"></script>
+  <script src="candle-lamp.js"></script>
   <script>
     State.init();
     Nav.init();
@@ -209,6 +225,35 @@
     Gamification.init();
     BackupUI.init();
     Settings.init();
+    (function () {
+      const ambientLayer = document.getElementById('misc-ambient-layer');
+      if (typeof CustomCursor !== 'undefined') CustomCursor.init();
+      if (typeof PressedPaper !== 'undefined') PressedPaper.autoInit();
+      if (typeof InteractivePins !== 'undefined') InteractivePins.init();
+      if (typeof WashiTape !== 'undefined') WashiTape.init();
+      if (ambientLayer) {
+        if (typeof Firefly !== 'undefined') Firefly.mount(ambientLayer, { count: 6 });
+        if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
+        if (typeof MiscWeather !== 'undefined') MiscWeather.mount(ambientLayer);
+      }
+      const libraryScreen = document.getElementById('screen-library');
+      if (libraryScreen && typeof WishButterfly !== 'undefined') {
+        libraryScreen.style.position = libraryScreen.style.position || 'relative';
+        WishButterfly.mount(libraryScreen, { top: '4%', left: '88%' });
+      }
+      const studyScreen = document.getElementById('screen-study');
+      if (studyScreen && typeof CandleLamp !== 'undefined') {
+        studyScreen.style.position = studyScreen.style.position || 'relative';
+        CandleLamp.mount(studyScreen);
+      }
+      const journalScreen = document.getElementById('screen-journal');
+      if (journalScreen && typeof PaperPocket !== 'undefined') {
+        journalScreen.style.position = journalScreen.style.position || 'relative';
+        PaperPocket.mount(journalScreen);
+      }
+      const paintbrushBtn = document.getElementById('paintbrush-icon');
+      if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
+    })();
     (function () {
       const s = State.get().settings || {};
       if (!s.hasSeenFullscreenPrompt && !s.userExitedFullscreen) {
