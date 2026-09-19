@@ -149,8 +149,6 @@ const Player = (function () {
       } else {
         console.log('[radio] entering loadHlsScript');
         loadHlsScript(function () {
-          console.log('[radio] entering loadHlsScript');
-        loadHlsScript(function () {
           console.log('[radio] loadHlsScript callback fired, window.Hls =', typeof window.Hls);
           hls = new Hls();
           hls.on(Hls.Events.ERROR, function (event, data) { console.error('Radio HLS error:', data); });
