@@ -364,19 +364,35 @@ const Player = (function () {
 
   function musicHtml() {
     const track = MusicData.getById(currentTrackId);
-    return '<h3>Music Player</h3>' +
-      '<div id="music-now-playing">' + (track ? track.name : 'Nothing playing') + '</div>' +
-      '<input type="range" id="music-seek-bar" min="0" value="0" step="1">' +
-      '<div id="music-time-label">0:00 / 0:00</div>' +
-      '<div id="music-controls">' +
-      '<button id="music-prev-btn">Prev</button> ' +
-      '<button id="music-playpause-btn">' + (musicPlaying ? 'Pause' : 'Play') + '</button> ' +
-      '<button id="music-next-btn">Next</button> ' +
-      '<button id=\"music-shuffle-btn\">' + (shuffleOn ? 'Shuffle: On' : 'Shuffle: Off') + '</button> ' +
-      '<button id=\"music-autoplay-btn\">' + (autoplayOn ? 'Autoplay: On' : 'Autoplay: Off') + '</button>' +
-      '</div>' +
-      '<button id="music-playlist-btn">Playlist</button> ' +
-      '<button id="player-back-btn">Back</button>';
+    return (
+      '<div class="cassette-player">' +
+        '<div class="modal-header"><h3 class="modal-title">Music Player</h3></div>' +
+        '<div class="cassette-body' + (musicPlaying ? ' music-playing' : '') + '">' +
+          '<div class="cassette-window">' +
+            '<span class="cassette-reel cassette-reel-left" aria-hidden="true"></span>' +
+            '<span class="cassette-reel cassette-reel-right" aria-hidden="true"></span>' +
+            '<div class="cassette-label" id="music-now-playing">' + (track ? track.name : 'Nothing playing') + '</div>' +
+          '</div>' +
+          '<div class="cassette-progress">' +
+            '<input type="range" id="music-seek-bar" class="cassette-seek" min="0" value="0" step="1">' +
+            '<div class="cassette-time-label" id="music-time-label">0:00 / 0:00</div>' +
+          '</div>' +
+          '<div class="cassette-controls" id="music-controls">' +
+            '<button id="music-prev-btn" class="cassette-btn">Prev</button>' +
+            '<button id="music-playpause-btn" class="cassette-btn cassette-btn-main">' + (musicPlaying ? 'Pause' : 'Play') + '</button>' +
+            '<button id="music-next-btn" class="cassette-btn">Next</button>' +
+          '</div>' +
+          '<div class="cassette-toggles">' +
+            '<button id="music-shuffle-btn" class="cassette-toggle-btn' + (shuffleOn ? ' cassette-toggle-active' : '') + '">' + (shuffleOn ? 'Shuffle: On' : 'Shuffle: Off') + '</button>' +
+            '<button id="music-autoplay-btn" class="cassette-toggle-btn' + (autoplayOn ? ' cassette-toggle-active' : '') + '">' + (autoplayOn ? 'Autoplay: On' : 'Autoplay: Off') + '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cassette-footer">' +
+          '<button id="music-playlist-btn" class="btn-secondary">Playlist</button>' +
+          '<button id="player-back-btn" class="btn-secondary">Back</button>' +
+        '</div>' +
+      '</div>'
+    );
   }
   function renderMusicModal() {
     const overlay = document.getElementById('modal-overlay');
@@ -401,16 +417,18 @@ const Player = (function () {
   function playlistHtml() {
     const list = MusicData.getPlaylist();
     const rows = list.length ? list.map(function (t) {
-      return '<div class="playlist-row' + (t.id === currentTrackId ? ' playlist-row-active' : '') + '" data-id="' + t.id + '">' +
-        '<span class="playlist-row-name">' + t.name + (t.available === false ? ' (unavailable)' : '') + '</span>' +
-        '<button class="playlist-remove-btn" data-id="' + t.id + '">Remove</button>' +
+      return '<div class="playlist-row list-row cassette-media-row' + (t.id === currentTrackId ? ' playlist-row-active' : '') + '" data-id="' + t.id + '">' +
+        '<span class="cassette-media-source" data-source="' + t.source + '" aria-hidden="true"></span>' +
+        '<span class="playlist-row-name list-row-title">' + t.name + (t.available === false ? ' (unavailable)' : '') + '</span>' +
+        '<button class="playlist-remove-btn cassette-media-remove" data-id="' + t.id + '">Remove</button>' +
         '</div>';
-    }).join('') : '<p>No tracks yet.</p>';
-    return '<h3>Playlist</h3>' + rows +
-      '<label>Add local file<br><input type="file" id="playlist-file-input" accept="audio/mpeg,audio/wav,.mp3,.wav"></label><br><br>' +
-      '<label>Add YouTube URL<br><input type="text" id="playlist-yt-input" placeholder="https://youtube.com/watch?v=..."></label> ' +
-      '<button id="playlist-add-yt-btn">Add</button>' +
-      '<br><br><button id="player-back-to-music-btn">Back</button>';
+    }).join('') : '<div class="empty-state">No tracks yet.</div>';
+    return '<div class="modal-header"><h3 class="modal-title">Playlist</h3></div>' +
+      rows +
+      '<div class="form-row"><label for="playlist-file-input">Add local file</label><input type="file" id="playlist-file-input" accept="audio/mpeg,audio/wav,.mp3,.wav"></div>' +
+      '<div class="form-row"><label for="playlist-yt-input">Add YouTube URL</label><input type="text" id="playlist-yt-input" placeholder="https://youtube.com/watch?v=..."></div>' +
+      '<button id="playlist-add-yt-btn" class="btn-secondary">Add</button>' +
+      '<div class="modal-footer"><button id="player-back-to-music-btn" class="btn-secondary">Back</button></div>';
   }
   function openPlaylistModal() {
     Modal.open(playlistHtml());
