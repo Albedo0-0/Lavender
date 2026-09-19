@@ -3374,12 +3374,14 @@ button.notepad-format-btn.notepad-format-active {
 
 .assistant-notebook {
   position: relative;
-  padding-right: 58px;
+  padding-right: 64px;
+  padding-bottom: 74px;
   animation: assistantNotebookIn 320ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 .assistant-notebook-cover {
   position: relative;
-  padding: var(--space-4);
+  padding: var(--space-5);
+  min-height: 96px;
   background: var(--color-surface);
   background-image: repeating-linear-gradient(0deg, transparent 0 27px, var(--color-cream-200) 27px 28px);
   border: 1px solid var(--color-kraft-400);
@@ -3395,22 +3397,33 @@ button.notepad-format-btn.notepad-format-active {
 }
 .assistant-notebook-title {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   color: var(--color-brown-700);
-  margin: 0 0 var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3) var(--space-3);
 }
-.assistant-notebook-summary { display: flex; flex-direction: column; gap: 2px; margin-left: var(--space-3); }
-.assistant-note-line { font-family: var(--font-hand); font-size: var(--text-sm); color: var(--color-ink-soft); }
+.assistant-notebook-summary { display: flex; flex-direction: column; gap: 4px; margin-left: var(--space-3); }
+.assistant-note-line { font-family: var(--font-hand); font-size: var(--text-base); color: var(--color-ink-soft); }
 
-.assistant-bookmarks { position: absolute; top: var(--space-3); right: 0; bottom: var(--space-3); width: 54px; }
-.assistant-bookmark {
+/* Right-edge tabs */
+.assistant-tabs-col {
   position: absolute;
+  top: var(--space-4);
   right: 0;
+  bottom: 78px;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.assistant-tab {
+  position: relative;
   font-family: var(--font-hand);
   font-size: var(--text-xs);
-  line-height: 1.15;
+  line-height: 1.2;
   color: var(--color-brown-800);
-  padding: 5px 8px;
+  padding: 6px 9px;
   border: none;
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   box-shadow: var(--shadow-sm);
@@ -3419,7 +3432,7 @@ button.notepad-format-btn.notepad-format-active {
   animation: assistantBookmarkSettle 260ms ease-out both;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
-.assistant-bookmark::before {
+.assistant-tab::before {
   content: '';
   position: absolute;
   left: -4px;
@@ -3430,17 +3443,58 @@ button.notepad-format-btn.notepad-format-active {
   opacity: 0.7;
   transform: rotate(-10deg);
 }
-.assistant-bookmark:hover { transform: translateX(-3px); box-shadow: var(--shadow-md); }
-.assistant-bookmark:active { transform: translateX(-1px) scale(0.97); }
+.assistant-tab:hover { transform: translateX(-3px); box-shadow: var(--shadow-md); }
+.assistant-tab:active { transform: translateX(-1px) scale(0.97); }
 
-.assistant-bookmark-1 { top: 0%;  width: 66px; background: var(--color-sage-200);  transform: rotate(-2deg);   animation-delay: 40ms; }
-.assistant-bookmark-2 { top: 13%; width: 54px; background: var(--color-kraft-300); transform: rotate(1.5deg);  animation-delay: 90ms; }
-.assistant-bookmark-3 { top: 26%; width: 56px; background: #f3dcd8;                transform: rotate(-1deg);   animation-delay: 140ms; }
-.assistant-bookmark-4 { top: 41%; width: 58px; background: var(--color-sage-300);  transform: rotate(2deg);    animation-delay: 190ms; }
-.assistant-bookmark-5 { top: 55%; width: 50px; background: var(--color-kraft-400); transform: rotate(-1.5deg); animation-delay: 240ms; }
-.assistant-bookmark-6 { top: 69%; width: 46px; background: var(--color-cream-300); transform: rotate(1deg);    animation-delay: 290ms; }
-.assistant-bookmark-7 { top: 83%; width: 52px; background: var(--color-sage-400);  transform: rotate(-2.5deg); animation-delay: 340ms; }
+.assistant-tab-1 { width: 88px; background: var(--color-sage-200);  transform: rotate(-2deg);   animation-delay: 40ms; }
+.assistant-tab-2 { width: 68px; background: var(--color-kraft-300); transform: rotate(1.5deg);  animation-delay: 110ms; }
+.assistant-tab-3 { width: 70px; background: #f3dcd8;                transform: rotate(-1.5deg); animation-delay: 180ms; }
+.assistant-tab-4 { width: 62px; background: var(--color-kraft-400); transform: rotate(2deg);    animation-delay: 250ms; }
 
+/* Bottom-edge ribbons */
+.assistant-ribbons-row {
+  position: absolute;
+  left: var(--space-4);
+  right: 70px;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-evenly;
+  gap: var(--space-3);
+}
+.assistant-ribbon {
+  position: relative;
+  font-family: var(--font-hand);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--color-brown-800);
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  border: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: center;
+  max-width: 110px;
+  animation: assistantBookmarkSettle 260ms ease-out both;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.assistant-ribbon::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 10px;
+  width: 14px;
+  height: 8px;
+  background: inherit;
+  opacity: 0.7;
+  transform: rotate(6deg);
+}
+.assistant-ribbon:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.assistant-ribbon:active { transform: translateY(-1px) scale(0.97); }
+
+.assistant-ribbon-1 { padding-bottom: var(--space-6); background: var(--color-sage-300);  transform: rotate(-1.5deg); animation-delay: 320ms; }
+.assistant-ribbon-2 { padding-bottom: 40px;           background: var(--color-cream-300); transform: rotate(1deg);    animation-delay: 380ms; }
+.assistant-ribbon-3 { padding-bottom: var(--space-5); background: var(--color-sage-400);  transform: rotate(-1deg);   animation-delay: 440ms; }
 .assistant-page { animation: assistantPageIn 240ms ease-out both; }
 
 .assistant-receipt {
@@ -3539,10 +3593,18 @@ button.notepad-format-btn.notepad-format-active {
 .assistant-index-row { border-left: 2px solid var(--color-kraft-400); }
 
 @media (max-width: 480px) {
-  .assistant-notebook { padding-right: 0; }
-  .assistant-bookmarks { position: static; width: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-  .assistant-bookmark { position: static; transform: none !important; border-radius: var(--radius-sm); }
-  .assistant-bookmark::before { display: none; }
+  .assistant-notebook { padding-right: 0; padding-bottom: 0; }
+  .assistant-tabs-col, .assistant-ribbons-row {
+    position: static;
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0;
+  }
+  .assistant-tab, .assistant-ribbon { position: static; transform: none !important; border-radius: var(--radius-sm); max-width: none; padding: 6px 10px; }
+  .assistant-tab::before, .assistant-ribbon::before { display: none; }
 }
 #settings-wallpaper-preview {
   max-width: 80px;
@@ -4182,6 +4244,10 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   0%, 100% { box-shadow: 0 0 4px 1px rgba(181, 86, 107, 0.35); opacity: 0.85; }
   50% { box-shadow: 0 0 10px 3px rgba(181, 86, 107, 0.55); opacity: 1; }
 }
+@keyframes radioCardSelect {
+  from { transform: scale(0.94); }
+  to { transform: scale(1); }
+}
 
 .radio-modal { position: relative; }
 
@@ -4189,22 +4255,38 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   position: relative;
   padding: var(--space-5) var(--space-4) var(--space-4);
   margin-bottom: var(--space-3);
-  background: linear-gradient(175deg, var(--color-kraft-300), var(--color-kraft-400) 85%);
-  border: 1px solid var(--color-brown-600);
+  background:
+    radial-gradient(120% 60% at 30% 0%, rgba(255,255,255,0.18), transparent 60%),
+    repeating-linear-gradient(100deg, rgba(90,62,34,0.08) 0 3px, transparent 3px 9px),
+    linear-gradient(175deg, var(--color-kraft-300), var(--color-brown-600) 130%);
+  border: 1px solid var(--color-brown-700);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -12px 18px -12px rgba(0,0,0,0.3);
   animation: radioSlideIn 340ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
+.radio-body::before,
+.radio-body::after {
+  content: '';
+  position: absolute;
+  top: var(--space-2);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--color-cream-100), var(--color-brown-800) 80%);
+  box-shadow: var(--shadow-sm);
+}
+.radio-body::before { left: var(--space-2); }
+.radio-body::after { right: var(--space-2); }
 
 .radio-grille {
-  height: 30px;
+  height: 32px;
   margin-bottom: var(--space-3);
   border-radius: var(--radius-sm);
-  background: repeating-linear-gradient(90deg,
-    var(--color-brown-700) 0px, var(--color-brown-700) 2px,
-    transparent 2px, transparent 8px);
-  background-color: var(--color-kraft-500);
-  opacity: 0.55;
+  background-color: var(--color-brown-800);
+  background-image: radial-gradient(var(--color-kraft-500) 1px, transparent 1.4px);
+  background-size: 7px 7px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.35);
+  opacity: 0.85;
 }
 
 .radio-top-row {
@@ -4311,6 +4393,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   background: var(--color-sage-200);
   border-color: var(--color-sage-600);
   box-shadow: var(--shadow-md);
+  animation: radioCardSelect 200ms ease-out;
 }
 .radio-station-name { font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-text); }
 .radio-station-check { color: var(--color-sage-700); font-weight: 700; }
@@ -4354,13 +4437,24 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 .cassette-player { position: relative; }
 
 .cassette-body {
+  position: relative;
   padding: var(--space-4);
   margin-bottom: var(--space-3);
-  background: linear-gradient(175deg, var(--color-brown-700), var(--color-brown-800) 85%);
+  background:
+    radial-gradient(140% 70% at 25% 0%, rgba(255,255,255,0.08), transparent 55%),
+    linear-gradient(175deg, var(--color-brown-700), #2a1c10 90%);
   border: 1px solid var(--color-brown-800);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.12);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -10px 16px -10px rgba(0,0,0,0.4);
   animation: cassetteSlideIn 340ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.cassette-body::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(201, 168, 106, 0.35);
+  border-radius: calc(var(--radius-lg) - 3px);
+  pointer-events: none;
 }
 
 .cassette-window {
@@ -4374,7 +4468,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   background: var(--color-cream-100);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-brown-800);
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.35);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.4), 0 0 0 3px rgba(201, 168, 106, 0.18);
 }
 .cassette-reel {
   width: 26px;
@@ -4399,7 +4493,8 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   background: var(--color-cream-050);
   padding: 1px 10px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
+  border: 1px solid #c9a86a;
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
