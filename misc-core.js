@@ -76,3 +76,68 @@ const MiscCore = (function () {
     injectStyle: injectStyle
   };
 })();
+
+/*
+ * Lavender — Weather Ambience Cycle.
+ *
+ * Automatically rotates between 'clear', 'rain' and 'sunlight' (never
+ * repeating the same state twice in a row), each held for at least 30
+ * minutes. Persists to State.get().miscWeather so a reload resumes the
+ * same state instead of restarting the cycle. No sound is triggered by
+ * the cycle itself — sounds here stay interaction-only, per design.
+ */
+const MiscWeather = (function () {
+  const STATES = ['clear', 'rain', 'sunlight'];
+  const MIN_DURATION_MS = 30 * 60 * 1000;
+  let rainInstance = null;
+  let sunInstance = null;
+  let checkTimer = null;
+
+  function getSaved() { return (typeof State !== 'undefined' && State.get().miscWeather) || null; }
+  function save(state, since) {
+    if (typeof State !== 'undefined') State.set({ miscWeather: { state: state, since: since } });
+  }
+
+  function pickNext(current) {
+    const options = STATES.filter(function (s) { return s !== current; });
+    return MiscCore.pick(options);
+  }
+
+  function applyState(state) {
+    if (rainInstance) { if (state === 'rain') rainInstance.start(); else rainInstance.stop(); }
+    if (sunInstance) { if (state === 'sunlight') sunInstance.start(); else sunInstance.stop(); }
+  }
+
+  function rollNext() {
+    const saved = getSaved();
+    const current = saved ? saved.state : 'clear';
+    const next = pickNext(current);
+    save(next, Date.now());
+    applyState(next);
+  }
+
+  function checkDue() {
+    const saved = getSaved();
+    if (!saved || !saved.since) { rollNext(); return; }
+    if (Date.now() - saved.since >= MIN_DURATION_MS) rollNext();
+    else applyState(saved.state);
+  }
+
+  function mount(container, options) {
+    if (!container || typeof RainAmbience === 'undefined' || typeof SunlightAmbience === 'undefined') return null;
+    options = options || {};
+    rainInstance = RainAmbience.mount(container, options.rain || {});
+    sunInstance = SunlightAmbience.mount(container, options.sunlight || {});
+    checkDue();
+    checkTimer = setInterval(checkDue, 60 * 1000);
+    return {
+      destroy: function () {
+        if (checkTimer) clearInterval(checkTimer);
+        if (rainInstance) rainInstance.destroy();
+        if (sunInstance) sunInstance.destroy();
+      }
+    };
+  }
+
+  return { mount: mount };
+})();
