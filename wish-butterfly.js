@@ -338,8 +338,13 @@ const WishButterfly = (function () {
       butterfly.addEventListener('mouseleave', function () { s.hover = false; });
       textarea.addEventListener('input', function () { sendBtn.disabled = textarea.value.trim().length === 0; });
       cancelBtn.addEventListener('click', function () {
+        textarea.value = '';
         closeBubble();
-        s.deadline = performance.now() + 20000;
+        if (reduced) { fadeEnd(); return; }
+        butterfly.classList.add('is-excited');
+        s.phase = 'excited';
+        s.t = 0;
+        s.biasT = 0;
       });
       sendBtn.addEventListener('click', function () {
         if (textarea.value.trim().length === 0) return;
