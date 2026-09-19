@@ -233,11 +233,12 @@ const CandleLamp = (function () {
       '<div class="candle-message"></div>';
 
     const dimOverlay = MiscCore.createEl('div', { className: 'candle-dim-overlay' });
+if (reduced) dimOverlay.style.transition = 'none';
     (options.dimTarget || document.body).appendChild(dimOverlay);
     container.appendChild(wrap);
 
     const base = wrap.querySelector('.candle-base');
-    const riders = wrap.querySelector('.candle-riders');
+    
     const blobs = wrap.querySelectorAll('.candle-blob');
     const puddle = wrap.querySelector('.candle-puddle');
     const flame = wrap.querySelector('.candle-flame');
@@ -248,27 +249,31 @@ const CandleLamp = (function () {
     let focused = false;
     let expireCallbacks = [];
 
+    function syncDim() {
+      dimOverlay.classList.toggle('is-active', focused && container.offsetParent !== null);
+    }
+
     function setFocused(next) {
       focused = next;
       wrap.classList.toggle('is-focused', focused);
-      dimOverlay.classList.toggle('is-active', focused);
+      syncDim();
     }
 
     function updateVisual(fraction) {
       fraction = MiscCore.clamp(fraction, 0, 1);
-      const baseFullH = CANDLE_H * 0.7, baseMinH = CANDLE_H * 0.1;
-      const baseH = baseFullH - (baseFullH - baseMinH) * fraction;
+      const fullH = CANDLE_H * 0.62, minH = CANDLE_H * 0.08;
+      const baseH = fullH - (fullH - minH) * fraction;
       base.style.height = baseH + 'px';
-      const dropPx = (CANDLE_H * 0.6) * fraction;
-      riders.style.transform = 'translateY(' + dropPx + 'px)';
+      const reach = [0.5, 0.85, 0.35, 0.65];
       blobs.forEach(function (blob, i) {
-        blob.style.height = (fraction * (CANDLE_H * 0.5) * (1 + i / 8)) + 'px';
+        const len = Math.max(0, Math.min(Math.max(0, fraction - 0.06 * (i + 1)) * reach[i % 4] * fullH * 1.3, baseH - 12));
+        blob.style.height = len + 'px';
+        blob.style.opacity = len > 2 ? '1' : '0';
       });
-      const puddleT = MiscCore.clamp((fraction - 0.38) / 0.62, 0, 1);
-      puddle.style.width = (46 + 54 * puddleT) + 'px';
-      puddle.style.height = (10 * puddleT) + 'px';
-      puddle.style.borderRadius = puddleT > 0 ? '50px / 6px' : '0px';
-      flame.style.opacity = String(1 - fraction * 0.5);
+      const puddleT = MiscCore.clamp((fraction - 0.15) / 0.85, 0, 1);
+      puddle.style.width = (CANDLE_W * (1 + 0.9 * puddleT)) + 'px';
+      puddle.style.height = (18 * puddleT) + 'px';
+      flame.style.opacity = String(1 - fraction * 0.35);
     }
 
     function persist(startedAt, durationMs) {
@@ -276,6 +281,7 @@ const CandleLamp = (function () {
     }
 
     function tick() {
+      syncDim();
       const saved = State.get().miscCandle;
       if (!lit || !saved || !saved.startedAt) return;
       const elapsed = TimeEngine.safeElapsed(saved.startedAt, Date.now());
@@ -283,14 +289,42 @@ const CandleLamp = (function () {
       if (elapsed >= saved.durationMs) finish(saved.durationMs);
     }
 
+    function subscribeTick() {
+      if (typeof TimeEngine === 'undefined' || !TimeEngine.subscribe) return;
+      if (TimeEngine.unsubscribe) TimeEngine.unsubscribe(SUBSCRIBER_ID);
+      TimeEngine.subscribe(tick, SUBSCRIBER_ID);
+    }
+
+    function unsubscribeTick() {
+      if (typeof TimeEngine !== 'undefined' && TimeEngine.unsubscribe) TimeEngine.unsubscribe(SUBSCRIBER_ID);
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') closeAndReset();
+    }
+
+    function closeAndReset() {
+      if (!lit) return;
+      lit = false;
+      unsubscribeTick();
+      document.removeEventListener('keydown', onKey);
+      persist(null);
+      wrap.classList.remove('is-out');
+      messageEl.classList.remove('is-visible');
+      updateVisual(0);
+      setFocused(false);
+    }
+
     function ignite() {
       if (lit || expired) return;
       lit = true;
+      updateVisual(0);
       const durationMs = minutesToMs(MiscCore.randInt(MIN_MINUTES, MAX_MINUTES));
       const startedAt = Date.now();
       persist(startedAt, durationMs);
       if (typeof MiscSound !== 'undefined') MiscSound.play('candleIgnite');
-      if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) TimeEngine.subscribe(tick, SUBSCRIBER_ID);
+      subscribeTick();
+      document.addEventListener('keydown', onKey);
       setFocused(true);
     }
 
@@ -298,7 +332,9 @@ const CandleLamp = (function () {
       if (expired) return;
       expired = true;
       lit = false;
-      if (typeof TimeEngine !== 'undefined' && TimeEngine.unsubscribe) TimeEngine.unsubscribe(SUBSCRIBER_ID);
+      unsubscribeTick();
+      document.removeEventListener('keydown', onKey);
+      setFocused(false);
       const elapsedMs = TimeEngine.safeMs(durationMs);
       if (elapsedMs > 0) {
         TimeEngine.recordStandaloneStudy(elapsedMs, 'candle');
@@ -327,7 +363,7 @@ const CandleLamp = (function () {
     wrap.addEventListener('click', function () {
       if (expired) { resetForRelight(); return; }
       if (!lit) { ignite(); return; }
-      setFocused(!focused);
+      closeAndReset();
     });
     wrap.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wrap.click(); }
@@ -341,7 +377,9 @@ const CandleLamp = (function () {
       const elapsed = TimeEngine.safeElapsed(saved.startedAt, Date.now());
       if (elapsed >= saved.durationMs) { finish(saved.durationMs); return; }
       updateVisual(elapsed / saved.durationMs);
-      if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) TimeEngine.subscribe(tick, SUBSCRIBER_ID);
+      subscribeTick();
+      document.addEventListener('keydown', onKey);
+      setFocused(true);
     })();
 
     return {
@@ -350,7 +388,8 @@ const CandleLamp = (function () {
       setFocused: setFocused,
       onExpire: function (cb) { expireCallbacks.push(cb); },
       destroy: function () {
-        if (typeof TimeEngine !== 'undefined' && TimeEngine.unsubscribe) TimeEngine.unsubscribe(SUBSCRIBER_ID);
+        unsubscribeTick();
+        document.removeEventListener('keydown', onKey);
         wrap.remove();
         dimOverlay.remove();
       }
