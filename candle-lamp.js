@@ -31,88 +31,124 @@
 const CandleLamp = (function () {
   const STYLE_ID = 'misc-candle-lamp-style';
   const SUBSCRIBER_ID = 'misc-candle';
-  const CANDLE_H = 60; // px — matches the .candle-scene proportions below
+  const CANDLE_H = 210; // px — scene height (base + wick + flame headroom)
+  const CANDLE_W = 92; // px
   const MIN_MINUTES = 10;
   const MAX_MINUTES = 90;
 
   const CSS = `
   .candle-lamp-mount {
     position: absolute;
-    bottom: 12px;
-    right: 16px;
+    bottom: 8px;
+    right: 5%;
+    width: ${CANDLE_W}px;
+    height: ${CANDLE_H}px;
     z-index: 4;
     cursor: pointer;
-    transition: transform 0.6s ease;
+    transform-origin: 50% 100%;
+    transition: transform 0.9s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .candle-lamp-mount.is-focused { transform: scale(1.9); z-index: 5; }
+  .candle-lamp-mount.is-focused { transform: scale(1.18); z-index: 31; }
   .candle-dim-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(20, 14, 30, 0);
-    transition: background 0.6s ease;
+    background: radial-gradient(ellipse 80% 85% at 88% 92%, rgba(40,20,8,0.45) 0%, rgba(14,9,20,0.76) 45%, rgba(6,4,12,0.84) 100%);
+    opacity: 0;
+    transition: opacity 0.9s ease;
     pointer-events: none;
-    z-index: 3;
+    z-index: 30;
   }
-  .candle-dim-overlay.is-active { background: rgba(20, 14, 30, 0.55); }
+  .candle-dim-overlay.is-active { opacity: 1; }
   .candle-glow-pool {
     position: absolute;
-    width: 260px;
-    height: 260px;
+    z-index: -1;
+    width: 1100px;
+    height: 1100px;
     left: 50%;
-    bottom: -40px;
-    transform: translateX(-50%) scale(0.3);
-    background: radial-gradient(circle, rgba(255,190,120,0.55) 0%, rgba(255,190,120,0.18) 40%, rgba(255,190,120,0) 72%);
+    margin-left: -550px;
+    bottom: calc(100% - 510px);
+    transform: scale(0.3);
+    background: radial-gradient(circle, rgba(255,176,92,0.5) 0%, rgba(255,150,70,0.2) 26%, rgba(255,130,50,0.06) 46%, rgba(255,130,50,0) 68%);
     opacity: 0;
-    transition: opacity 0.7s ease, transform 0.7s ease;
+    transition: opacity 0.9s ease, transform 1.2s ease;
     pointer-events: none;
-    z-index: 3;
   }
-  .candle-lamp-mount.is-focused .candle-glow-pool { opacity: 1; transform: translateX(-50%) scale(1); }
+  .candle-lamp-mount.is-focused .candle-glow-pool { opacity: 1; transform: scale(1); }
+  .candle-lamp-mount.is-out .candle-glow-pool { opacity: 0; }
 
-  .candle-scene { position: relative; width: 48px; height: ${CANDLE_H}px; overflow: visible; }
-  .candle-riders { position: relative; width: 100%; height: 100%; transition: transform 0.9s var(--ease-soft, ease); }
+  .candle-scene { position: relative; z-index: 1; width: ${CANDLE_W}px; height: ${CANDLE_H}px; overflow: visible; }
   .candle-base {
     position: absolute;
-    bottom: 0; left: 4px;
-    width: 40px;
-    height: ${CANDLE_H * 0.7}px;
-    background: linear-gradient(180deg, var(--color-cream-050, #fffdf8) 0%, var(--color-kraft-300, #d9c4a3) 100%);
-    border-radius: 3px 3px 1px 1px;
-    box-shadow: inset -2px 0 4px rgba(63,47,33,0.15);
-    transition: height 0.9s var(--ease-soft, ease);
+    bottom: 0; left: 0;
+    width: 100%;
+    height: ${CANDLE_H * 0.62}px;
+    background: linear-gradient(90deg, #cdb894 0%, #f6ecd4 22%, #fffaf0 45%, #efe2c4 72%, #c7b088 100%);
+    border-radius: 6px 6px 4px 4px / 8px 8px 4px 4px;
+    box-shadow: inset -6px 0 10px rgba(90,64,36,0.18), 0 6px 10px rgba(30,18,8,0.45);
+    transition: height 1.2s linear;
+  }
+  .candle-base::before {
+    content: "";
+    position: absolute;
+    top: -7px; left: 2px; right: 2px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 45%, #ffe2a0 0%, #f7d99b 45%, #e6cf9f 100%);
+    box-shadow: 0 0 14px rgba(255,190,100,0.55);
   }
   .candle-blob {
     position: absolute;
-    width: 12px; height: 5px;
-    top: ${CANDLE_H * 0.28}px;
-    background: linear-gradient(180deg, var(--color-cream-050, #fffdf8) 0%, var(--color-kraft-300, #d9c4a3) 100%);
-    border-radius: 5px;
-    box-shadow: var(--shadow-sm, 0 1px 3px rgba(63,47,33,0.15));
-    transition: height 0.9s var(--ease-soft, ease);
+    top: 2px;
+    width: 10px; height: 0;
+    opacity: 0;
+    background: linear-gradient(90deg, #efe2c4, #fffaf0 55%, #e6d6b2);
+    border-radius: 0 0 6px 6px;
+    box-shadow: 1px 2px 3px rgba(90,64,36,0.25);
+    transition: height 1.2s linear, opacity 0.6s ease;
   }
-  .candle-blob[data-i="0"] { left: 2px; }
-  .candle-blob[data-i="1"] { left: 14px; }
-  .candle-blob[data-i="2"] { left: 26px; }
-  .candle-blob[data-i="3"] { left: 36px; }
-  .candle-wick { position: absolute; top: -8px; left: 50%; width: 1.5px; height: 8px; background: var(--color-brown-800, #3f2f21); transform: translateX(-50%); }
+  .candle-blob::after {
+    content: "";
+    position: absolute;
+    left: -1px; bottom: -4px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #fffaf0, #e6d6b2);
+    box-shadow: 1px 2px 3px rgba(90,64,36,0.25);
+  }
+  .candle-blob[data-i="0"] { left: 8%; }
+  .candle-blob[data-i="1"] { left: 32%; }
+  .candle-blob[data-i="2"] { left: 58%; }
+  .candle-blob[data-i="3"] { left: 80%; }
+  .candle-wick {
+    position: absolute;
+    bottom: calc(100% - 3px);
+    left: 50%;
+    width: 3px; height: 24px;
+    margin-left: -1.5px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #1c130c 0%, #4a3421 60%, #3a2a1a 100%);
+  }
   .candle-flame {
     position: absolute;
-    top: -20px; left: 50%;
-    width: 9px; height: 16px;
+    bottom: calc(100% + 12px); left: 50%;
+    width: 26px; height: 56px;
     transform: translateX(-50%);
-    background: radial-gradient(ellipse at 50% 70%, #fff3c4 0%, #ffb84d 55%, rgba(255,120,30,0) 85%);
-    border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
+    transform-origin: 50% 100%;
+    background: radial-gradient(ellipse at 50% 72%, #fffbe0 0%, #ffd070 30%, #ff9a30 62%, rgba(255,110,20,0) 88%);
+    border-radius: 50% 50% 50% 50% / 68% 68% 32% 32%;
     animation: candleFlicker 1.4s ease-in-out infinite;
-    filter: drop-shadow(0 0 5px rgba(255,170,80,0.8));
+    filter: drop-shadow(0 0 12px rgba(255,160,60,0.9));
     transition: opacity 0.9s ease;
   }
   .candle-lamp-mount.reduced-motion .candle-flame,
   .candle-lamp-mount.reduced-motion .candle-spark { animation: none; }
+  .candle-lamp-mount.reduced-motion, .candle-lamp-mount.reduced-motion * { transition-duration: 0.01s !important; }
   .candle-lamp-mount.is-out .candle-flame,
   .candle-lamp-mount.is-out .candle-spark { display: none; }
   .candle-spark {
     position: absolute;
-    bottom: 2px; left: 2px;
+    bottom: 8px; left: 11px;
     width: 3px; height: 3px;
     background: #ffe27a;
     border-radius: 50%;
@@ -127,27 +163,28 @@ const CandleLamp = (function () {
   @keyframes candleSpark {
     0% { transform: translate(0, 0); opacity: 0; }
     20% { opacity: 0.75; }
-    100% { transform: translate(2px, -14px); opacity: 0; }
+    100% { transform: translate(3px, -46px); opacity: 0; }
   }
 
   .candle-puddle {
     position: absolute;
-    bottom: -2px;
+    z-index: 0;
+    bottom: -5px;
     left: 50%;
-    width: 46px;
-    height: 0px;
-    background: linear-gradient(180deg, var(--color-cream-050, #fffdf8), var(--color-kraft-300, #d9c4a3));
-    border-radius: 0;
+    width: ${CANDLE_W}px;
+    height: 0;
+    background: radial-gradient(ellipse at 50% 40%, #fff6dc 0%, #ecdcb6 70%, #d9c4a3 100%);
+    border-radius: 50%;
+    box-shadow: 0 3px 6px rgba(30,18,8,0.35);
     transform: translateX(-50%);
-    transition: width 0.9s var(--ease-soft, ease), height 0.9s var(--ease-soft, ease), border-radius 0.9s var(--ease-soft, ease);
+    transition: width 1.2s linear, height 1.2s linear;
   }
 
   .candle-message {
     position: absolute;
-    bottom: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 180px;
+    bottom: ${CANDLE_H + 30}px;
+    right: 0;
+    width: 200px;
     padding: 9px 12px;
     background: var(--color-surface, #fffdf8);
     border: 1px solid var(--color-border, #ddd3bd);
@@ -161,7 +198,7 @@ const CandleLamp = (function () {
     pointer-events: none;
     transition: opacity 0.8s ease, transform 0.8s ease;
   }
-  .candle-message.is-visible { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+  .candle-message.is-visible { opacity: 1; transform: translateY(-4px); }
   `;
 
   function minutesToMs(min) { return min * 60 * 1000; }
@@ -177,9 +214,10 @@ const CandleLamp = (function () {
       attrs: { role: 'button', tabindex: '0', 'aria-label': 'candle' }
     });
     wrap.innerHTML =
-      '<div class="candle-glow-pool"></div>' +
+      '<div class="candle-puddle"></div>' +
       '<div class="candle-scene">' +
-      '<div class="candle-riders">' +
+      '<div class="candle-base">' +
+      '<div class="candle-glow-pool"></div>' +
       '<div class="candle-blob" data-i="0"></div>' +
       '<div class="candle-blob" data-i="1"></div>' +
       '<div class="candle-blob" data-i="2"></div>' +
@@ -191,9 +229,7 @@ const CandleLamp = (function () {
       '<div class="candle-spark" style="animation-delay:-0.9s"></div>' +
       '</div>' +
       '</div>' +
-      '<div class="candle-base"></div>' +
       '</div>' +
-      '<div class="candle-puddle"></div>' +
       '<div class="candle-message"></div>';
 
     const dimOverlay = MiscCore.createEl('div', { className: 'candle-dim-overlay' });
