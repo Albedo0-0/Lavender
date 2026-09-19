@@ -25,7 +25,7 @@ const Assistant = (function () {
     const totals = AssistantData.getTodayTotals();
 
     return (
-      '<div class="assistant-notebook">' +
+      '<div class="assistant-notebook" id="assistant-menu">' +
         '<div class="assistant-notebook-cover">' +
           '<h3 class="assistant-notebook-title">' + esc(Settings.assistantLabel()) + '</h3>' +
           '<div class="assistant-notebook-summary">' +
@@ -33,21 +33,23 @@ const Assistant = (function () {
             '<span class="assistant-note-line">Break \u00b7 ' + fmtMs(totals.breakMs) + ' \u00b7 ' + totals.questionsSolved + ' questions</span>' +
           '</div>' +
         '</div>' +
-        '<div class="assistant-bookmarks" id="assistant-menu">' +
-          '<button class="assistant-bookmark assistant-bookmark-1" data-go="summary">Daily Summary</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-2" data-go="leftoff">Resume</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-3" data-go="timeline">History</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-4" data-go="tomorrow">Tomorrow</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-5" data-go="search">Search</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-6" data-go="store">Store</button>' +
-          '<button class="assistant-bookmark assistant-bookmark-7" data-go="alarms">Alarms</button>' +
+        '<div class="assistant-tabs-col">' +
+          '<button class="assistant-tab assistant-tab-1" data-go="summary">Daily Summary</button>' +
+          '<button class="assistant-tab assistant-tab-2" data-go="leftoff">Resume</button>' +
+          '<button class="assistant-tab assistant-tab-3" data-go="timeline">History</button>' +
+          '<button class="assistant-tab assistant-tab-4" data-go="search">Search</button>' +
+        '</div>' +
+        '<div class="assistant-ribbons-row">' +
+          '<button class="assistant-ribbon assistant-ribbon-1" data-go="tomorrow">Tomorrow</button>' +
+          '<button class="assistant-ribbon assistant-ribbon-2" data-go="store">Store</button>' +
+          '<button class="assistant-ribbon assistant-ribbon-3" data-go="alarms">Alarms</button>' +
         '</div>' +
       '</div>'
     );
   }
 
   function openMain() {
-    Modal.open(mainHtml());
+    Modal.open(mainHtml(), { size: 'lg' });
     document.querySelectorAll('#assistant-menu button').forEach(function (btn) {
       btn.addEventListener('click', function () { routeTo(btn.dataset.go); });
     });
