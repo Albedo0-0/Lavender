@@ -56,11 +56,31 @@ const MiscCosmetics = (function () {
       .filter(function (entry) { return !category || entry.category === category; });
   }
 
+  // Placeholder-only collection view: opens a small panel listing whatever has
+  // been register()ed so far. No Store, no currency, no purchasing here — see
+  // file header. Safe to call once; ignores a second call on the same button.
+  function mountPaintbrushButton(button) {
+    if (!button || button.__paintbrushWired) return;
+    button.__paintbrushWired = true;
+    button.addEventListener('click', function () {
+      const items = list();
+      const rows = items.length
+        ? items.map(function (i) {
+            return '<div class="misc-cosmetic-row">' + i.label + (i.unlocked ? '' : ' (locked)') + '</div>';
+          }).join('')
+        : '<p class="micro-label">Nothing to show yet.</p>';
+      if (typeof Modal !== 'undefined' && Modal.open) {
+        Modal.open('<div class="modal-header"><h3 class="modal-title">Cosmetics</h3></div>' + rows);
+      }
+    });
+  }
+
   return {
     register: register,
     isActive: isActive,
     setUnlocked: setUnlocked,
     setActive: setActive,
-    list: list
+    list: list,
+    mountPaintbrushButton: mountPaintbrushButton
   };
 })();
