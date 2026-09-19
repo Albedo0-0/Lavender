@@ -65,6 +65,19 @@ const MiscCore = (function () {
     injectedStyles.add(id);
   }
 
+  // Shared non-wiping decor layer (lives in <main>, outside every screen
+  // section, so screen re-renders can't delete decorations).
+  function getDecorLayer() {
+    let layer = document.getElementById('lav-decor-layer');
+    if (layer) return layer;
+    const host = document.querySelector('main') || document.body;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    layer = createEl('div', { attrs: { id: 'lav-decor-layer', 'aria-hidden': 'true' } });
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:6;';
+    host.appendChild(layer);
+    return layer;
+  }
+
   return {
     prefersReducedMotion: prefersReducedMotion,
     ready: ready,
@@ -73,7 +86,8 @@ const MiscCore = (function () {
     pick: pick,
     clamp: clamp,
     createEl: createEl,
-    injectStyle: injectStyle
+    injectStyle: injectStyle,
+    getDecorLayer: getDecorLayer
   };
 })();
 
