@@ -36,6 +36,8 @@ const State = (function () {
     tagsMigrated: false,
     studyTemplates: {},
     musicPlaylist: [],
+    miscCandle: null, // Miscellaneous Candle Lamp: { lit, startedAt, durationMs } while a hidden-duration burn is active, else null
+    miscWeather: null, // Miscellaneous weather ambience cycle: { state: 'clear'|'rain'|'sunlight', since }
   };
   let data = Object.assign({}, defaultState);
 
