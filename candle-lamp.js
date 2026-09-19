@@ -62,30 +62,36 @@ const CandleLamp = (function () {
   .candle-dim-overlay.is-active { opacity: 1; }
   .candle-glow-pool {
     position: absolute;
-    z-index: -1;
-    width: 1100px;
-    height: 1100px;
+    z-index: 0;
+    width: 1500px;
+    height: 1500px;
     left: 50%;
-    margin-left: -550px;
-    bottom: calc(100% - 510px);
-    transform: scale(0.3);
-    background: radial-gradient(circle, rgba(255,176,92,0.5) 0%, rgba(255,150,70,0.2) 26%, rgba(255,130,50,0.06) 46%, rgba(255,130,50,0) 68%);
+    margin-left: -750px;
+    top: ${CANDLE_H * 0.12 - 750}px;
+    transform: scale(0.2);
+    background: radial-gradient(circle, rgba(255,176,92,0.55) 0%, rgba(255,150,70,0.22) 24%, rgba(255,130,50,0.07) 44%, rgba(255,130,50,0) 66%);
     opacity: 0;
-    transition: opacity 0.9s ease, transform 1.2s ease;
+    transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1), top 1.2s linear;
     pointer-events: none;
   }
+  .candle-lamp-mount.no-anim .candle-base,
+  .candle-lamp-mount.no-anim .candle-riders,
+  .candle-lamp-mount.no-anim .candle-blob,
+  .candle-lamp-mount.no-anim .candle-puddle { transition: none !important; }
+  .candle-lamp-mount.no-anim .candle-glow-pool { transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1); }
   .candle-lamp-mount.is-focused .candle-glow-pool { opacity: 1; transform: scale(1); }
   .candle-lamp-mount.is-out .candle-glow-pool { opacity: 0; }
 
-  .candle-scene { position: relative; z-index: 1; width: ${CANDLE_W}px; height: ${CANDLE_H}px; overflow: visible; }
+  .candle-scene { position: relative; z-index: 1; width: ${CANDLE_W}px; height: ${CANDLE_H}px; overflow: hidden; }
+  .candle-riders { position: absolute; inset: 0; transition: transform 1.2s linear; }
   .candle-base {
     position: absolute;
-    bottom: 0; left: 0;
-    width: 100%;
-    height: ${CANDLE_H * 0.62}px;
+    bottom: 0; left: 4px;
+    width: ${CANDLE_W - 8}px;
+    height: ${CANDLE_H * 0.7}px;
     background: linear-gradient(90deg, #cdb894 0%, #f6ecd4 22%, #fffaf0 45%, #efe2c4 72%, #c7b088 100%);
-    border-radius: 6px 6px 4px 4px / 8px 8px 4px 4px;
-    box-shadow: inset -6px 0 10px rgba(90,64,36,0.18), 0 6px 10px rgba(30,18,8,0.45);
+    border-radius: 6px 6px 3px 3px / 8px 8px 3px 3px;
+    box-shadow: inset -7px 0 12px rgba(90,64,36,0.2);
     transition: height 1.2s linear;
   }
   .candle-base::before {
@@ -99,8 +105,8 @@ const CandleLamp = (function () {
   }
   .candle-blob {
     position: absolute;
-    top: 2px;
-    width: 10px; height: 0;
+    top: ${CANDLE_H * 0.3 + 2}px;
+    width: 14px; height: 0;
     opacity: 0;
     background: linear-gradient(90deg, #efe2c4, #fffaf0 55%, #e6d6b2);
     border-radius: 0 0 6px 6px;
@@ -116,28 +122,37 @@ const CandleLamp = (function () {
     background: radial-gradient(circle at 40% 35%, #fffaf0, #e6d6b2);
     box-shadow: 1px 2px 3px rgba(90,64,36,0.25);
   }
-  .candle-blob[data-i="0"] { left: 8%; }
-  .candle-blob[data-i="1"] { left: 32%; }
-  .candle-blob[data-i="2"] { left: 58%; }
-  .candle-blob[data-i="3"] { left: 80%; }
+  .candle-blob[data-i="0"] { left: 10px; }
+  .candle-blob[data-i="1"] { left: 34px; }
+  .candle-blob[data-i="2"] { left: 58px; }
+  .candle-blob[data-i="3"] { left: 80px; }
   .candle-wick {
     position: absolute;
-    bottom: calc(100% - 3px);
+    top: ${CANDLE_H * 0.2}px;
     left: 50%;
-    width: 3px; height: 24px;
+    width: 3px; height: ${CANDLE_H * 0.1 + 4}px;
     margin-left: -1.5px;
     border-radius: 2px;
     background: linear-gradient(180deg, #1c130c 0%, #4a3421 60%, #3a2a1a 100%);
   }
+  @keyframes candleIgnite {
+    0% { transform: translateX(-50%) scale(0.05); opacity: 0; }
+    55% { transform: translateX(-50%) scale(0.75); opacity: 1; }
+    100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  }
+  .candle-lamp-mount.is-lit .candle-flame {
+    display: block;
+    animation: candleIgnite 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) 1 both, candleFlicker 1.4s ease-in-out 1.8s infinite;
+  }
   .candle-flame {
+    display: none;
     position: absolute;
-    bottom: calc(100% + 12px); left: 50%;
-    width: 26px; height: 56px;
+    top: 4px; left: 50%;
+    width: 32px; height: ${CANDLE_H * 0.25}px;
     transform: translateX(-50%);
     transform-origin: 50% 100%;
     background: radial-gradient(ellipse at 50% 72%, #fffbe0 0%, #ffd070 30%, #ff9a30 62%, rgba(255,110,20,0) 88%);
     border-radius: 50% 50% 50% 50% / 68% 68% 32% 32%;
-    animation: candleFlicker 1.4s ease-in-out infinite;
     filter: drop-shadow(0 0 12px rgba(255,160,60,0.9));
     transition: opacity 0.9s ease;
   }
@@ -214,10 +229,11 @@ const CandleLamp = (function () {
       attrs: { role: 'button', tabindex: '0', 'aria-label': 'candle' }
     });
     wrap.innerHTML =
+      '<div class="candle-glow-pool"></div>' +
       '<div class="candle-puddle"></div>' +
       '<div class="candle-scene">' +
-      '<div class="candle-base">' +
-      '<div class="candle-glow-pool"></div>' +
+      '<div class="candle-base"></div>' +
+      '<div class="candle-riders">' +
       '<div class="candle-blob" data-i="0"></div>' +
       '<div class="candle-blob" data-i="1"></div>' +
       '<div class="candle-blob" data-i="2"></div>' +
@@ -242,6 +258,9 @@ if (reduced) dimOverlay.style.transition = 'none';
     const blobs = wrap.querySelectorAll('.candle-blob');
     const puddle = wrap.querySelector('.candle-puddle');
     const flame = wrap.querySelector('.candle-flame');
+    const riders = wrap.querySelector('.candle-riders');
+    const wick = wrap.querySelector('.candle-wick');
+    const glow = wrap.querySelector('.candle-glow-pool');
     const messageEl = wrap.querySelector('.candle-message');
 
     let lit = false;
