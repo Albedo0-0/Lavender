@@ -38,15 +38,15 @@ const CustomCursor = (function () {
   }
   .lav-cursor-dot {
     width: 6px; height: 6px;
-    background: #a98fd6;
+    background: var(--color-accent-rust, #b5566b);
     transition: opacity 0.15s ease;
   }
   .lav-cursor-ring {
     width: 22px; height: 22px;
-    border: 1px solid rgba(169,143,214,0.5);
+    border: 1px solid rgba(181,86,107,0.5);
     transition: width 0.18s ease, height 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
   }
-  .lav-cursor-ring.is-hovering { width: 30px; height: 30px; border-color: rgba(169,143,214,0.85); }
+  .lav-cursor-ring.is-hovering { width: 30px; height: 30px; border-color: rgba(181,86,107,0.85); }
   .lav-cursor-ring.is-pressed { width: 18px; height: 18px; }
   .lav-cursor-dot.is-hidden, .lav-cursor-ring.is-hidden { opacity: 0; }
   `;
