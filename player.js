@@ -330,6 +330,30 @@ const Player = (function () {
       '</div>'
     );
   }
+  // Updates the card highlight, checkmark, and LCD display text in place —
+  // no Modal.open(), so selecting a station never replays the modal/radio-body
+  // entrance animation. Only playStation()/stopRadio() change actual playback.
+  function updateRadioSelectionUi(id) {
+    document.querySelectorAll('.radio-station-row').forEach(function (r) {
+      const active = r.dataset.id === id;
+      r.classList.toggle('radio-station-active', active);
+      let check = r.querySelector('.radio-station-check');
+      if (active && !check) {
+        check = document.createElement('span');
+        check.className = 'radio-station-check';
+        check.setAttribute('aria-hidden', 'true');
+        check.innerHTML = '&#10003;';
+        r.appendChild(check);
+      } else if (!active && check) {
+        check.remove();
+      }
+    });
+    const display = document.querySelector('.radio-display-text');
+    if (display) {
+      const station = RadioData.getById(id);
+      display.textContent = station ? station.name : '\u2014 \u00b7 \u2014';
+    }
+  }
   function openRadioModal() {
     Modal.open(radioHtml());
     const _rows = document.querySelectorAll('.radio-station-row');
@@ -338,8 +362,7 @@ const Player = (function () {
       r.addEventListener('click', function () {
         console.log('[radio] direct row click, id =', r.dataset.id);
         currentStationId = r.dataset.id;
-        _rows.forEach(function (x) { x.classList.remove('radio-station-active'); });
-        r.classList.add('radio-station-active');
+        updateRadioSelectionUi(currentStationId);
       });
     });
     if (!window.__radioDelegationBound) {
@@ -349,7 +372,7 @@ const Player = (function () {
         if (!row) return;
         console.log('[radio] row click delegated, id =', row.dataset.id);
         currentStationId = row.dataset.id;
-        openRadioModal();
+        updateRadioSelectionUi(currentStationId);
       });
     }
     document.getElementById('radio-play-btn').addEventListener('click', function () {
