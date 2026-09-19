@@ -38,9 +38,9 @@ const CandleLamp = (function () {
 
   const CSS = `
   .candle-lamp-mount {
-    position: absolute;
-    bottom: 0;
-    right: 16%;
+position: fixed;
+bottom: 0;
+right: 16%;
     width: ${CANDLE_W}px;
     height: ${CANDLE_H}px;
     z-index: 4;
@@ -142,10 +142,10 @@ const CandleLamp = (function () {
     55% { transform: translateX(-50%) scale(0.75); opacity: 1; }
     100% { transform: translateX(-50%) scale(1); opacity: 1; }
   }
-  .candle-lamp-mount.is-lit .candle-flame {
-    display: block;
-    animation: candleIgnite 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) 1 both, candleFlicker 1.4s ease-in-out 1.8s infinite;
-  }
+.candle-lamp-mount.is-lit .candle-flame {
+display: block;
+animation: candleIgnite 2.6s cubic-bezier(0.16, 1, 0.3, 1) 1 both, candleFlicker 3.4s ease-in-out 2.6s infinite;
+}
   .candle-flame {
     display: none;
     position: absolute;
@@ -170,23 +170,42 @@ const CandleLamp = (function () {
     background: #ffe27a;
     border-radius: 50%;
     opacity: 0;
-    animation: candleSpark 1.6s ease-in infinite;
+    animation: candleSpark 2.6s ease-out infinite;
   }
   @keyframes candleFlicker {
     0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(1); }
-    30% { transform: translateX(-52%) scaleY(1.06) scaleX(0.94); }
-    60% { transform: translateX(-48%) scaleY(0.94) scaleX(1.04); }
+    20% { transform: translateX(-50.6%) scaleY(1.02) scaleX(0.99); }
+    45% { transform: translateX(-51.5%) scaleY(1.04) scaleX(0.97); }
+    65% { transform: translateX(-49%) scaleY(0.97) scaleX(1.03); }
+    85% { transform: translateX(-49.6%) scaleY(1.01) scaleX(0.99); }
   }
   @keyframes candleSpark {
     0% { transform: translate(0, 0); opacity: 0; }
-    20% { opacity: 0.75; }
+    15% { opacity: 0.5; }
+    35% { opacity: 0.75; }
+    80% { opacity: 0.2; }
     100% { transform: translate(3px, -46px); opacity: 0; }
   }
 
+  .candle-ground-shadow {
+    position: absolute;
+    z-index: 0;
+    bottom: 0;
+    left: 50%;
+    width: ${CANDLE_W * 1.7}px;
+    height: 16px;
+    transform: translateX(-50%) scaleX(0.6);
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(60,42,22,0.32) 0%, rgba(60,42,22,0.15) 48%, rgba(60,42,22,0) 78%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.8s ease, transform 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .candle-lamp-mount.is-lit .candle-ground-shadow { opacity: 1; transform: translateX(-50%) scaleX(1); }
   .candle-puddle {
     position: absolute;
     z-index: 0;
-    bottom: -5px;
+    bottom: 3px;
     left: 50%;
     width: ${CANDLE_W}px;
     height: 0;
@@ -233,6 +252,7 @@ const CandleLamp = (function () {
     });
     wrap.innerHTML =
       '<div class="candle-glow-pool"></div>' +
+      '<div class="candle-ground-shadow"></div>' +
       '<div class="candle-puddle"></div>' +
       '<div class="candle-scene">' +
       '<div class="candle-base"></div>' +
