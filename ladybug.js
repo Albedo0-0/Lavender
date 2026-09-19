@@ -18,6 +18,7 @@ const Ladybug = (function () {
     width: 14px;
     height: 11px;
     cursor: pointer;
+    pointer-events: auto;
     transition: left 3.5s ease-in-out, top 3.5s ease-in-out, transform 0.2s ease;
   }
   .ladybug.reduced-motion { transition: transform 0.2s ease; }
