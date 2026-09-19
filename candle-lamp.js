@@ -280,9 +280,19 @@ if (reduced) dimOverlay.style.transition = 'none';
 
     function updateVisual(fraction) {
       fraction = MiscCore.clamp(fraction, 0, 1);
-      const fullH = CANDLE_H * 0.62, minH = CANDLE_H * 0.08;
+      if (fraction === 0) {
+        wrap.classList.add('no-anim');
+        requestAnimationFrame(function () { requestAnimationFrame(function () { wrap.classList.remove('no-anim'); }); });
+      }
+      const fullH = CANDLE_H * 0.7, minH = CANDLE_H * 0.1;
       const baseH = fullH - (fullH - minH) * fraction;
       base.style.height = baseH + 'px';
+      const drop = (CANDLE_H * 0.6) * fraction;
+      riders.style.transform = 'translateY(' + drop + 'px)';
+      glow.style.top = (CANDLE_H * 0.12 + drop - 750) + 'px';
+      const wickCut = CANDLE_H * 0.05 * fraction;
+      wick.style.height = (CANDLE_H * 0.1 + 4 - wickCut) + 'px';
+      wick.style.marginTop = wickCut + 'px';
       const reach = [0.5, 0.85, 0.35, 0.65];
       blobs.forEach(function (blob, i) {
         const len = Math.max(0, Math.min(Math.max(0, fraction - 0.06 * (i + 1)) * reach[i % 4] * fullH * 1.3, baseH - 12));
@@ -325,6 +335,7 @@ if (reduced) dimOverlay.style.transition = 'none';
     function closeAndReset() {
       if (!lit) return;
       lit = false;
+      wrap.classList.remove('is-lit');
       unsubscribeTick();
       document.removeEventListener('keydown', onKey);
       persist(null);
@@ -342,6 +353,7 @@ if (reduced) dimOverlay.style.transition = 'none';
       const startedAt = Date.now();
       persist(startedAt, durationMs);
       if (typeof MiscSound !== 'undefined') MiscSound.play('candleIgnite');
+      wrap.classList.add('is-lit');
       subscribeTick();
       document.addEventListener('keydown', onKey);
       setFocused(true);
@@ -396,6 +408,7 @@ if (reduced) dimOverlay.style.transition = 'none';
       const elapsed = TimeEngine.safeElapsed(saved.startedAt, Date.now());
       if (elapsed >= saved.durationMs) { finish(saved.durationMs); return; }
       updateVisual(elapsed / saved.durationMs);
+      wrap.classList.add('is-lit');
       subscribeTick();
       document.addEventListener('keydown', onKey);
       setFocused(true);
