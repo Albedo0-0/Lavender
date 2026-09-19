@@ -31,8 +31,8 @@
 const CandleLamp = (function () {
   const STYLE_ID = 'misc-candle-lamp-style';
   const SUBSCRIBER_ID = 'misc-candle';
-  const CANDLE_H = 210; // px — scene height (base + wick + flame headroom)
-  const CANDLE_W = 92; // px
+ const CANDLE_H = 260; // px — scene height (base + wick + flame headroom)
+  const CANDLE_W = 104; // px
   const MIN_MINUTES = 10;
   const MAX_MINUTES = 90;
 
@@ -40,22 +40,22 @@ const CandleLamp = (function () {
   .candle-lamp-mount {
     position: absolute;
     bottom: 8px;
-    right: 5%;
+    right: 16%;
     width: ${CANDLE_W}px;
     height: ${CANDLE_H}px;
     z-index: 4;
     cursor: pointer;
     transform-origin: 50% 100%;
-    transition: transform 0.9s ease;
+    transition: transform 1.6s cubic-bezier(0.22, 0.61, 0.36, 1);
     -webkit-tap-highlight-color: transparent;
   }
-  .candle-lamp-mount.is-focused { transform: scale(1.18); z-index: 31; }
+  .candle-lamp-mount.is-focused { transform: scale(1.25); z-index: 31; }
   .candle-dim-overlay {
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse 80% 85% at 88% 92%, rgba(40,20,8,0.45) 0%, rgba(14,9,20,0.76) 45%, rgba(6,4,12,0.84) 100%);
+    background: radial-gradient(ellipse 65% 75% at 80% 88%, rgba(40,20,8,0.55) 0%, rgba(8,5,14,0.9) 42%, rgba(3,2,8,0.95) 100%);
     opacity: 0;
-    transition: opacity 0.9s ease;
+    transition: opacity 2s ease;
     pointer-events: none;
     z-index: 30;
   }
