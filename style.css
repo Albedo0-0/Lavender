@@ -3975,6 +3975,360 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 }
 #backup-export-btn:hover, #backup-restore-btn:hover { background: var(--color-kraft-400); }
 
+/* ==========================================================================
+   Styling Phase 11 — Radio (vintage tabletop radio object)
+   ========================================================================== */
+
+.player-chooser { display: flex; gap: var(--space-3); }
+.player-chooser-btn { flex: 1; padding: var(--space-4) var(--space-3); text-align: center; }
+
+@keyframes radioSlideIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes radioPowerOn {
+  from { opacity: 0.15; }
+  to { opacity: 1; }
+}
+@keyframes radioLampPulse {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(181, 86, 107, 0.35); opacity: 0.85; }
+  50% { box-shadow: 0 0 10px 3px rgba(181, 86, 107, 0.55); opacity: 1; }
+}
+
+.radio-modal { position: relative; }
+
+.radio-body {
+  position: relative;
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  margin-bottom: var(--space-3);
+  background: linear-gradient(175deg, var(--color-kraft-300), var(--color-kraft-400) 85%);
+  border: 1px solid var(--color-brown-600);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.25);
+  animation: radioSlideIn 340ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.radio-grille {
+  height: 30px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: repeating-linear-gradient(90deg,
+    var(--color-brown-700) 0px, var(--color-brown-700) 2px,
+    transparent 2px, transparent 8px);
+  background-color: var(--color-kraft-500);
+  opacity: 0.55;
+}
+
+.radio-top-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.radio-knob {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--color-cream-100), var(--color-brown-600) 75%);
+  border: 1px solid var(--color-brown-800);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+.radio-knob::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 2px;
+  height: 8px;
+  background: var(--color-brown-800);
+  transform: translateX(-50%);
+}
+.radio-knob-left { transform: rotate(-15deg); }
+.radio-knob-right { transform: rotate(10deg); }
+
+.radio-display {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: #23281c;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-brown-800);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.5);
+  animation: radioPowerOn 480ms ease-out 140ms both;
+}
+.radio-display-text {
+  font-family: var(--font-hand);
+  font-size: var(--text-sm);
+  letter-spacing: 0.5px;
+  color: #cfe8b0;
+  text-shadow: 0 0 4px rgba(207, 232, 176, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.radio-lamp {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #5b4a2a;
+  flex-shrink: 0;
+  transition: background-color var(--transition-base);
+}
+.radio-playing .radio-lamp {
+  background: var(--color-accent-rust);
+  animation: radioLampPulse 2.2s ease-in-out infinite;
+}
+
+.radio-on-air-tag {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  font-family: var(--font-hand);
+  font-size: var(--text-xs);
+  color: var(--color-accent-rust);
+  transform: rotate(-6deg);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+.radio-playing .radio-on-air-tag { opacity: 1; }
+
+.radio-stations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+}
+.radio-station-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-cream-050);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transform: rotate(-0.6deg);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+.radio-stations .radio-station-card:nth-child(even) { transform: rotate(0.6deg); }
+.radio-station-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.radio-station-card.radio-station-active {
+  background: var(--color-sage-200);
+  border-color: var(--color-sage-600);
+  box-shadow: var(--shadow-md);
+}
+.radio-station-name { font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-text); }
+.radio-station-check { color: var(--color-sage-700); font-weight: 700; }
+
+.radio-controls { display: flex; justify-content: center; gap: var(--space-3); }
+.radio-btn {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-cream-050);
+  background: linear-gradient(180deg, var(--color-brown-600), var(--color-brown-700));
+  border: 1px solid var(--color-brown-800);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 0 var(--color-brown-800), var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.radio-btn:hover { transform: translateY(-1px); }
+.radio-btn:active { transform: translateY(1px); box-shadow: 0 0 0 var(--color-brown-800); }
+
+.radio-back-btn { margin-top: var(--space-1); }
+
+@media (max-width: 420px) {
+  .radio-knob { width: 20px; height: 20px; }
+  .radio-display-text { font-size: var(--text-xs); }
+}
+
+/* ==========================================================================
+   Styling Phase 11 — Music Player (cassette / portable player hybrid)
+   ========================================================================== */
+
+@keyframes cassetteSlideIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cassetteSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cassette-player { position: relative; }
+
+.cassette-body {
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  background: linear-gradient(175deg, var(--color-brown-700), var(--color-brown-800) 85%);
+  border: 1px solid var(--color-brown-800);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.12);
+  animation: cassetteSlideIn 340ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.cassette-window {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3) var(--space-5);
+  margin-bottom: var(--space-3);
+  background: var(--color-cream-100);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-brown-800);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.35);
+}
+.cassette-reel {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--color-kraft-500) 0 30%, transparent 31%),
+    radial-gradient(circle, var(--color-brown-700) 0 55%, var(--color-kraft-300) 56% 100%);
+  border: 1px solid var(--color-brown-700);
+  flex-shrink: 0;
+}
+.music-playing .cassette-reel { animation: cassetteSpin 2.6s linear infinite; }
+.cassette-label {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  max-width: 78%;
+  font-family: var(--font-hand);
+  font-size: var(--text-xs);
+  color: var(--color-brown-700);
+  background: var(--color-cream-050);
+  padding: 1px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cassette-progress { margin-bottom: var(--space-3); }
+.cassette-seek {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--color-kraft-400);
+  background-image: repeating-linear-gradient(90deg, var(--color-cream-100) 0 2px, transparent 2px 6px);
+  border-radius: var(--radius-pill);
+}
+.cassette-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-cream-050);
+  border: 2px solid var(--color-accent-rust);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  margin-top: -5px;
+}
+.cassette-seek::-moz-range-track { height: 4px; background: var(--color-kraft-400); border-radius: var(--radius-pill); }
+.cassette-seek::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-cream-050);
+  border: 2px solid var(--color-accent-rust);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.cassette-time-label {
+  margin-top: var(--space-1);
+  text-align: center;
+  font-family: var(--font-hand);
+  font-size: var(--text-xs);
+  color: var(--color-cream-200);
+}
+
+.cassette-controls { display: flex; align-items: center; justify-content: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.cassette-btn {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-brown-800);
+  background: linear-gradient(180deg, var(--color-cream-050), var(--color-cream-200));
+  border: 1px solid var(--color-brown-600);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 0 var(--color-brown-700), var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.cassette-btn:hover { transform: translateY(-1px); }
+.cassette-btn:active { transform: translateY(1px); box-shadow: 0 0 0 var(--color-brown-700); }
+.cassette-btn-main {
+  color: var(--color-cream-050);
+  background: linear-gradient(180deg, var(--color-accent-rust), var(--color-accent-rust-soft));
+  border-color: var(--color-brown-800);
+  box-shadow: 0 2px 0 var(--color-brown-800), var(--shadow-sm);
+}
+
+.cassette-toggles { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+.cassette-toggle-btn {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  padding: 3px var(--space-2);
+  color: var(--color-cream-200);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-pill);
+}
+.cassette-toggle-btn:hover { background: rgba(255,255,255,0.12); }
+.cassette-toggle-active { color: var(--color-brown-800); background: var(--color-kraft-300); border-color: var(--color-kraft-500); }
+
+.cassette-footer { display: flex; gap: var(--space-2); }
+
+.cassette-media-row { position: relative; padding-left: calc(var(--space-3) + 8px); }
+.cassette-media-row::before {
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 60%;
+  border-radius: var(--radius-pill);
+  background: var(--color-kraft-500);
+}
+.cassette-media-row.playlist-row-active::before { background: var(--color-accent-rust); }
+.cassette-media-source {
+  font-family: var(--font-hand);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  margin-right: var(--space-2);
+}
+.cassette-media-source[data-source="youtube"] { color: var(--color-accent-rust); border-color: var(--color-accent-rust-soft); }
+.cassette-media-source[data-source="youtube"]::before { content: 'YT'; }
+.cassette-media-source[data-source="local"]::before { content: '\266A'; }
+.cassette-media-remove {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-2);
+  color: var(--color-accent-rust);
+  background: none;
+  border: 1px solid var(--color-accent-rust-soft);
+  box-shadow: none;
+}
+.cassette-media-remove:hover { background: var(--color-cream-200); box-shadow: none; transform: none; }
+
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
