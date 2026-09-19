@@ -711,9 +711,13 @@ const MyWorld = (function () {
     }
   }
 
-  function drawTerrainBack() {
+  function drawHillsFar() {
     ensureTerrain();
     ctx.drawImage(terrain.far.canvas, 0, 0);
+  }
+
+  function drawHillsMid() {
+    ensureTerrain();
     ctx.drawImage(terrain.mid.canvas, 0, 0);
   }
 
@@ -731,6 +735,446 @@ const MyWorld = (function () {
     return surf[clampNum(Math.round(x), 0, W - 1, 0)];
   }
 
+  // ---------------------------------------------------------------------
+  // Clouds and weather (Phase 4)
+  // ---------------------------------------------------------------------
+  const WX = {
+    clear:  { cover: 0.25, rain: 0, fog: 0,    wind: 0.15 },
+    breeze: { cover: 0.45, rain: 0, fog: 0,    wind: 0.75 },
+    rain:   { cover: 0.92, rain: 1, fog: 0.12, wind: 0.4 },
+    fog:    { cover: 0.6,  rain: 0, fog: 1,    wind: 0.08 }
+  };
+  const WX_NAMES = ['clear', 'breeze', 'rain', 'fog'];
+  const WX_WEIGHTS = [0.4, 0.25, 0.2, 0.15];
+
+  const CLOUD_TONES = {
+    day:   [[255, 255, 255], [232, 236, 246], [184, 192, 214]],
+    dusk:  [[255, 226, 178], [240, 168, 136], [160, 104, 128]],
+    night: [[96, 104, 150], [62, 70, 124], [42, 48, 92]]
+  };
+
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+  let wxName = 'clear';
+  let wxLeft = 0;
+  let wxLocked = false;
+  let wxRand = null;
+  let wxNow = { cover: 0.25, rain: 0, fog: 0, wind: 0.15 };
+  let wxDt = 0;
+  let windNow = 0.15;
+  let motionScale = 1;
+  let debugWeather = null;
+  let clouds = null;
+  let cloudKey = '';
+  let fogBands = null;
+  let fogKey = '';
+  let drops = null;
+  let splashes = null;
+
+  function isWx(n) {
+    return typeof n === 'string' && Object.prototype.hasOwnProperty.call(WX, n);
+  }
+
+  function wxRnd() {
+    if (!wxRand) wxRand = makeRng((Date.now() / 1000) >>> 0);
+    return wxRand();
+  }
+
+  function lockWeather(name) {
+    const t = WX[name];
+    wxName = name;
+    wxLocked = true;
+    wxNow = { cover: t.cover, rain: t.rain, fog: t.fog, wind: t.wind };
+  }
+
+  function setDebugWeather(name) {
+    if (isWx(name)) {
+      debugWeather = name;
+      wxName = name;
+      wxLocked = true;
+    } else {
+      debugWeather = null;
+      wxLocked = false;
+      wxLeft = 0;
+    }
+  }
+
+  function getWind() {
+    return windNow;
+  }
+
+  function getWeather() {
+    return wxName;
+  }
+
+  function resetWeather() {
+    clouds = null;
+    cloudKey = '';
+    fogBands = null;
+    fogKey = '';
+    drops = null;
+    splashes = null;
+  }
+
+  function initWeather() {
+    wxRand = makeRng((Date.now() / 1000) >>> 0);
+    motionScale = (typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 0.4 : 1;
+    const m = typeof location !== 'undefined' ? /[?&]mwweather=([a-z]+)/.exec(location.search) : null;
+    const dw = m ? m[1] : debugWeather;
+    wxLocked = false;
+    wxName = 'clear';
+    wxNow = { cover: WX.clear.cover, rain: 0, fog: 0, wind: WX.clear.wind };
+    windNow = WX.clear.wind;
+    wxLeft = 90 + wxRnd() * 90;
+    if (isWx(dw)) lockWeather(dw);
+    resetWeather();
+  }
+
+  function pickWeather() {
+    let total = 0;
+    for (let i = 0; i < WX_NAMES.length; i++) {
+      if (WX_NAMES[i] !== wxName) total += WX_WEIGHTS[i];
+    }
+    let r = wxRnd() * total;
+    for (let i = 0; i < WX_NAMES.length; i++) {
+      if (WX_NAMES[i] === wxName) continue;
+      r -= WX_WEIGHTS[i];
+      if (r <= 0) return WX_NAMES[i];
+    }
+    return 'clear';
+  }
+
+  function updateWeather(dt) {
+    wxDt = dt;
+    if (!wxLocked) {
+      wxLeft -= dt;
+      if (wxLeft <= 0) {
+        wxName = pickWeather();
+        wxLeft = 100 + wxRnd() * 120;
+      }
+    }
+    const tgt = WX[wxName];
+    const k = 1 - Math.exp(-dt / 7);
+    wxNow.cover += (tgt.cover - wxNow.cover) * k;
+    wxNow.rain += (tgt.rain - wxNow.rain) * k;
+    wxNow.fog += (tgt.fog - wxNow.fog) * k;
+    wxNow.wind += (tgt.wind - wxNow.wind) * k;
+    const t = clockElapsed;
+    const gust = 0.85 + 0.15 * Math.sin(t * 0.37) + 0.1 * Math.sin(t * 0.91 + 1.3);
+    windNow = clampNum(wxNow.wind * gust, 0, 1, 0);
+    updateClouds(dt);
+  }
+
+  // ---- clouds ----
+  function makeCloudMap(rand, w, h) {
+    const map = new Uint8Array(w * h);
+    const n = 3 + Math.floor(w / 13);
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      let ry = Math.max(2, h * (0.3 + 0.32 * rand()) * (1 - 0.5 * Math.abs(2 * t - 1)));
+      ry = Math.min(ry, (h - 1) / 1.85);
+      const rx = Math.min(w / 2 - 0.5, ry * (1.2 + rand() * 0.6));
+      const cx = rx + t * (w - 2 * rx);
+      const cy = h - 1 - ry * 0.85;
+      const y1 = Math.min(h - 1, Math.ceil(cy + ry));
+      const x1 = Math.min(w - 1, Math.ceil(cx + rx));
+      for (let y = Math.max(0, Math.floor(cy - ry)); y <= y1; y++) {
+        for (let x = Math.max(0, Math.floor(cx - rx)); x <= x1; x++) {
+          const dx = (x - cx) / rx;
+          const dy = (y - cy) / ry;
+          if (dx * dx + dy * dy <= 1) map[y * w + x] = 2;
+        }
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      if (map[(h - 1) * w + x] && rand() < 0.3) map[(h - 1) * w + x] = 0;
+    }
+    for (let x = 0; x < w; x++) {
+      let ct = -1;
+      let cb = -1;
+      for (let y = 0; y < h; y++) {
+        if (map[y * w + x]) { if (ct < 0) ct = y; cb = y; }
+      }
+      if (ct < 0) continue;
+      const span = cb - ct + 1;
+      for (let y = ct; y <= cb; y++) {
+        if (!map[y * w + x]) continue;
+        const rel = (y - ct) / span;
+        let v = 2;
+        if (y === ct || (rel < 0.22 && (x + y) % 3 === 0)) v = 1;
+        else if (rel > 0.7 || (rel > 0.58 && ((x + y) & 1))) v = 3;
+        map[y * w + x] = v;
+      }
+    }
+    return map;
+  }
+
+  function buildClouds() {
+    const rand = makeRng(4242);
+    clouds = [];
+    for (let li = 0; li < 2; li++) {
+      const far = li === 0;
+      const sprites = [];
+      let maxW = 0;
+      for (let s = 0; s < 4; s++) {
+        let w = far ? Math.round(H * (0.1 + rand() * 0.12)) : Math.round(H * (0.26 + rand() * 0.22));
+        w = Math.max(14, Math.min(w, Math.round(W * (far ? 0.4 : 0.75))));
+        const h = Math.max(5, Math.round(w * (far ? 0.28 : 0.36)));
+        sprites.push({ w: w, h: h, map: makeCloudMap(rand, w, h), canvas: null, g: null, img: null });
+        if (w > maxW) maxW = w;
+      }
+      const n = far ? clampNum(Math.round(W / 48), 4, 9, 5) : clampNum(Math.round(W / 70), 3, 7, 4);
+      const period = W + maxW * 2;
+      const rank = [];
+      for (let i = 0; i < n; i++) rank.push(i);
+      for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        const tmp = rank[i]; rank[i] = rank[j]; rank[j] = tmp;
+      }
+      const list = [];
+      for (let i = 0; i < n; i++) {
+        list.push({
+          sp: sprites[i % 4],
+          x: -maxW + (i + rand() * 0.6) * period / n,
+          y: Math.round(H * (far ? 0.07 + rand() * 0.33 : 0.05 + rand() * 0.34)),
+          v: far ? 1.2 + rand() * 0.8 : 3 + rand() * 2,
+          th: rank[i] / n * 0.85
+        });
+      }
+      clouds.push({ far: far, sprites: sprites, list: list, maxW: maxW, period: period });
+    }
+    cloudKey = '';
+  }
+
+  function updateClouds(dt) {
+    if (!clouds) return;
+    const f = dt * motionScale * (0.6 + windNow * 1.4);
+    for (let li = 0; li < clouds.length; li++) {
+      const L = clouds[li];
+      for (let i = 0; i < L.list.length; i++) {
+        const c = L.list[i];
+        c.x += c.v * f;
+        if (c.x >= W + L.maxW) c.x -= L.period;
+      }
+    }
+  }
+
+  function cloudPal(env, far, gray) {
+    const out = [null];
+    for (let i = 0; i < 3; i++) {
+      let c = mixRgb(CLOUD_TONES.day[i], CLOUD_TONES.night[i], env.nf);
+      c = mixRgb(c, CLOUD_TONES.dusk[i], env.dusk * 0.9);
+      c = mixRgb(c, [110, 118, 138], gray * 0.55);
+      if (far) c = mixRgb(c, env.sky.bot, 0.3);
+      out.push(quant(c));
+    }
+    return out;
+  }
+
+  function paintSprite(sp, pal) {
+    if (!sp.canvas) {
+      sp.canvas = document.createElement('canvas');
+      sp.canvas.width = sp.w;
+      sp.canvas.height = sp.h;
+      sp.g = sp.canvas.getContext('2d');
+      sp.img = sp.g.createImageData(sp.w, sp.h);
+    }
+    const d = sp.img.data;
+    const m = sp.map;
+    for (let i = 0, n = m.length; i < n; i++) {
+      const v = m[i];
+      const j = i * 4;
+      if (!v) { d[j + 3] = 0; continue; }
+      const c = pal[v];
+      d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = 255;
+    }
+    sp.g.putImageData(sp.img, 0, 0);
+  }
+
+  function ensureClouds() {
+    if (!clouds) buildClouds();
+    const hour = getWorldHour();
+    const gray = Math.round(clampNum((wxNow.cover - 0.5) / 0.45, 0, 1, 0) * 6);
+    const key = Math.floor(hour * 12) + '|' + gray + '|' + W + 'x' + H;
+    if (key === cloudKey) return;
+    cloudKey = key;
+    const env = terrainEnv(hour);
+    for (let li = 0; li < clouds.length; li++) {
+      const pal = cloudPal(env, clouds[li].far, gray / 6);
+      for (let s = 0; s < clouds[li].sprites.length; s++) paintSprite(clouds[li].sprites[s], pal);
+    }
+  }
+
+  function drawClouds(li) {
+    ensureClouds();
+    const L = clouds[li];
+    for (let i = 0; i < L.list.length; i++) {
+      const c = L.list[i];
+      const a = Math.round(clampNum((wxNow.cover - c.th) / 0.14, 0, 1, 0) * 4) / 4;
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.drawImage(c.sp.canvas, Math.round(c.x), c.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- fog ----
+  function buildFog() {
+    const fw = Math.ceil(W / 4) * 4;
+    const defs = [
+      { y: groundY - Math.round(H * 0.2), h: Math.round(H * 0.16), peak: 0.85, mid: 0.6, v: 1.6 },
+      { y: groundY - Math.round(H * 0.09), h: Math.round(H * 0.09) + 3, peak: 0.7, mid: 0.7, v: 2.6 }
+    ];
+    fogBands = defs.map(function (d) {
+      return {
+        y: d.y, h: Math.max(4, d.h), peak: d.peak, mid: d.mid, v: d.v, fw: fw,
+        off: 0, canvas: null, g: null, img: null
+      };
+    });
+    fogKey = '';
+  }
+
+  function paintFog(b, rgb) {
+    const fw = b.fw;
+    if (!b.canvas) {
+      b.canvas = document.createElement('canvas');
+      b.canvas.width = fw;
+      b.canvas.height = b.h;
+      b.g = b.canvas.getContext('2d');
+      b.img = b.g.createImageData(fw, b.h);
+    }
+    const d = b.img.data;
+    const TAU = 6.2832;
+    for (let y = 0; y < b.h; y++) {
+      const pv = y / (b.h - 1);
+      const prof = Math.sin(Math.PI / 2 * (pv < b.mid ? pv / b.mid : (1 - pv) / (1 - b.mid)));
+      for (let x = 0; x < fw; x++) {
+        const n = 0.5 + 0.2 * Math.sin(TAU * 2 * x / fw + 0.9) +
+          0.18 * Math.sin(TAU * 3 * x / fw + y * 0.15 + 2.1) +
+          0.12 * Math.sin(TAU * 5 * x / fw - y * 0.2);
+        const dens = b.peak * prof * (0.45 + 0.75 * n);
+        const on = dens > (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+        const j = (y * fw + x) * 4;
+        d[j] = rgb[0]; d[j + 1] = rgb[1]; d[j + 2] = rgb[2]; d[j + 3] = on ? 255 : 0;
+      }
+    }
+    b.g.putImageData(b.img, 0, 0);
+  }
+
+  function ensureFog() {
+    if (!fogBands) buildFog();
+    const hour = getWorldHour();
+    const key = Math.floor(hour * 12) + '|' + W + 'x' + H;
+    if (key === fogKey) return;
+    fogKey = key;
+    const env = terrainEnv(hour);
+    const rgb = quant(mixRgb(mixRgb(env.sky.bot, [236, 238, 246], 0.55), [52, 60, 100], env.nf * 0.8));
+    for (let i = 0; i < fogBands.length; i++) paintFog(fogBands[i], rgb);
+  }
+
+  function drawFog(i) {
+    if (wxNow.fog < 0.03) return;
+    ensureFog();
+    const b = fogBands[i];
+    b.off = (b.off + b.v * wxDt * motionScale * (0.5 + windNow)) % b.fw;
+    ctx.globalAlpha = Math.round(clampNum(wxNow.fog * 0.7, 0, 1, 0) * 20) / 20;
+    const o = Math.round(b.off);
+    ctx.drawImage(b.canvas, -o, b.y);
+    ctx.drawImage(b.canvas, b.fw - o, b.y);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- rain ----
+  function buildRain() {
+    const cap = clampNum(Math.round(W * H / 230), 60, 220, 120);
+    drops = [];
+    for (let i = 0; i < cap; i++) drops.push({ x: 0, y: 0, vy: 120, off: 0, len: 2, on: false });
+    splashes = [];
+    for (let i = 0; i < 40; i++) splashes.push({ x: 0, y: 0, t: 0.24 });
+  }
+
+  function dropLandY(d) {
+    const x = clampNum(Math.round(d.x), 0, W - 1, 0);
+    const wet = pond && surf && x >= pond.x0 && x <= pond.x1 && surf[x] > groundY;
+    return (wet ? groundY : getSurfaceY(x)) - d.off;
+  }
+
+  function spawnDrop(d) {
+    d.x = -40 + wxRnd() * (W + 40);
+    d.y = -2 - wxRnd() * H * 0.5;
+    d.vy = (110 + wxRnd() * 70) * Math.max(0.55, motionScale);
+    d.off = wxRnd() < 0.3 ? 2 + Math.floor(wxRnd() * 9) : 0;
+    d.len = wxRnd() < 0.4 ? 3 : 2;
+    d.on = true;
+  }
+
+  function addSplash(x, y) {
+    if (x < 0 || x >= W) return;
+    for (let i = 0; i < splashes.length; i++) {
+      const s = splashes[i];
+      if (s.t >= 0.24) {
+        s.x = Math.round(x);
+        s.y = Math.round(y);
+        s.t = 0;
+        return;
+      }
+    }
+  }
+
+  function drawRain(dt) {
+    if (!drops) buildRain();
+    const active = Math.round(drops.length * wxNow.rain);
+    const nf = nightFactor(getWorldHour());
+    ctx.fillStyle = css(mixRgb([205, 226, 252], [120, 140, 200], nf));
+    ctx.globalAlpha = 0.6;
+    const vx = windNow * 50 * Math.max(0.55, motionScale);
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i];
+      if (!d.on) {
+        if (i >= active) continue;
+        spawnDrop(d);
+      }
+      d.y += d.vy * dt;
+      d.x += vx * dt;
+      const ly = dropLandY(d);
+      if (d.y >= ly) {
+        addSplash(d.x, ly);
+        if (i < active) spawnDrop(d); else d.on = false;
+        continue;
+      }
+      const sl = vx / d.vy;
+      for (let j = 0; j < d.len; j++) {
+        ctx.fillRect(Math.round(d.x - j * sl), Math.round(d.y) - j, 1, 1);
+      }
+    }
+    for (let i = 0; i < splashes.length; i++) {
+      const s = splashes[i];
+      if (s.t >= 0.24) continue;
+      s.t += dt;
+      if (s.t >= 0.24) continue;
+      if (s.t < 0.12) {
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(s.x - 1, s.y - 1, 1, 1);
+        ctx.fillRect(s.x + 1, s.y - 1, 1, 1);
+      } else {
+        ctx.globalAlpha = 0.35;
+        ctx.fillRect(s.x - 2, s.y - 2, 1, 1);
+        ctx.fillRect(s.x + 2, s.y - 2, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawWeatherTint() {
+    const a = (wxNow.rain * 0.2 + wxNow.fog * 0.05) * (1 - 0.6 * nightFactor(getWorldHour()));
+    if (a < 0.02) return;
+    ctx.globalAlpha = Math.round(a * 50) / 50;
+    ctx.fillStyle = 'rgb(70,80,104)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
   function fit() {
     if (!host || !canvas) return;
     const vw = host.clientWidth || window.innerWidth;
@@ -746,15 +1190,24 @@ const MyWorld = (function () {
     if (ctx) ctx.imageSmoothingEnabled = false;
     onSkyResize();
     onTerrainResize();
+    resetWeather();
     drawFrame(0);
   }
 
   function drawFrame(dt) {
     if (!ctx) return;
     clockElapsed += dt;
+    updateWeather(dt);
     drawSky();
-    drawTerrainBack();
+    drawClouds(0);
+    drawHillsFar();
+    drawFog(0);
+    drawHillsMid();
+    drawClouds(1);
     drawTerrainFront();
+    drawFog(1);
+    drawRain(dt);
+    drawWeatherTint();
 
     if (isDebug()) {
       ctx.fillStyle = '#f4f1ff';
@@ -872,6 +1325,7 @@ const MyWorld = (function () {
     requestNative(host);
     frame = 0;
     initSkyClock();
+    initWeather();
     fit();
     startLoop();
 
@@ -898,6 +1352,7 @@ const MyWorld = (function () {
     ctx = null;
     resetSky();
     resetTerrain();
+    resetWeather();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
@@ -960,6 +1415,9 @@ const MyWorld = (function () {
     setDebugTime,
     getGroundY,
     getSurfaceY,
+    getWind,
+    getWeather,
+    setDebugWeather,
 
     render,
     renderTree,
