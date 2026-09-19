@@ -4,13 +4,17 @@
 const Modal = (function () {
   let lastFocused = null; // restored on close — keyboard/screen-reader users land back where they left off
 
-  function open(html) {
+  function open(html, opts) {
     const overlay = document.getElementById('modal-overlay');
     const content = document.getElementById('modal-content');
     if (!overlay || !content) return;
     lastFocused = document.activeElement;
     overlay.classList.remove('modal-closing');
     content.classList.remove('modal-closing');
+    // Reset any size modifier on every open — the shared #modal-content element persists
+    // across unrelated modals, so a size requested by one caller must never leak into the next.
+    content.classList.remove('modal-sm', 'modal-md', 'modal-lg');
+    if (opts && opts.size) content.classList.add('modal-' + opts.size);
     content.innerHTML = html;
     overlay.style.display = 'flex';
     // Move focus into the modal so screen readers announce it and Escape/Tab work immediately,
