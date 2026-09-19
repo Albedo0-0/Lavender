@@ -209,13 +209,10 @@ const WishButterfly = (function () {
         setTimeout(function () { wrap.remove(); }, 700);
         return;
       }
-      let trailTimer = setInterval(spawnTrailDot, 110);
+      const trailTimer = setInterval(spawnTrailDot, 110);
       setTimeout(function () { butterfly.classList.add('is-leaving'); }, 500);
-      butterfly.addEventListener('transitionend', function handler() {
-        butterfly.removeEventListener('transitionend', handler);
-        clearInterval(trailTimer);
-        wrap.remove();
-      });
+      setTimeout(function () { clearInterval(trailTimer); }, 7500);
+      setTimeout(function () { wrap.remove(); }, 12500);
     }
 
     butterfly.addEventListener('click', openBubble);
