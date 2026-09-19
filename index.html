@@ -65,6 +65,7 @@
 <button id="journal-lock-toggle" title="Journal lock" style="display:none">&#128275;</button>
 <div id="global-break-takeover" style="display:none"></div>
 <div id="misc-ambient-layer" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2;"></div>
+<div id="misc-objects-layer" style="position:fixed;inset:0;pointer-events:none;z-index:40;"></div>
 
 <nav id="main-nav">
   <button class="nav-btn" data-screen="library">Library</button>
@@ -236,20 +237,17 @@
         if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
         if (typeof MiscWeather !== 'undefined') MiscWeather.mount(ambientLayer);
       }
-      const libraryScreen = document.getElementById('screen-library');
-      if (libraryScreen && typeof WishButterfly !== 'undefined') {
-        libraryScreen.style.position = libraryScreen.style.position || 'relative';
-        WishButterfly.mount(libraryScreen, { top: '4%', left: '88%' });
+      const objectsLayer = document.getElementById('misc-objects-layer');
+      if (objectsLayer && typeof WishButterfly !== 'undefined') {
+        WishButterfly.mount(objectsLayer, { top: '16%', left: '86%' });
       }
       const studyScreen = document.getElementById('screen-study');
       if (studyScreen && typeof CandleLamp !== 'undefined') {
         studyScreen.style.position = studyScreen.style.position || 'relative';
         CandleLamp.mount(studyScreen);
       }
-      const journalScreen = document.getElementById('screen-journal');
-      if (journalScreen && typeof PaperPocket !== 'undefined') {
-        journalScreen.style.position = journalScreen.style.position || 'relative';
-        PaperPocket.mount(journalScreen);
+      if (objectsLayer && typeof PaperPocket !== 'undefined') {
+        PaperPocket.mount(objectsLayer, { rotation: -2, position: { position: 'absolute', left: '14px', bottom: '14px' } });
       }
       const paintbrushBtn = document.getElementById('paintbrush-icon');
       if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
