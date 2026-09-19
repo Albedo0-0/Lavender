@@ -1,0 +1,53 @@
+/* myworld.css — My World pixel world (Phase 0 skeleton + Phase 1 shell) */
+
+.myworld-fullscreen-host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 100000;
+  overflow: hidden;
+  background: #232a52;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.myworld-canvas {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.myworld-exit-btn {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(244, 241, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(10, 12, 30, 0.35);
+  color: rgba(244, 241, 255, 0.75);
+  font-size: 16px;
+  line-height: 34px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.3s ease, background 0.3s ease;
+  z-index: 2;
+}
+
+.myworld-exit-btn:hover,
+.myworld-exit-btn:focus-visible {
+  opacity: 1;
+  background: rgba(10, 12, 30, 0.6);
+  outline: none;
+}
