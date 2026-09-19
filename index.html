@@ -252,10 +252,8 @@
       const paintbrushBtn = document.getElementById('paintbrush-icon');
       if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
     })();
-    (function () {
-    
-    
-      if ('serviceWorker' in navigator) {
+
+  if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./service-worker.js')
       .then(function (reg) {
