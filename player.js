@@ -128,6 +128,7 @@ const Player = (function () {
   function stopRadio() {
     if (radioAudioEl) radioAudioEl.pause();
     radioPlaying = false;
+    updateRadioPlayingUi();
   }
 
   function playStation(id) {
@@ -148,6 +149,8 @@ const Player = (function () {
       } else {
         console.log('[radio] entering loadHlsScript');
         loadHlsScript(function () {
+          console.log('[radio] entering loadHlsScript');
+        loadHlsScript(function () {
           console.log('[radio] loadHlsScript callback fired, window.Hls =', typeof window.Hls);
           hls = new Hls();
           hls.on(Hls.Events.ERROR, function (event, data) { console.error('Radio HLS error:', data); });
@@ -157,14 +160,22 @@ const Player = (function () {
             console.log('[radio] play() resolved');
           }).catch(function (err) { console.error('Radio play() rejected:', err); });
           radioPlaying = true;
+          updateRadioPlayingUi();
         });
         return;
       }
     }
     radioAudioEl.play().catch(function (err) { console.error('Radio play() rejected:', err); });
     radioPlaying = true;
+    updateRadioPlayingUi();
   }
   function pauseRadio() { stopRadio(); }
+  // Toggles the .radio-playing class only — no state change, purely reflects
+  // radioPlaying in the DOM so the lamp/ON AIR tag update without a full re-render.
+  function updateRadioPlayingUi() {
+    const body = document.querySelector('.radio-body');
+    if (body) body.classList.toggle('radio-playing', radioPlaying);
+  }
 
   function playableOrder() {
     const list = MusicData.getPlaylist();
@@ -275,9 +286,11 @@ const Player = (function () {
   }
 
   function chooserHtml() {
-    return '<h3>Radio &amp; Music</h3>' +
-      '<button id="player-open-radio-btn">Radio</button> ' +
-      '<button id="player-open-music-btn">Music Player</button>';
+    return '<div class="modal-header"><h3 class="modal-title">Radio &amp; Music</h3></div>' +
+      '<div class="player-chooser">' +
+      '<button id="player-open-radio-btn" class="btn-secondary player-chooser-btn">Radio</button>' +
+      '<button id="player-open-music-btn" class="btn-secondary player-chooser-btn">Music Player</button>' +
+      '</div>';
   }
   function openChooser() {
     Modal.open(chooserHtml());
@@ -287,16 +300,37 @@ const Player = (function () {
 
   function radioHtml() {
     const stations = RadioData.getStations();
+    const tunedStation = RadioData.getById(currentStationId);
     const rows = stations.map(function (s) {
       const active = s.id === currentStationId;
-      const baseStyle = 'display:block;padding:10px 12px;margin:6px 0;border-radius:8px;border:1px solid #ccc;cursor:pointer;';
-      const activeStyle = active ? 'background:#b39ddb;color:#fff;border-color:#b39ddb;font-weight:bold;' : 'background:#f7f7f7;';
-      return '<div class="radio-station-row' + (active ? ' radio-station-active' : '') + '" data-id="' + s.id + '" style="' + baseStyle + activeStyle + '">' + s.name + (active ? ' ✓' : '') + '</div>';
+      return '<div class="radio-station-row radio-station-card' + (active ? ' radio-station-active' : '') + '" data-id="' + s.id + '">' +
+        '<span class="radio-station-name">' + s.name + '</span>' +
+        (active ? '<span class="radio-station-check" aria-hidden="true">&#10003;</span>' : '') +
+        '</div>';
     }).join('');
-    return '<h3>Radio</h3>' + rows +
-      '<div id="radio-controls">' +
-      '<button id="radio-play-btn">Play</button> <button id="radio-pause-btn">Pause</button>' +
-      '</div><button id="player-back-btn">Back</button>';
+    return (
+      '<div class="radio-modal">' +
+        '<div class="modal-header"><h3 class="modal-title">Radio</h3></div>' +
+        '<div class="radio-body' + (radioPlaying ? ' radio-playing' : '') + '">' +
+          '<div class="radio-grille" aria-hidden="true"></div>' +
+          '<div class="radio-top-row">' +
+            '<span class="radio-knob radio-knob-left" aria-hidden="true"></span>' +
+            '<div class="radio-display">' +
+              '<span class="radio-display-text">' + (tunedStation ? tunedStation.name : '\u2014 \u00b7 \u2014') + '</span>' +
+              '<span class="radio-lamp" aria-hidden="true"></span>' +
+            '</div>' +
+            '<span class="radio-knob radio-knob-right" aria-hidden="true"></span>' +
+          '</div>' +
+          '<div class="radio-on-air-tag" aria-hidden="true">On Air</div>' +
+          '<div class="radio-stations">' + rows + '</div>' +
+          '<div id="radio-controls" class="radio-controls">' +
+            '<button id="radio-play-btn" class="radio-btn radio-btn-play">Play</button>' +
+            '<button id="radio-pause-btn" class="radio-btn radio-btn-pause">Pause</button>' +
+          '</div>' +
+        '</div>' +
+        '<button id="player-back-btn" class="btn-secondary radio-back-btn">Back</button>' +
+      '</div>'
+    );
   }
   function openRadioModal() {
     Modal.open(radioHtml());
