@@ -22,7 +22,19 @@ const Firefly = (function () {
     animation: fireflyDrift linear infinite, fireflyPulse ease-in-out infinite;
   }
   .firefly.reduced-motion { animation: none; opacity: 0.6; }
-  .firefly.is-clicked { animation-play-state: paused; transition: opacity 0.9s ease, transform 0.6s ease; }
+  .firefly { pointer-events: auto; }
+  .firefly.is-clicked { animation-play-state: paused; transition: transform 1.4s ease-out, opacity 1.4s ease-out; }
+  .firefly-trail-dot {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff6c8 0%, rgba(244,224,106,0) 75%);
+    transform: translate(-50%, -50%);
+    opacity: 0.85;
+    transition: opacity 0.9s ease, transform 0.9s ease;
+    pointer-events: none;
+  }
+  .firefly-trail-dot.is-fading { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
   @keyframes fireflyPulse {
     0%, 100% { opacity: 0.35; }
     50% { opacity: 0.9; }
@@ -52,13 +64,39 @@ const Firefly = (function () {
     el.style.animationDuration = MiscCore.rand(9, 16) + 's, ' + MiscCore.rand(2, 4) + 's';
     el.style.animationDelay = '-' + MiscCore.rand(0, 8) + 's';
 
+    function trailPos() {
+      const r = el.getBoundingClientRect();
+      const cr = container.getBoundingClientRect();
+      return {
+        left: ((r.left + r.width / 2 - cr.left) / cr.width) * 100,
+        top: ((r.top + r.height / 2 - cr.top) / cr.height) * 100
+      };
+    }
+    function spawnTrailDot() {
+      const pos = trailPos();
+      const dot = MiscCore.createEl('div', { className: 'firefly-trail-dot' });
+      dot.style.left = pos.left + '%';
+      dot.style.top = pos.top + '%';
+      container.appendChild(dot);
+      requestAnimationFrame(function () { dot.classList.add('is-fading'); });
+      setTimeout(function () { dot.remove(); }, 900);
+    }
     function onActivate() {
       if (el.classList.contains('is-clicked')) return;
       el.classList.add('is-clicked');
-      el.style.opacity = '1';
-      el.style.transform = 'scale(1.8)';
       if (typeof MiscSound !== 'undefined') MiscSound.play('fireflySparkle');
-      setTimeout(function () { el.style.opacity = '0'; }, 250);
+      const dx = MiscCore.rand(-40, 40), dy = MiscCore.rand(-70, -25);
+      el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.4)';
+      el.style.opacity = '0';
+      if (!reduced) {
+        let n = 0;
+        const trailTimer = setInterval(function () {
+          n++;
+          spawnTrailDot();
+          if (n >= 6) clearInterval(trailTimer);
+        }, 200);
+      }
+      setTimeout(function () { el.remove(); }, 1500);
     }
 
     el.addEventListener('click', onActivate);
