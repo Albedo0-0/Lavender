@@ -9,8 +9,7 @@
  * Until a real Store exists, every registered cosmetic defaults to
  * "active" so all Miscellaneous features work exactly as shipped.
  * Any module can adopt this pattern later by calling register() once
- * and gating its render behind isActive() — see wish-butterfly.js for
- * a working example.
+* gating its render behind isActive().
  */
 const MiscCosmetics = (function () {
   const registry = {}; // id -> { category, label, unlocked, active }
