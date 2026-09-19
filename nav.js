@@ -3,6 +3,7 @@
 const Nav = (function () {
   const screens = ['calendar', 'journal', 'library', 'study', 'progress', 'myworld'];
   function switchTo(screenName) {
+    const prevScreen = State.get().currentScreen;
     if (screenName === 'library' && typeof Library !== 'undefined' && Library.render) Library.render();
     screens.forEach(function (name) {
       const el = document.getElementById('screen-' + name);
@@ -27,7 +28,7 @@ const Nav = (function () {
     if (screenName === 'progress' && typeof Progress !== 'undefined' && Progress.render) Progress.render();
     if (screenName === 'myworld' && typeof MyWorld !== 'undefined' && MyWorld.init) {
       const mwContainer = document.getElementById('screen-myworld');
-      if (mwContainer) MyWorld.init(mwContainer);
+      if (mwContainer) MyWorld.init(mwContainer, prevScreen);
     }
   }
   function init() {
