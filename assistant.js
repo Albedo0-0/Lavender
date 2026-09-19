@@ -25,17 +25,23 @@ const Assistant = (function () {
     const totals = AssistantData.getTodayTotals();
 
     return (
-      '<div class="modal-header"><h3 class="modal-title">' + esc(Settings.assistantLabel()) + '</h3></div>' +
-      '<p class="micro-label">Today: ' + fmtMs(totals.studyMs) + ' studied \u00b7 ' + fmtMs(totals.breakMs) + ' break \u00b7 ' + totals.questionsSolved + ' questions</p>' +
-      '<hr class="divider">' +
-      '<div id="assistant-menu">' +
-        '<button class="btn-secondary" data-go="store">Store</button>' +
-        '<button class="btn-secondary" data-go="timeline">History</button>' +
-        '<button class="btn-secondary" data-go="tomorrow">Tomorrow</button>' +
-        '<button class="btn-secondary" data-go="leftoff">Resume</button>' +
-        '<button class="btn-secondary" data-go="search">Global Search</button>' +
-        '<button class="btn-secondary" data-go="summary">Daily Summary</button>' +
-        '<button class="btn-secondary" data-go="alarms">Alarms</button>' +
+      '<div class="assistant-notebook">' +
+        '<div class="assistant-notebook-cover">' +
+          '<h3 class="assistant-notebook-title">' + esc(Settings.assistantLabel()) + '</h3>' +
+          '<div class="assistant-notebook-summary">' +
+            '<span class="assistant-note-line">Studied today \u00b7 ' + fmtMs(totals.studyMs) + '</span>' +
+            '<span class="assistant-note-line">Break \u00b7 ' + fmtMs(totals.breakMs) + ' \u00b7 ' + totals.questionsSolved + ' questions</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="assistant-bookmarks" id="assistant-menu">' +
+          '<button class="assistant-bookmark assistant-bookmark-1" data-go="summary">Daily Summary</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-2" data-go="leftoff">Resume</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-3" data-go="timeline">History</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-4" data-go="tomorrow">Tomorrow</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-5" data-go="search">Search</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-6" data-go="store">Store</button>' +
+          '<button class="assistant-bookmark assistant-bookmark-7" data-go="alarms">Alarms</button>' +
+        '</div>' +
       '</div>'
     );
   }
@@ -58,7 +64,7 @@ const Assistant = (function () {
       if (key === 'alarms') return openAlarms();
     } catch (err) {
       console.error('Assistant.routeTo failed for', key, err);
-      Modal.open(backBtnHtml() + '<h3 class="section-title">' + key + '</h3><div class="empty-state">Couldn\'t load this right now.</div>');
+      Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-plain"><h3 class="section-title">' + key + '</h3><div class="empty-state">Couldn\'t load this right now.</div></div>');
       wireBack();
     }
   }
@@ -69,7 +75,7 @@ const Assistant = (function () {
   // ---------- Store (placeholder, §7.3) ----------
 
   function openStore() {
-    Modal.open(backBtnHtml() + '<h3 class="section-title">Store</h3><p>Coming soon \u2014 will link to Gamification\u2019s store (\u00a7B.8).</p>');
+    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-plain"><h3 class="section-title">Store</h3><p>Coming soon \u2014 will link to Gamification\u2019s store (\u00a7B.8).</p></div>');
     wireBack();
   }
 
@@ -77,29 +83,40 @@ const Assistant = (function () {
 
   function openTimeline() {
     const items = AssistantData.getTodayTimeline();
-    const rows = items.length ? items.map(function (it) {
-      return '<div class="assistant-timeline-row list-row list-row-compact">' +
-        '<span class="list-row-title">' + esc(it.label) + (it.type === 'break' ? ' <span class="tag tag-neutral">break</span>' : '') + '</span>' +
-        '<span class="list-row-meta">' + it.at + ' \u00b7 ' + fmtMs(it.durationMs) + '</span>' +
+    const rows = items.length ? items.map(function (it, idx) {
+      const offsetClass = idx % 2 === 0 ? 'assistant-timeline-marker-up' : 'assistant-timeline-marker-down';
+      return '<div class="assistant-timeline-marker ' + offsetClass + '">' +
+        '<span class="assistant-timeline-dot" aria-hidden="true"></span>' +
+        '<span class="assistant-timeline-time">' + it.at + '</span>' +
+        '<span class="assistant-timeline-label">' + esc(it.label) + (it.type === 'break' ? ' <span class="tag tag-neutral">break</span>' : '') + '</span>' +
+        '<span class="assistant-timeline-dur">' + fmtMs(it.durationMs) + '</span>' +
       '</div>';
     }).join('') : '<div class="empty-state">Nothing recorded yet today.</div>';
-    Modal.open(backBtnHtml() + '<h3 class="section-title">History</h3>' + rows);
+    const body = items.length ? '<div class="assistant-timeline-wrap"><div class="assistant-timeline-track">' + rows + '</div></div>' : rows;
+    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-timeline"><h3 class="section-title">History</h3>' + body + '</div>');
     wireBack();
   }
 
   // ---------- Tomorrow (§7.3) ----------
 
   function taskRowHtml(t) {
-    return '<div class="assistant-task-row list-row list-row-compact">' +
-      '<span class="list-row-title">' + esc(t.topicName || t.title || PlannerData.taskLabel(t)) + '</span>' +
-      '<span class="list-row-meta">' + esc(t.date) + '</span>' +
+    return '<div class="assistant-envelope-item">' +
+      '<span class="assistant-envelope-item-title">' + esc(t.topicName || t.title || PlannerData.taskLabel(t)) + '</span>' +
+      '<span class="assistant-envelope-item-date">' + esc(t.date) + '</span>' +
     '</div>';
   }
 
   function openTomorrow() {
     const list = AssistantData.getTomorrow();
     const rows = list.length ? list.map(taskRowHtml).join('') : '<div class="empty-state">Nothing scheduled for tomorrow yet.</div>';
-    Modal.open(backBtnHtml() + '<h3 class="section-title">Tomorrow</h3>' + rows);
+    Modal.open(backBtnHtml() +
+      '<div class="assistant-page assistant-page-envelope">' +
+        '<h3 class="section-title">Tomorrow</h3>' +
+        '<div class="assistant-envelope">' +
+          '<div class="assistant-envelope-flap" aria-hidden="true"></div>' +
+          '<div class="assistant-envelope-contents">' + rows + '</div>' +
+        '</div>' +
+      '</div>');
     wireBack();
   }
 
@@ -112,7 +129,7 @@ const Assistant = (function () {
       '<p>' + (w.taskLabel ? esc(w.taskLabel) + ' \u2014 ' : '') + esc(w.state) + ' \u00b7 ' + fmtMs(w.studyMs) + (w.isToday ? '' : ' \u00b7 ' + esc(w.date)) + '</p>' +
       (w.note ? '<p>' + esc(w.note) + '</p>' : '')
       : '<div class="empty-state">No study sessions found yet.</div>';
-    Modal.open(backBtnHtml() + '<h3 class="section-title">Resume</h3>' + body);
+    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-note"><h3 class="section-title">Resume</h3><div class="assistant-note-slip">' + body + '</div></div>');
     wireBack();
   }
 
@@ -120,7 +137,7 @@ const Assistant = (function () {
 
   function resultRowHtml(r) {
     const ref = r.ref || {};
-    return '<div class="assistant-search-row assistant-search-result list-row list-row-compact" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
+    return '<div class="assistant-search-row assistant-search-result assistant-index-row list-row list-row-compact" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
       '<span class="list-row-title"><strong>' + esc(r.type) + '</strong> \u2014 ' + esc(r.text) + '</span>' +
       '<span class="list-row-meta">' + esc(r.date) + '</span>' +
     '</div>';
@@ -146,10 +163,13 @@ const Assistant = (function () {
   }
 
   function openSearch() {
-    Modal.open(backBtnHtml() + '<h3 class="section-title">Global Search</h3>' +
-      '<div class="form-row"><input type="text" id="assistant-search-input" placeholder="Search everything..."></div>' +
+    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-search"><h3 class="section-title">Global Search</h3>' +
+      '<div class="assistant-search-index">' +
+        '<span class="assistant-search-glass" aria-hidden="true"></span>' +
+        '<div class="form-row"><input type="text" id="assistant-search-input" placeholder="Search everything..."></div>' +
+      '</div>' +
       '<button id="assistant-search-btn" class="btn-secondary">Search</button>' +
-      '<div id="assistant-search-results" style="margin-top: var(--space-3);"></div>');
+      '<div id="assistant-search-results" style="margin-top: var(--space-3);"></div></div>');
     wireBack();
     function runSearch() {
       const results = AssistantData.search(document.getElementById('assistant-search-input').value);
@@ -166,11 +186,15 @@ const Assistant = (function () {
 
   function summaryHtml(dateStr) {
     const s = AssistantData.getDailySummary(dateStr);
-    return backBtnHtml() + '<h3 class="section-title">Daily Summary</h3>' +
-      '<div class="form-row"><input type="date" id="assistant-summary-date" value="' + dateStr + '"></div>' +
-      '<p>Study: ' + fmtMs(s.studyMs) + ' \u00b7 Break: ' + fmtMs(s.breakMs) + ' \u00b7 Questions: ' + s.questionsSolved + '</p>' +
-      '<p>Hydration: ' + (s.hydrationScore === null ? '\u2013' : s.hydrationScore + '/10') + ' \u00b7 Sleep: ' + (s.sleepHours === null ? '\u2013' : s.sleepHours + 'h') + '</p>' +
-      '<p>Tasks: ' + s.tasksCompleted + ' / ' + s.tasksTotal + ' completed</p>';
+    return backBtnHtml() + '<div class="assistant-page assistant-page-receipt"><h3 class="section-title">Daily Summary</h3>' +
+      '<div class="assistant-receipt">' +
+        '<span class="assistant-receipt-stamp" aria-hidden="true">' + dateStr + '</span>' +
+        '<div class="form-row"><input type="date" id="assistant-summary-date" value="' + dateStr + '"></div>' +
+        '<p>Study: ' + fmtMs(s.studyMs) + ' \u00b7 Break: ' + fmtMs(s.breakMs) + ' \u00b7 Questions: ' + s.questionsSolved + '</p>' +
+        '<p>Hydration: ' + (s.hydrationScore === null ? '\u2013' : s.hydrationScore + '/10') + ' \u00b7 Sleep: ' + (s.sleepHours === null ? '\u2013' : s.sleepHours + 'h') + '</p>' +
+        '<p>Tasks: ' + s.tasksCompleted + ' / ' + s.tasksTotal + ' completed</p>' +
+      '</div>' +
+    '</div>';
   }
 
   function openSummary(dateStr) {
