@@ -130,6 +130,15 @@ const GamificationData = (function () {
     const dateStr = todayStr();
     awardLive(dateStr, 'Target uncompleted: ' + target.title, -targetExpValue(target), { targetId: target.targetId, kind: 'target-retract' });
   }
+
+  function spendExp(amount, label) {
+    const cost = Math.max(0, amount || 0);
+    if (!cost) return true;
+    const gam = getGamState();
+    if (gam.totalExp < cost) return false;
+    awardLive(todayStr(), label || 'Purchase', -cost, { kind: 'purchase' });
+    return true;
+  }
   
   // Called from Study.commitSegment for every committed Stopwatch/Timer segment — 100 EXP/hour,
   // proportional, logged even for very short segments (min 1 EXP so a 1-minute segment ~= 1-2 EXP
@@ -260,6 +269,7 @@ const GamificationData = (function () {
     retractTaskCompleted: retractTaskCompleted,
     awardStudyTime: awardStudyTime,
     awardTargetCompleted: awardTargetCompleted,
-    retractTargetCompleted: retractTargetCompleted
+    retractTargetCompleted: retractTargetCompleted,
+    spendExp: spendExp
   };
 })();
