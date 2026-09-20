@@ -639,12 +639,15 @@ const MyWorld = (function () {
     terrain = { far: newLayer(), mid: newLayer(), ground: newLayer(), key: '' };
     buildHills(cx);
     buildGround(cx);
+    buildGrassTufts();
   }
 
   function resetTerrain() {
     terrain = null;
     surf = null;
     pond = null;
+    grassTufts = null;
+    groundPalCache = null;
   }
 
   function onTerrainResize() {
@@ -696,6 +699,7 @@ const MyWorld = (function () {
     paintLayer(terrain.far, tintPal(PAL_FAR, env, 0.5, 0.4));
     paintLayer(terrain.mid, tintPal(PAL_MID, env, 0.25, 0.55));
     const gp = tintPal(PAL_GROUND, env, 0.04, 0.25);
+    groundPalCache = gp;
     gp.push(quant(mixRgb(s.bot, s.mid, 0.4)));
     gp.push(quant(mixRgb(s.mid, [16, 40, 70], 0.35)));
     gp.push(quant(mixRgb(s.top, [10, 24, 48], 0.5)));
@@ -1576,6 +1580,7 @@ const MyWorld = (function () {
   let treePrev = null;
   let treeFade = 1;
   let debugStage = null;
+  let treeSwayPh = 0;
 
   function hash3(x, y, s) {
     return hash2(x * 1013 + y, s);
