@@ -39,45 +39,7 @@ const Gamification = (function () {
 
   // ---------- §8.5 Gamification hub modal ----------
 
-  const WORLD_COST = 1000;
-
-  function renderStoreBody() {
-    if (typeof MyWorldContent === 'undefined') return '<p class="micro-label">Store unavailable.</p>';
-    const worlds = MyWorldContent.list('world');
-    if (!worlds.length) return '<p class="micro-label">No worlds registered.</p>';
-    return worlds.map(function (w) {
-      const owned = w.owned || w.cost === 0;
-      return '<div class="gamification-store-row" data-world-id="' + w.id + '">' +
-        '<span>' + w.name + '</span>' +
-        (owned
-          ? '<span class="micro-label">Owned</span>'
-          : '<button class="btn-secondary gamification-store-buy" data-world-id="' + w.id + '">Buy \u2014 ' + WORLD_COST + ' EXP</button>') +
-        '<span class="micro-label gamification-store-msg" data-world-id="' + w.id + '"></span>' +
-        '</div>';
-    }).join('');
-  }
-
-  function wireStoreBody(container) {
-    if (!container) return;
-    container.querySelectorAll('.gamification-store-buy').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const id = btn.dataset.worldId;
-        const gam = GamificationData.getGamState();
-        const msg = container.querySelector('.gamification-store-msg[data-world-id="' + id + '"]');
-        if (gam.totalExp < WORLD_COST) {
-          if (msg) msg.textContent = 'Not enough EXP';
-          return;
-        }
-        GamificationData.spendExp(WORLD_COST, 'World unlocked: ' + id);
-        MyWorldContent.grant(id);
-        container.innerHTML = renderStoreBody();
-        wireStoreBody(container);
-        renderMeter();
-      });
-    });
-  }
-
-  function openHub() {
+function openHub() {
     const gam = GamificationData.getGamState();
     const info = GamificationData.getLevelInfo(gam.totalExp);
     const pct = info.expForNextLevel > 0 ? Math.min(100, (info.expIntoLevel / info.expForNextLevel) * 100) : 100;
@@ -88,17 +50,13 @@ const Gamification = (function () {
       '<div class="gamification-exp-track"><div class="gamification-exp-fill" style="width:' + pct + '%"></div></div>' +
       '<p>' + info.expIntoLevel + ' / ' + info.expForNextLevel + ' EXP to level ' + (info.level + 1) + '</p>' +
       '<button id="gamification-store-btn">Store</button>' +
-      '<div id="gamification-store-body" style="display:none"></div>'
+      '<div id="gamification-store-body" style="display:none"><p>Coming soon.</p></div>'
     );
     const storeBtn = document.getElementById('gamification-store-btn');
-    const storeBody = document.getElementById('gamification-store-body');
     if (storeBtn) storeBtn.addEventListener('click', function () {
-      if (storeBody.style.display === 'block') { storeBody.style.display = 'none'; return; }
-      storeBody.innerHTML = renderStoreBody();
-      wireStoreBody(storeBody);
-      storeBody.style.display = 'block';
+      document.getElementById('gamification-store-body').style.display = 'block';
     });
-  }
+}
 
   function handleBarClick() { openHub(); }
 
