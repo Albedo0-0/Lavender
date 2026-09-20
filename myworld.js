@@ -1175,6 +1175,619 @@ const MyWorld = (function () {
     ctx.globalAlpha = 1;
   }
 
+  // ---------------------------------------------------------------------
+  // Tree: procedural pixel tree grown from the persisted seed (Phase 5)
+  // ---------------------------------------------------------------------
+  const TREE_FT = [[0, 0], [2, 0], [3, 0.04], [8, 0.16], [12, 0.36], [19, 0.84], [22, 1]];
+
+  const PAL_BARK = mkPal([
+    ['#b9795a', '#5c4064'], ['#8a4f48', '#46304f'], ['#623a42', '#33243f'], ['#3e2434', '#1c1428'],
+    ['#ffd36a', '#ffd36a'],
+    ['#a9744a', '#5a4560'], ['#6c4429', '#33263f'], ['#e8d090', '#c8b070'],
+    ['#8fdc5a', '#6ad0a0'], ['#4fae4a', '#3f9a78'], ['#2e6e3a', '#2a6e5e']
+  ]);
+
+  const PAL_FOLIAGE = mkPal([
+    ['#1c3f3a', '#0f2230'], ['#2b5e48', '#173a44'], ['#3f8250', '#1f5058'],
+    ['#63a84a', '#2f6a66'], ['#a6dc5a', '#6ad0a0'], ['#f0c040', '#c8a050'],
+    ['#fff4f0', '#d8d0e8'], ['#f7a8c4', '#c890b8'], ['#d8403c', '#a03050'],
+    ['#ff8a70', '#d06080'], ['#ffe27a', '#e8c870']
+  ]);
+
+  const LEAF_VARIANTS = [null, [40, 130, 150], [160, 175, 50]];
+
+  let treeGrowth = { g: 0, seed: 1, variant: 0 };
+  let treeDirty = true;
+  let treeSkel = null;
+  let treeCur = null;
+  let treePrev = null;
+  let treeFade = 1;
+  let debugStage = null;
+
+  function hash3(x, y, s) {
+    return hash2(x * 1013 + y, s);
+  }
+
+  function seedInt(s) {
+    if (typeof s === 'number' && isFinite(s)) return (Math.floor(Math.abs(s)) >>> 0) || 1;
+    let h = 2166136261;
+    const str = String(s == null ? '' : s);
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) || 1;
+  }
+
+  function ftAt(g) {
+    for (let i = 1; i < TREE_FT.length; i++) {
+      if (g <= TREE_FT[i][0]) {
+        const a = TREE_FT[i - 1];
+        const b = TREE_FT[i];
+        return a[1] + (b[1] - a[1]) * (g - a[0]) / (b[0] - a[0]);
+      }
+    }
+    return 1;
+  }
+
+  function ftInv(f) {
+    for (let i = 1; i < TREE_FT.length; i++) {
+      const a = TREE_FT[i - 1];
+      const b = TREE_FT[i];
+      if (b[1] > a[1] && f <= b[1]) return a[0] + (b[0] - a[0]) * (f - a[1]) / (b[1] - a[1]);
+    }
+    return 22;
+  }
+
+  function brEase(t) {
+    const c = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return 1 - Math.pow(1 - c, 1.6);
+  }
+
+  function brInv(f) {
+    return 1 - Math.pow(1 - clampNum(f, 0, 1, 0), 1 / 1.6);
+  }
+
+  function setDebugStage(n) {
+    debugStage = (typeof n === 'number' && isFinite(n)) ? clampNum(n, 0, 21.999, 0) : null;
+    treeDirty = true;
+  }
+
+  function readTreeGrowth() {
+    treeDirty = false;
+    const world = hasData() ? MyWorldData.getWorld() : null;
+    const st = computeGrowthState(world);
+    const p = (world && world.tree && world.tree.params) ? world.tree.params : {};
+    let g = st.stageIndex + clampNum(st.stageProgress, 0, 1, 0);
+    const m = typeof location !== 'undefined' ? /[?&]mwstage=(\d+(?:\.\d+)?)/.exec(location.search) : null;
+    if (debugStage !== null) g = debugStage;
+    else if (m) g = parseFloat(m[1]);
+    const v = p.leafColorVariant;
+    treeGrowth = {
+      g: clampNum(g, 0, 21.999, 0),
+      seed: seedInt(p.seed),
+      variant: (typeof v === 'number' && isFinite(v)) ? Math.abs(Math.floor(v)) % 3 : 0
+    };
+  }
+
+  function resetTree() {
+    treeSkel = null;
+    treeCur = null;
+    treePrev = null;
+    treeFade = 1;
+    treeDirty = true;
+  }
+
+  function ptAt(br, u) {
+    const f = clampNum(u, 0, 1, 0) * (br.n - 1);
+    const i = Math.min(br.n - 2, Math.floor(f));
+    const t = f - i;
+    const p = br.pts;
+    return [p[i * 2] + (p[i * 2 + 2] - p[i * 2]) * t, p[i * 2 + 1] + (p[i * 2 + 3] - p[i * 2 + 1]) * t];
+  }
+
+  function angAt(br, u) {
+    const i = Math.min(br.n - 2, Math.floor(clampNum(u, 0, 1, 0) * (br.n - 1)));
+    const p = br.pts;
+    return Math.atan2(p[i * 2 + 3] - p[i * 2 + 1], p[i * 2 + 2] - p[i * 2]);
+  }
+
+  function tracePath(rand, x0, y0, phi0, turn, L, wob) {
+    const n = Math.max(3, Math.ceil(L / 1.2) + 1);
+    const pts = new Float32Array(n * 2);
+    const step = L / (n - 1);
+    let x = x0;
+    let y = y0;
+    let jit = 0;
+    pts[0] = x;
+    pts[1] = y;
+    for (let i = 1; i < n; i++) {
+      const t = i / (n - 1);
+      jit = jit * 0.85 + (rand() - 0.5) * wob;
+      const phi = phi0 + turn * Math.pow(t, 1.2) + jit;
+      x += Math.cos(phi) * step;
+      y += Math.sin(phi) * step;
+      pts[i * 2] = x;
+      pts[i * 2 + 1] = y;
+    }
+    return { pts: pts, n: n };
+  }
+
+  function mkBranch(kind, path, par, att, w0, tip, b, d, len) {
+    const bb = Math.min(b, 20.6);
+    return {
+      kind: kind, pts: path.pts, n: path.n, par: par, att: att, w0: w0, tip: tip,
+      b: bb, d: Math.max(0.8, Math.min(d, 21.95 - bb)), len: len
+    };
+  }
+
+  function buildTreeSkeleton(seed, Ht, Rc) {
+    const rand = makeRng(seed);
+    const mir = rand() < 0.5 ? -1 : 1;
+    const lean = (rand() - 0.5) * 0.16;
+    const ph = rand() * 6.28;
+    const hl = Ht * 0.76;
+    const wL0 = Ht * 0.13;
+    const br = [];
+    const cl = [];
+
+    const ln = Math.ceil(hl / 1.2) + 1;
+    const lp = new Float32Array(ln * 2);
+    for (let i = 0; i < ln; i++) {
+      const u = i / (ln - 1);
+      lp[i * 2] = lean * Ht * Math.pow(u, 1.6) + 0.035 * Ht * Math.sin(u * 5.2 + ph) * u;
+      lp[i * 2 + 1] = hl * u;
+    }
+    br.push({ kind: 0, pts: lp, n: ln, par: -1, att: 0, w0: wL0, tip: 0.28, b: 2, d: 20, len: hl });
+
+    const P = clampNum(Math.round(Ht / 13), 6, 10, 8);
+    const limbs = [];
+    let side = rand() < 0.5 ? -1 : 1;
+    for (let i = 0; i < P; i++) {
+      const a = 0.14 + (i + 0.5) / P * 0.68 + (rand() - 0.5) * 0.04;
+      side = rand() < 0.15 ? side : -side;
+      const s = Math.sin(Math.PI * clampNum((a - 0.05) / 0.85, 0, 1, 0));
+      const L = Rc * (0.16 + 0.7 * Math.pow(s, 1.3)) * (0.88 + rand() * 0.24);
+      const ang = (14 + 40 * a + rand() * 12) * Math.PI / 180;
+      const turn = side * ((a < 0.45 ? -0.2 : 0.3) + (rand() - 0.5) * 0.2);
+      const sp = ptAt(br[0], a);
+      const path = tracePath(rand, sp[0], sp[1], side > 0 ? ang : Math.PI - ang, turn, L, 0.1);
+      const w0 = wL0 * (1 - 0.72 * Math.pow(a, 0.85)) * 0.58;
+      limbs.push(br.length);
+      br.push(mkBranch(1, path, 0, a, w0, 0.12, ftInv(a + 0.04), 3 + 7 * L / Rc, L));
+    }
+
+    for (let li = 0; li < limbs.length; li++) {
+      const L = br[limbs[li]];
+      const nS = 2 + (rand() < 0.5 ? 1 : 0);
+      for (let j = 0; j < nS; j++) {
+        const u = 0.32 + j * 0.22 + rand() * 0.06;
+        const sp = ptAt(L, u);
+        const phi0 = angAt(L, u) + (0.55 + rand() * 0.5) * (j % 2 ? 1 : -1);
+        const len2 = L.len * (0.36 + rand() * 0.2);
+        const turn2 = (Math.cos(phi0) >= 0 ? 1 : -1) * (0.15 + rand() * 0.3);
+        const path = tracePath(rand, sp[0], sp[1], phi0, turn2, len2, 0.14);
+        const w0 = Math.max(1.5, L.w0 * (1 - 0.88 * Math.pow(u, 0.9)) * 0.62);
+        const si = br.length;
+        br.push(mkBranch(2, path, limbs[li], u, w0, 0.2, L.b + L.d * brInv(u) + 0.3, L.d * 0.65 + 1, len2));
+        const S = br[si];
+        for (let k = 0; k < 2; k++) {
+          const u3 = 0.5 + k * 0.32;
+          const p3 = ptAt(S, u3);
+          const phi3 = angAt(S, u3) + (0.5 + rand() * 0.4) * (k ? 1 : -1);
+          const len3 = len2 * (0.4 + rand() * 0.2);
+          const turn3 = (Math.cos(phi3) >= 0 ? 1 : -1) * (0.1 + rand() * 0.3);
+          const path3 = tracePath(rand, p3[0], p3[1], phi3, turn3, len3, 0.16);
+          br.push(mkBranch(3, path3, si, u3, 1.2, 0.5, S.b + S.d * brInv(u3) + 0.3, S.d * 0.7 + 0.8, len3));
+        }
+      }
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const rs = i % 2 ? 1 : -1;
+      const sx = rs * wL0 * (0.12 + rand() * 0.22);
+      const sy = wL0 * (0.7 + rand() * 0.6);
+      const Lr = wL0 * (1 + rand() * 1.3);
+      const n = Math.ceil(Lr / 1.2) + 1;
+      const pts = new Float32Array(n * 2);
+      for (let k = 0; k < n; k++) {
+        const t = k / (n - 1);
+        pts[k * 2] = sx + rs * Lr * t;
+        pts[k * 2 + 1] = sy * Math.pow(1 - t, 1.6) - 2.2 * t;
+      }
+      br.push(mkBranch(4, { pts: pts, n: n }, 0, 0.02, wL0 * 0.5 * (0.8 + rand() * 0.4), 0.15, 5 + rand() * 7, 6, Lr));
+    }
+
+    for (let k = 0; k < 6; k++) {
+      const u = 0.42 + k * 0.1;
+      const sd = k % 2 ? 1 : -1;
+      cl.push({
+        br: 0, u: u, ox: sd * Rc * 0.16 * (0.5 + rand()), oy: Rc * 0.05 * (rand() - 0.5),
+        rmax: Rc * (0.2 + 0.06 * rand()), tau: ftInv(u) + 0.2
+      });
+    }
+    const us = [0.42, 0.58, 0.72, 0.86, 1];
+    for (let li = 0; li < limbs.length; li++) {
+      const L = br[limbs[li]];
+      for (let k = 0; k < us.length; k++) {
+        const rm = clampNum(Rc * 0.13 + L.len * 0.07, 5, Rc * 0.27, 8) * (us[k] === 1 ? 1.2 : 1);
+        cl.push({
+          br: limbs[li], u: us[k], ox: (rand() - 0.5) * rm * 0.7, oy: (rand() - 0.5) * rm * 0.7 + rm * 0.15,
+          rmax: rm, tau: L.b + L.d * brInv(us[k]) + 0.3
+        });
+      }
+    }
+    for (let bi = 1; bi < br.length; bi++) {
+      const B = br[bi];
+      if (B.kind !== 2 && B.kind !== 3) continue;
+      const ul = B.kind === 2 ? [0.6, 1] : [1];
+      for (let k = 0; k < ul.length; k++) {
+        const rm = B.kind === 2 ? clampNum(Rc * 0.08 + B.len * 0.05, 4, Rc * 0.18, 5) : Math.max(3.5, Rc * 0.07);
+        cl.push({
+          br: bi, u: ul[k], ox: (rand() - 0.5) * rm * 0.6, oy: (rand() - 0.5) * rm * 0.6 + rm * 0.15,
+          rmax: rm, tau: B.b + B.d * brInv(ul[k]) + 0.3
+        });
+      }
+    }
+
+    if (mir < 0) {
+      for (let bi = 0; bi < br.length; bi++) {
+        for (let i = 0; i < br[bi].n; i++) br[bi].pts[i * 2] = -br[bi].pts[i * 2];
+      }
+      for (let i = 0; i < cl.length; i++) cl[i].ox = -cl[i].ox;
+    }
+
+    const cxL = Rc + 16;
+    return {
+      branches: br, clusters: cl, Ht: Ht, Rc: Rc, hl: hl,
+      cxL: cxL, wc: cxL * 2, hc: Ht + 26, baseL: Ht + 18, key: ''
+    };
+  }
+
+  function newTreeLayer(w, h) {
+    return { w: w, h: h, map: new Uint8Array(w * h), canvas: null, g: null, img: null };
+  }
+
+  function setPxW(map, wc, hc, x, y, v) {
+    if (x >= 0 && x < wc && y >= 0 && y < hc) map[y * wc + x] = v;
+  }
+
+  function stampDisc(map, sk, x, y, wd, tx, ty, green) {
+    const cx = sk.cxL + x;
+    const cy = sk.baseL - y;
+    const r = wd / 2;
+    const R = Math.ceil(r);
+    const px0 = Math.round(cx);
+    const py0 = Math.round(cy);
+    const nx = -ty;
+    const ny = tx;
+    const lim = r * r + 0.3;
+    const lx = nx * -0.72 + ny * 0.69;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const X = px0 + dx;
+        const Y = py0 + dy;
+        const ox = X - cx;
+        const oy = -(Y - cy);
+        if (ox * ox + oy * oy > lim) continue;
+        const lat = clampNum((ox * nx + oy * ny) / Math.max(r, 0.5), -1, 1, 0);
+        const l = lat * lx + Math.sqrt(1 - lat * lat) * 0.5;
+        let t = l > 0.7 ? 1 : (l > 0.25 ? 2 : (l > -0.35 ? 3 : 4));
+        if (green) t = t === 1 ? 9 : (t === 4 ? 11 : 10);
+        setPxW(map, sk.wc, sk.hc, X, Y, t);
+      }
+    }
+  }
+
+  function drawSoil(map, sk, g) {
+    const m = 1 - smoothstep(4, 10, g);
+    if (m <= 0.02) return;
+    const hw = Math.round(3 + 5 * m);
+    const hh = Math.max(1, Math.round(1 + 2 * m));
+    for (let dx = -hw; dx <= hw; dx++) {
+      const top = Math.round(hh * Math.sqrt(1 - Math.abs(dx) / (hw + 0.5)));
+      for (let k = 0; k <= top; k++) {
+        setPxW(map, sk.wc, sk.hc, sk.cxL + dx, sk.baseL - k, k === top ? 6 : 7);
+      }
+    }
+    if (g < 1) {
+      setPxW(map, sk.wc, sk.hc, sk.cxL, sk.baseL - hh - 1, 8);
+      setPxW(map, sk.wc, sk.hc, sk.cxL + 1, sk.baseL - hh - 1, 8);
+    } else if (g < 2) {
+      setPxW(map, sk.wc, sk.hc, sk.cxL, sk.baseL - hh, 7);
+      if (g >= 1.5) setPxW(map, sk.wc, sk.hc, sk.cxL, sk.baseL - hh - 1, 9);
+    }
+  }
+
+  function finishBark(map, sk, g) {
+    const wc = sk.wc;
+    const hc = sk.hc;
+    const mag = smoothstep(19, 21.9, g);
+    const src = map.slice();
+    for (let y = 0; y < hc; y++) {
+      for (let x = 0; x < wc; x++) {
+        const i = y * wc + x;
+        const v = src[i];
+        if (!v || (v > 4 && v < 9)) continue;
+        const green = v >= 9;
+        const r = x + 1 < wc ? src[i + 1] : 0;
+        const d = y + 1 < hc ? src[i + wc] : 0;
+        if (!r || !d) { map[i] = green ? 11 : 4; continue; }
+        if (green || (v !== 2 && v !== 3)) continue;
+        if (hash3(x, y >> 2, 313) < 0.09) map[i] = v + 1;
+        else if (mag > 0 && sk.baseL - y < sk.Ht * 0.5 && hash3(x, y >> 2, 91) < 0.07 * mag) map[i] = 5;
+      }
+    }
+  }
+
+  function drawFoliage(cm, sk, g, met) {
+    const wc = sk.wc;
+    const hc = sk.hc;
+    const cxL = sk.cxL;
+    const baseL = sk.baseL;
+    const Ht = sk.Ht;
+    const Rc = sk.Rc;
+    const bs = sk.branches;
+    const zb = new Float32Array(wc * hc).fill(-1);
+    const lt = new Float32Array(wc * hc);
+
+    function blob(cx, cy, r) {
+      const x0 = Math.max(0, Math.floor(cx - r - 1));
+      const x1 = Math.min(wc - 1, Math.ceil(cx + r + 1));
+      const y0 = Math.max(0, Math.floor(cy - r - 1));
+      const y1 = Math.min(hc - 1, Math.ceil(cy + r + 1));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const dx = (x + 0.5 - cx) / r;
+          const dy = (y + 0.5 - cy) / r;
+          const d2 = dx * dx + dy * dy;
+          if (d2 + (hash3(x, y, 401) - 0.5) * 0.4 > 1) continue;
+          const h = Math.sqrt(Math.max(0, 1 - d2));
+          const z = h * r;
+          const i = y * wc + x;
+          if (z <= zb[i]) continue;
+          zb[i] = z;
+          lt[i] = dx * -0.5 - dy * 0.62 + h * 0.6;
+        }
+      }
+    }
+
+    const M0 = met[0];
+    if (M0 && g >= 2.6) {
+      const tx = cxL + bs[0].pts[M0.m * 2];
+      const ty = baseL - bs[0].pts[M0.m * 2 + 1];
+      const rt = 2 + (0.3 * Rc - 2) * Math.pow(smoothstep(3, 20, g), 1.1);
+      blob(tx, ty - rt * 0.35, rt);
+      const k = 1 - smoothstep(8, 10.5, g);
+      if (k > 0.05) {
+        const lr = (1.4 + 0.3 * (g - 2.6)) * k;
+        blob(tx - rt * 0.9 - lr * 0.8, ty - lr * 0.2, lr);
+        blob(tx + rt * 0.9 + lr * 0.8, ty - lr * 0.2, lr);
+      }
+    }
+
+    for (let i = 0; i < sk.clusters.length; i++) {
+      const c = sk.clusters[i];
+      if (g < c.tau) continue;
+      const r = c.rmax * smoothstep(c.tau, c.tau + 4.5, g);
+      if (r < 1.5) continue;
+      const p = ptAt(bs[c.br], c.u);
+      const s = r / c.rmax;
+      blob(cxL + p[0] + c.ox * s, baseL - p[1] - c.oy * s, r);
+    }
+
+    const gold = smoothstep(18.5, 21.9, g) * 0.85;
+    const holeAmt = 0.028 * smoothstep(11, 18, g);
+    const bl = smoothstep(16.8, 18, g) * (1 - smoothstep(19.3, 20.3, g));
+    const fr = smoothstep(19.4, 20.8, g);
+
+    for (let y = 0; y < hc; y++) {
+      for (let x = 0; x < wc; x++) {
+        const i = y * wc + x;
+        if (zb[i] < 0) continue;
+        const wy = baseL - y;
+        const l = lt[i] - 0.3 * (1 - clampNum(wy / (0.6 * Ht), 0, 1, 0)) +
+          ((BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5) * 0.2;
+        let t = l > 0.78 ? 5 : (l > 0.45 ? 4 : (l > 0.05 ? 3 : (l > -0.35 ? 2 : 1)));
+        if (gold > 0 && t >= 4) {
+          const gp = smoothstep(-0.1, 0.8, (x - cxL) / Rc * 0.6 + wy / Ht * 0.5);
+          if (hash3(x, y, 611) < gold * (0.15 + 0.85 * gp)) t = t === 5 ? 11 : 6;
+        }
+        if (holeAmt > 0 && t >= 2 && hash3(x, y, 733) < holeAmt) continue;
+        cm[i] = t;
+      }
+    }
+
+    if (bl > 0.02) {
+      for (let y = 0; y < hc; y++) {
+        for (let x = 0; x < wc; x++) {
+          const v = cm[y * wc + x];
+          if (v >= 3 && v <= 5 && hash3(x, y, 555) < 0.05 * bl) {
+            cm[y * wc + x] = hash3(x, y, 556) < 0.35 ? 8 : 7;
+          }
+        }
+      }
+    }
+
+    if (fr > 0.02) {
+      for (let y = 0; y < hc - 1; y += 2) {
+        for (let x = 0; x < wc - 1; x += 2) {
+          const a = y * wc + x;
+          if (hash3(x, y, 777) >= 0.014 * fr) continue;
+          const v0 = cm[a], v1 = cm[a + 1], v2 = cm[a + wc], v3 = cm[a + wc + 1];
+          if (v0 < 2 || v0 > 5 || v1 < 2 || v1 > 5 || v2 < 2 || v2 > 5 || v3 < 2 || v3 > 5) continue;
+          cm[a] = 10;
+          cm[a + 1] = 9;
+          cm[a + wc] = 9;
+          cm[a + wc + 1] = 9;
+        }
+      }
+    }
+
+    const src = cm.slice();
+    for (let y = 0; y < hc; y++) {
+      for (let x = 0; x < wc; x++) {
+        const i = y * wc + x;
+        const v = src[i];
+        if (!v || (v >= 7 && v <= 10)) continue;
+        const r = x + 1 < wc ? src[i + 1] : 0;
+        const d = y + 1 < hc ? src[i + wc] : 0;
+        if (!r || !d) cm[i] = 1;
+      }
+    }
+  }
+
+  function buildTreeLayers(sk, g) {
+    const trunk = newTreeLayer(sk.wc, sk.hc);
+    const crown = newTreeLayer(sk.wc, sk.hc);
+    const bs = sk.branches;
+    const girth = 0.15 + 0.85 * Math.pow(smoothstep(2, 21.5, g), 0.75);
+    const met = [];
+
+    for (let bi = 0; bi < bs.length; bi++) {
+      const b = bs[bi];
+      const f = b.kind === 0 ? ftAt(g) : brEase((g - b.b) / b.d);
+      if (b.kind === 0 ? g < 2 : f <= 0) { met.push(null); continue; }
+      const m = Math.max(0, Math.floor(f * (b.n - 1)));
+      let wb = b.w0 * girth;
+      if (b.par >= 0 && b.kind !== 4) {
+        const PM = met[b.par];
+        if (PM) {
+          const pb = bs[b.par];
+          const pu = Math.min(1, b.att * (pb.n - 1) / Math.max(1, PM.m));
+          wb = Math.min(wb, PM.wb * (1 - (1 - pb.tip) * Math.pow(pu, 0.9)) * 0.78);
+        }
+      }
+      met.push({ m: m, wb: Math.max(1, wb) });
+    }
+
+    function stampBranch(bi) {
+      const b = bs[bi];
+      const M = met[bi];
+      if (!M) return;
+      const flare = b.kind === 0 ? 0.5 * smoothstep(6, 14, g) : 0;
+      for (let i = 0; i <= M.m; i++) {
+        const u = i / (b.n - 1);
+        const x = b.pts[i * 2];
+        const y = b.pts[i * 2 + 1];
+        const j = Math.min(i + 1, b.n - 1);
+        const k = Math.max(i - 1, 0);
+        let tx = b.pts[j * 2] - b.pts[k * 2];
+        let ty = b.pts[j * 2 + 1] - b.pts[k * 2 + 1];
+        const tl = Math.sqrt(tx * tx + ty * ty) || 1;
+        tx /= tl;
+        ty /= tl;
+        let wd = M.wb * (1 - (1 - b.tip) * Math.pow(i / Math.max(1, M.m), 0.9));
+        if (flare) wd *= 1 + flare * Math.exp(-y / 6);
+        const tau = b.kind === 0 ? ftInv(u) : b.b + b.d * brInv(u);
+        stampDisc(trunk.map, sk, x, y, Math.max(1, wd), tx, ty, g - tau < 3.6);
+      }
+    }
+
+    for (let bi = 0; bi < bs.length; bi++) if (bs[bi].kind === 4) stampBranch(bi);
+    for (let bi = 0; bi < bs.length; bi++) if (bs[bi].kind !== 4) stampBranch(bi);
+    drawSoil(trunk.map, sk, g);
+    finishBark(trunk.map, sk, g);
+    drawFoliage(crown.map, sk, g, met);
+    return { trunk: trunk, crown: crown, key: '', variant: 0, palKey: -1 };
+  }
+
+  function paintMap(L, pal) {
+    if (!L.canvas) {
+      L.canvas = document.createElement('canvas');
+      L.canvas.width = L.w;
+      L.canvas.height = L.h;
+      L.g = L.canvas.getContext('2d');
+      L.img = L.g.createImageData(L.w, L.h);
+    }
+    const d = L.img.data;
+    const m = L.map;
+    for (let i = 0, n = m.length; i < n; i++) {
+      const v = m[i];
+      const j = i * 4;
+      if (!v) { d[j + 3] = 0; continue; }
+      const c = pal[v];
+      d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = 255;
+    }
+    L.g.putImageData(L.img, 0, 0);
+  }
+
+  function variantPal(v) {
+    const t = LEAF_VARIANTS[v];
+    if (!t) return PAL_FOLIAGE;
+    return PAL_FOLIAGE.map(function (e, i) {
+      return i < 5 ? [mixRgb(e[0], t, 0.28), mixRgb(e[1], t, 0.2)] : e;
+    });
+  }
+
+  function paintTree(t, pk) {
+    const env = terrainEnv(getWorldHour());
+    const bp = tintPal(PAL_BARK, env, 0, 0.2);
+    bp[5] = hexToRgb('#ffd36a');
+    paintMap(t.trunk, bp);
+    paintMap(t.crown, tintPal(variantPal(t.variant), env, 0, 0.15));
+    t.palKey = pk;
+  }
+
+  function ensureTree() {
+    if (treeDirty) readTreeGrowth();
+    const Ht = Math.round(clampNum(H * 0.6, 60, 120, 100));
+    const Rc = Math.max(20, Math.min(Math.round(Ht * 0.56), Math.floor(W * 0.47)));
+    const sk = treeGrowth.seed + '|' + Ht + '|' + Rc;
+    if (!treeSkel || treeSkel.key !== sk) {
+      treeSkel = buildTreeSkeleton(treeGrowth.seed, Ht, Rc);
+      treeSkel.key = sk;
+      treeCur = null;
+      treePrev = null;
+    }
+    const gq = Math.round(treeGrowth.g * 8);
+    const gk = gq + '|' + treeGrowth.variant;
+    if (!treeCur || treeCur.key !== gk) {
+      const prev = treeCur;
+      treeCur = buildTreeLayers(treeSkel, gq / 8);
+      treeCur.key = gk;
+      treeCur.variant = treeGrowth.variant;
+      if (prev) {
+        treePrev = prev;
+        treeFade = 0;
+      }
+    }
+    const pk = Math.floor(getWorldHour() * 12);
+    if (treeCur.palKey !== pk) paintTree(treeCur, pk);
+    if (treePrev && treePrev.palKey !== pk) paintTree(treePrev, pk);
+  }
+
+  function drawTree() {
+    ensureTree();
+    const x = Math.floor(W / 2) - treeSkel.cxL;
+    const y = groundY + 1 - treeSkel.baseL;
+    const fading = !!treePrev;
+    if (fading) {
+      ctx.drawImage(treePrev.trunk.canvas, x, y);
+      ctx.drawImage(treePrev.crown.canvas, x, y);
+      treeFade += wxDt / 1.6;
+    }
+    ctx.globalAlpha = fading ? Math.min(1, treeFade) : 1;
+    ctx.drawImage(treeCur.trunk.canvas, x, y);
+    ctx.drawImage(treeCur.crown.canvas, x, y);
+    ctx.globalAlpha = 1;
+    if (fading && treeFade >= 1) {
+      treePrev = null;
+      treeFade = 1;
+    }
+  }
+
+  function getTreeInfo() {
+    if (!treeSkel) return null;
+    return {
+      x: Math.floor(W / 2),
+      y: groundY,
+      g: treeGrowth.g,
+      height: Math.round(ftAt(treeGrowth.g) * treeSkel.hl),
+      crownRadius: treeSkel.Rc
+    };
+  }
+
   function fit() {
     if (!host || !canvas) return;
     const vw = host.clientWidth || window.innerWidth;
@@ -1205,6 +1818,7 @@ const MyWorld = (function () {
     drawHillsMid();
     drawClouds(1);
     drawTerrainFront();
+    drawTree();
     drawFog(1);
     drawRain(dt);
     drawWeatherTint();
@@ -1353,6 +1967,7 @@ const MyWorld = (function () {
     resetSky();
     resetTerrain();
     resetWeather();
+    resetTree();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
@@ -1383,9 +1998,9 @@ const MyWorld = (function () {
     fit();
   }
 
-  function renderTree() { /* Phase 5 */ }
+  function renderTree() { treeDirty = true; }
 
-  function refresh() { fit(); }
+  function refresh() { treeDirty = true; fit(); }
 
   function loadState() {
     if (!hasData()) { warnMissingDeps('loadState'); return null; }
@@ -1418,6 +2033,8 @@ const MyWorld = (function () {
     getWind,
     getWeather,
     setDebugWeather,
+    setDebugStage,
+    getTreeInfo,
 
     render,
     renderTree,
