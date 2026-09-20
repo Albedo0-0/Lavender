@@ -251,6 +251,25 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       Backup.downloadExport();
     });
 
+    const importContentBtn = document.getElementById('settings-import-content-btn');
+    const importContentInput = document.getElementById('settings-import-content-input');
+    if (importContentBtn && importContentInput) {
+      importContentBtn.addEventListener('click', function () { importContentInput.click(); });
+      importContentInput.addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        importContentInput.value = '';
+        if (!file) return;
+        const status = document.getElementById('settings-import-content-status');
+        if (status) status.textContent = 'Importing\u2026';
+        MyWorldContent.importPackFile(file).then(function (result) {
+          if (!status) return;
+          status.textContent = result.ok
+            ? (result.count ? ('Imported ' + result.count + ' item(s).') : 'Already imported.')
+            : result.error;
+        });
+      });
+    }
+
     document.getElementById('settings-import-input').addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
