@@ -2018,12 +2018,12 @@ const MyWorld = (function () {
     return { world: worldDef ? worldDef.id : null, tree: treeDef ? treeDef.id : null };
   }
 
-  function setContent(worldId, treeId) {
+  function setContent(worldId) {
     if (typeof MyWorldContent === 'undefined' || !MyWorldContent) return false;
-    if (worldId && !MyWorldContent.canActivate('world', worldId)) return false;
-    if (treeId && !MyWorldContent.canActivate('tree', treeId)) return false;
-    if (worldId) MyWorldContent.setActive('world', worldId);
-    if (treeId) MyWorldContent.setActive('tree', treeId);
+    if (worldId) {
+      if (!MyWorldContent.canActivate('world', worldId)) return false;
+      MyWorldContent.setActive('world', worldId);
+    }
     if (!applyContent()) return false;
     resetSky();
     resetTerrain();
