@@ -58,6 +58,32 @@ const MiscCosmetics = (function () {
   // Placeholder-only collection view: opens a small panel listing whatever has
   // been register()ed so far. No Store, no currency, no purchasing here — see
   // file header. Safe to call once; ignores a second call on the same button.
+  function renderWorldsTab() {
+    if (typeof MyWorldContent === 'undefined') return '<p class="micro-label">Worlds unavailable.</p>';
+    const worlds = MyWorldContent.list('world').filter(function (w) { return w.owned; });
+    if (!worlds.length) return '<p class="micro-label">No worlds owned yet.</p>';
+    return worlds.map(function (w) {
+      return '<div class="misc-cosmetic-row misc-world-row' + (w.active ? ' misc-world-row-active' : '') + '" data-world-id="' + w.id + '">' +
+        w.name + (w.active ? ' \u2014 Active' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  function wireWorldsTab(container) {
+    if (!container) return;
+    container.querySelectorAll('.misc-world-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        const id = row.dataset.worldId;
+        if (!id || typeof MyWorldContent === 'undefined') return;
+        if (MyWorldContent.getActive('world').id === id) return;
+        if (!MyWorldContent.setActive('world', id)) return;
+        if (typeof MyWorld !== 'undefined' && MyWorld.setContent) MyWorld.setContent(id);
+        container.innerHTML = renderWorldsTab();
+        wireWorldsTab(container);
+      });
+    });
+  }
+
   function mountPaintbrushButton(button) {
     if (!button || button.__paintbrushWired) return;
     button.__paintbrushWired = true;
@@ -69,7 +95,20 @@ const MiscCosmetics = (function () {
           }).join('')
         : '<p class="micro-label">Nothing to show yet.</p>';
       if (typeof Modal !== 'undefined' && Modal.open) {
-        Modal.open('<div class="modal-header"><h3 class="modal-title">Cosmetics</h3></div>' + rows);
+        Modal.open(
+          '<div class="modal-header"><h3 class="modal-title">Cosmetics</h3></div>' +
+          '<div class="misc-tabs"><button id="misc-tab-cosmetics" class="btn-secondary">Cosmetics</button>' +
+          '<button id="misc-tab-worlds" class="btn-secondary">Worlds</button></div>' +
+          '<div id="misc-tab-body">' + rows + '</div>'
+        );
+        const body = document.getElementById('misc-tab-body');
+        const cosmeticsTab = document.getElementById('misc-tab-cosmetics');
+        const worldsTab = document.getElementById('misc-tab-worlds');
+        if (cosmeticsTab) cosmeticsTab.addEventListener('click', function () { body.innerHTML = rows; });
+        if (worldsTab) worldsTab.addEventListener('click', function () {
+          body.innerHTML = renderWorldsTab();
+          wireWorldsTab(body);
+        });
       }
     });
   }
