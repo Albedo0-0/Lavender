@@ -2118,6 +2118,7 @@ const MyWorld = (function () {
       treeSkel.key = sk;
       treeCur = null;
       treePrev = null;
+      treeSwayPh = makeRng(treeGrowth.seed ^ 0x27d4eb2f)() * 6.283;
     }
     const gq = Math.round(treeGrowth.g * 8);
     const gk = gq + '|' + treeGrowth.variant;
@@ -2141,15 +2142,21 @@ const MyWorld = (function () {
     const x = Math.floor(W * TREE_SLOT) - treeSkel.cxL;
     const y = groundY + 1 - treeSkel.baseL;
     const fading = !!treePrev;
+    const swayAmp = reduceMotion ? 0 : 1.6 * (0.5 + 0.5 * windNow);
+    const sway = swayAmp ? Math.sin(clockElapsed * 0.5 + treeSwayPh) * swayAmp : 0;
+    const skew = sway / Math.max(1, treeSkel.baseL);
+    ctx.save();
+    ctx.transform(1, 0, -skew, 1, x + skew * treeSkel.baseL, y);
     if (fading) {
-      ctx.drawImage(treePrev.trunk.canvas, x, y);
-      ctx.drawImage(treePrev.crown.canvas, x, y);
+      ctx.drawImage(treePrev.trunk.canvas, 0, 0);
+      ctx.drawImage(treePrev.crown.canvas, 0, 0);
       treeFade += wxDt / 1.6;
     }
     ctx.globalAlpha = fading ? Math.min(1, treeFade) : 1;
-    ctx.drawImage(treeCur.trunk.canvas, x, y);
-    ctx.drawImage(treeCur.crown.canvas, x, y);
+    ctx.drawImage(treeCur.trunk.canvas, 0, 0);
+    ctx.drawImage(treeCur.crown.canvas, 0, 0);
     ctx.globalAlpha = 1;
+    ctx.restore();
     if (fading && treeFade >= 1) {
       treePrev = null;
       treeFade = 1;
@@ -2190,6 +2197,7 @@ const MyWorld = (function () {
     if (!ctx) return;
     clockElapsed += dt;
     updateWeather(dt);
+    updateLife(dt);
     drawSky();
     drawClouds(0);
     drawHillsFar();
@@ -2198,6 +2206,12 @@ const MyWorld = (function () {
     drawClouds(1);
     drawTerrainFront();
     drawTree();
+    drawGrass();
+    drawShimmer();
+    drawBirds();
+    drawButterflies();
+    drawLeaves();
+    drawFireflies();
     drawFog(1);
     drawRain(dt);
     drawWeatherTint();
@@ -2320,6 +2334,7 @@ const MyWorld = (function () {
     frame = 0;
     initSkyClock();
     initWeather();
+    initLife();
     fit();
     startLoop();
 
@@ -2348,6 +2363,7 @@ const MyWorld = (function () {
     resetTerrain();
     resetWeather();
     resetTree();
+    resetLife();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
@@ -2428,8 +2444,10 @@ const MyWorld = (function () {
     resetTerrain();
     resetWeather();
     resetTree();
+    resetLife();
     if (host) {
       initWeather();
+      initLife();
       fit();
     }
     return true;
