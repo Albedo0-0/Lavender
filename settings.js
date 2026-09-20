@@ -69,6 +69,10 @@ const Settings = (function () {
 
       '<hr class="divider">' +
 
+            '<div class="form-row"><button id="settings-import-content-btn" class="btn-secondary">Import Content</button>' +
+      '<input type="file" id="settings-import-content-input" accept=".lvpack" style="display:none">' +
+      '<span id="settings-import-content-status" class="micro-label"></span></div>' +
+
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
       '<div class="form-row"><label for="settings-import-input">Restore from backup</label>' +
       '<input type="file" id="settings-import-input" accept="application/json">' +
