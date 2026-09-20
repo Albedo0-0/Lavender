@@ -205,6 +205,7 @@
   <script src="candle-lamp.js"></script>
   <script src="fullscreen.js"></script>
   <script>
+     MyWorldContent.restoreImportedPacks().catch(function () {}).then(function () {
     State.init();
     Nav.init();
     Modal.init();
@@ -226,8 +227,9 @@
     UnrecordedStudy.init();
     Gamification.init();
     BackupUI.init();
-    Settings.init();
+      Settings.init();
     ForcedFullscreen.init();
+    });
     (function () {
       const ambientLayer = document.getElementById('misc-ambient-layer');
       if (typeof CustomCursor !== 'undefined') CustomCursor.init();
