@@ -218,6 +218,96 @@ const MyWorldContent = (function () {
     return true;
   }
 
+  // ---------------------------------------------------------------------
+  // Imported pack storage (IndexedDB) — Settings Phase 1/2
+  // ---------------------------------------------------------------------
+  const PACK_DB_NAME = 'lavender.packs.v1';
+  const PACK_STORE = 'packs';
+  let _packDbPromise = null;
+
+  function openPackDb() {
+    if (_packDbPromise) return _packDbPromise;
+    _packDbPromise = new Promise(function (resolve, reject) {
+      if (typeof indexedDB === 'undefined') { reject(new Error('no indexedDB')); return; }
+      const req = indexedDB.open(PACK_DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(PACK_STORE)) db.createObjectStore(PACK_STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('indexedDB open failed')); };
+    });
+    return _packDbPromise;
+  }
+
+  function storePackDef(def) {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(PACK_STORE, 'readwrite');
+        tx.objectStore(PACK_STORE).put(def);
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { reject(tx.error || new Error('put failed')); };
+      });
+    });
+  }
+
+  function loadAllPackDefs() {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(PACK_STORE, 'readonly');
+        const req = tx.objectStore(PACK_STORE).getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error || new Error('getAll failed')); };
+      });
+    });
+  }
+
+  function restoreImportedPacks() {
+    return loadAllPackDefs().then(function (defs) {
+      defs.forEach(function (def) {
+        if (!registry[def.id]) register(def);
+      });
+      return defs.length;
+    }).catch(function () { return 0; });
+  }
+
+  function importPackFile(file) {
+    return file.text().then(function (text) {
+      let pack;
+      try { pack = JSON.parse(text); } catch (e) { throw new Error('Not valid pack data.'); }
+      if (!isObj(pack)) throw new Error('Not valid pack data.');
+      if (pack.schemaVersion !== 1) throw new Error('Unsupported pack version.');
+      if (!isNum(pack.engineMin) || pack.engineMin > ENGINE_VERSION) throw new Error('This pack needs a newer app version.');
+      if (typeof pack.sha256 !== 'string' || !pack.sha256) throw new Error('Pack is missing a checksum.');
+      if (!Array.isArray(pack.definitions) || !pack.definitions.length) throw new Error('Pack has no content.');
+
+      const claimed = pack.sha256;
+      const checkObj = Object.assign({}, pack, { sha256: '' });
+      const checkText = JSON.stringify(checkObj);
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(checkText)).then(function (buf) {
+        const hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+          return b.toString(16).padStart(2, '0');
+        }).join('');
+        if (hex !== claimed.toLowerCase()) throw new Error('Pack failed the checksum check.');
+
+        const toStore = [];
+        for (let i = 0; i < pack.definitions.length; i++) {
+          const def = pack.definitions[i];
+          const err = validate(def);
+          if (err) throw new Error('Invalid content in pack (' + (def && def.id) + '): ' + err);
+          if (!registry[def.id]) toStore.push(def);
+        }
+        return Promise.all(toStore.map(storePackDef)).then(function () {
+          let count = 0;
+          toStore.forEach(function (def) { if (register(def)) count++; });
+          return { ok: true, count: count };
+        });
+      });
+    }).catch(function (e) {
+      return { ok: false, error: (e && e.message) || 'Import failed.' };
+    });
+                        }
+
   function get(id) {
     return (typeof id === 'string' && registry[id]) || null;
   }
@@ -429,6 +519,9 @@ function canActivate(type, id) {
     getActive,
 
     getTreeRecord,
-    setTreeGrowth
+    setTreeGrowth,
+
+    importPackFile,
+    restoreImportedPacks
   };
 })();
