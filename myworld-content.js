@@ -52,6 +52,7 @@ const MyWorldContent = (function () {
   // ---------------------------------------------------------------------
   const MEADOW = {
     type: 'world', id: 'core.meadow', name: 'Meadow', version: 1, engineMin: 1, cost: 0,
+    tree: 'core.apple',
     baseHeight: 180,
     horizon: 0.66,
     ground: 0.74,
@@ -142,6 +143,7 @@ const MyWorldContent = (function () {
   }
 
   function validateWorld(d) {
+    if (typeof d.tree !== 'string' || !d.tree) return 'tree';
     if (!isNum(d.baseHeight) || d.baseHeight < 90 || d.baseHeight > 400) return 'baseHeight';
     if (!isNum(d.horizon) || d.horizon < 0.3 || d.horizon > 0.9) return 'horizon';
     if (!isNum(d.ground) || d.ground < 0.4 || d.ground > 0.95) return 'ground';
@@ -305,35 +307,42 @@ const MyWorldContent = (function () {
 
   /** Marks a registered id as owned (the future Store calls this after a purchase). */
   function grant(id) {
-    if (!get(id)) return false;
+    const d = get(id);
+    if (!d) return false;
     const i = loadInv();
-    if (i.owned.indexOf(id) < 0) {
-      i.owned.push(id);
-      saveInv();
-    }
+    const ids = [id];
+    if (d.type === 'world' && d.tree) ids.push(d.tree);
+    let changed = false;
+    ids.forEach(function (x) {
+      if (get(x) && i.owned.indexOf(x) < 0) { i.owned.push(x); changed = true; }
+    });
+    if (changed) saveInv();
     return true;
   }
 
-  function canActivate(type, id) {
+function canActivate(type, id) {
     const d = get(id);
-    return !!d && d.type === type && isOwned(id);
+    if (type !== 'world' || !d || d.type !== 'world' || !isOwned(id)) return false;
+    const t = get(d.tree);
+    return !!t && t.type === 'tree';
   }
 
   function setActive(type, id) {
     if (!canActivate(type, id)) return false;
     const i = loadInv();
-    if (type === 'world') i.activeWorld = id; else i.activeTree = id;
+    i.activeWorld = id;
+    i.activeTree = get(id).tree;
     saveInv();
     return true;
   }
 
-  /** Active definition for 'world' | 'tree'; falls back to the built-in if the saved one is missing. */
+  /** Active world, or the tree locked to it. Falls back to the built-ins if missing. */
   function getActive(type) {
     const i = loadInv();
-    const id = type === 'world' ? i.activeWorld : i.activeTree;
-    const d = get(id);
-    if (d && d.type === type) return d;
-    return get(type === 'world' ? DEFAULT_WORLD : DEFAULT_TREE);
+    const w = get(i.activeWorld);
+    if (type === 'world') return (w && w.type === 'world') ? w : get(DEFAULT_WORLD);
+    const t = (w && w.type === 'world') ? get(w.tree) : null;
+    return (t && t.type === 'tree') ? t : get(DEFAULT_TREE);
   }
 
   // ---------------------------------------------------------------------
