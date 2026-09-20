@@ -74,12 +74,56 @@ const Assistant = (function () {
   function backBtnHtml() { return '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>'; }
   function wireBack() { document.getElementById('assistant-back-btn').addEventListener('click', openMain); }
 
-  // ---------- Store (placeholder, §7.3) ----------
+  // ---------- Store (§7.3) ----------
+
+  const WORLD_COST = 1000;
+
+  function storeRowHtml(w) {
+    const owned = w.owned || w.cost === 0;
+    return '<div class="assistant-store-item" data-world-id="' + esc(w.id) + '">' +
+      '<span class="assistant-store-item-name">' + esc(w.name) + '</span>' +
+      (owned
+        ? '<span class="tag tag-neutral">Owned</span>'
+        : '<button class="btn-secondary assistant-store-buy" data-world-id="' + esc(w.id) + '">Buy \u2014 ' + WORLD_COST + ' EXP</button>') +
+      '<span class="assistant-store-msg" data-world-id="' + esc(w.id) + '"></span>' +
+    '</div>';
+  }
+
+  function storeBodyHtml() {
+    if (typeof MyWorldContent === 'undefined') return '<div class="empty-state">Store unavailable.</div>';
+    const worlds = MyWorldContent.list('world');
+    if (!worlds.length) return '<div class="empty-state">No worlds registered yet.</div>';
+    return '<div class="assistant-store-list">' + worlds.map(storeRowHtml).join('') + '</div>';
+  }
+
+  function wireStore() {
+    document.querySelectorAll('.assistant-store-buy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.worldId;
+        const msg = document.querySelector('.assistant-store-msg[data-world-id="' + id + '"]');
+        const gam = GamificationData.getGamState();
+        if (gam.totalExp < WORLD_COST) {
+          if (msg) msg.textContent = 'Not enough EXP';
+          return;
+        }
+        GamificationData.spendExp(WORLD_COST, 'World unlocked: ' + id);
+        MyWorldContent.grant(id);
+        if (typeof Gamification !== 'undefined' && Gamification.renderMeter) Gamification.renderMeter();
+        openStore();
+      });
+    });
+  }
 
   function openStore() {
-    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-plain"><h3 class="section-title">Store</h3><p>Coming soon \u2014 will link to Gamification\u2019s store (\u00a7B.8).</p></div>');
+    Modal.open(backBtnHtml() +
+      '<div class="assistant-page assistant-page-plain">' +
+        '<h3 class="section-title">Store</h3>' +
+        '<div class="assistant-store-card">' + storeBodyHtml() + '</div>' +
+      '</div>');
     wireBack();
+    wireStore();
   }
+
 
   // ---------- Timeline (§7.3) ----------
 
