@@ -1560,6 +1560,7 @@ const MyWorld = (function () {
     buildFireflies();
     buildLeaves();
     buildShimmer();
+    buildMotes();
     birdTimer = 6 + lifeRnd() * 10;
   }
 
@@ -2714,6 +2715,7 @@ const MyWorld = (function () {
     resetWeather();
     resetTree();
     resetLife();
+    resetLighting();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
