@@ -640,6 +640,9 @@ const MyWorld = (function () {
     buildHills(cx);
     buildGround(cx);
     buildGrassTufts();
+    buildAmbientLights();
+    buildLightShafts();
+    buildAmbientProps();
   }
 
   function resetTerrain() {
@@ -648,6 +651,9 @@ const MyWorld = (function () {
     pond = null;
     grassTufts = null;
     groundPalCache = null;
+    ambientLights = null;
+    lightShafts = null;
+    ambientProps = null;
   }
 
   function onTerrainResize() {
@@ -705,6 +711,7 @@ const MyWorld = (function () {
     gp.push(quant(mixRgb(s.top, [10, 24, 48], 0.5)));
     gp.push(quant(mixRgb(s.bot, [255, 255, 255], 0.55)));
     paintLayer(terrain.ground, gp);
+    stampAmbientProps(terrain.ground.g, env);
   }
 
   function ensureTerrain() {
@@ -1542,6 +1549,7 @@ const MyWorld = (function () {
     updateFireflies(dt);
     updateLeaves(dt);
     updateShimmer(dt);
+    updateMotes(dt);
   }
 
   function initLife() {
@@ -1562,7 +1570,341 @@ const MyWorld = (function () {
     fireflyHalo = null;
     leaves = null;
     shimmer = null;
+    motes = null;
     birdTimer = 0;
+  }
+
+  // ---------------------------------------------------------------------
+  // Glow, lighting and magic (Phase 7)
+  // ---------------------------------------------------------------------
+  const LIGHT_GRADE = [
+    { h: 0,    c: [150, 150, 205] },
+    { h: 5,    c: [170, 160, 195] },
+    { h: 6.5,  c: [255, 205, 210] },
+    { h: 8,    c: [235, 235, 240] },
+    { h: 11,   c: [255, 255, 252] },
+    { h: 13,   c: [255, 255, 250] },
+    { h: 16.5, c: [255, 238, 225] },
+    { h: 18,   c: [255, 180, 120] },
+    { h: 19.5, c: [200, 140, 150] },
+    { h: 21,   c: [150, 150, 205] },
+    { h: 24,   c: [150, 150, 205] }
+  ];
+
+  let lightGradeCanvas = null;
+  let lightGradeKey = '';
+  let vignetteCanvas = null;
+  let ambientLights = null;
+  let lightHalo = null;
+  let treeGlowCanvas = null;
+  let treeGlowKey = '';
+  let lightShafts = null;
+  let motes = null;
+  let ambientProps = null;
+
+  function lightGradeAt(hour) {
+    const keys = LIGHT_GRADE;
+    let i = 0;
+    while (i < keys.length - 2 && hour >= keys[i + 1].h) i++;
+    const a = keys[i];
+    const b = keys[i + 1];
+    const t = clampNum((hour - a.h) / (b.h - a.h), 0, 1, 0);
+    const s = t * t * (3 - 2 * t);
+    return mixRgb(a.c, b.c, s);
+  }
+
+  function buildLightGrade() {
+    const hour = getWorldHour();
+    const c = lightGradeAt(hour);
+    if (!lightGradeCanvas) lightGradeCanvas = document.createElement('canvas');
+    lightGradeCanvas.width = W;
+    lightGradeCanvas.height = H;
+    const g = lightGradeCanvas.getContext('2d');
+    const bands = 4;
+    for (let i = 0; i < bands; i++) {
+      const t = i / (bands - 1);
+      const shade = quant(mixRgb(c, [255, 255, 255], 0.12 * (1 - t)));
+      g.fillStyle = css(shade);
+      g.fillRect(0, Math.round(H * i / bands), W, Math.ceil(H / bands) + 1);
+    }
+    lightGradeKey = Math.floor(hour * 12) + '|' + W + 'x' + H;
+  }
+
+  function drawLightGrade() {
+    const hour = getWorldHour();
+    const key = Math.floor(hour * 12) + '|' + W + 'x' + H;
+    if (!lightGradeCanvas || key !== lightGradeKey) buildLightGrade();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(lightGradeCanvas, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function buildVignette() {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d');
+    const img = g.createImageData(W, H);
+    const d = img.data;
+    const cx = W / 2;
+    const cy = H / 2;
+    const maxD = Math.sqrt(cx * cx + cy * cy);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) / maxD;
+        const a = clampNum((dist - 0.55) / 0.45, 0, 1, 0);
+        const j = (y * W + x) * 4;
+        d[j] = 6; d[j + 1] = 6; d[j + 2] = 14; d[j + 3] = Math.round(a * 110);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    vignetteCanvas = c;
+  }
+
+  function drawVignette() {
+    if (!vignetteCanvas || vignetteCanvas.width !== W || vignetteCanvas.height !== H) buildVignette();
+    ctx.drawImage(vignetteCanvas, 0, 0);
+  }
+
+  function resetLighting() {
+    lightGradeCanvas = null;
+    lightGradeKey = '';
+    vignetteCanvas = null;
+  }
+
+  // ---- ambient lights (lanterns / glowing mushrooms) ----
+  function buildLightHalo() {
+    const size = 9;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const img = g.createImageData(size, size);
+    const d = img.data;
+    const cx = (size - 1) / 2;
+    const cy = (size - 1) / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - dist / (cx + 0.5));
+        const j = (y * size + x) * 4;
+        d[j] = 255; d[j + 1] = 200; d[j + 2] = 110; d[j + 3] = Math.round(Math.pow(a, 1.4) * 190);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    lightHalo = c;
+  }
+
+  function buildAmbientLights() {
+    ambientLights = [];
+    if (!surf) return;
+    const rand = makeRng(STAR_SEED ^ 0x51ed270b);
+    const n = 2 + Math.floor(rand() * 2);
+    const cx = Math.floor(W * TREE_SLOT);
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 ? 1 : -1;
+      const x = clampNum(cx + side * (8 + Math.floor(rand() * 14)), 1, W - 2, cx);
+      ambientLights.push({ x: x, y: surf[x] - 1, ph: rand() * 6.283 });
+    }
+  }
+
+  function drawAmbientLights() {
+    if (!ambientLights) return;
+    if (!lightHalo) buildLightHalo();
+    const vis = nightFactor(getWorldHour());
+    if (vis < 0.05) return;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < ambientLights.length; i++) {
+      const l = ambientLights[i];
+      const flick = 0.85 + 0.15 * Math.sin(clockElapsed * 3 + l.ph);
+      ctx.globalAlpha = vis * flick;
+      ctx.drawImage(lightHalo, Math.round(l.x) - 4, Math.round(l.y) - 8);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- tree light pool ----
+  function buildTreeGlow() {
+    const grown = clampNum(treeGrowth.g / 21, 0, 1, 0);
+    const r = treeSkel ? Math.max(10, Math.round(treeSkel.Rc * (0.3 + 0.6 * grown))) : 16;
+    const size = r * 2;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const img = g.createImageData(size, size);
+    const d = img.data;
+    const cx = size / 2;
+    const cy = size / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - cx) / r;
+        const dy = (y - cy) / r;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - dist);
+        const j = (y * size + x) * 4;
+        d[j] = 255; d[j + 1] = 214; d[j + 2] = 150; d[j + 3] = Math.round(Math.pow(a, 1.6) * 90);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    treeGlowCanvas = c;
+    treeGlowKey = Math.floor(treeGrowth.g) + '';
+  }
+
+  function drawTreeGlow() {
+    if (!treeSkel || treeGrowth.g < 3) return;
+    const vis = nightFactor(getWorldHour());
+    if (vis < 0.05) return;
+    const key = Math.floor(treeGrowth.g) + '';
+    if (!treeGlowCanvas || treeGlowKey !== key) buildTreeGlow();
+    const cx = Math.floor(W * TREE_SLOT);
+    const cy = groundY - 2;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = vis;
+    ctx.drawImage(treeGlowCanvas, cx - treeGlowCanvas.width / 2, cy - treeGlowCanvas.height / 2);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- light shafts ----
+  function buildLightShafts() {
+    lightShafts = [];
+    const rand = makeRng(STAR_SEED ^ 0x7f4a7c13);
+    const n = 2 + Math.floor(rand() * 2);
+    for (let i = 0; i < n; i++) {
+      lightShafts.push({ ox: (rand() - 0.5) * 0.7, w: 1 + (rand() < 0.4 ? 1 : 0), ang: 0.35 + rand() * 0.25 });
+    }
+  }
+
+  function shaftFactor(hour) {
+    const morn = Math.max(0, 1 - Math.abs(hour - 7.5) / 1.5);
+    const eve = Math.max(0, 1 - Math.abs(hour - 18.5) / 1.5);
+    return clampNum(Math.max(morn, eve), 0, 1, 0);
+  }
+
+  function drawLightShafts() {
+    const hour = getWorldHour();
+    const f = shaftFactor(hour);
+    if (f < 0.03 || !treeSkel || !lightShafts) return;
+    const dir = hour < 12 ? 1 : -1;
+    const cx = Math.floor(W * TREE_SLOT);
+    const topY = groundY - treeSkel.Ht - 6;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#fff0c0';
+    for (let i = 0; i < lightShafts.length; i++) {
+      const s = lightShafts[i];
+      const x0 = cx + s.ox * treeSkel.Rc * 1.4;
+      const len = treeSkel.Ht * 1.1;
+      ctx.globalAlpha = f * 0.16;
+      for (let k = 0; k < len; k += 2) {
+        const y = Math.round(topY + k);
+        if (y >= groundY) break;
+        const x = Math.round(x0 + dir * s.ang * k);
+        ctx.fillRect(x, y, s.w, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- magical motes ----
+  function buildMotes() {
+    motes = [];
+    const n = reduceMotion ? 4 : (6 + Math.floor(lifeRnd() * 5));
+    for (let i = 0; i < n; i++) {
+      motes.push({
+        x: lifeRnd() * W,
+        y: groundY - lifeRnd() * H * 0.55,
+        vx: (lifeRnd() - 0.5) * 2,
+        vy: -0.4 - lifeRnd() * 0.6,
+        ph: lifeRnd() * 6.283
+      });
+    }
+  }
+
+  function updateMotes(dt) {
+    if (!motes) buildMotes();
+    for (let i = 0; i < motes.length; i++) {
+      const m = motes[i];
+      m.ph += dt * 0.4 * motionScale;
+      m.x += (m.vx + Math.sin(m.ph) * 1.2) * dt * motionScale;
+      m.y += m.vy * dt * motionScale;
+      if (m.x < -2) m.x += W; else if (m.x > W + 2) m.x -= W;
+      if (m.y < groundY - H * 0.6) {
+        m.y = groundY - 2;
+        m.x = lifeRnd() * W;
+      }
+    }
+  }
+
+  function drawMotes() {
+    if (!motes) return;
+    const vis = 0.25 + 0.65 * nightFactor(getWorldHour());
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#eaf0ff';
+    for (let i = 0; i < motes.length; i++) {
+      const m = motes[i];
+      const tw = 0.4 + 0.4 * Math.sin(m.ph * 1.7);
+      ctx.globalAlpha = vis * tw * 0.5;
+      ctx.fillRect(Math.round(m.x), Math.round(m.y), 1, 1);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- ambient props (flowers, mushrooms, rocks, bushes) ----
+  function buildAmbientProps() {
+    ambientProps = [];
+    if (!surf) return;
+    const rand = makeRng(STAR_SEED ^ 0x1a2b3c4d);
+    const treeX = Math.floor(W * TREE_SLOT);
+    const n = Math.round(W / 16);
+    for (let i = 0; i < n; i++) {
+      const x = 2 + Math.floor(rand() * (W - 4));
+      if (Math.abs(x - treeX) < 10) continue;
+      if (pond && x >= pond.x0 - 3 && x <= pond.x1 + 3) continue;
+      const kind = rand();
+      ambientProps.push({
+        x: x,
+        y: surf[x],
+        type: kind < 0.4 ? 'flower' : (kind < 0.65 ? 'mushroom' : (kind < 0.85 ? 'rock' : 'bush')),
+        hue: rand()
+      });
+    }
+  }
+
+  function stampAmbientProps(g, env) {
+    if (!ambientProps) return;
+    for (let i = 0; i < ambientProps.length; i++) {
+      const p = ambientProps[i];
+      const y = p.y;
+      if (p.type === 'flower') {
+        g.fillStyle = css(quant(mixRgb(p.hue < 0.5 ? [230, 120, 160] : [240, 200, 90], env.sky.bot, 0.15 * env.nf)));
+        g.fillRect(p.x, y - 1, 1, 1);
+        g.fillStyle = css(quant(mixRgb([90, 140, 60], env.sky.bot, 0.2 * env.nf)));
+        g.fillRect(p.x, y, 1, 1);
+      } else if (p.type === 'mushroom') {
+        g.fillStyle = css(quant(mixRgb([210, 90, 90], env.sky.bot, 0.15 * env.nf)));
+        g.fillRect(p.x - 1, y - 2, 3, 1);
+        g.fillStyle = css(quant(mixRgb([230, 220, 200], env.sky.bot, 0.15 * env.nf)));
+        g.fillRect(p.x, y - 1, 1, 2);
+      } else if (p.type === 'rock') {
+        g.fillStyle = css(quant(mixRgb([120, 120, 130], env.sky.bot, 0.2 * env.nf)));
+        g.fillRect(p.x - 1, y - 1, 3, 2);
+        g.fillStyle = css(quant(mixRgb([160, 160, 172], env.sky.bot, 0.2 * env.nf)));
+        g.fillRect(p.x - 1, y - 2, 2, 1);
+      } else {
+        g.fillStyle = css(quant(mixRgb([60, 110, 58], env.sky.bot, 0.2 * env.nf)));
+        g.fillRect(p.x - 1, y - 2, 3, 2);
+      }
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -1655,6 +1997,8 @@ const MyWorld = (function () {
     treePrev = null;
     treeFade = 1;
     treeDirty = true;
+    treeGlowCanvas = null;
+    treeGlowKey = '';
   }
 
   function ptAt(br, u) {
@@ -2205,16 +2549,22 @@ const MyWorld = (function () {
     drawHillsMid();
     drawClouds(1);
     drawTerrainFront();
+    drawLightShafts();
     drawTree();
+    drawTreeGlow();
+    drawAmbientLights();
     drawGrass();
     drawShimmer();
     drawBirds();
     drawButterflies();
     drawLeaves();
     drawFireflies();
+    drawMotes();
     drawFog(1);
     drawRain(dt);
     drawWeatherTint();
+    drawLightGrade();
+    drawVignette();
 
     if (isDebug()) {
       ctx.fillStyle = '#f4f1ff';
