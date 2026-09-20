@@ -1168,6 +1168,400 @@ const MyWorld = (function () {
   }
 
   // ---------------------------------------------------------------------
+  // Living ambience: birds, butterflies, fireflies, falling leaves/petals,
+  // grass sway, water shimmer (Phase 6)
+  // ---------------------------------------------------------------------
+  let reduceMotion = false;
+  let lifeRand = null;
+  let grassTufts = null;
+  let groundPalCache = null;
+  let birds = null;
+  let birdTimer = 0;
+  let butterflies = null;
+  let fireflies = null;
+  let fireflyHalo = null;
+  let leaves = null;
+  let shimmer = null;
+
+  function lifeRnd() {
+    if (!lifeRand) lifeRand = makeRng((Date.now() / 1000 + 777) >>> 0);
+    return lifeRand();
+  }
+
+  // ---- grass tufts ----
+  function buildGrassTufts() {
+    grassTufts = [];
+    if (!surf) return;
+    const rand = makeRng(STAR_SEED ^ 0x2f6e2b1);
+    const step = 3;
+    for (let x = 1; x < W - 1; x += step) {
+      const gx = Math.min(W - 2, x + Math.floor(rand() * step));
+      if (rand() < 0.35) continue;
+      if (pond && gx >= pond.x0 - 2 && gx <= pond.x1 + 2) continue;
+      grassTufts.push({ x: gx, y: surf[gx], ph: rand() * 6.283, tall: rand() < 0.3, ci: 1 + Math.floor(rand() * 3) });
+    }
+  }
+
+  function drawGrass() {
+    if (!grassTufts || !groundPalCache) return;
+    const amp = reduceMotion ? 0 : 1.1 * windNow;
+    for (let i = 0; i < grassTufts.length; i++) {
+      const t = grassTufts[i];
+      const c = groundPalCache[t.ci];
+      if (!c) continue;
+      ctx.fillStyle = css(c);
+      ctx.fillRect(t.x, t.y - 1, 1, 1);
+      const sway = amp ? Math.sin(clockElapsed * 2.1 + t.ph) * amp * (t.tall ? 1 : 0.6) : 0;
+      ctx.fillRect(t.x + Math.round(sway), t.y - 2, 1, 1);
+    }
+  }
+
+  // ---- birds ----
+  function buildBirds() {
+    birds = [];
+    for (let i = 0; i < 8; i++) birds.push({ active: false });
+  }
+
+  function spawnFlock() {
+    const n = reduceMotion ? 1 + Math.floor(lifeRnd() * 2) : 2 + Math.floor(lifeRnd() * 3);
+    const dir = lifeRnd() < 0.5 ? 1 : -1;
+    const baseY = Math.round(horizonY * (0.15 + lifeRnd() * 0.35));
+    const speed = (14 + lifeRnd() * 8) * dir;
+    const treeX = Math.floor(W * TREE_SLOT);
+    let placed = 0;
+    for (let i = 0; i < birds.length && placed < n; i++) {
+      const b = birds[i];
+      if (b.active) continue;
+      b.active = true;
+      b.perch = false;
+      b.landed = false;
+      b.x = dir > 0 ? -6 - placed * 8 : W + 6 + placed * 8;
+      b.y = baseY + (lifeRnd() - 0.5) * 10;
+      b.vx = speed;
+      b.amp = 1.2 + lifeRnd() * 1.3;
+      b.ph = lifeRnd() * 6.283;
+      b.wph = lifeRnd() * 6.283;
+      b.canPerch = placed === 0 && treeGrowth.g >= 12 && lifeRnd() < 0.4 && !!treeSkel;
+      if (b.canPerch) {
+        b.tx = treeX + (lifeRnd() - 0.5) * treeSkel.Rc * 0.7;
+        b.ty = groundY - treeSkel.Ht * (0.55 + lifeRnd() * 0.25);
+      }
+      placed++;
+    }
+  }
+
+  function updateBirds(dt) {
+    if (!birds) buildBirds();
+    const day = nightFactor(getWorldHour()) < 0.5;
+    if (!day) {
+      for (let i = 0; i < birds.length; i++) birds[i].active = false;
+      birdTimer = 20;
+      return;
+    }
+    birdTimer -= dt * motionScale;
+    if (birdTimer <= 0) {
+      spawnFlock();
+      birdTimer = (reduceMotion ? 26 : 16) + lifeRnd() * 20;
+    }
+    const treeX = Math.floor(W * TREE_SLOT);
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      if (!b.active) continue;
+      b.wph += dt * 9 * motionScale;
+      if (b.perch) {
+        b.perchT -= dt * motionScale;
+        if (b.perchT <= 0) {
+          b.perch = false;
+          b.vx = (b.x < treeX ? -1 : 1) * 18;
+        }
+        continue;
+      }
+      if (b.canPerch && !b.landed) {
+        const dx = b.tx - b.x;
+        const dy = b.ty - b.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (d < 2.5) {
+          b.perch = true;
+          b.perchT = 4 + lifeRnd() * 5;
+          b.landed = true;
+          b.x = b.tx;
+          b.y = b.ty;
+          continue;
+        }
+        b.x += (dx / d) * 20 * dt * motionScale;
+        b.y += (dy / d) * 20 * dt * motionScale + Math.sin(clockElapsed * 6 + b.ph) * 0.15;
+        continue;
+      }
+      b.x += b.vx * dt * motionScale;
+      b.y += Math.sin(clockElapsed * 3 + b.ph) * b.amp * dt * motionScale * 3;
+      if (b.x < -12 || b.x > W + 12) b.active = false;
+    }
+  }
+
+  function drawBirds() {
+    if (!birds) return;
+    ctx.fillStyle = '#2a2438';
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      if (!b.active) continue;
+      const x = Math.round(b.x);
+      const y = Math.round(b.y);
+      if (b.perch) {
+        ctx.fillRect(x, y - 1, 1, 2);
+        ctx.fillRect(x - 1, y - 1, 1, 1);
+        continue;
+      }
+      const up = Math.sin(b.wph) > 0;
+      ctx.fillRect(x - 2, y - (up ? 1 : 0), 2, 1);
+      ctx.fillRect(x + 1, y - (up ? 1 : 0), 2, 1);
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // ---- butterflies ----
+  function buildButterflies() {
+    butterflies = [];
+    const n = reduceMotion ? 2 : 3;
+    for (let i = 0; i < n; i++) butterflies.push({ active: false });
+  }
+
+  function spawnButterfly(b) {
+    b.active = true;
+    b.x = lifeRnd() * W;
+    b.y = groundY - 8 - lifeRnd() * (H * 0.22);
+    b.ang = lifeRnd() * 6.283;
+    b.turnPh = lifeRnd() * 6.283;
+    b.wph = lifeRnd() * 6.283;
+    b.hue = lifeRnd() < 0.5;
+  }
+
+  function updateButterflies(dt) {
+    if (!butterflies) buildButterflies();
+    const active = nightFactor(getWorldHour()) < 0.75;
+    for (let i = 0; i < butterflies.length; i++) {
+      const b = butterflies[i];
+      if (!active) { b.active = false; continue; }
+      if (!b.active) {
+        if (lifeRnd() < dt * 0.1) spawnButterfly(b);
+        continue;
+      }
+      b.wph += dt * 7 * motionScale;
+      b.turnPh += dt * 0.6;
+      b.ang += Math.sin(b.turnPh) * dt * 0.8;
+      const sp = 5 * motionScale;
+      b.x += Math.cos(b.ang) * sp * dt;
+      b.y += Math.sin(b.ang) * sp * dt * 0.6;
+      if (b.x < -4 || b.x > W + 4 || b.y < 4 || b.y > groundY) b.active = false;
+    }
+  }
+
+  function drawButterflies() {
+    if (!butterflies) return;
+    for (let i = 0; i < butterflies.length; i++) {
+      const b = butterflies[i];
+      if (!b.active) continue;
+      const x = Math.round(b.x);
+      const y = Math.round(b.y);
+      const open = Math.sin(b.wph) > 0;
+      ctx.fillStyle = b.hue ? '#f0c040' : '#e88ac0';
+      ctx.fillRect(x - (open ? 2 : 1), y, 1, 1);
+      ctx.fillRect(x + (open ? 1 : 0), y, 1, 1);
+      ctx.fillStyle = '#2a2438';
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // ---- fireflies ----
+  function buildFireflyHalo() {
+    const c = document.createElement('canvas');
+    c.width = 5;
+    c.height = 5;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const img = g.createImageData(5, 5);
+    const d = img.data;
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        const dx = x - 2;
+        const dy = y - 2;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - dist / 2.6);
+        const j = (y * 5 + x) * 4;
+        d[j] = 255; d[j + 1] = 228; d[j + 2] = 140; d[j + 3] = Math.round(a * 160);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    fireflyHalo = c;
+  }
+
+  function buildFireflies() {
+    fireflies = [];
+    const count = (reduceMotion ? 2 : 4) + Math.floor(lifeRnd() * (reduceMotion ? 3 : 5));
+    for (let i = 0; i < 8; i++) {
+      fireflies.push({
+        active: i < count,
+        x: lifeRnd() * W,
+        y: groundY - lifeRnd() * H * 0.14,
+        vx: (lifeRnd() - 0.5) * 4,
+        vy: (lifeRnd() - 0.5) * 3,
+        ph: lifeRnd() * 6.283,
+        bph: lifeRnd() * 6.283
+      });
+    }
+  }
+
+  function updateFireflies(dt) {
+    if (!fireflies) buildFireflies();
+    if (!fireflyHalo) buildFireflyHalo();
+    for (let i = 0; i < fireflies.length; i++) {
+      const f = fireflies[i];
+      if (!f.active) continue;
+      f.ph += dt * 0.5 * motionScale;
+      f.bph += dt * 1.6 * motionScale;
+      f.x += (f.vx + Math.sin(f.ph) * 2) * dt * motionScale;
+      f.y += (f.vy + Math.cos(f.ph * 1.3) * 1.5) * dt * motionScale;
+      if (f.x < 0) f.x += W; else if (f.x > W) f.x -= W;
+      f.y = clampNum(f.y, groundY - H * 0.2, groundY - 1, f.y);
+    }
+  }
+
+  function drawFireflies() {
+    if (!fireflies || !fireflyHalo) return;
+    const vis = nightFactor(getWorldHour());
+    if (vis < 0.04) return;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < fireflies.length; i++) {
+      const f = fireflies[i];
+      if (!f.active) continue;
+      const blink = 0.35 + 0.65 * Math.max(0, Math.sin(f.bph));
+      ctx.globalAlpha = vis * blink;
+      ctx.drawImage(fireflyHalo, Math.round(f.x) - 2, Math.round(f.y) - 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- falling leaves / petals ----
+  function buildLeaves() {
+    leaves = [];
+    for (let i = 0; i < 12; i++) leaves.push({ active: false });
+  }
+
+  function spawnLeaf(l) {
+    const cx = Math.floor(W * TREE_SLOT);
+    const r = treeSkel ? treeSkel.Rc * 0.8 : 20;
+    const ht = treeSkel ? treeSkel.Ht : 60;
+    l.active = true;
+    l.x = cx + (lifeRnd() - 0.5) * r * 2;
+    l.y = groundY - ht + lifeRnd() * ht * 0.6;
+    l.vy = 5 + lifeRnd() * 4;
+    l.ph = lifeRnd() * 6.283;
+    l.amp = 3 + lifeRnd() * 3;
+    l.petal = treeGrowth.g >= 18 && treeGrowth.g < 22;
+    l.tw = lifeRnd() * 6.283;
+  }
+
+  function updateLeaves(dt) {
+    if (!leaves) buildLeaves();
+    const cap = reduceMotion ? 6 : 12;
+    const rate = reduceMotion ? 0.05 : 0.1;
+    for (let i = 0; i < leaves.length; i++) {
+      const l = leaves[i];
+      if (!l.active) {
+        if (i < cap && lifeRnd() < dt * rate) spawnLeaf(l);
+        continue;
+      }
+      l.ph += dt * 1.4 * motionScale;
+      l.tw += dt * 1.2 * motionScale;
+      l.y += l.vy * dt * motionScale;
+      l.x += Math.sin(l.ph) * l.amp * dt * motionScale;
+      if (l.y > getSurfaceY(l.x)) l.active = false;
+    }
+  }
+
+  function drawLeaves() {
+    if (!leaves) return;
+    for (let i = 0; i < leaves.length; i++) {
+      const l = leaves[i];
+      if (!l.active) continue;
+      ctx.fillStyle = l.petal ? '#f7a8c4' : '#7c9a3f';
+      const x = Math.round(l.x) + (Math.sin(l.tw) > 0 ? 0 : 1);
+      ctx.fillRect(x, Math.round(l.y), 1, 1);
+    }
+  }
+
+  // ---- pond shimmer ----
+  function buildShimmer() {
+    shimmer = [];
+    for (let i = 0; i < 3; i++) shimmer.push({ active: false });
+  }
+
+  function updateShimmer(dt) {
+    if (!pond) return;
+    if (!shimmer) buildShimmer();
+    const n = reduceMotion ? 2 : 3;
+    for (let i = 0; i < shimmer.length; i++) {
+      const s = shimmer[i];
+      if (i >= n) { s.active = false; continue; }
+      if (!s.active) {
+        s.active = true;
+        s.x = pond.x0 + 2 + lifeRnd() * Math.max(1, pond.x1 - pond.x0 - 4);
+        s.vx = (lifeRnd() - 0.5) * 3;
+        s.ph = lifeRnd() * 6.283;
+        s.life = 3 + lifeRnd() * 3;
+      }
+      s.ph += dt * 1.5 * motionScale;
+      s.x += s.vx * dt * motionScale;
+      s.life -= dt;
+      if (s.x < pond.x0 + 1 || s.x > pond.x1 - 1 || s.life <= 0) s.active = false;
+    }
+  }
+
+  function drawShimmer() {
+    if (!pond || !shimmer) return;
+    for (let i = 0; i < shimmer.length; i++) {
+      const s = shimmer[i];
+      if (!s.active) continue;
+      const tw = Math.sin(s.ph);
+      if (tw < 0.2) continue;
+      ctx.globalAlpha = 0.5 + 0.5 * tw;
+      ctx.fillStyle = '#eaf6ff';
+      ctx.fillRect(Math.round(s.x), groundY, 1, 1);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---- driver ----
+  function updateLife(dt) {
+    updateBirds(dt);
+    updateButterflies(dt);
+    updateFireflies(dt);
+    updateLeaves(dt);
+    updateShimmer(dt);
+  }
+
+  function initLife() {
+    reduceMotion = motionScale < 1;
+    lifeRand = makeRng((Date.now() / 1000 + 777) >>> 0);
+    buildBirds();
+    buildButterflies();
+    buildFireflies();
+    buildLeaves();
+    buildShimmer();
+    birdTimer = 6 + lifeRnd() * 10;
+  }
+
+  function resetLife() {
+    birds = null;
+    butterflies = null;
+    fireflies = null;
+    fireflyHalo = null;
+    leaves = null;
+    shimmer = null;
+    birdTimer = 0;
+  }
+
+  // ---------------------------------------------------------------------
   // Tree: procedural pixel tree grown from the persisted seed (Phase 5)
   // ---------------------------------------------------------------------
   let TREE_FT = [[0, 0], [1, 1]];
