@@ -1,6 +1,6 @@
 // service-worker.js — cache-first for app shell, network-only for streams.
 // Bump CACHE_VERSION whenever JS/CSS/HTML changes to force a clean update.
-const CACHE_VERSION = 'lavender-v3.1';
+const CACHE_VERSION = 'lavender-v3.1-sound';
 
 const APP_SHELL = [
   './',
