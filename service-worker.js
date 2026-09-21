@@ -1,6 +1,6 @@
 // service-worker.js — cache-first for app shell, network-only for streams.
 // Bump CACHE_VERSION whenever JS/CSS/HTML changes to force a clean update.
-const CACHE_VERSION = 'lavender-v2';
+const CACHE_VERSION = 'lavender-v3';
 
 const APP_SHELL = [
   './',
@@ -49,8 +49,25 @@ const APP_SHELL = [
   './backup.js',
   './backup-ui.js',
   './settings.js',
-  './icon-192.png',
+  ''./icon-192.png',
   './icon-512.png',
+  './myworld.css',
+  './myworld-data.js',
+  './myworld-assets.js',
+  './myworld-content.js',
+  './myworld.js',
+  './misc-core.js',
+  './misc-cosmetics.js',
+  './misc-sound.js',
+  './pressed-paper.js',
+  './paper-pocket.js',
+  './rain-ambience.js',
+  './sunlight-ambience.js',
+  './wish-butterfly.js',
+  './firefly.js',
+  './ladybug.js',
+  './candle-lamp.js',
+  './fullscreen.js',
 ];
 // URLs that must never be served from cache (live streams, YouTube, CDNs)
 function isUncacheable(url) {
@@ -87,6 +104,14 @@ self.addEventListener('activate', function (e) {
       );
     }).then(function () { return self.clients.claim(); })
   );
+});
+
+// Lets a page (Settings > Updates) ask which cache version is currently
+// controlling it. No new caching behavior — just a status query.
+self.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'GET_VERSION' && e.source) {
+    e.source.postMessage({ type: 'VERSION', version: CACHE_VERSION });
+  }
 });
 
 self.addEventListener('fetch', function (e) {
