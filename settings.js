@@ -20,6 +20,27 @@ const Settings = (function () {
     });
   }
 
+  // Reads window.LavenderSW (set up by index.html's SW registration) to
+  // reflect update status — a view onto the existing mechanism, not a new one.
+  function renderUpdateStatus() {
+    const statusEl = document.getElementById('settings-update-status');
+    const applyBtn = document.getElementById('settings-apply-update-btn');
+    if (!statusEl) return;
+    if (!('serviceWorker' in navigator) || !window.LavenderSW) {
+      statusEl.textContent = 'Updates unavailable on this device.';
+      return;
+    }
+    if (window.LavenderSW.updateAvailable) {
+      statusEl.innerHTML = window.LavenderSW.pendingVersion
+        ? 'Update available<br>Version ' + esc(window.LavenderSW.pendingVersion) + ' is ready'
+        : 'Update available';
+      if (applyBtn) applyBtn.style.display = '';
+    } else {
+      statusEl.textContent = "You're up to date.";
+      if (applyBtn) applyBtn.style.display = 'none';
+    }
+  }
+
   function formHtml() {
     const cur = settings();
     return (
@@ -79,7 +100,13 @@ const Settings = (function () {
       '<div id="settings-import-status" class="micro-label"></div></div>' +
       '<button id="settings-clear-btn" class="btn-danger">Clear all data</button>' +
 
-      '<hr class="divider">' +
+            '<hr class="divider">' +
+      '<div class="form-row settings-updates-row">' +
+      '<label>Updates</label>' +
+      '<div id="settings-update-status" class="micro-label">You\'re up to date.</div>' +
+      '<button id="settings-check-update-btn" class="btn-secondary">Check for updates</button>' +
+      '<button id="settings-apply-update-btn" class="btn-secondary" style="display:none;">Update now</button>' +
+      '</div>' +
       '<p class="micro-label">Lavender v' + APP_VERSION + '</p>'
     );
   }
@@ -292,6 +319,49 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       Modal.close();
       location.reload();
     });
+
+    renderUpdateStatus();
+
+    const checkUpdateBtn = document.getElementById('settings-check-update-btn');
+    if (checkUpdateBtn) {
+      checkUpdateBtn.addEventListener('click', function () {
+        const statusEl = document.getElementById('settings-update-status');
+        if (!window.LavenderSW || !window.LavenderSW.registration) {
+          if (statusEl) statusEl.textContent = 'Updates unavailable on this device.';
+          return;
+        }
+        checkUpdateBtn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Checking for updates\u2026';
+        window.LavenderSW.registration.update().then(function () {
+          setTimeout(function () {
+            checkUpdateBtn.disabled = false;
+            renderUpdateStatus();
+          }, 2000);
+        }).catch(function () {
+          checkUpdateBtn.disabled = false;
+          if (statusEl) statusEl.textContent = "Couldn't check for updates.";
+        });
+      });
+    }
+
+    const applyUpdateBtn = document.getElementById('settings-apply-update-btn');
+    if (applyUpdateBtn) {
+      applyUpdateBtn.addEventListener('click', function () { location.reload(); });
+    }
+
+    window.addEventListener('lavender-update-ready', renderUpdateStatus);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'VERSION') {
+          if (window.LavenderSW) window.LavenderSW.pendingVersion = e.data.version;
+          renderUpdateStatus();
+        }
+      });
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+      }
+    }
   }
 
   // Read by Assistant (§B.7) for its modal header — cosmetic label only, falls back to "Assistant".
