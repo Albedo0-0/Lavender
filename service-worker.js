@@ -49,7 +49,7 @@ const APP_SHELL = [
   './backup.js',
   './backup-ui.js',
   './settings.js',
-  ''./icon-192.png',
+  './icon-192.png',
   './icon-512.png',
   './myworld.css',
   './myworld-data.js',
