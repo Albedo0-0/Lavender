@@ -257,17 +257,20 @@
     }
 
   if ('serviceWorker' in navigator) {
+  window.LavenderSW = { registration: null, updateAvailable: false, pendingVersion: null };
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./service-worker.js')
       .then(function (reg) {
+        window.LavenderSW.registration = reg;
         reg.addEventListener('updatefound', function () {
-          // New SW installing — when it activates, reload to pick up fresh cache
+          // New SW installing — when it activates, mark the update ready instead
+          // of forcing a reload; Settings > Updates lets the user apply it.
           var newSW = reg.installing;
           if (newSW) {
             newSW.addEventListener('statechange', function () {
               if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
-                // Only reload if this isn't the very first install
-                window.location.reload();
+                window.LavenderSW.updateAvailable = true;
+                window.dispatchEvent(new CustomEvent('lavender-update-ready'));
               }
             });
           }
