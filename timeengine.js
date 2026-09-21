@@ -205,7 +205,15 @@ const TimeEngine = (function () {
     const active = engine.activeSessionId ? getRecord(engine.activeSessionId) : null;
     if (active && !active.actualEnd) {
       const studyMs = safeMs(active.studyMs) + (active.state === 'active' ? safeElapsed(active.activeSince, Date.now()) : 0);
-      updateRecord(active.sessionId, { state: 'stale', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
+      // A session left paused (e.g. by the 11PM cutoff) still owes its pause time: bank it into
+      // breakMs, counted only up to the midnight that ends the session's own day.
+      let breakMs = safeMs(active.breakMs);
+      if (active.state === 'paused') {
+        const dayEnd = new Date(engine.date + 'T00:00:00');
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        breakMs += safeElapsed(active.pausedSince, Math.min(Date.now(), dayEnd.getTime()));
+      }
+      updateRecord(active.sessionId, { state: 'stale', actualEnd: Date.now(), studyMs: studyMs, breakMs: breakMs, activeSince: null, pausedSince: null });
     }
     pruneOldRecords(today);
     // Feature 12 — fire the authoritative rollover signal BEFORE resetting the engine's own
