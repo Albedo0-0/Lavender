@@ -631,10 +631,26 @@ const Ladybug = (function () {
     }
 
     let lastCursor = null;
+    // Single cursor-position source for mouse AND S Pen hover. Touch is
+    // excluded on purpose so a finger drag never acts like a hovering
+    // cursor. Every existing check (cursorNear, flee, watch, alert) reads
+    // lastCursor.x/y exactly as before — nothing downstream changes.
     function onPointerMove(e) {
-      lastCursor = { x: e.clientX, y: e.clientY };
+      if (e.pointerType === 'touch') return;
+      lastCursor = { x: e.clientX, y: e.clientY, pointerType: e.pointerType };
+    }
+    // Flagging: new listener/function, added only to clear a hovering pen's
+    // position once it lifts out of range, so reactions stop naturally.
+    // Only clears when the departing pointer is the pen that set lastCursor —
+    // mouse behavior is untouched.
+    function onPointerLeave(e) {
+      if (e.pointerType === 'pen' && lastCursor && lastCursor.pointerType === 'pen') {
+        lastCursor = null;
+      }
     }
     document.addEventListener('pointermove', onPointerMove, { passive: true });
+    document.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    document.addEventListener('pointercancel', onPointerLeave, { passive: true });
 
     function spawnClickSparkles() {
       const layer = document.body;
@@ -896,6 +912,8 @@ const Ladybug = (function () {
         if (rafId) cancelAnimationFrame(rafId);
         if (scareTimer) clearTimeout(scareTimer);
         document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerleave', onPointerLeave);
+        document.removeEventListener('pointercancel', onPointerLeave);
         el.remove();
       }
     };
