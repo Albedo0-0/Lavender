@@ -47,7 +47,9 @@ const Backup = (function () {
       },
       planner: {
         topics: s.topics,
-        tasks: s.tasks
+        tasks: s.tasks,
+        tags: s.tags,
+        tagsMigrated: s.tagsMigrated
       },
       targets: {
         targets: s.targets,
@@ -63,7 +65,9 @@ const Backup = (function () {
         timeEngine: s.timeEngine,
         sessionRecords: s.sessionRecords,
         timeEngineBreaks: s.timeEngineBreaks,
-        studyLog: s.studyLog
+        studyLog: s.studyLog,
+        studyTemplates: s.studyTemplates,
+        musicPlaylist: s.musicPlaylist
       },
       progress: {}, // derived-only — Progress owns no data of its own; key reserved
       water: {
@@ -80,7 +84,8 @@ const Backup = (function () {
         expLedger: s.expLedger
       },
       assistant: {
-        assistantNotes: s.assistantNotes
+        assistantNotes: s.assistantNotes,
+        notepadFolders: s.notepadFolders
       },
       alarms: {
         generalAlarms: s.generalAlarms
@@ -250,6 +255,18 @@ const Backup = (function () {
     return true;
   }
 
+  function validTag(rec) {
+    return typeof rec.tagId === 'string' && rec.tagId.length > 0 && typeof rec.name === 'string';
+  }
+
+  function validStudyTemplate(rec) {
+    return typeof rec.templateId === 'string' && rec.templateId.length > 0 && typeof rec.name === 'string';
+  }
+
+  function validTrack(rec) {
+    return typeof rec.id === 'string' && rec.id.length > 0 && (rec.source === 'local' || rec.source === 'youtube');
+  }
+
   function validExpEntry(rec) {
     if (rec.id === undefined || rec.id === null) return false;
     // Award/retract pairs are the documented EXP pattern, so a negative delta is legitimate here —
@@ -309,6 +326,11 @@ const Backup = (function () {
       favoriteTopics: c.favoriteTopics,
       topics: p.topics,
       tasks: p.tasks,
+      tags: p.tags,
+      tagsMigrated: p.tagsMigrated,
+      studyTemplates: st.studyTemplates,
+      musicPlaylist: st.musicPlaylist,
+      notepadFolders: a.notepadFolders,
       targets: tg.targets,
       subtargets: tg.subtargets,
       journalEntries: j.journalEntries,
@@ -364,6 +386,16 @@ const Backup = (function () {
       expLedger: cleanIdArray(flat.expLedger, 'id', validExpEntry),
       favoriteTopics: Array.isArray(flat.favoriteTopics)
         ? flat.favoriteTopics.filter(function (id) { return typeof id === 'string'; })
+        : [],
+      tags: cleanIdMap(flat.tags, 'tagId', validTag),
+      tagsMigrated: typeof flat.tagsMigrated === 'boolean' ? flat.tagsMigrated : undefined,
+      studyTemplates: cleanIdMap(flat.studyTemplates, 'templateId', validStudyTemplate),
+      // Local File objects can't survive a backup — same rule as player.js init: mark them unavailable.
+      musicPlaylist: cleanIdArray(flat.musicPlaylist, 'id', validTrack).map(function (t) {
+        return t.source === 'local' ? Object.assign({}, t, { available: false, fileObj: null }) : t;
+      }),
+      notepadFolders: Array.isArray(flat.notepadFolders)
+        ? flat.notepadFolders.filter(function (f) { return typeof f === 'string' && f.trim().length > 0; })
         : []
     };
 
@@ -415,6 +447,25 @@ const Backup = (function () {
     const mergedFavoriteTopics = Array.from(new Set([].concat(cur.favoriteTopics || [], c.favoriteTopics || [])))
       .filter(function (id) { return !!mergedTopics[id]; });
 
+    // Study templates: the live Pomodoro default always wins — a second isPomodoroDefault record
+    // would be undeletable (deleteTemplate refuses defaults), so a backup's default is skipped
+    // whenever the live state already has one.
+    const liveTemplates = cur.studyTemplates || {};
+    const liveHasDefaultTemplate = Object.keys(liveTemplates).some(function (id) {
+      return liveTemplates[id] && liveTemplates[id].isPomodoroDefault;
+    });
+    const backupTemplates = {};
+    Object.keys(c.studyTemplates || {}).forEach(function (id) {
+      if (liveHasDefaultTemplate && c.studyTemplates[id].isPomodoroDefault) return;
+      backupTemplates[id] = c.studyTemplates[id];
+    });
+
+    // Playlist order matters: live tracks keep their order, backup-only tracks are appended.
+    const livePlaylist = cur.musicPlaylist || [];
+    const livePlaylistIds = {};
+    livePlaylist.forEach(function (t) { livePlaylistIds[t.id] = true; });
+    const mergedPlaylist = livePlaylist.concat((c.musicPlaylist || []).filter(function (t) { return !livePlaylistIds[t.id]; }));
+
     return {
       currentScreen: cur.currentScreen,
       dateHubs: mergeIdMap(c.dateHubs, cur.dateHubs),
@@ -440,7 +491,13 @@ const Backup = (function () {
       expLedger: mergeIdArrayById(c.expLedger, cur.expLedger, 'id'),
       settings: cur.settings,
       targets: mergedTargets,
-      subtargets: mergedSubtargets
+      subtargets: mergedSubtargets,
+      tags: mergeIdMap(c.tags, cur.tags),
+      // If either side hasn't run the legacy-tag migration, leave it false so it re-runs (idempotent).
+      tagsMigrated: cur.tagsMigrated === true && c.tagsMigrated !== false,
+      studyTemplates: mergeIdMap(backupTemplates, liveTemplates),
+      musicPlaylist: mergedPlaylist,
+      notepadFolders: Array.from(new Set([].concat(cur.notepadFolders || [], c.notepadFolders || [])))
     };
   }
 
@@ -661,6 +718,16 @@ const Backup = (function () {
 
   function clearAllData() {
     State.clear();
+    // My World persists outside State's appState key: world ('lavender.myWorld.v*') and inventory
+    // ('lavender.myWorld.inventory.v*') each live in their own localStorage key.
+    try {
+      const myWorldKeys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('lavender.myWorld.') === 0) myWorldKeys.push(k);
+      }
+      myWorldKeys.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* localStorage unavailable — nothing to clear */ }
   }
 
   return {
