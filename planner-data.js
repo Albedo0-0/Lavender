@@ -279,8 +279,11 @@ const PlannerData = (function () {
       completed: nowCompleted,
       completedDate: nowCompleted ? todayStr() : null,
       // Completing a task frees its slot so it stops blocking hasSlotConflict checks for new/rescheduled tasks.
-      startTime: nowCompleted ? null : task.startTime,
-      stopTime: nowCompleted ? null : task.stopTime
+      // The original slot is stashed in savedStartTime/savedStopTime so uncompleting restores it exactly.
+      startTime: nowCompleted ? null : (task.startTime || task.savedStartTime || null),
+      stopTime: nowCompleted ? null : (task.stopTime || task.savedStopTime || null),
+      savedStartTime: nowCompleted ? (task.startTime || null) : null,
+      savedStopTime: nowCompleted ? (task.stopTime || null) : null
     });
     tasks[taskId] = updated;
     State.set({ tasks: tasks });
