@@ -10,7 +10,7 @@
 // .form-row, .divider, .btn-secondary/.btn-danger, .micro-label) — no new Settings-screen
 // layout system, that's Phase 12 refinement territory.
 const Settings = (function () {
-  const APP_VERSION = '0.5';
+  const APP_VERSION = 'First';
 
   function settings() { return State.get().settings || {}; }
 
