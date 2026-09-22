@@ -259,26 +259,20 @@
 
   if ('serviceWorker' in navigator) {
   window.LavenderSW = { registration: null, updateAvailable: false, pendingVersion: null };
+  navigator.serviceWorker.addEventListener('message', function (e) {
+    // Posted by a newly installed worker once it's fully cached and waiting.
+    // Receiving it while a controller already exists is the real "update
+    // available" moment — mark it ready and expose its version, never activate.
+    if (e.data && e.data.type === 'SW_INSTALLED' && navigator.serviceWorker.controller) {
+      window.LavenderSW.updateAvailable = true;
+      window.LavenderSW.pendingVersion = e.data.version;
+      window.dispatchEvent(new CustomEvent('lavender-update-ready'));
+    }
+  });
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./service-worker.js')
       .then(function (reg) {
         window.LavenderSW.registration = reg;
-        reg.addEventListener('updatefound', function () {
-          // New SW installing — once it reaches "installed" while an existing
-          // worker is still controlling this page, it is waiting rather than
-          // activating. That's the real "update available" moment; mark it
-          // ready instead of forcing a reload — Settings > Updates lets the
-          // user apply it.
-          var newSW = reg.installing;
-          if (newSW) {
-            newSW.addEventListener('statechange', function () {
-              if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-                window.LavenderSW.updateAvailable = true;
-                window.dispatchEvent(new CustomEvent('lavender-update-ready'));
-              }
-            });
-          }
-        });
       })
 .catch(function (err) {
         console.warn('Service worker registration failed:', err);
