@@ -470,6 +470,22 @@ const MyWorld = (function () {
     }
   }
 
+  function buildHillsBack(cx) {
+    const back = terrain.back.map;
+    const bottom = Math.min(H, groundY + 9);
+    for (let x = 0; x < W; x++) {
+      const xr = x - cx;
+      const bTop = Math.round(horizonY - 10 - H * 0.30 *
+        (0.55 * vnoise(xr, 96, 14) + 0.3 * vnoise(xr, 40, 15) + 0.15 * vnoise(xr, 16, 16)));
+      const span = Math.max(1, bottom - bTop);
+      for (let y = Math.max(0, bTop); y < bottom; y++) {
+        const dep = (y - bTop) / span;
+        let v = y === bTop ? 1 : (dep > 0.72 ? 3 : 2);
+        back[y * W + x] = v;
+      }
+    }
+  }
+  
   function buildHills(cx) {
     const far = terrain.far.map;
     const mid = terrain.mid.map;
@@ -479,7 +495,7 @@ const MyWorld = (function () {
 
     for (let x = 0; x < W; x++) {
       const xr = x - cx;
-      const fTop = Math.round(horizonY - 6 - H * 0.16 *
+      const fTop = Math.round(horizonY - 6 - H * 0.20 *
         (0.55 * vnoise(xr, 74, 11) + 0.3 * vnoise(xr, 29, 12) + 0.15 * vnoise(xr, 11, 13)));
       const span = Math.max(1, bottom - fTop);
       for (let y = Math.max(0, fTop); y < bottom; y++) {
@@ -492,7 +508,7 @@ const MyWorld = (function () {
       }
       prevTop = fTop;
 
-      const mTop = Math.round(groundY - 6 - H * 0.11 *
+      const mTop = Math.round(groundY - 6 - H * 0.14 *
         (0.6 * vnoise(xr, 48, 21) + 0.3 * vnoise(xr, 18, 22) + 0.1 * vnoise(xr, 7, 23)));
       midTops[x] = mTop;
       for (let y = Math.max(0, mTop); y < bottom; y++) {
@@ -636,7 +652,8 @@ const MyWorld = (function () {
   function buildTerrain() {
     groundY = Math.floor(H * GROUND_RATIO);
     const cx = Math.floor(W * TREE_SLOT);
-    terrain = { far: newLayer(), mid: newLayer(), ground: newLayer(), key: '' };
+    terrain = { back: newLayer(), far: newLayer(), mid: newLayer(), ground: newLayer(), key: '' };
+    buildHillsBack(cx);
     buildHills(cx);
     buildGround(cx);
     buildGrassTufts();
@@ -702,6 +719,7 @@ const MyWorld = (function () {
   function paintTerrain(hour) {
     const env = terrainEnv(hour);
     const s = env.sky;
+    paintLayer(terrain.back, tintPal(PAL_FAR, env, 0.72, 0.58));
     paintLayer(terrain.far, tintPal(PAL_FAR, env, 0.5, 0.4));
     paintLayer(terrain.mid, tintPal(PAL_MID, env, 0.25, 0.55));
     const gp = tintPal(PAL_GROUND, env, 0.04, 0.25);
@@ -724,6 +742,11 @@ const MyWorld = (function () {
     }
   }
 
+  function drawHillsBack() {
+    ensureTerrain();
+    ctx.drawImage(terrain.back.canvas, 0, 0);
+  }
+  
   function drawHillsFar() {
     ensureTerrain();
     ctx.drawImage(terrain.far.canvas, 0, 0);
@@ -1385,20 +1408,22 @@ const MyWorld = (function () {
   // ---- fireflies ----
   function buildFireflyHalo() {
     const c = document.createElement('canvas');
-    c.width = 5;
-    c.height = 5;
+    c.width = 9;
+    c.height = 9;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
-    const img = g.createImageData(5, 5);
+    const img = g.createImageData(9, 9);
     const d = img.data;
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        const dx = x - 2;
-        const dy = y - 2;
+    for (let y = 0; y < 9; y++) {
+      for (let x = 0; x < 9; x++) {
+        const dx = x - 4;
+        const dy = y - 4;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const a = Math.max(0, 1 - dist / 2.6);
-        const j = (y * 5 + x) * 4;
-        d[j] = 255; d[j + 1] = 228; d[j + 2] = 140; d[j + 3] = Math.round(a * 160);
+        const core = Math.max(0, 1 - dist / 1.3);
+        const halo = Math.max(0, 1 - dist / 4.3);
+        const a = Math.min(1, core * 0.8 + Math.pow(halo, 1.9) * 0.38);
+        const j = (y * 9 + x) * 4;
+        d[j] = 255; d[j + 1] = 226; d[j + 2] = 152; d[j + 3] = Math.round(a * 145);
       }
     }
     g.putImageData(img, 0, 0);
@@ -1446,7 +1471,7 @@ const MyWorld = (function () {
       if (!f.active) continue;
       const blink = 0.35 + 0.65 * Math.max(0, Math.sin(f.bph));
       ctx.globalAlpha = vis * blink;
-      ctx.drawImage(fireflyHalo, Math.round(f.x) - 2, Math.round(f.y) - 2);
+      ctx.drawImage(fireflyHalo, Math.round(f.x) - 4, Math.round(f.y) - 4);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -2239,7 +2264,7 @@ const MyWorld = (function () {
         if (!r || !d) { map[i] = green ? 11 : 4; continue; }
         if (green || (v !== 2 && v !== 3)) continue;
         if (hash3(x, y >> 2, 313) < 0.09) map[i] = v + 1;
-        else if (mag > 0 && sk.baseL - y < sk.Ht * 0.5 && hash3(x, y >> 2, 91) < 0.07 * mag) map[i] = 5;
+        else if (mag > 0 && hash3(x, y >> 2, 91) < 0.05 * mag) map[i] = 7;
       }
     }
   }
@@ -2315,7 +2340,7 @@ const MyWorld = (function () {
         let t = l > 0.78 ? 5 : (l > 0.45 ? 4 : (l > 0.05 ? 3 : (l > -0.35 ? 2 : 1)));
         if (gold > 0 && t >= 4) {
           const gp = smoothstep(-0.1, 0.8, (x - cxL) / Rc * 0.6 + wy / Ht * 0.5);
-          if (hash3(x, y, 611) < gold * (0.15 + 0.85 * gp)) t = t === 5 ? 11 : 6;
+          if (hash3(x, y, 611) < gold * (0.15 + 0.85 * gp)) t = t === 5 ? 10 : 6;
         }
         if (holeAmt > 0 && t >= 2 && hash3(x, y, 733) < holeAmt) continue;
         cm[i] = t;
@@ -2334,16 +2359,13 @@ const MyWorld = (function () {
     }
 
     if (fr > 0.02) {
-      for (let y = 0; y < hc - 1; y += 2) {
-        for (let x = 0; x < wc - 1; x += 2) {
-          const a = y * wc + x;
-          if (hash3(x, y, 777) >= 0.014 * fr) continue;
-          const v0 = cm[a], v1 = cm[a + 1], v2 = cm[a + wc], v3 = cm[a + wc + 1];
-          if (v0 < 2 || v0 > 5 || v1 < 2 || v1 > 5 || v2 < 2 || v2 > 5 || v3 < 2 || v3 > 5) continue;
-          cm[a] = 10;
-          cm[a + 1] = 9;
-          cm[a + wc] = 9;
-          cm[a + wc + 1] = 9;
+      for (let y = 0; y < hc; y++) {
+        for (let x = 0; x < wc; x++) {
+          const i = y * wc + x;
+          const v = cm[i];
+          if (v < 3 || v > 5) continue;
+          if (hash3(x, y, 777) >= 0.01 * fr) continue;
+          cm[i] = 6;
         }
       }
     }
@@ -2408,7 +2430,7 @@ const MyWorld = (function () {
       }
     }
 
-    for (let bi = 0; bi < bs.length; bi++) if (bs[bi].kind === 4) stampBranch(bi);
+    for (let bi = 0; bi < bs.length; bi++) if (bs[bi].kind === 4 && g < 19) stampBranch(bi);
     for (let bi = 0; bi < bs.length; bi++) if (bs[bi].kind !== 4) stampBranch(bi);
     drawSoil(trunk.map, sk, g);
     finishBark(trunk.map, sk, g);
@@ -2447,7 +2469,6 @@ const MyWorld = (function () {
   function paintTree(t, pk) {
     const env = terrainEnv(getWorldHour());
     const bp = tintPal(PAL_BARK, env, 0, 0.2);
-    bp[5] = hexToRgb('#ffd36a');
     paintMap(t.trunk, bp);
     paintMap(t.crown, tintPal(variantPal(t.variant), env, 0, 0.15));
     t.palKey = pk;
@@ -2544,6 +2565,7 @@ const MyWorld = (function () {
     updateWeather(dt);
     updateLife(dt);
     drawSky();
+    drawHillsBack();
     drawClouds(0);
     drawHillsFar();
     drawFog(0);
