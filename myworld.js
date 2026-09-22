@@ -10,8 +10,6 @@ const MyWorld = (function () {
   // Growth policy (carried over unchanged from the previous myworld.js)
   // ---------------------------------------------------------------------
    const GROWTH_POINTS_PER_STUDY_MINUTE = 0.15;
-  // Daily campfire consistency action reaches max tree growth in ~7-10 days.
-  const CAMPFIRE_GROWTH_TARGET_DAYS = 8;
 
   // ---------------------------------------------------------------------
   // Shell constants
@@ -137,6 +135,32 @@ const MyWorld = (function () {
     writeGrowth(newGrowthPoints);
 
     return recalculateGrowth() && MyWorldData.getWorld();
+  }
+
+  /**
+   * Generic growth API for the active LV pack: applies a growth-point
+   * delta to the active tree using the same storage/stage machinery as
+   * study-driven growth. The core has no opinion on why/how much — that
+   * decision belongs entirely to the calling pack.
+   */
+  function growActiveTree(deltaPoints) {
+    if (!hasData()) { warnMissingDeps('growActiveTree'); return null; }
+    const delta = clampNum(deltaPoints, 0, Number.MAX_SAFE_INTEGER, 0);
+    if (delta <= 0) return null;
+    const world = MyWorldData.getWorld();
+    const rec = treeRecord(world);
+    if (!rec) return null;
+    const newGrowthPoints = clampNum(
+      (rec.growthPoints || 0) + delta,
+      0, Number.MAX_SAFE_INTEGER, rec.growthPoints || 0
+    );
+    writeGrowth(newGrowthPoints);
+    return recalculateGrowth();
+  }
+
+  /** The active tree's stage list, for packs that scale progression against it. */
+  function getTreeStages() {
+    return treeStages || [];
   }
 
   // ---------------------------------------------------------------------
@@ -2024,54 +2048,26 @@ const MyWorld = (function () {
     ctx.fillRect(Math.round(fx + sway * 0.6), fy - 5, 1, 2);
   }
 
+    // ---------------------------------------------------------------------
+  // Campfire interaction is visually/geometrically owned here (hit-test
+  // in onCanvasClick, rendering in buildCampsite/stampCampsite/
+  // drawCampfire below, all unchanged) — but the *meaning* of lighting it
+  // (lit-state persistence, daily-consistency tracking, and the resulting
+  // tree-growth rate) belongs to the active LV pack, not the core.
+  // ---------------------------------------------------------------------
   function initCampfire() {
-    campfireLit = false;
-    if (hasData()) {
-      const w = MyWorldData.getWorld();
-      campfireLit = !!(w && w.environment && w.environment.campfire && w.environment.campfire.lit);
-    }
-  }
-
-  function getMaxTreeGrowthPoints() {
-    const stages = (treeStages && treeStages.length)
-      ? treeStages
-      : (hasAssets() && MyWorldAssets.TREE_STAGES ? MyWorldAssets.TREE_STAGES : null);
-    if (!stages || !stages.length) return 0;
-    return stages[stages.length - 1].minGrowthPoints || 0;
-  }
-
-  function getCampfireGrowthPerDay() {
-    const max = getMaxTreeGrowthPoints();
-    return max > 0 ? (max / CAMPFIRE_GROWTH_TARGET_DAYS) : 0;
-  }
-
-  function applyCampfireDailyAction() {
-    if (!hasData()) return;
-    const result = MyWorldData.recordCampfireLight();
-    if (!result || !result.isNewDayAction) return;
-
-    const world = MyWorldData.getWorld();
-    const rec = treeRecord(world);
-    if (!rec) return;
-
-    const delta = getCampfireGrowthPerDay();
-    if (delta <= 0) return;
-
-    const newGrowthPoints = clampNum(
-      (rec.growthPoints || 0) + delta,
-      0, Number.MAX_SAFE_INTEGER, rec.growthPoints || 0
-    );
-    writeGrowth(newGrowthPoints);
-    recalculateGrowth();
+    campfireLit = (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onEnter)
+      ? !!MyWorldLV1.onEnter() : false;
   }
 
   function toggleCampfire() {
-    campfireLit = !campfireLit;
-    if (!hasData()) return;
-    if (campfireLit) {
-      applyCampfireDailyAction();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.toggle) {
+      campfireLit = !!MyWorldLV1.toggle(campfireLit, {
+        growActiveTree: growActiveTree,
+        getTreeStages: getTreeStages
+      });
     } else {
-      MyWorldData.setCampfireLit(false);
+      campfireLit = !campfireLit;
     }
   }
 
