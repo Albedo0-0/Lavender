@@ -169,7 +169,8 @@ const MyWorldData = (function () {
         birds: { enabled: false, count: 0 },
         stars: { enabled: false, visible: false },
         weather: { current: 'clear' },
-        season: { current: 'spring' }
+        season: { current: 'spring' },
+        campfire: { lit: false }
       },
 
       // Lightweight history of notable moments (e.g. stage changes).
@@ -243,6 +244,10 @@ const MyWorldData = (function () {
       world.environment.grass = Array.isArray(e.grass) ? e.grass : [];
       world.environment.bushes = Array.isArray(e.bushes) ? e.bushes : [];
       world.environment.rocks = Array.isArray(e.rocks) ? e.rocks : [];
+
+      if (isPlainObject(e.campfire)) {
+        world.environment.campfire.lit = !!e.campfire.lit;
+      }
 
       if (isPlainObject(e.fireflies)) {
         world.environment.fireflies.enabled = !!e.fireflies.enabled;
