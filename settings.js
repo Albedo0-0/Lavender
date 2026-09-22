@@ -349,22 +349,21 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
 
     const applyUpdateBtn = document.getElementById('settings-apply-update-btn');
     if (applyUpdateBtn) {
-      applyUpdateBtn.addEventListener('click', function () { location.reload(); });
+      applyUpdateBtn.addEventListener('click', function () {
+        const reg = window.LavenderSW && window.LavenderSW.registration;
+        if (!reg || !reg.waiting) return;
+        applyUpdateBtn.disabled = true;
+        var reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (reloaded) return;
+          reloaded = true;
+          location.reload();
+        });
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      });
     }
 
     window.addEventListener('lavender-update-ready', renderUpdateStatus);
-
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', function (e) {
-        if (e.data && e.data.type === 'VERSION') {
-          if (window.LavenderSW) window.LavenderSW.pendingVersion = e.data.version;
-          renderUpdateStatus();
-        }
-      });
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
-      }
-    }
   }
 
   // Read by Assistant (§B.7) for its modal header — cosmetic label only, falls back to "Assistant".
