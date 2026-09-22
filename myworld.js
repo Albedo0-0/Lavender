@@ -2625,10 +2625,11 @@ const MyWorld = (function () {
     drawHillsMid();
     drawClouds(1);
     drawTerrainFront();
+    if (activePack && activePack.drawBackground) activePack.drawBackground(ctx, W, H, clockElapsed);
     drawLightShafts();
     drawTree();
     drawTreeGlow();
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.draw) MyWorldLV1.draw(ctx, clockElapsed);
+    if (activePack && activePack.drawForeground) activePack.drawForeground(ctx, W, H, clockElapsed);
     drawAmbientLights();
     drawGrass();
     if (AMBIENCE.shimmer) drawShimmer();
