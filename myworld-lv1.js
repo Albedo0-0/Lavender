@@ -30,6 +30,18 @@ const MyWorldLV1 = (function () {
   // Daily campfire consistency action reaches max tree growth in ~7-10 days.
   const GROWTH_TARGET_DAYS = 8;
 
+  // Campsite/tent/campfire geometry, owned by this pack. Populated by
+  // buildGroundProps() (called from myworld.js's buildTerrain), consumed
+  // by stampGroundProps() (ground-layer paint), draw() (per-frame overlay)
+  // and onCanvasClick() (hit-test) below.
+  let campsite = null;
+  let campfireGlowHalo = null;
+
+  function clampNum(n, min, max, fallback) {
+    if (typeof n !== 'number' || isNaN(n) || !isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
   function hasData() {
     return typeof MyWorldData !== 'undefined' && !!MyWorldData;
   }
@@ -72,16 +84,20 @@ const MyWorldLV1 = (function () {
     if (delta > 0 && engine && engine.growActiveTree) engine.growActiveTree(delta);
   }
 
-  /** Called by the core when the world is (re)entered, to sync visual state. */
+/** Called by the core when the world is (re)entered, to sync visual state. */
   function onEnter() {
     return isLit();
   }
 
+  /** Called by the core when the world is exited (fullscreen closed). */
+  function onExit() {
+    campsite = null;
+    campfireGlowHalo = null;
+  }
+
   /**
-   * Called by the core when the campfire is toggled. `wasLit` is the
-   * core's current visual state; `engine` exposes the small generic
-   * growth API this pack needs (growActiveTree, getTreeStages). Returns
-   * the new lit state for the core to use for rendering.
+   * Called by the core's toggle path. Kept for compatibility; the tap
+   * itself now arrives via onCanvasClick below, which calls this.
    */
   function toggle(wasLit, engine) {
     const nowLit = !wasLit;
@@ -90,9 +106,119 @@ const MyWorldLV1 = (function () {
     return nowLit;
   }
 
+  // -----------------------------------------------------------------
+  // Ground props: campsite + tent + campfire position. Geometry only
+  // (same placement rule as the original core implementation).
+  // -----------------------------------------------------------------
+  function buildGroundProps(surf, W, TREE_SLOT, pond) {
+    if (!surf) { campsite = null; return; }
+    const treeX = Math.floor(W * TREE_SLOT);
+    const side = treeX > W * 0.55 ? -1 : 1;
+    let x = clampNum(treeX + side * Math.round(W * 0.22), 10, W - 16, treeX);
+    if (pond && x >= pond.x0 - 8 && x <= pond.x1 + 8) {
+      x = clampNum(treeX - side * Math.round(W * 0.22), 10, W - 16, treeX);
+    }
+    const fx = clampNum(x + 9, 10, W - 6, x + 9);
+    campsite = { x: x, y: surf[x], fireX: fx, fireY: surf[fx] };
+  }
+
+  function resetGroundProps() {
+    campsite = null;
+    campfireGlowHalo = null;
+  }
+
+  /** Paints the tent + cold-fire pit into the ground layer (same visual as before). */
+  function stampGroundProps(g, env) {
+    if (!campsite) return;
+    function css(c) { return 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')'; }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function mixRgb(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+    function quant(c) { return c.map(function (v) { return Math.min(255, Math.max(0, Math.round(v / 6) * 6)); }); }
+
+    const x = campsite.x;
+    const y = campsite.y;
+    const fabric = css(quant(mixRgb([196, 156, 108], env.sky.bot, 0.15 * env.nf)));
+    const fabricShade = css(quant(mixRgb([146, 108, 74], env.sky.bot, 0.18 * env.nf)));
+    const doorway = css(quant(mixRgb([40, 30, 26], env.sky.bot, 0.1 * env.nf)));
+    const h = 8;
+    for (let r = 0; r < h; r++) {
+      const hw = Math.max(1, Math.round((r + 1) / h * 4));
+      g.fillStyle = r % 2 === 0 ? fabric : fabricShade;
+      g.fillRect(x - hw, y - h + r, hw * 2, 1);
+    }
+    g.fillStyle = doorway;
+    g.fillRect(x - 1, y - 3, 2, 3);
+
+    const fx = campsite.fireX;
+    const fy = campsite.fireY;
+    g.fillStyle = css(quant(mixRgb([120, 118, 116], env.sky.bot, 0.2 * env.nf)));
+    g.fillRect(fx - 2, fy - 1, 5, 1);
+    g.fillStyle = css(quant(mixRgb([90, 62, 40], env.sky.bot, 0.2 * env.nf)));
+    g.fillRect(fx - 1, fy - 2, 3, 1);
+  }
+
+  function buildCampfireGlowHalo() {
+    const size = 15;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const img = g.createImageData(size, size);
+    const d = img.data;
+    const cx = (size - 1) / 2;
+    const cy = (size - 1) / 2;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const a = Math.max(0, 1 - dist / (cx + 0.5));
+        const j = (y * size + x) * 4;
+        d[j] = 255; d[j + 1] = 176; d[j + 2] = 96; d[j + 3] = Math.round(Math.pow(a, 1.7) * 120);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    campfireGlowHalo = c;
+  }
+
+  /** Per-frame overlay draw (flame + glow), called from myworld.js's drawFrame. */
+  function draw(ctx, clockElapsed) {
+    if (!campsite || !isLit()) return;
+    if (!campfireGlowHalo) buildCampfireGlowHalo();
+    const fx = campsite.fireX;
+    const fy = campsite.fireY;
+    const flick = 0.85 + 0.15 * Math.sin(clockElapsed * 6);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = flick;
+    ctx.drawImage(campfireGlowHalo, Math.round(fx) - 7, Math.round(fy) - 9);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    const sway = Math.sin(clockElapsed * 5) * 0.6;
+    ctx.fillStyle = '#ff8a3d';
+    ctx.fillRect(Math.round(fx - 1 + sway), fy - 4, 2, 3);
+    ctx.fillStyle = '#ffd27a';
+    ctx.fillRect(Math.round(fx + sway * 0.6), fy - 5, 1, 2);
+  }
+
+  /** Hit-test in canvas pixel space, called from myworld.js's onCanvasClick. */
+  function onCanvasClick(px, py, engine) {
+    if (!campsite) return;
+    const dx = px - campsite.fireX;
+    const dy = py - (campsite.fireY - 2);
+    if (dx * dx + dy * dy <= 25) toggle(isLit(), engine);
+  }
+
   return {
     id: PACK_ID,
     onEnter,
-    toggle
+    onExit,
+    toggle,
+    buildGroundProps,
+    resetGroundProps,
+    stampGroundProps,
+    draw,
+    onCanvasClick
   };
 })();
