@@ -2280,7 +2280,8 @@ for (let y = 0; y < 19; y++) {
     for (let i = 0; i < n; i++) {
       const x = 2 + Math.floor(rand() * (W - 4));
       if (Math.abs(x - treeX) < 10) continue;
-      if (campsite && Math.abs(x - campsite.x) < 8) continue;
+      const _cs = activePack && activePack.getCampsite && activePack.getCampsite();
+      if (_cs && Math.abs(x - _cs.x) < 8) continue;
       if (pond && x >= pond.x0 - 3 && x <= pond.x1 + 3) continue;
       const kind = rand();
       ambientProps.push({
