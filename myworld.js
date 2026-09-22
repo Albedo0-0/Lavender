@@ -1954,7 +1954,6 @@ for (let y = 0; y < 19; y++) {
     butterflies = null;
     fireflies = null;
     fireflyHalo = null;
-    campfireGlowHalo = null;
     leaves = null;
     shimmer = null;
     motes = null;
