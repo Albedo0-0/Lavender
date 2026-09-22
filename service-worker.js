@@ -91,6 +91,14 @@ self.addEventListener('install', function (e) {
       return Promise.allSettled(
         APP_SHELL.map(function (url) { return cache.add(url); })
       );
+    }).then(function () {
+      // Announce this version to every open tab so the UI can show the
+      // incoming update's name without guessing at it.
+      return self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    }).then(function (clients) {
+      clients.forEach(function (c) {
+        c.postMessage({ type: 'SW_INSTALLED', version: CACHE_VERSION });
+      });
     })
     // No self.skipWaiting() here: on an update this lets the new worker sit
     // in the "installed" (waiting) state instead of activating immediately,
