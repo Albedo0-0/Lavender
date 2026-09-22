@@ -218,7 +218,7 @@ const MyWorldLV1 = (function () {
     buildGroundProps,
     resetGroundProps,
     stampGroundProps,
-    draw,
+    drawForeground: draw,
     onCanvasClick
   };
 })();
