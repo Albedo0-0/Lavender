@@ -1511,24 +1511,24 @@ const MyWorld = (function () {
   // ---- fireflies ----
   function buildFireflyHalo() {
     const c = document.createElement('canvas');
-    c.width = 9;
-    c.height = 9;
-    const g = c.getContext('2d');
+c.width = 17;
+c.height = 17;
+const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
-    const img = g.createImageData(9, 9);
-    const d = img.data;
-    for (let y = 0; y < 9; y++) {
-      for (let x = 0; x < 9; x++) {
-        const dx = x - 4;
-        const dy = y - 4;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const core = Math.max(0, 1 - dist / 1.3);
-        const halo = Math.max(0, 1 - dist / 4.3);
-        const a = Math.min(1, core * 0.8 + Math.pow(halo, 1.9) * 0.38);
-        const j = (y * 9 + x) * 4;
-        d[j] = 255; d[j + 1] = 226; d[j + 2] = 152; d[j + 3] = Math.round(a * 145);
-      }
-    }
+    const img = g.createImageData(17, 17);
+const d = img.data;
+for (let y = 0; y < 17; y++) {
+  for (let x = 0; x < 17; x++) {
+    const dx = x - 8;
+    const dy = y - 8;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const core = Math.max(0, 1 - dist / 1.6);
+    const halo = Math.max(0, 1 - dist / 8.2);
+    const a = Math.min(1, core * 0.9 + Math.pow(halo, 1.5) * 0.55);
+    const j = (y * 17 + x) * 4;
+    d[j] = 255; d[j + 1] = 226; d[j + 2] = 152; d[j + 3] = Math.round(a * 180);
+  }
+}
     g.putImageData(img, 0, 0);
     fireflyHalo = c;
   }
@@ -1574,7 +1574,7 @@ const MyWorld = (function () {
       if (!f.active) continue;
       const blink = 0.35 + 0.65 * Math.max(0, Math.sin(f.bph));
       ctx.globalAlpha = vis * blink;
-      ctx.drawImage(fireflyHalo, Math.round(f.x) - 4, Math.round(f.y) - 4);
+      ctx.drawImage(fireflyHalo, Math.round(f.x) - 8, Math.round(f.y) - 8);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
