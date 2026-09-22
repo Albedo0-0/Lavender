@@ -33,7 +33,7 @@ const ForcedFullscreen = (function () {
 
   function isEnabled() {
     const settings = (State.get().settings || {});
-    return !!settings.forcedFullscreen;
+    return settings.forcedFullscreen !== false;
   }
 
   function persist(enabled) {
