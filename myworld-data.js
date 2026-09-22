@@ -178,8 +178,9 @@ const MyWorldData = (function () {
         stars: { enabled: false, visible: false },
         weather: { current: 'clear' },
         season: { current: 'spring' },
-        campfire: { lit: false, lastActionDate: null }
-      },
+          // Generic, opaque per-LV-pack state bucket. Core never inspects
+        // the contents — each pack owns and shapes its own namespace here.
+        lv: {}
 
       // Lightweight history of notable moments (e.g. stage changes).
       // Optional — nothing requires this to be populated.
@@ -253,10 +254,27 @@ const MyWorldData = (function () {
       world.environment.bushes = Array.isArray(e.bushes) ? e.bushes : [];
       world.environment.rocks = Array.isArray(e.rocks) ? e.rocks : [];
 
+      // Legacy pre-LV-pack campfire state migrates forward into LV1's own
+      // namespaced bucket, preserving its lit flag and daily-action date.
       if (isPlainObject(e.campfire)) {
-        world.environment.campfire.lit = !!e.campfire.lit;
-        world.environment.campfire.lastActionDate =
-          (typeof e.campfire.lastActionDate === 'string') ? e.campfire.lastActionDate : null;
+        world.environment.lv.lv1 = isPlainObject(world.environment.lv.lv1) ? world.environment.lv.lv1 : {};
+        world.environment.lv.lv1.campfire = { lit: !!e.campfire.lit };
+        if (typeof e.campfire.lastActionDate === 'string') {
+          world.environment.lv.lv1.dailyActions = isPlainObject(world.environment.lv.lv1.dailyActions)
+            ? world.environment.lv.lv1.dailyActions : {};
+          world.environment.lv.lv1.dailyActions.campfire = { lastActionDate: e.campfire.lastActionDate };
+        }
+      }
+
+      // Generic per-LV-pack state: opaque to the core, carried forward
+      // as-is (shallow per pack id) so any pack can shape its own bucket.
+      if (isPlainObject(e.lv)) {
+        Object.keys(e.lv).forEach((packId) => {
+          if (typeof packId !== 'string' || !packId) return;
+          if (isPlainObject(e.lv[packId])) {
+            world.environment.lv[packId] = Object.assign({}, world.environment.lv[packId], e.lv[packId]);
+          }
+        });
       }
 
       if (isPlainObject(e.fireflies)) {
@@ -463,7 +481,7 @@ const MyWorldData = (function () {
     }).tree;
   }
 
-    /** Shallow, safe merge into the environment placeholder block. */
+     /** Shallow, safe merge into the environment placeholder block. */
   function patchEnvironment(partial) {
     return updateWorld((world) => {
       if (isPlainObject(partial)) {
@@ -473,34 +491,54 @@ const MyWorldData = (function () {
     }).environment;
   }
 
-  /**
-   * Sets the campfire's lit/unlit state without touching lastActionDate.
-   * Turning the campfire off never undoes a day's already-recorded action.
-   */
-  function setCampfireLit(lit) {
+  // ---------------------------------------------------------------------
+  // Generic LV-pack state (core has no knowledge of what any pack stores
+  // here — each pack id owns an opaque bucket it shapes for itself).
+  // ---------------------------------------------------------------------
+
+  /** Returns a pack's own state bucket (never null; safe to read from). */
+  function getLVState(packId) {
+    const world = load();
+    return (typeof packId === 'string' && isPlainObject(world.environment.lv[packId]))
+      ? world.environment.lv[packId] : {};
+  }
+
+  /** Shallow merge into a pack's own state bucket. */
+  function patchLVState(packId, partial) {
+    if (typeof packId !== 'string' || !packId) return null;
     return updateWorld((world) => {
-      world.environment.campfire = Object.assign({}, world.environment.campfire, { lit: !!lit });
+      if (isPlainObject(partial)) {
+        world.environment.lv[packId] = Object.assign({}, world.environment.lv[packId], partial);
+      }
       return world;
-    }).environment.campfire;
+    }).environment.lv[packId];
   }
 
   /**
-   * Records "the campfire was lit" as today's consistency action, at most
-   * once per calendar day. Lighting it again later the same day is a
-   * no-op for progress (lit stays true, lastActionDate is unchanged).
-   * Returns { isNewDayAction, dateKey } so callers can decide whether to
-   * apply any further consequence (e.g. tree growth) exactly once.
+   * Records a named daily action for a pack, at most once per calendar
+   * day. Calling again later the same day is a no-op. Returns
+   * { isNewDayAction, dateKey } so the pack can decide whether to apply
+   * any further consequence (e.g. progressing a growth mechanic) exactly
+   * once per day.
    */
-  function recordCampfireLight() {
+  function recordLVDailyAction(packId, actionKey) {
+    if (typeof packId !== 'string' || !packId || typeof actionKey !== 'string' || !actionKey) {
+      return { isNewDayAction: false, dateKey: localDateKey() };
+    }
     const today = localDateKey();
     const world = load();
-    const prevDate = world.environment.campfire.lastActionDate;
+    const bucket = isPlainObject(world.environment.lv[packId]) ? world.environment.lv[packId] : {};
+    const actions = isPlainObject(bucket.dailyActions) ? bucket.dailyActions : {};
+    const prevDate = isPlainObject(actions[actionKey]) ? actions[actionKey].lastActionDate : null;
     const isNewDayAction = prevDate !== today;
 
     updateWorld((w) => {
-      w.environment.campfire = Object.assign({}, w.environment.campfire, {
-        lit: true,
-        lastActionDate: isNewDayAction ? today : prevDate
+      const b = isPlainObject(w.environment.lv[packId]) ? w.environment.lv[packId] : {};
+      const a = isPlainObject(b.dailyActions) ? b.dailyActions : {};
+      w.environment.lv[packId] = Object.assign({}, b, {
+        dailyActions: Object.assign({}, a, {
+          [actionKey]: { lastActionDate: isNewDayAction ? today : prevDate }
+        })
       });
       return w;
     });
@@ -592,13 +630,16 @@ const MyWorldData = (function () {
     persist,
     resetWorld,
 
-        // targeted mutators
+         // targeted mutators
     setLifetimeStudyContribution,
     setTreeGrowth,
     patchEnvironment,
-    setCampfireLit,
-    recordCampfireLight,
     addMilestone,
+
+    // generic per-LV-pack state (opaque to core)
+    getLVState,
+    patchLVState,
+    recordLVDailyAction,
 
     // backup / restore
     mergeBackupWorld,
