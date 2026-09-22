@@ -91,7 +91,12 @@ self.addEventListener('install', function (e) {
       return Promise.allSettled(
         APP_SHELL.map(function (url) { return cache.add(url); })
       );
-    }).then(function () { return self.skipWaiting(); })
+    })
+    // No self.skipWaiting() here: on an update this lets the new worker sit
+    // in the "installed" (waiting) state instead of activating immediately,
+    // so the running app stays on the old version until the user chooses to
+    // update from Settings. On a first install (no existing controller) the
+    // browser activates this worker on its own, so that behavior is unaffected.
   );
 });
 
@@ -111,6 +116,11 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('message', function (e) {
   if (e.data && e.data.type === 'GET_VERSION' && e.source) {
     e.source.postMessage({ type: 'VERSION', version: CACHE_VERSION });
+  }
+  // Settings > Updates > "Update now" sends this to move a waiting worker
+  // out of the waiting state and into activation.
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
