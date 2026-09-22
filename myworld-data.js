@@ -178,9 +178,10 @@ const MyWorldData = (function () {
         stars: { enabled: false, visible: false },
         weather: { current: 'clear' },
         season: { current: 'spring' },
-          // Generic, opaque per-LV-pack state bucket. Core never inspects
+        // Generic, opaque per-LV-pack state bucket. Core never inspects
         // the contents — each pack owns and shapes its own namespace here.
         lv: {}
+      },
 
       // Lightweight history of notable moments (e.g. stage changes).
       // Optional — nothing requires this to be populated.
@@ -515,6 +516,22 @@ const MyWorldData = (function () {
   }
 
   /**
+   * Removes a pack's entire state bucket (used when a pack is
+   * uninstalled). Only touches this one pack's namespace under
+   * environment.lv — no other Lavender or My World data is affected.
+   */
+  function clearLVState(packId) {
+    if (typeof packId !== 'string' || !packId) return false;
+    updateWorld((world) => {
+      if (Object.prototype.hasOwnProperty.call(world.environment.lv, packId)) {
+        delete world.environment.lv[packId];
+      }
+      return world;
+    });
+    return true;
+  }
+
+  /**
    * Records a named daily action for a pack, at most once per calendar
    * day. Calling again later the same day is a no-op. Returns
    * { isNewDayAction, dateKey } so the pack can decide whether to apply
@@ -640,7 +657,7 @@ const MyWorldData = (function () {
     getLVState,
     patchLVState,
     recordLVDailyAction,
-
+    clearLVState,
     // backup / restore
     mergeBackupWorld,
 
