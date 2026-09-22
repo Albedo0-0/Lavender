@@ -683,11 +683,13 @@ const MyWorld = (function () {
     buildHillsBack(cx);
     buildHills(cx);
     buildGround(cx);
-    buildCampsite();
     buildGrassTufts();
     buildAmbientLights();
     buildLightShafts();
     buildAmbientProps();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.buildGroundProps) {
+      MyWorldLV1.buildGroundProps(surf, W, TREE_SLOT, pond);
+    }
   }
 
   function resetTerrain() {
@@ -699,7 +701,7 @@ const MyWorld = (function () {
     ambientLights = null;
     lightShafts = null;
     ambientProps = null;
-    campsite = null;
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.resetGroundProps) MyWorldLV1.resetGroundProps();
   }
 
   function onTerrainResize() {
@@ -759,7 +761,9 @@ const MyWorld = (function () {
     gp.push(quant(mixRgb(s.bot, [255, 255, 255], 0.55)));
     paintLayer(terrain.ground, gp);
     stampAmbientProps(terrain.ground.g, env);
-    stampCampsite(terrain.ground.g, env);
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.stampGroundProps) {
+      MyWorldLV1.stampGroundProps(terrain.ground.g, env, surf, W, TREE_SLOT, pond);
+    }
   }
 
   function ensureTerrain() {
@@ -1246,9 +1250,6 @@ const MyWorld = (function () {
   let fireflyHalo = null;
   let leaves = null;
   let shimmer = null;
-  let campsite = null;
-  let campfireLit = false;
-  let campfireGlowHalo = null;
 
   function lifeRnd() {
     if (!lifeRand) lifeRand = makeRng((Date.now() / 1000 + 777) >>> 0);
@@ -1941,18 +1942,6 @@ const MyWorld = (function () {
     }
   }
 
-  function buildCampsite() {
-    if (!surf) { campsite = null; return; }
-    const treeX = Math.floor(W * TREE_SLOT);
-    const side = treeX > W * 0.55 ? -1 : 1;
-    let x = clampNum(treeX + side * Math.round(W * 0.22), 10, W - 16, treeX);
-    if (pond && x >= pond.x0 - 8 && x <= pond.x1 + 8) {
-      x = clampNum(treeX - side * Math.round(W * 0.22), 10, W - 16, treeX);
-    }
-    const fx = clampNum(x + 9, 10, W - 6, x + 9);
-    campsite = { x: x, y: surf[x], fireX: fx, fireY: surf[fx] };
-  }
-  
   function stampAmbientProps(g, env) {
     if (!ambientProps) return;
     for (let i = 0; i < ambientProps.length; i++) {
@@ -1980,107 +1969,21 @@ const MyWorld = (function () {
     }
   }
 
-  function stampCampsite(g, env) {
-    if (!campsite) return;
-    const x = campsite.x;
-    const y = campsite.y;
-    const fabric = css(quant(mixRgb([196, 156, 108], env.sky.bot, 0.15 * env.nf)));
-    const fabricShade = css(quant(mixRgb([146, 108, 74], env.sky.bot, 0.18 * env.nf)));
-    const doorway = css(quant(mixRgb([40, 30, 26], env.sky.bot, 0.1 * env.nf)));
-    const h = 8;
-    for (let r = 0; r < h; r++) {
-      const hw = Math.max(1, Math.round((r + 1) / h * 4));
-      g.fillStyle = r % 2 === 0 ? fabric : fabricShade;
-      g.fillRect(x - hw, y - h + r, hw * 2, 1);
-    }
-    g.fillStyle = doorway;
-    g.fillRect(x - 1, y - 3, 2, 3);
-
-    const fx = campsite.fireX;
-    const fy = campsite.fireY;
-    g.fillStyle = css(quant(mixRgb([120, 118, 116], env.sky.bot, 0.2 * env.nf)));
-    g.fillRect(fx - 2, fy - 1, 5, 1);
-    g.fillStyle = css(quant(mixRgb([90, 62, 40], env.sky.bot, 0.2 * env.nf)));
-    g.fillRect(fx - 1, fy - 2, 3, 1);
-  }
-
-  // ---- campfire (interactive: tap/click to toggle) ----
-  function buildCampfireGlowHalo() {
-    const size = 15;
-    const c = document.createElement('canvas');
-    c.width = size;
-    c.height = size;
-    const g = c.getContext('2d');
-    g.imageSmoothingEnabled = false;
-    const img = g.createImageData(size, size);
-    const d = img.data;
-    const cx = (size - 1) / 2;
-    const cy = (size - 1) / 2;
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const dx = x - cx;
-        const dy = y - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const a = Math.max(0, 1 - dist / (cx + 0.5));
-        const j = (y * size + x) * 4;
-        d[j] = 255; d[j + 1] = 176; d[j + 2] = 96; d[j + 3] = Math.round(Math.pow(a, 1.7) * 120);
-      }
-    }
-    g.putImageData(img, 0, 0);
-    campfireGlowHalo = c;
-  }
-
-  function drawCampfire() {
-    if (!campsite || !campfireLit) return;
-    if (!campfireGlowHalo) buildCampfireGlowHalo();
-    const fx = campsite.fireX;
-    const fy = campsite.fireY;
-    const flick = 0.85 + 0.15 * Math.sin(clockElapsed * 6);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = flick;
-    ctx.drawImage(campfireGlowHalo, Math.round(fx) - 7, Math.round(fy) - 9);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-
-    const sway = Math.sin(clockElapsed * 5) * 0.6;
-    ctx.fillStyle = '#ff8a3d';
-    ctx.fillRect(Math.round(fx - 1 + sway), fy - 4, 2, 3);
-    ctx.fillStyle = '#ffd27a';
-    ctx.fillRect(Math.round(fx + sway * 0.6), fy - 5, 1, 2);
-  }
-
-    // ---------------------------------------------------------------------
-  // Campfire interaction is visually/geometrically owned here (hit-test
-  // in onCanvasClick, rendering in buildCampsite/stampCampsite/
-  // drawCampfire below, all unchanged) — but the *meaning* of lighting it
-  // (lit-state persistence, daily-consistency tracking, and the resulting
-  // tree-growth rate) belongs to the active LV pack, not the core.
-  // ---------------------------------------------------------------------
-  function initCampfire() {
-    campfireLit = (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onEnter)
-      ? !!MyWorldLV1.onEnter() : false;
-  }
-
-  function toggleCampfire() {
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.toggle) {
-      campfireLit = !!MyWorldLV1.toggle(campfireLit, {
-        growActiveTree: growActiveTree,
-        getTreeStages: getTreeStages
-      });
-    } else {
-      campfireLit = !campfireLit;
-    }
-  }
+   
+  
 
   function onCanvasClick(e) {
-    if (!canvas || !campsite) return;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const px = (e.clientX - rect.left) * (W / rect.width);
     const py = (e.clientY - rect.top) * (H / rect.height);
-    const dx = px - campsite.fireX;
-    const dy = py - (campsite.fireY - 2);
-    if (dx * dx + dy * dy <= 25) toggleCampfire();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onCanvasClick) {
+      MyWorldLV1.onCanvasClick(px, py, {
+        growActiveTree: growActiveTree,
+        getTreeStages: getTreeStages
+      });
+    }
   }
   
   // ---------------------------------------------------------------------
@@ -2725,7 +2628,7 @@ const MyWorld = (function () {
     drawLightShafts();
     drawTree();
     drawTreeGlow();
-    drawCampfire();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.draw) MyWorldLV1.draw(ctx, clockElapsed);
     drawAmbientLights();
     drawGrass();
     if (AMBIENCE.shimmer) drawShimmer();
@@ -2860,7 +2763,7 @@ const MyWorld = (function () {
     initSkyClock();
     initWeather();
     initLife();
-    initCampfire();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onEnter) MyWorldLV1.onEnter();
     fit();
     startLoop();
 
@@ -2891,6 +2794,7 @@ const MyWorld = (function () {
     resetTree();
     resetLife();
     resetLighting();
+    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onExit) MyWorldLV1.onExit();
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
