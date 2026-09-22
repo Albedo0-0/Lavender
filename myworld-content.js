@@ -59,6 +59,7 @@ const MyWorldContent = (function () {
     treeSlot: 0.5,
     pond: true,
     ambience: { birds: true, butterflies: true, fireflies: true, leaves: true, shimmer: true, motes: true },
+    lvPack: 'lv1',
     seeds: { stars: 20240517, clouds: 4242 },
     sky: [
       { h: 0,     top: '#0b0e24', mid: '#131a3a', bot: '#232a52' },
