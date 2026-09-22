@@ -103,9 +103,9 @@ const ProgressData = (function () {
     questions: questionsValue,
     productivity: productivityValue,
     hydration: hydrationValue,
-    sleep: sleepValue
+    sleep: sleepValue,
+    targets: targetsValue
   };
-
   function getEntryFor(dateStr) {
     return JournalData.getEntry(dateStr);
   }
