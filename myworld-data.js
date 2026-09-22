@@ -62,6 +62,14 @@ const MyWorldData = (function () {
     return new Date().toISOString();
   }
 
+  function localDateKey(d) {
+    const date = (d instanceof Date && !isNaN(d)) ? d : new Date();
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   function isPlainObject(v) {
     return !!v && typeof v === 'object' && !Array.isArray(v);
   }
@@ -170,7 +178,7 @@ const MyWorldData = (function () {
         stars: { enabled: false, visible: false },
         weather: { current: 'clear' },
         season: { current: 'spring' },
-        campfire: { lit: false }
+        campfire: { lit: false, lastActionDate: null }
       },
 
       // Lightweight history of notable moments (e.g. stage changes).
@@ -247,6 +255,8 @@ const MyWorldData = (function () {
 
       if (isPlainObject(e.campfire)) {
         world.environment.campfire.lit = !!e.campfire.lit;
+        world.environment.campfire.lastActionDate =
+          (typeof e.campfire.lastActionDate === 'string') ? e.campfire.lastActionDate : null;
       }
 
       if (isPlainObject(e.fireflies)) {
@@ -453,7 +463,7 @@ const MyWorldData = (function () {
     }).tree;
   }
 
-  /** Shallow, safe merge into the environment placeholder block. */
+    /** Shallow, safe merge into the environment placeholder block. */
   function patchEnvironment(partial) {
     return updateWorld((world) => {
       if (isPlainObject(partial)) {
@@ -461,6 +471,41 @@ const MyWorldData = (function () {
       }
       return world;
     }).environment;
+  }
+
+  /**
+   * Sets the campfire's lit/unlit state without touching lastActionDate.
+   * Turning the campfire off never undoes a day's already-recorded action.
+   */
+  function setCampfireLit(lit) {
+    return updateWorld((world) => {
+      world.environment.campfire = Object.assign({}, world.environment.campfire, { lit: !!lit });
+      return world;
+    }).environment.campfire;
+  }
+
+  /**
+   * Records "the campfire was lit" as today's consistency action, at most
+   * once per calendar day. Lighting it again later the same day is a
+   * no-op for progress (lit stays true, lastActionDate is unchanged).
+   * Returns { isNewDayAction, dateKey } so callers can decide whether to
+   * apply any further consequence (e.g. tree growth) exactly once.
+   */
+  function recordCampfireLight() {
+    const today = localDateKey();
+    const world = load();
+    const prevDate = world.environment.campfire.lastActionDate;
+    const isNewDayAction = prevDate !== today;
+
+    updateWorld((w) => {
+      w.environment.campfire = Object.assign({}, w.environment.campfire, {
+        lit: true,
+        lastActionDate: isNewDayAction ? today : prevDate
+      });
+      return w;
+    });
+
+    return { isNewDayAction: isNewDayAction, dateKey: today };
   }
 
   /**
@@ -547,10 +592,12 @@ const MyWorldData = (function () {
     persist,
     resetWorld,
 
-    // targeted mutators
+        // targeted mutators
     setLifetimeStudyContribution,
     setTreeGrowth,
     patchEnvironment,
+    setCampfireLit,
+    recordCampfireLight,
     addMilestone,
 
     // backup / restore
