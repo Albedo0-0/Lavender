@@ -14,7 +14,7 @@ const MyWorld = (function () {
   // ---------------------------------------------------------------------
   // Shell constants
   // ---------------------------------------------------------------------
-  let BASE_HEIGHT = 180;
+  let BASE_HEIGHT = 360;
   const MAX_DT = 0.1;
   const HOST_CLASS = 'myworld-fullscreen-host';
   const CANVAS_CLASS = 'myworld-canvas';
@@ -268,7 +268,7 @@ const MyWorld = (function () {
   }
 
   function quant(c) {
-    return c.map(function (v) { return Math.min(255, Math.max(0, Math.round(v / 6) * 6)); });
+    return c.map(function (v) { return Math.min(255, Math.max(0, Math.round(v / 4) * 4)); });
   }
 
   function css(c) {
@@ -882,7 +882,16 @@ const MyWorld = (function () {
   let WX_WEIGHTS = [1];
   let CLOUD_TONES = { day: [], dusk: [], night: [] };
 
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const BAYER = [
+    0, 32,  8, 40,  2, 34, 10, 42,
+    48, 16, 56, 24, 50, 18, 58, 26,
+    12, 44,  4, 36, 14, 46,  6, 38,
+    60, 28, 52, 20, 62, 30, 54, 22,
+    3, 35, 11, 43,  1, 33,  9, 41,
+    51, 19, 59, 27, 49, 17, 57, 25,
+    15, 47,  7, 39, 13, 45,  5, 37,
+    63, 31, 55, 23, 61, 29, 53, 21
+  ];
 
   let wxName = 'clear';
   let wxLeft = 0;
@@ -1183,7 +1192,7 @@ const MyWorld = (function () {
           0.18 * Math.sin(TAU * 3 * x / fw + y * 0.15 + 2.1) +
           0.12 * Math.sin(TAU * 5 * x / fw - y * 0.2);
         const dens = b.peak * prof * (0.45 + 0.75 * n);
-        const on = dens > (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+        const on = dens > (BAYER[(y & 7) * 8 + (x & 7)] + 0.5) / 64;
         const j = (y * fw + x) * 4;
         d[j] = rgb[0]; d[j + 1] = rgb[1]; d[j + 2] = rgb[2]; d[j + 3] = on ? 255 : 0;
       }
@@ -1750,7 +1759,7 @@ for (let y = 0; y < 17; y++) {
     lightGradeCanvas.width = W;
     lightGradeCanvas.height = H;
     const g = lightGradeCanvas.getContext('2d');
-    const bands = 4;
+    const bands = Math.max(4, Math.round(H / 45));
     for (let i = 0; i < bands; i++) {
       const t = i / (bands - 1);
       const shade = quant(mixRgb(c, [255, 255, 255], 0.12 * (1 - t)));
@@ -2455,7 +2464,7 @@ for (let y = 0; y < 17; y++) {
         if (zb[i] < 0) continue;
         const wy = baseL - y;
         const l = lt[i] - 0.3 * (1 - clampNum(wy / (0.6 * Ht), 0, 1, 0)) +
-          ((BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5) * 0.2;
+          ((BAYER[(y & 7) * 8 + (x & 7)] + 0.5) / 64 - 0.5) * 0.2;
         let t = l > 0.78 ? 5 : (l > 0.45 ? 4 : (l > 0.05 ? 3 : (l > -0.35 ? 2 : 1)));
         if (gold > 0 && t >= 4) {
           const gp = smoothstep(-0.1, 0.8, (x - cxL) / Rc * 0.6 + wy / Ht * 0.5);
