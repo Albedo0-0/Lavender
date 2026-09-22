@@ -227,6 +227,68 @@ const MyWorldContent = (function () {
     return true;
   }
 
+  /** Overwrites an existing registry entry in place (same id, newer version only). Used by importPackFile's version-upgrade path — never inserts a new id. */
+  function replaceDef(def) {
+    const err = validate(def);
+    if (err) { warn('rejected update for "' + (def && def.id) + '": ' + err); return false; }
+    if (!registry[def.id]) return false;
+    registry[def.id] = def;
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Active-pack registry (Phase 6/7/8) — a pack's behaviour script (or the
+  // built-in LV1 module) registers its API object here, keyed by its own
+  // id. The engine (myworld.js) resolves the active pack strictly through
+  // the world definition's `lvPack` id via getPack() — it never scans for
+  // a magically-named global, so an imported pack cannot casually shadow
+  // or replace another pack's hook.
+  // ---------------------------------------------------------------------
+  const packRegistry = Object.create(null);
+  const RESERVED_PACK_IDS = ['lv1'];
+
+  function registerPack(api) {
+    if (!isObj(api) || typeof api.id !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(api.id)) {
+      warn('rejected pack registration: invalid id');
+      return false;
+    }
+    packRegistry[api.id] = api;
+    return true;
+  }
+
+  function unregisterPack(id) {
+    if (typeof id === 'string' && packRegistry[id]) { delete packRegistry[id]; return true; }
+    return false;
+  }
+
+  function getPack(id) {
+    return (typeof id === 'string' && packRegistry[id]) || null;
+  }
+
+  /** The frozen capability object handed to an imported pack's behaviour script — its own namespaced state, growth helpers and an offscreen-canvas helper. No page, window, or other-module access is exposed. */
+  function makePackSandbox(lvPackId) {
+    return Object.freeze({
+      id: lvPackId,
+      getState: function () {
+        return (typeof MyWorldData !== 'undefined' && MyWorldData) ? MyWorldData.getLVState(lvPackId) : {};
+      },
+      patchState: function (partial) {
+        return (typeof MyWorldData !== 'undefined' && MyWorldData) ? MyWorldData.patchLVState(lvPackId, partial) : null;
+      },
+      recordDailyAction: function (actionKey) {
+        return (typeof MyWorldData !== 'undefined' && MyWorldData)
+          ? MyWorldData.recordLVDailyAction(lvPackId, actionKey)
+          : { isNewDayAction: false, dateKey: '' };
+      },
+      createCanvas: function (w, h) {
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, w | 0);
+        c.height = Math.max(1, h | 0);
+        return c;
+      }
+    });
+  }
+
   // ---------------------------------------------------------------------
   // Imported pack storage (IndexedDB) — Settings Phase 1/2
   // ---------------------------------------------------------------------
@@ -274,7 +336,36 @@ const MyWorldContent = (function () {
     });
   }
 
-  /** Loads and runs a stored behaviour script by lvPackId, registering its global. */
+  function removePackDef(id) {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(PACK_STORE, 'readwrite');
+        tx.objectStore(PACK_STORE).delete(id);
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { reject(tx.error || new Error('delete failed')); };
+      });
+    }).catch(function () { return false; });
+  }
+
+  function removeBehaviour(lvPackId) {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(BEHAVIOUR_STORE, 'readwrite');
+        tx.objectStore(BEHAVIOUR_STORE).delete(lvPackId);
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { reject(tx.error || new Error('delete failed')); };
+      });
+    }).catch(function () { return false; });
+  }
+
+  /**
+   * Loads a stored behaviour script by lvPackId and runs it inside a
+   * constrained sandbox (see makePackSandbox): the script receives only
+   * its own `LV` capability object as an argument and must return its
+   * pack API object — that return value is how it registers, instead of
+   * assigning a window/page global. Nothing outside that one object is
+   * exposed to it.
+   */
   function loadBehaviour(lvPackId) {
     return openPackDb().then(function (db) {
       return new Promise(function (resolve, reject) {
@@ -286,9 +377,13 @@ const MyWorldContent = (function () {
     }).then(function (row) {
       if (!row || typeof row.source !== 'string') return false;
       try {
-        const fn = new Function(row.source);
-        fn();
-        return true;
+        const fn = new Function('LV', '"use strict";\n' + row.source);
+        const api = fn(makePackSandbox(lvPackId));
+        if (!isObj(api) || typeof api.id !== 'string' || api.id !== lvPackId) {
+          warn('behaviour script for ' + lvPackId + ' did not return a matching pack API');
+          return false;
+        }
+        return registerPack(api);
       } catch (e) {
         warn('behaviour script failed for ' + lvPackId + ': ' + (e && e.message));
         return false;
@@ -334,6 +429,8 @@ const MyWorldContent = (function () {
             typeof pack.behaviour.source !== 'string' || !pack.behaviour.lvPackId || !pack.behaviour.source) {
           throw new Error('Invalid behaviour block.');
         }
+        if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(pack.behaviour.lvPackId)) throw new Error('Invalid behaviour pack id.');
+        if (RESERVED_PACK_IDS.indexOf(pack.behaviour.lvPackId) >= 0) throw new Error('That pack id is reserved.');
       }
 
       const claimed = pack.sha256;
@@ -345,17 +442,26 @@ const MyWorldContent = (function () {
         }).join('');
         if (hex !== claimed.toLowerCase()) throw new Error('Pack failed the checksum check.');
 
-        const toStore = [];
+        const toStore = [];   // brand-new ids
+        const toUpdate = [];  // existing ids being upgraded to a strictly newer version
         for (let i = 0; i < pack.definitions.length; i++) {
           const def = pack.definitions[i];
           const err = validate(def);
           if (err) throw new Error('Invalid content in pack (' + (def && def.id) + '): ' + err);
-          if (!registry[def.id]) toStore.push(def);
+          const existing = registry[def.id];
+          if (!existing) { toStore.push(def); continue; }
+          if (existing.type !== def.type) {
+            throw new Error('Pack id "' + def.id + '" conflicts with existing ' + existing.type + ' content.');
+          }
+          if (def.version > (existing.version || 0)) toUpdate.push(def);
+          // same or older version: leave the existing, owned/unlocked
+          // definition and its ownership/growth state completely alone.
         }
-        return Promise.all(toStore.map(storePackDef)).then(function () {
+        return Promise.all(toStore.concat(toUpdate).map(storePackDef)).then(function () {
           let count = 0;
           toStore.forEach(function (def) { if (register(def)) count++; });
-          if (pack.behaviour) {
+          toUpdate.forEach(function (def) { if (replaceDef(def)) count++; });
+          if (pack.behaviour && (toStore.length || toUpdate.length)) {
             return storeBehaviour(pack.behaviour.lvPackId, pack.behaviour.source)
               .then(function () { return loadBehaviour(pack.behaviour.lvPackId); })
               .then(function () { return { ok: true, count: count }; });
@@ -366,8 +472,50 @@ const MyWorldContent = (function () {
     }).catch(function (e) {
       return { ok: false, error: (e && e.message) || 'Import failed.' };
     });
-                        }
+  }
 
+  /**
+   * Uninstalls an imported (non-built-in) definition: removes it from the
+   * live registry and the imported-pack IndexedDB store, drops it from
+   * inventory ownership/growth, and — only if no other registered world
+   * still references the same behaviour pack id — also removes that
+   * pack's behaviour script, its in-memory registration, and its private
+   * saved state. Built-in content and unrelated Lavender data are never
+   * touched.
+   */
+  function uninstallPack(id) {
+    const d = registry[id];
+    if (!d) return { ok: false, error: 'Not found.' };
+    if (BUILTIN_IDS.indexOf(id) >= 0) return { ok: false, error: 'Built-in content cannot be uninstalled.' };
+    const i = loadInv();
+    if (id === i.activeWorld || id === i.activeTree) {
+      return { ok: false, error: 'Switch to another world before uninstalling this one.' };
+    }
+
+    delete registry[id];
+    const oi = order.indexOf(id);
+    if (oi >= 0) order.splice(oi, 1);
+    i.owned = i.owned.filter(function (x) { return x !== id; });
+    if (Object.prototype.hasOwnProperty.call(i.growth, id)) delete i.growth[id];
+    saveInv();
+
+    const removals = [removePackDef(id)];
+    const behaviourId = (d.type === 'world' && typeof d.lvPack === 'string') ? d.lvPack : null;
+    if (behaviourId) {
+      const stillUsed = order.some(function (oid) {
+        return registry[oid] && registry[oid].type === 'world' && registry[oid].lvPack === behaviourId;
+      });
+      if (!stillUsed) {
+        unregisterPack(behaviourId);
+        removals.push(removeBehaviour(behaviourId));
+        if (typeof MyWorldData !== 'undefined' && MyWorldData && MyWorldData.clearLVState) {
+          MyWorldData.clearLVState(behaviourId);
+        }
+      }
+    }
+
+    return { ok: true, settled: Promise.all(removals).then(function () { return true; }).catch(function () { return false; }) };
+  }
   function get(id) {
     return (typeof id === 'string' && registry[id]) || null;
   }
@@ -662,6 +810,11 @@ function canActivate(type, id) {
     importPackFile,
     restoreImportedPacks,
     loadBehaviour,
+    uninstallPack,
+
+    registerPack,
+    unregisterPack,
+    getPack,
 
     exportBackup,
     mergeBackup
