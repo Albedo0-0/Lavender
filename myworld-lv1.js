@@ -219,7 +219,8 @@ const MyWorldLV1 = (function () {
     resetGroundProps,
     stampGroundProps,
     drawForeground: draw,
-    onCanvasClick
+    onCanvasClick,
+    getCampsite: function () { return campsite; }
   };
 
   // Register into the generic pack registry under this pack's own id
