@@ -28,6 +28,7 @@ const MyWorld = (function () {
   let worldDef = null;
   let treeDef = null;
   let treeStages = null;
+  let AMBIENCE = { birds: true, butterflies: true, fireflies: true, leaves: true, shimmer: true, motes: true };
 
   // Sky keyframes come from the active world definition (see applyContent).
   let SKY_KEYS = [];
@@ -1601,12 +1602,12 @@ const MyWorld = (function () {
 
   // ---- driver ----
   function updateLife(dt) {
-    updateBirds(dt);
-    updateButterflies(dt);
-    updateFireflies(dt);
-    updateLeaves(dt);
-    updateShimmer(dt);
-    updateMotes(dt);
+    if (AMBIENCE.birds) updateBirds(dt);
+    if (AMBIENCE.butterflies) updateButterflies(dt);
+    if (AMBIENCE.fireflies) updateFireflies(dt);
+    if (AMBIENCE.leaves) updateLeaves(dt);
+    if (AMBIENCE.shimmer) updateShimmer(dt);
+    if (AMBIENCE.motes) updateMotes(dt);
   }
 
   function initLife() {
@@ -2727,12 +2728,12 @@ const MyWorld = (function () {
     drawCampfire();
     drawAmbientLights();
     drawGrass();
-    drawShimmer();
-    drawBirds();
-    drawButterflies();
-    drawLeaves();
-    drawFireflies();
-    drawMotes();
+    if (AMBIENCE.shimmer) drawShimmer();
+    if (AMBIENCE.birds) drawBirds();
+    if (AMBIENCE.butterflies) drawButterflies();
+    if (AMBIENCE.leaves) drawLeaves();
+    if (AMBIENCE.fireflies) drawFireflies();
+    if (AMBIENCE.motes) drawMotes();
     drawFog(1);
     drawRain(dt);
     drawWeatherTint();
@@ -2952,6 +2953,15 @@ const MyWorld = (function () {
     PAL_FOLIAGE = mkPal(td.procedural.foliage);
     LEAF_VARIANTS = td.procedural.leafVariants;
     treeStages = td.stages;
+    const amb = wd.ambience || {};
+    AMBIENCE = {
+      birds: amb.birds !== false,
+      butterflies: amb.butterflies !== false,
+      fireflies: amb.fireflies !== false,
+      leaves: amb.leaves !== false,
+      shimmer: amb.shimmer !== false,
+      motes: amb.motes !== false
+    };
     return true;
   }
 
