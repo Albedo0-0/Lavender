@@ -9,7 +9,9 @@ const MyWorld = (function () {
   // ---------------------------------------------------------------------
   // Growth policy (carried over unchanged from the previous myworld.js)
   // ---------------------------------------------------------------------
-  const GROWTH_POINTS_PER_STUDY_MINUTE = 0.15;
+   const GROWTH_POINTS_PER_STUDY_MINUTE = 0.15;
+  // Daily campfire consistency action reaches max tree growth in ~7-10 days.
+  const CAMPFIRE_GROWTH_TARGET_DAYS = 8;
 
   // ---------------------------------------------------------------------
   // Shell constants
@@ -2030,9 +2032,47 @@ const MyWorld = (function () {
     }
   }
 
+  function getMaxTreeGrowthPoints() {
+    const stages = (treeStages && treeStages.length)
+      ? treeStages
+      : (hasAssets() && MyWorldAssets.TREE_STAGES ? MyWorldAssets.TREE_STAGES : null);
+    if (!stages || !stages.length) return 0;
+    return stages[stages.length - 1].minGrowthPoints || 0;
+  }
+
+  function getCampfireGrowthPerDay() {
+    const max = getMaxTreeGrowthPoints();
+    return max > 0 ? (max / CAMPFIRE_GROWTH_TARGET_DAYS) : 0;
+  }
+
+  function applyCampfireDailyAction() {
+    if (!hasData()) return;
+    const result = MyWorldData.recordCampfireLight();
+    if (!result || !result.isNewDayAction) return;
+
+    const world = MyWorldData.getWorld();
+    const rec = treeRecord(world);
+    if (!rec) return;
+
+    const delta = getCampfireGrowthPerDay();
+    if (delta <= 0) return;
+
+    const newGrowthPoints = clampNum(
+      (rec.growthPoints || 0) + delta,
+      0, Number.MAX_SAFE_INTEGER, rec.growthPoints || 0
+    );
+    writeGrowth(newGrowthPoints);
+    recalculateGrowth();
+  }
+
   function toggleCampfire() {
     campfireLit = !campfireLit;
-    if (hasData()) MyWorldData.patchEnvironment({ campfire: { lit: campfireLit } });
+    if (!hasData()) return;
+    if (campfireLit) {
+      applyCampfireDailyAction();
+    } else {
+      MyWorldData.setCampfireLit(false);
+    }
   }
 
   function onCanvasClick(e) {
