@@ -232,16 +232,18 @@ const MyWorldContent = (function () {
   // ---------------------------------------------------------------------
   const PACK_DB_NAME = 'lavender.packs.v1';
   const PACK_STORE = 'packs';
+  const BEHAVIOUR_STORE = 'behaviours';
   let _packDbPromise = null;
 
   function openPackDb() {
     if (_packDbPromise) return _packDbPromise;
     _packDbPromise = new Promise(function (resolve, reject) {
       if (typeof indexedDB === 'undefined') { reject(new Error('no indexedDB')); return; }
-      const req = indexedDB.open(PACK_DB_NAME, 1);
+      const req = indexedDB.open(PACK_DB_NAME, 2);
       req.onupgradeneeded = function () {
         const db = req.result;
         if (!db.objectStoreNames.contains(PACK_STORE)) db.createObjectStore(PACK_STORE, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(BEHAVIOUR_STORE)) db.createObjectStore(BEHAVIOUR_STORE, { keyPath: 'lvPackId' });
       };
       req.onsuccess = function () { resolve(req.result); };
       req.onerror = function () { reject(req.error || new Error('indexedDB open failed')); };
@@ -260,6 +262,40 @@ const MyWorldContent = (function () {
     });
   }
 
+  /** Stores a pack's optional behaviour script, keyed by its lvPackId. */
+  function storeBehaviour(lvPackId, source) {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(BEHAVIOUR_STORE, 'readwrite');
+        tx.objectStore(BEHAVIOUR_STORE).put({ lvPackId: lvPackId, source: source });
+        tx.oncomplete = function () { resolve(true); };
+        tx.onerror = function () { reject(tx.error || new Error('put failed')); };
+      });
+    });
+  }
+
+  /** Loads and runs a stored behaviour script by lvPackId, registering its global. */
+  function loadBehaviour(lvPackId) {
+    return openPackDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(BEHAVIOUR_STORE, 'readonly');
+        const req = tx.objectStore(BEHAVIOUR_STORE).get(lvPackId);
+        req.onsuccess = function () { resolve(req.result || null); };
+        req.onerror = function () { reject(req.error || new Error('get failed')); };
+      });
+    }).then(function (row) {
+      if (!row || typeof row.source !== 'string') return false;
+      try {
+        const fn = new Function(row.source);
+        fn();
+        return true;
+      } catch (e) {
+        warn('behaviour script failed for ' + lvPackId + ': ' + (e && e.message));
+        return false;
+      }
+    }).catch(function () { return false; });
+  }
+
   function loadAllPackDefs() {
     return openPackDb().then(function (db) {
       return new Promise(function (resolve, reject) {
@@ -273,10 +309,14 @@ const MyWorldContent = (function () {
 
   function restoreImportedPacks() {
     return loadAllPackDefs().then(function (defs) {
+      const behaviourIds = [];
       defs.forEach(function (def) {
         if (!registry[def.id]) register(def);
+        if (def.type === 'world' && typeof def.lvPack === 'string' && behaviourIds.indexOf(def.lvPack) < 0) {
+          behaviourIds.push(def.lvPack);
+        }
       });
-      return defs.length;
+      return Promise.all(behaviourIds.map(loadBehaviour)).then(function () { return defs.length; });
     }).catch(function () { return 0; });
   }
 
@@ -289,6 +329,12 @@ const MyWorldContent = (function () {
       if (!isNum(pack.engineMin) || pack.engineMin > ENGINE_VERSION) throw new Error('This pack needs a newer app version.');
       if (typeof pack.sha256 !== 'string' || !pack.sha256) throw new Error('Pack is missing a checksum.');
       if (!Array.isArray(pack.definitions) || !pack.definitions.length) throw new Error('Pack has no content.');
+      if (pack.behaviour !== undefined) {
+        if (!isObj(pack.behaviour) || typeof pack.behaviour.lvPackId !== 'string' ||
+            typeof pack.behaviour.source !== 'string' || !pack.behaviour.lvPackId || !pack.behaviour.source) {
+          throw new Error('Invalid behaviour block.');
+        }
+      }
 
       const claimed = pack.sha256;
       const checkObj = Object.assign({}, pack, { sha256: '' });
@@ -309,6 +355,11 @@ const MyWorldContent = (function () {
         return Promise.all(toStore.map(storePackDef)).then(function () {
           let count = 0;
           toStore.forEach(function (def) { if (register(def)) count++; });
+          if (pack.behaviour) {
+            return storeBehaviour(pack.behaviour.lvPackId, pack.behaviour.source)
+              .then(function () { return loadBehaviour(pack.behaviour.lvPackId); })
+              .then(function () { return { ok: true, count: count }; });
+          }
           return { ok: true, count: count };
         });
       });
@@ -610,6 +661,7 @@ function canActivate(type, id) {
 
     importPackFile,
     restoreImportedPacks,
+    loadBehaviour,
 
     exportBackup,
     mergeBackup
