@@ -140,14 +140,14 @@ const MyWorldLV1 = (function () {
     const fabric = css(quant(mixRgb([196, 156, 108], env.sky.bot, 0.15 * env.nf)));
     const fabricShade = css(quant(mixRgb([146, 108, 74], env.sky.bot, 0.18 * env.nf)));
     const doorway = css(quant(mixRgb([40, 30, 26], env.sky.bot, 0.1 * env.nf)));
-    const h = 10;
+    const h = 14;
     for (let r = 0; r < h; r++) {
-      const hw = Math.max(1, Math.round((r + 1) / h * 5));
+      const hw = Math.max(1, Math.round((r + 1) / h * 7));
       g.fillStyle = r % 2 === 0 ? fabric : fabricShade;
       g.fillRect(x - hw, y - h + r, hw * 2, 1);
     }
     g.fillStyle = doorway;
-    g.fillRect(x - 1, y - 4, 2, 4);
+    g.fillRect(x - 1, y - 6, 2, 6);
 
     const fx = campsite.fireX;
     const fy = campsite.fireY;
@@ -155,6 +155,7 @@ const MyWorldLV1 = (function () {
     g.fillRect(fx - 3, fy - 1, 6, 1);
     g.fillStyle = css(quant(mixRgb([90, 62, 40], env.sky.bot, 0.2 * env.nf)));
     g.fillRect(fx - 2, fy - 2, 4, 1);
+    g.fillRect(fx - 1, fy - 3, 2, 1);
   }
 
   function buildCampfireGlowHalo() {
@@ -197,9 +198,9 @@ const MyWorldLV1 = (function () {
 
     const sway = Math.sin(clockElapsed * 5) * 0.6;
     ctx.fillStyle = '#ff8a3d';
-    ctx.fillRect(Math.round(fx - 1 + sway), fy - 5, 2, 4);
+    ctx.fillRect(Math.round(fx - 1 + sway), fy - 7, 2, 6);
     ctx.fillStyle = '#ffd27a';
-    ctx.fillRect(Math.round(fx + sway * 0.6), fy - 6, 1, 3);
+    ctx.fillRect(Math.round(fx + sway * 0.6), fy - 8, 1, 4);
   }
 
   /** Hit-test in canvas pixel space, called from myworld.js's onCanvasClick. */
