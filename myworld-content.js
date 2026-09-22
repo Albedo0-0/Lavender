@@ -58,6 +58,7 @@ const MyWorldContent = (function () {
     ground: 0.74,
     treeSlot: 0.5,
     pond: true,
+    ambience: { birds: true, butterflies: true, fireflies: true, leaves: true, shimmer: true, motes: true },
     seeds: { stars: 20240517, clouds: 4242 },
     sky: [
       { h: 0,     top: '#0b0e24', mid: '#131a3a', bot: '#232a52' },
@@ -146,8 +147,15 @@ const MyWorldContent = (function () {
     if (typeof d.tree !== 'string' || !d.tree) return 'tree';
     if (!isNum(d.baseHeight) || d.baseHeight < 90 || d.baseHeight > 400) return 'baseHeight';
     if (!isNum(d.horizon) || d.horizon < 0.3 || d.horizon > 0.9) return 'horizon';
-    if (!isNum(d.ground) || d.ground < 0.4 || d.ground > 0.95) return 'ground';
     if (!isNum(d.treeSlot) || d.treeSlot < 0.2 || d.treeSlot > 0.8) return 'treeSlot';
+    if (d.ambience !== undefined) {
+      if (!isObj(d.ambience)) return 'ambience';
+      const AMB_KEYS = ['birds', 'butterflies', 'fireflies', 'leaves', 'shimmer', 'motes'];
+      for (let i = 0; i < AMB_KEYS.length; i++) {
+        if (d.ambience[AMB_KEYS[i]] !== undefined && typeof d.ambience[AMB_KEYS[i]] !== 'boolean') return 'ambience.' + AMB_KEYS[i];
+      }
+    }
+    if (!isObj(d.seeds) || !isNum(d.seeds.stars) || !isNum(d.seeds.clouds)) return 'seeds';
     if (!isObj(d.seeds) || !isNum(d.seeds.stars) || !isNum(d.seeds.clouds)) return 'seeds';
     if (!Array.isArray(d.sky) || d.sky.length < 3) return 'sky';
     for (let i = 0; i < d.sky.length; i++) {
