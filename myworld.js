@@ -705,8 +705,8 @@ const MyWorld = (function () {
     buildAmbientLights();
     buildLightShafts();
     buildAmbientProps();
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.buildGroundProps) {
-      MyWorldLV1.buildGroundProps(surf, W, TREE_SLOT, pond);
+    if (activePack && activePack.buildGroundProps) {
+      activePack.buildGroundProps(surf, W, TREE_SLOT, pond);
     }
   }
 
@@ -719,7 +719,7 @@ const MyWorld = (function () {
     ambientLights = null;
     lightShafts = null;
     ambientProps = null;
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.resetGroundProps) MyWorldLV1.resetGroundProps();
+if (activePack && activePack.resetGroundProps) activePack.resetGroundProps();
   }
 
   function onTerrainResize() {
@@ -779,8 +779,8 @@ const MyWorld = (function () {
     gp.push(quant(mixRgb(s.bot, [255, 255, 255], 0.55)));
     paintLayer(terrain.ground, gp);
     stampAmbientProps(terrain.ground.g, env);
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.stampGroundProps) {
-      MyWorldLV1.stampGroundProps(terrain.ground.g, env, surf, W, TREE_SLOT, pond);
+    if (activePack && activePack.stampGroundProps) {
+      activePack.stampGroundProps(terrain.ground.g, env, surf, W, TREE_SLOT, pond);
     }
   }
 
@@ -1996,11 +1996,8 @@ const MyWorld = (function () {
     if (!rect.width || !rect.height) return;
     const px = (e.clientX - rect.left) * (W / rect.width);
     const py = (e.clientY - rect.top) * (H / rect.height);
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onCanvasClick) {
-      MyWorldLV1.onCanvasClick(px, py, {
-        growActiveTree: growActiveTree,
-        getTreeStages: getTreeStages
-      });
+    if (activePack && activePack.onCanvasClick) {
+      activePack.onCanvasClick(px, py, packEngineContext());
     }
   }
   
@@ -2782,7 +2779,7 @@ const MyWorld = (function () {
     initSkyClock();
     initWeather();
     initLife();
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onEnter) MyWorldLV1.onEnter();
+    if (activePack && activePack.onEnter) activePack.onEnter(packEngineContext());
     fit();
     startLoop();
 
@@ -2813,7 +2810,7 @@ const MyWorld = (function () {
     resetTree();
     resetLife();
     resetLighting();
-    if (typeof MyWorldLV1 !== 'undefined' && MyWorldLV1 && MyWorldLV1.onExit) MyWorldLV1.onExit();
+    if (activePack && activePack.onExit) activePack.onExit(packEngineContext());
     if (mountedContainer === h) mountedContainer = null;
     h.remove();
     exitNative();
@@ -2856,6 +2853,7 @@ const MyWorld = (function () {
     if (!wd || !td || !td.procedural) return false;
     worldDef = wd;
     treeDef = td;
+    activePack = resolvePackFor(wd);
     BASE_HEIGHT = wd.baseHeight;
     HORIZON_RATIO = wd.horizon;
     GROUND_RATIO = wd.ground;
@@ -2898,13 +2896,19 @@ const MyWorld = (function () {
       if (!MyWorldContent.canActivate('world', worldId)) return false;
       MyWorldContent.setActive('world', worldId);
     }
+    const prevPack = activePack;
     if (!applyContent()) return false;
+    if (prevPack && prevPack !== activePack) {
+      if (host && prevPack.onExit) prevPack.onExit(packEngineContext());
+      if (prevPack.resetGroundProps) prevPack.resetGroundProps();
+    }
     resetSky();
     resetTerrain();
     resetWeather();
     resetTree();
     resetLife();
     if (host) {
+      if (activePack && activePack.onEnter) activePack.onEnter(packEngineContext());
       initWeather();
       initLife();
       fit();
