@@ -182,8 +182,8 @@ const MyWorldLV1 = (function () {
     campfireGlowHalo = c;
   }
 
-  /** Per-frame overlay draw (flame + glow), called from myworld.js's drawFrame. */
-  function draw(ctx, clockElapsed) {
+/** Per-frame overlay draw (flame + glow), called from myworld.js's drawFrame. */
+  function draw(ctx, W, H, clockElapsed) {
     if (!campsite || !isLit()) return;
     if (!campfireGlowHalo) buildCampfireGlowHalo();
     const fx = campsite.fireX;
@@ -210,7 +210,7 @@ const MyWorldLV1 = (function () {
     if (dx * dx + dy * dy <= 25) toggle(isLit(), engine);
   }
 
-  return {
+  const api = {
     id: PACK_ID,
     onEnter,
     onExit,
@@ -221,4 +221,14 @@ const MyWorldLV1 = (function () {
     drawForeground: draw,
     onCanvasClick
   };
+
+  // Register into the generic pack registry under this pack's own id
+  // ('lv1') so myworld.js can resolve it the same way it resolves any
+  // imported pack — by the active world's declared lvPack id — rather
+  // than by scanning for this file's global.
+  if (typeof MyWorldContent !== 'undefined' && MyWorldContent && MyWorldContent.registerPack) {
+    MyWorldContent.registerPack(api);
+  }
+
+  return api;
 })();
