@@ -28,6 +28,12 @@ const MyWorld = (function () {
   let worldDef = null;
   let treeDef = null;
   let treeStages = null;
+  // The single "active pack slot" (Phase 3/6/7): a controlled reference to
+  // whichever LV Pack owns the current world, resolved from the world
+  // definition's own `lvPack` id via MyWorldContent.getPack() — never a
+  // hardcoded name check. Packs receive capabilities only through the
+  // small context object below; they never reach into core internals.
+  let activePack = null;
   let AMBIENCE = { birds: true, butterflies: true, fireflies: true, leaves: true, shimmer: true, motes: true };
 
   // Sky keyframes come from the active world definition (see applyContent).
@@ -162,6 +168,18 @@ const MyWorld = (function () {
   /** The active tree's stage list, for packs that scale progression against it. */
   function getTreeStages() {
     return treeStages || [];
+  }
+
+  /** The capability object handed to the active pack's lifecycle/event calls — the only channel it has back into the core. */
+  function packEngineContext() {
+    return { growActiveTree: growActiveTree, getTreeStages: getTreeStages };
+  }
+
+  /** Resolves the pack that owns a world definition, via the generic registry — not by name. */
+  function resolvePackFor(wd) {
+    if (!wd || typeof wd.lvPack !== 'string') return null;
+    return (typeof MyWorldContent !== 'undefined' && MyWorldContent && MyWorldContent.getPack)
+      ? MyWorldContent.getPack(wd.lvPack) : null;
   }
 
   // ---------------------------------------------------------------------
