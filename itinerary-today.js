@@ -265,6 +265,9 @@ const ItineraryToday = (function () {
 
   function init() {
     maybePresentGate();
+    if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.onRollover === 'function') {
+      TimeEngine.onRollover(maybePresentGate, 'itinerary-today');
+    }
     if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.subscribe === 'function') {
       TimeEngine.subscribe(refreshIfOpen, 'itinerary-today');
     }
