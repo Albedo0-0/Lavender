@@ -211,8 +211,37 @@ const MyWorldContent = (function () {
     return '';
   }
 
+  // Assistant LV Packs travel in the same .lvpack envelope/IndexedDB store as My World content, but
+  // register into AssistantLVPackData (art + cost only; ownership stays in the Cosmetics ledger).
+  const ASSISTANT_TYPE = 'assistant-pack';
+  function isAssistantDef(d) { return isObj(d) && d.type === ASSISTANT_TYPE; }
+  function validateAssistantPack(d) {
+    if (typeof d.id !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(d.id)) return 'id';
+    if (typeof d.name !== 'string' || !d.name) return 'name';
+    if (!isNum(d.version)) return 'version';
+    if (!isNum(d.cost) || d.cost < 0) return 'cost';
+    if (!isObj(d.pixel) || !isObj(d.pixel.palette)) return 'pixel.palette';
+    const palette = d.pixel.palette;
+    if (!Object.keys(palette).every(function (k) { return k.length === 1 && k !== '.' && isHex(palette[k]); })) return 'pixel.palette';
+    function isFrame(f) {
+      return Array.isArray(f) && f.length === 8 && f.every(function (r) { return typeof r === 'string' && r.length === 8; });
+    }
+    if (!Array.isArray(d.pixel.idle) || !d.pixel.idle.length || d.pixel.idle.length > 8 || !d.pixel.idle.every(isFrame)) return 'pixel.idle';
+    if (d.pixel.blink !== undefined && !isFrame(d.pixel.blink)) return 'pixel.blink';
+    return '';
+  }
+  const assistantImported = Object.create(null);
+  function registerAssistantPack(def) {
+    if (typeof AssistantLVPackData === 'undefined' || !AssistantLVPackData.register(def)) return false;
+    assistantImported[def.id] = def;
+    return true;
+  }
+  function registerAny(def) { return isAssistantDef(def) ? registerAssistantPack(def) : register(def); }
+
+  
   function validate(d) {
     if (!isObj(d)) return 'not an object';
+    if (d.type === ASSISTANT_TYPE) return validateAssistantPack(d);
     if (typeof d.id !== 'string' || !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(d.id)) return 'id';
     if (d.type !== 'world' && d.type !== 'tree') return 'type';
     if (typeof d.name !== 'string' || !d.name) return 'name';
@@ -467,7 +496,8 @@ const MyWorldContent = (function () {
     }).catch(function () { return 0; });
   }
 
-  function importPackFile(file) {
+  // kind (optional): 'world' | 'assistant' — restricts which category of pack this import accepts.
+  function importPackFile(file, kind) {
     return file.text().then(function (text) {
       let pack;
       try { pack = JSON.parse(text); } catch (e) { throw new Error('Not valid pack data.'); }
@@ -476,6 +506,15 @@ const MyWorldContent = (function () {
       if (!isNum(pack.engineMin) || pack.engineMin > ENGINE_VERSION) throw new Error('This pack needs a newer app version.');
       if (typeof pack.sha256 !== 'string' || !pack.sha256) throw new Error('Pack is missing a checksum.');
       if (!Array.isArray(pack.definitions) || !pack.definitions.length) throw new Error('Pack has no content.');
+      if (kind === 'world' || kind === 'assistant') {
+        const wantAssistant = kind === 'assistant';
+        if (!pack.definitions.every(function (d) { return isAssistantDef(d) === wantAssistant; })) {
+          throw new Error(wantAssistant
+            ? 'This is not an Assistant LV Pack. Import it under My World LV Packs.'
+            : 'This is an Assistant LV Pack. Import it under Assistant LV Packs.');
+        }
+        if (wantAssistant && pack.behaviour !== undefined) throw new Error('Assistant LV Packs cannot include behaviour scripts.');
+      }
       if (pack.behaviour !== undefined) {
         if (!isObj(pack.behaviour) || typeof pack.behaviour.lvPackId !== 'string' ||
             typeof pack.behaviour.source !== 'string' || !pack.behaviour.lvPackId || !pack.behaviour.source) {
@@ -511,6 +550,12 @@ const MyWorldContent = (function () {
           const def = pack.definitions[i];
           const err = validate(def);
           if (err) throw new Error('Invalid content in pack (' + (def && def.id) + '): ' + err);
+           if (isAssistantDef(def)) {
+            // Already-known id (built-in or previously imported): leave it and its ownership alone.
+            if (typeof AssistantLVPackData === 'undefined') throw new Error('Assistant packs are unavailable right now.');
+            if (!AssistantLVPackData.get(def.id)) toStore.push(def);
+            continue;
+          }
           const existing = registry[def.id];
           if (!existing) { toStore.push(def); continue; }
           if (existing.type !== def.type) {
@@ -522,7 +567,7 @@ const MyWorldContent = (function () {
         }
         return Promise.all(toStore.concat(toUpdate).map(storePackDef)).then(function () {
           let count = 0;
-          toStore.forEach(function (def) { if (register(def)) count++; });
+          toStore.forEach(function (def) { if (registerAny(def)) count++; });
           toUpdate.forEach(function (def) { if (replaceDef(def)) count++; });
           if (pack.behaviour && (toStore.length || toUpdate.length)) {
             return storeBehaviour(pack.behaviour.lvPackId, pack.behaviour.source)
@@ -782,6 +827,7 @@ function canActivate(type, id) {
     for (let n = 0; n < order.length; n++) {
       if (BUILTIN_IDS.indexOf(order[n]) < 0) definitions.push(registry[order[n]]);
     }
+    Object.keys(assistantImported).forEach(function (aid) { definitions.push(assistantImported[aid]); });
     return {
       inventory: { v: i.v, owned: i.owned.slice(), activeWorld: i.activeWorld, activeTree: i.activeTree, growth: i.growth },
       definitions: definitions
@@ -803,8 +849,9 @@ function canActivate(type, id) {
     const writes = [];
     if (Array.isArray(raw.definitions)) {
       raw.definitions.forEach(function (def) {
-        if (!isObj(def) || typeof def.id !== 'string' || registry[def.id] || validate(def)) return;
-        if (!register(def)) return;
+         if (!isObj(def) || typeof def.id !== 'string' || validate(def)) return;
+        if (isAssistantDef(def) ? (typeof AssistantLVPackData === 'undefined' || AssistantLVPackData.get(def.id)) : registry[def.id]) return;
+        if (!registerAny(def)) return;
         result.definitionsAdded++;
         writes.push(storePackDef(def).catch(function () { /* still usable for this session */ }));
       });
