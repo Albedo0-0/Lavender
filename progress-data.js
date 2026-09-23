@@ -310,7 +310,12 @@ const ProgressData = (function () {
     }
     return total > 0 ? completed / total : null;
   }
-  
+
+  function getItineraryAdherence(dateStr) {
+    const hub = DateHub.get(dateStr);
+    return (hub && hub.itinerarySummary) || null;
+  }
+
   function getOtherStats() {
     return {
       bestStudyStreak: getBestStudyStreak(),
@@ -340,7 +345,8 @@ const ProgressData = (function () {
     getSeries: getSeries,
 
     getOtherStats: getOtherStats,
-    getTagCompletionRate: getTagCompletionRate
+    getTagCompletionRate: getTagCompletionRate,
+    getItineraryAdherence: getItineraryAdherence
   };
 })();
 
