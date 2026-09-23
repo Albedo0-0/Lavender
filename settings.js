@@ -90,10 +90,20 @@ const Settings = (function () {
 
       '<hr class="divider">' +
 
-            '<div class="form-row"><button id="settings-import-content-btn" class="btn-secondary">Import Content</button>' +
+             '<h4 class="section-title">My World LV Packs</h4>' +
+      '<div class="form-row"><button id="settings-import-content-btn" class="btn-secondary">Import My World LV Pack</button>' +
       '<input type="file" id="settings-import-content-input" accept=".lvpack" style="display:none">' +
       '<span id="settings-import-content-status" class="micro-label"></span></div>' +
 
+        '<hr class="divider">' +
+
+      '<h4 class="section-title">Assistant LV Packs</h4>' +
+      '<div class="form-row"><button id="settings-import-assistant-btn" class="btn-secondary">Import Assistant LV Pack</button>' +
+      '<input type="file" id="settings-import-assistant-input" accept=".lvpack" style="display:none">' +
+      '<span id="settings-import-assistant-status" class="micro-label"></span></div>' +
+
+      '<hr class="divider">' +
+      
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
       '<div class="form-row"><label for="settings-import-input">Restore from backup</label>' +
       '<input type="file" id="settings-import-input" accept="application/json">' +
@@ -279,17 +289,21 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       Backup.downloadExport();
     });
 
-    const importContentBtn = document.getElementById('settings-import-content-btn');
-    const importContentInput = document.getElementById('settings-import-content-input');
-    if (importContentBtn && importContentInput) {
-      importContentBtn.addEventListener('click', function () { importContentInput.click(); });
-      importContentInput.addEventListener('change', function (e) {
+     // Both import areas share the one LV Pack importer (MyWorldContent.importPackFile); `kind`
+    // only tells it which category of pack this area accepts.
+    function wirePackImport(kind, prefix) {
+      const btn = document.getElementById(prefix + '-btn');
+      const input = document.getElementById(prefix + '-input');
+     if (!btn || !input) return;
+      btn.addEventListener('click', function () { input.click(); });
+      input.addEventListener('change', function (e) {
         const file = e.target.files[0];
-        importContentInput.value = '';
+        input.value = '';
         if (!file) return;
-        const status = document.getElementById('settings-import-content-status');
+        const status = document.getElementById(prefix + '-status');
         if (status) status.textContent = 'Importing\u2026';
-        MyWorldContent.importPackFile(file).then(function (result) {
+        MyWorldContent.importPackFile(file, kind).then(function (result) {
+          if (result.ok && kind === 'assistant' && typeof Assistant !== 'undefined') Assistant.refreshPixelEntitySkin();
           if (!status) return;
           status.textContent = result.ok
             ? (result.count ? ('Imported ' + result.count + ' item(s).') : 'Already imported.')
@@ -298,6 +312,9 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       });
     }
 
+    wirePackImport('world', 'settings-import-content');
+    wirePackImport('assistant', 'settings-import-assistant');
+    
     document.getElementById('settings-import-input').addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
