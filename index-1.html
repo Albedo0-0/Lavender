@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Kalam:wght@300;400;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap">
+<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="myworld.css">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="theme-color" content="#11142b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+
+  <header id="app-header">
+  <div id="app-header-left">
+    <span id="app-title">Lavender</span>
+  </div>
+  <div id="app-header-right">
+    <div id="top-meter-bar">
+      <div id="productivity-bar-wrap" title="Productivity">
+        <div id="productivity-bar-fill"></div>
+        <span id="productivity-bar-label"></span>
+      </div>
+      <div id="exp-bar-wrap" title="EXP">
+        <div id="exp-bar-fill"></div>
+        <span id="exp-bar-label"></span>
+      </div>
+    </div>
+    <button id="header-search-btn" title="Search">&#128269;</button>
+    <button id="player-music-btn" title="Radio / Music">&#127925;</button>
+    <button id="utility-menu-btn" title="Utilities">&#9776;</button>
+  </div>
+</header>
+
+<div id="utility-drawer" class="utility-drawer-hidden">
+  <div class="utility-drawer-group" data-group="study">
+    <button id="global-break-btn" title="Take a break">Break</button>
+    <button id="unrecorded-study-icon" title="Unrecorded Study">&#128221;+</button>
+    <button id="water-icon" title="Log water">&#128167;</button>
+  </div>
+  <div class="utility-drawer-divider"></div>
+<div class="utility-drawer-group" data-group="personal">
+    <button id="notepad-icon" title="Notepad">&#128221;</button>
+    <button id="paintbrush-icon" title="Cosmetics">&#128396;</button>
+  </div>
+  <div class="utility-drawer-divider"></div>
+  <div class="utility-drawer-group" data-group="system">
+    <button id="assistant-icon" title="Assistant">&#128203;</button>
+    <button id="backup-export-btn" title="Export backup">&#128190;</button>
+    <button id="backup-restore-btn" title="Restore backup">&#128257;</button>
+    <button id="settings-icon" title="Settings">&#9881;</button>
+    <button id="fullscreen-btn" title="Fullscreen">&#9974;</button>
+  </div>
+</div>
+<input type="file" id="backup-restore-file-input" accept="application/json" style="display:none">
+
+<button id="journal-lock-toggle" title="Journal lock" style="display:none">&#128275;</button>
+<div id="global-break-takeover" style="display:none"></div>
+<div id="misc-ambient-layer" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2;"></div>
+<div id="misc-objects-layer" style="position:fixed;inset:0;pointer-events:none;z-index:40;"></div>
+
+<nav id="main-nav">
+  <button class="nav-btn" data-screen="library">Library</button>
+  <button class="nav-btn" data-screen="calendar">Calendar</button>
+  <button class="nav-btn" data-screen="journal">Journal</button>
+  <button class="nav-btn" data-screen="study">Study</button>
+ <button class="nav-btn" data-screen="progress">Progress</button>
+  <button class="nav-btn" data-screen="myworld">My World</button>
+</nav>
+  <main>
+    <section id="screen-calendar" class="screen">
+      <div id="calendar-header">
+        <button id="calendar-prev">&lt; prev</button>
+        <span id="calendar-month-label"></span>
+        <button id="calendar-next">next &gt;</button>
+      </div>
+      <div id="calendar-grid"></div>
+      <div id="calendar-countdown-row">
+        <div id="calendar-countdown"></div>
+        <button id="calendar-events-btn" title="All important dates &amp; events">Events</button>
+      </div>
+      <div id="calendar-streak"></div>
+    </section>
+    <section id="screen-journal" class="screen"></section>
+    <section id="screen-library" class="screen">
+      <div id="library-layout">
+        <div id="library-left">
+          <div id="library-main">
+            <div id="library-body"></div>
+          </div>
+          <div id="planner-side">
+            <div id="planner-main">
+              <h3>New Task</h3>
+              <div id="planner-form"></div>
+            </div>
+          </div>
+        </div>
+        <div id="library-right-panel">
+          <div id="library-right-header">
+            <button id="library-panel-prev">&#8592;</button>
+            <span id="library-panel-tab-label">Today</span>
+            <button id="library-delete-all-archived" style="display:none;" title="Delete all archived items">Delete All</button>
+            <button id="library-panel-next">&#8594;</button>
+            <button id="library-panel-collapse" title="Collapse panel">&#10006;</button>
+          </div>
+          <div id="library-panel-content"></div>
+        </div>
+        <button id="library-panel-expand" style="display:none;" title="Show panel">&#8942;</button>
+      </div>
+    </section>
+    <section id="screen-study" class="screen">
+      <div id="study-layout">
+             <div id="study-wallpaper-layer"></div>
+        <video id="study-wallpaper-video" muted loop playsinline autoplay></video>
+        <label id="study-autofs-toggle-row"><input type="checkbox" id="study-autofs-toggle"> Auto fullscreen</label>
+        <button id="study-wallpaper-prev" class="study-wallpaper-nav" title="Previous wallpaper">&#8592;</button>
+        <button id="study-wallpaper-next" class="study-wallpaper-nav" title="Next wallpaper">&#8594;</button>
+        <div id="study-header">
+          <h3>Study</h3>
+        </div>
+        <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
+        <div id="study-clock-panel"></div>
+        <div id="study-session-panel"></div>
+        <div id="study-cutoff-view" style="display:none"></div>
+        <div id="study-log-panel"></div>
+      </div>
+    </section>
+    <section id="screen-progress" class="screen"></section>
+    <section id="screen-myworld" class="screen"></section>
+</main>
+
+  <div id="modal-overlay">
+    <div id="modal-content" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <!-- Load order matters: storage -> state -> nav -->
+<script src="storage.js"></script>
+<script src="state.js"></script>
+  <script src="notify.js"></script>
+  <script src="sleep-data.js"></script>
+  <script src="water-data.js"></script>
+  <script src="alarm-data.js"></script>
+  <script src="itinerary-template-data.js"></script>
+  <script src="nav.js"></script>
+  <script src="datehub.js"></script>
+  <script src="streak.js"></script>
+  <script src="planner-data.js"></script>
+  <script src="tags-data.js"></script>
+  <script src="targets-data.js"></script>
+  <script src="timeengine.js"></script>
+  <script src="itinerary-data.js"></script>
+  <script src="journal-data.js"></script>
+  <script src="modal.js"></script>
+  <script src="tags.js"></script>
+  <script src="targets.js"></script>
+  <script src="sleep.js"></script>
+  <script src="water.js"></script>
+  <script src="alarm.js"></script>
+  <script src="itinerary.js"></script>
+  <script src="journal.js"></script>
+  <script src="calendar.js"></script>
+  <script src="planner.js"></script>
+  <script src="library.js"></script>
+  <script src="study-templates-data.js"></script>
+  <script src="study-wallpaper.js"></script>
+  <script src="study.js"></script>
+  <script src="gamification-data.js"></script>
+  <script src="productivity-data.js"></script>
+
+  <script src="progress-data.js"></script>
+  <script src="progress.js"></script>
+  <script src="assistant-data.js"></script>
+  <script src="assistant.js"></script>
+  <script src="itinerary-today.js"></script>
+  <script src="notepad.js"></script>
+  <script src="radio-data.js"></script>
+  <script src="music-data.js"></script>
+<script src="player.js"></script>
+   <script src="myworld-data.js"></script>
+  <script src="myworld-assets.js"></script>
+  <script src="myworld-content.js"></script>
+  <script src="myworld-lv1.js"></script>
+  <script src="myworld.js"></script>
+  <script src="unrecorded.js"></script>
+  <script src="gamification.js"></script>
+  
+  <script src="backup.js"></script>
+  <script src="backup-ui.js"></script>
+  <script src="settings.js"></script>
+  <script src="misc-core.js"></script>
+  <script src="misc-cosmetics.js"></script>
+  <script src="misc-sound.js"></script>
+  <script src="pressed-paper.js"></script>
+  
+  <script src="paper-pocket.js"></script>
+  
+  <script src="rain-ambience.js"></script>
+  <script src="sunlight-ambience.js"></script>
+  <script src="wish-butterfly.js"></script>
+  <script src="firefly.js"></script>
+<script src="ladybug.js"></script>
+  <script src="candle-lamp.js"></script>
+  <script src="fullscreen.js"></script>
+  <script>
+     MyWorldContent.restoreImportedPacks().catch(function () {}).then(function () {
+    State.init();
+    Nav.init();
+    Modal.init();
+    
+    Water.init();
+    Alarm.init();
+    TimeEngine.init();
+    if (typeof ItineraryToday !== 'undefined') ItineraryToday.init();
+    Calendar.init();
+    Journal.init();
+    Planner.init();
+    Targets.init();
+    Library.init();
+    Study.init();
+    StudyWallpaper.init();
+    Progress.init();
+    Assistant.init();
+    Notepad.init();
+    Player.init();
+    UnrecordedStudy.init();
+    Gamification.init();
+    BackupUI.init();
+      Settings.init();
+    ForcedFullscreen.init();
+    }).finally(_mountMiscAmbient);
+    function _mountMiscAmbient() {
+      if (typeof MiscSound !== 'undefined') MiscSound.bindGlobalUI();
+      const ambientLayer = document.getElementById('misc-ambient-layer');
+      if (typeof CustomCursor !== 'undefined') CustomCursor.init();
+      if (typeof PressedPaper !== 'undefined') PressedPaper.autoInit();
+      
+      if (ambientLayer) {
+        if (typeof Firefly !== 'undefined') Firefly.mount(ambientLayer, { count: 6 });
+        if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
+        if (typeof MiscWeather !== 'undefined') MiscWeather.mount(ambientLayer);
+      }
+      const objectsLayer = document.getElementById('misc-objects-layer');
+      if (objectsLayer && typeof WishButterfly !== 'undefined') {
+        WishButterfly.mount(objectsLayer, { top: '16%', left: '86%' });
+      }
+      const studyScreen = document.getElementById('screen-study');
+      if (studyScreen && typeof CandleLamp !== 'undefined') {
+        studyScreen.style.position = studyScreen.style.position || 'relative';
+        CandleLamp.mount(studyScreen);
+      }
+      if (objectsLayer && typeof PaperPocket !== 'undefined') {
+        PaperPocket.mount(objectsLayer, { rotation: -2, position: { position: 'absolute', left: '8px', bottom: '8px'} });
+      }
+      const paintbrushBtn = document.getElementById('paintbrush-icon');
+      if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
+    }
+
+  if ('serviceWorker' in navigator) {
+  window.LavenderSW = { registration: null, updateAvailable: false, pendingVersion: null };
+  navigator.serviceWorker.addEventListener('message', function (e) {
+    // Posted by a newly installed worker once it's fully cached and waiting.
+    // Receiving it while a controller already exists is the real "update
+    // available" moment — mark it ready and expose its version, never activate.
+    if (e.data && e.data.type === 'SW_INSTALLED' && navigator.serviceWorker.controller) {
+      window.LavenderSW.updateAvailable = true;
+      window.LavenderSW.pendingVersion = e.data.version;
+      window.dispatchEvent(new CustomEvent('lavender-update-ready'));
+    }
+  });
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(function (reg) {
+        window.LavenderSW.registration = reg;
+      })
+.catch(function (err) {
+        console.warn('Service worker registration failed:', err);
+      });
+  });
+}
+  </script>
+</body>
+  </html>
