@@ -168,8 +168,8 @@ const ItineraryOrchestrator = (function () {
   // Section 24 — completion = a real change to today's entry while this item was the one asking
   // for it, not merely "the entry has some content" (which could predate the item entirely).
   function checkJournal(item) {
+    if (journalSnapshots[item.itemId] === undefined) journalSnapshots[item.itemId] = JSON.stringify(JournalData.getEntry(todayStr()));
     const snap = journalSnapshots[item.itemId];
-    if (snap === undefined) return;
     if (JSON.stringify(JournalData.getEntry(todayStr())) !== snap) {
       resolveItem(item, { state: 'completed', actualEnd: nowMs() });
     }
@@ -178,8 +178,8 @@ const ItineraryOrchestrator = (function () {
   // Section 25 — completion = a NEW waterEvents entry appears after this item's own activation,
   // not merely "today already has some logged water".
   function checkWater(item) {
+    if (waterSnapshots[item.itemId] === undefined) waterSnapshots[item.itemId] = WaterData.getEventsForDate(todayStr()).length;
     const base = waterSnapshots[item.itemId];
-    if (base === undefined) return;
     if (WaterData.getEventsForDate(todayStr()).length > base) {
       resolveItem(item, { state: 'completed', actualEnd: nowMs() });
     }
