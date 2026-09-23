@@ -207,6 +207,7 @@ const Itinerary = (function () {
       item.label = dest.label;
     } else if (type === 'checklist' || type === 'custom') {
       item.label = '';
+      if (type === 'checklist') item.tagIds = [];
     }
     return item;
   }
@@ -299,15 +300,33 @@ const Itinerary = (function () {
       return '<label>Go to<br><select class="input itinerary-field-nav" data-id="' + it.itemId + '">' + navOptionsHtml(selectedKey) + '</select></label>';
     }
     if (type === 'checklist' || type === 'custom') {
-      return '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
+      const labelField = '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
+      if (type !== 'checklist') return labelField;
+      const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
+      const tagIds = it.tagIds || [];
+      const tagsField = '<div class="itinerary-field-tags"><span class="micro-label">Tags</span>' +
+        '<div class="chip-row itinerary-field-tags-row" data-id="' + it.itemId + '">' +
+          (allTags.length ? allTags.map(function (tag) {
+            const on = tagIds.indexOf(tag.tagId) !== -1;
+            return '<button type="button" class="tag-chip chip itinerary-field-tag-toggle' + (on ? ' tag-chip-active' : '') + '" data-id="' + it.itemId + '" data-tag-id="' + tag.tagId + '" style="border-color:' + tag.color + ';background:' + (on ? tag.color : 'transparent') + '">' + esc(tag.name) + '</button>';
+          }).join('') : '<span class="planner-empty empty-state">No tags yet \u2014 add some in Library.</span>') +
+        '</div></div>';
+      return labelField + tagsField;
     }
     return ''; // break/journal/water — no extra fields, just duration below
   }
 
   function wireExpandedFields() {
-    document.querySelectorAll('.itinerary-field-subject').forEach(function (sel) {
-      sel.addEventListener('change', function () {
-        updateItemField(sel.dataset.id, { subject: sel.value });
+    document.querySelectorAll('.itinerary-field-tag-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.id;
+        const tagId = btn.dataset.tagId;
+        const it = draftItems.find(function (x) { return x.itemId === id; });
+        const current = (it && it.tagIds) || [];
+        const next = current.indexOf(tagId) !== -1
+          ? current.filter(function (t) { return t !== tagId; })
+          : current.concat([tagId]);
+        updateItemField(id, { tagIds: next });
         renderBuilder();
       });
     });
