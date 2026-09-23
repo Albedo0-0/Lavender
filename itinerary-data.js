@@ -104,6 +104,23 @@ const ItineraryData = (function () {
     Object.keys(byTag).forEach(function (tagId) { rollup[tagId] = byTag[tagId]; });
     if (typeof DateHub !== 'undefined') DateHub.update(day.date, { itineraryTagRollup: rollup });
   }
+
+  function writeItinerarySummary(day) {
+    const items = day.items || [];
+    const counts = {
+      total: items.length,
+      completed: items.filter(function (it) { return it.state === 'completed'; }).length,
+      skipped: items.filter(function (it) { return it.state === 'skipped'; }).length,
+      rescheduled: items.filter(function (it) { return it.state === 'rescheduled'; }).length
+    };
+    const summary = {
+      status: day.status,
+      diyChosen: !!day.diyChosen,
+      templateId: day.templateId || null,
+      counts: counts
+    };
+    if (typeof DateHub !== 'undefined') DateHub.update(day.date, { itinerarySummary: summary });
+  }
   
   // ---------- state machine transitions (§13) ----------
 
@@ -146,7 +163,9 @@ const ItineraryData = (function () {
   function chooseDIY() {
     const day = getToday();
     if (day.status !== 'awaiting_choice') return day;
-    return setToday({ status: 'diy_selected', templateId: null, items: [], checklist: [], diyChosen: true });
+    const nextDay = setToday({ status: 'diy_selected', templateId: null, items: [], checklist: [], diyChosen: true });
+    writeItinerarySummary(nextDay);
+    return nextDay;
   }
 
   function startItinerary() {
@@ -174,7 +193,10 @@ const ItineraryData = (function () {
       patch.completedAt = Date.now();
     }
     const nextDay = setToday(patch);
-    if (patch.status === 'completed') writeChecklistTagRollup(nextDay);
+    if (patch.status === 'completed') {
+      writeChecklistTagRollup(nextDay);
+      writeItinerarySummary(nextDay);
+    }
     return nextDay;
   }
 
@@ -230,6 +252,7 @@ const ItineraryData = (function () {
         const finalized = finalizeDay(day);
         summaries[cursor] = finalized;
         writeChecklistTagRollup(finalized);
+        writeItinerarySummary(finalized);
       }
       cursor = shiftDateStr(cursor, 1);
       guard++;
