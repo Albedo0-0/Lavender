@@ -289,6 +289,16 @@ const Assistant = (function () {
 
   // ---------- Daily Summary (§7.4/§7.5) ----------
 
+  function itinerarySummaryLine(it) {
+    if (!it) return '';
+    let text;
+    if (it.diyChosen) text = 'Itinerary: did it myself today';
+    else if (it.status === 'abandoned') text = 'Itinerary: no itinerary followed today';
+    else if (it.counts) text = 'Itinerary: ' + it.counts.completed + ' / ' + it.counts.total + ' items completed';
+    else return '';
+    return '<p>' + text + '</p>';
+  }
+
   function summaryHtml(dateStr) {
     const s = AssistantData.getDailySummary(dateStr);
     return backBtnHtml() + '<div class="assistant-page assistant-page-receipt"><h3 class="section-title">Daily Summary</h3>' +
@@ -298,6 +308,7 @@ const Assistant = (function () {
         '<p>Study: ' + fmtMs(s.studyMs) + ' \u00b7 Break: ' + fmtMs(s.breakMs) + ' \u00b7 Questions: ' + s.questionsSolved + '</p>' +
         '<p>Hydration: ' + (s.hydrationScore === null ? '\u2013' : s.hydrationScore + '/10') + ' \u00b7 Sleep: ' + (s.sleepHours === null ? '\u2013' : s.sleepHours + 'h') + '</p>' +
         '<p>Tasks: ' + s.tasksCompleted + ' / ' + s.tasksTotal + ' completed</p>' +
+        itinerarySummaryLine(s.itinerary) +
       '</div>' +
     '</div>';
   }
