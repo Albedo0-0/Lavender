@@ -292,6 +292,25 @@ const ProgressData = (function () {
     return best;
   }
 
+  // §19/§28 — reads the {completedCount, totalCount} rollups Itinerary writes into
+  // DateHub.get(date).itineraryTagRollup over the trailing rangeDays (inclusive of today).
+  // Returns a 0-1 rate, or null if no data.
+  function getTagCompletionRate(tagId, rangeDays) {
+    const days = rangeDays || 7;
+    let completed = 0, total = 0;
+    const today = parseDateStr(todayStr());
+    for (let i = 0; i < days; i++) {
+      const d = addDays(today, -i);
+      const dateStr = toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+      const hub = DateHub.get(dateStr);
+      const entry = hub && hub.itineraryTagRollup && hub.itineraryTagRollup[tagId];
+      if (!entry) continue;
+      completed += entry.completedCount || 0;
+      total += entry.totalCount || 0;
+    }
+    return total > 0 ? completed / total : null;
+  }
+  
   function getOtherStats() {
     return {
       bestStudyStreak: getBestStudyStreak(),
@@ -320,7 +339,8 @@ const ProgressData = (function () {
     getYearlySeries: getYearlySeries,
     getSeries: getSeries,
 
-    getOtherStats: getOtherStats
+    getOtherStats: getOtherStats,
+    getTagCompletionRate: getTagCompletionRate
   };
 })();
 
