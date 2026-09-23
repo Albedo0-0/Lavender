@@ -532,9 +532,23 @@ const Itinerary = (function () {
   function renderBuilder() {
     Modal.open(builderHtml(), { size: 'lg' });
 
-    document.getElementById('itinerary-daystart-input').addEventListener('change', function (e) {
-      draftDayStartTime = e.target.value || DEFAULT_DAY_START;
-      renderBuilder();
+    // Update in place — re-rendering the modal on every change destroyed the input mid-edit,
+    // so the time could never be typed/picked. Timing still flows through recomputeTimes().
+    const dayStartInput = document.getElementById('itinerary-daystart-input');
+    function applyDayStart() {
+      if (!dayStartInput.value) return; // partially typed — keep the last valid start time
+      draftDayStartTime = dayStartInput.value;
+      draftItems = recomputeTimes(draftItems, draftDayStartTime);
+      document.querySelectorAll('#itinerary-items-list .itinerary-item-row').forEach(function (row) {
+        const it = draftItems.filter(function (x) { return x.itemId === row.dataset.id; })[0];
+        const chip = row.querySelector('.itinerary-item-time');
+        if (it && chip) chip.textContent = (it.plannedStart || '') + '\u2013' + (it.plannedEnd || '');
+      });
+    }
+    dayStartInput.addEventListener('input', applyDayStart);
+    dayStartInput.addEventListener('change', applyDayStart);
+    dayStartInput.addEventListener('blur', function () {
+      if (!dayStartInput.value) dayStartInput.value = draftDayStartTime;
     });
 
     wirePalette();
