@@ -151,7 +151,43 @@ const Progress = (function () {
 
     container.innerHTML =
       '<h2 class="progress-section-title">Other Stats</h2>' +
-      '<div class="progress-stats-grid">' + cards + '</div>';
+      '<div class="progress-stats-grid">' + cards + '</div>' +
+      renderTagStatsHtml();
+    wireTagStatsPicker();
+  }
+
+  function renderTagStatsHtml() {
+    const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
+    const picked = (State.get().settings && State.get().settings.progressTrackedTagIds) || [];
+    const pickerHtml = allTags.length
+      ? '<div class="chip-row progress-tag-stats-picker">' + allTags.map(function (tag) {
+          const on = picked.indexOf(tag.tagId) !== -1;
+          return '<button type="button" class="tag-chip chip progress-tag-stat-toggle' + (on ? ' tag-chip-active' : '') + '" data-tag-id="' + tag.tagId + '" style="border-color:' + tag.color + ';background:' + (on ? tag.color : 'transparent') + '">' + tag.name + '</button>';
+        }).join('') + '</div>'
+      : '<p class="planner-empty empty-state">No tags yet \u2014 add some in Library.</p>';
+    const cardsHtml = picked.map(function (tagId) {
+      const tag = (typeof TagsData !== 'undefined') ? TagsData.getTag(tagId) : null;
+      if (!tag) return '';
+      const rate = ProgressData.getTagCompletionRate(tagId, 7);
+      return statCard(tag.name + ' (7d)', rate === null ? '\u2013' : Math.round(rate * 100) + '%');
+    }).join('');
+    return '<h2 class="progress-section-title">Checklist Tag Stats</h2>' +
+      pickerHtml +
+      (cardsHtml ? '<div class="progress-stats-grid">' + cardsHtml + '</div>' : '');
+  }
+
+  function wireTagStatsPicker() {
+    document.querySelectorAll('.progress-tag-stat-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const tagId = btn.dataset.tagId;
+        const current = (State.get().settings && State.get().settings.progressTrackedTagIds) || [];
+        const next = current.indexOf(tagId) !== -1
+          ? current.filter(function (t) { return t !== tagId; })
+          : current.concat([tagId]);
+        State.patch('settings', { progressTrackedTagIds: next });
+        renderOtherStats(document.getElementById('progress-main'));
+      });
+    });
   }
   
   // ---------- Main render dispatch ----------
