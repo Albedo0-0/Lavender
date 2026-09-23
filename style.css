@@ -266,6 +266,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 #app-header-right { display: flex; align-items: center; gap: var(--space-2); }
 
+/* Reserved spot for the fixed Assistant entity, directly left of Search; pushes the Productivity/EXP bar left. */
+#header-assistant-slot {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 34px;
+  margin-left: var(--space-2);
+  margin-right: var(--space-1);
+}
+
 #header-search-btn {
   cursor: pointer;
   display: inline-flex;
