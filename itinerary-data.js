@@ -85,6 +85,26 @@ const ItineraryData = (function () {
     return day;
   }
 
+  // §19 — rolls up today's checklist items by tagIds into DateHub's itineraryTagRollup so
+  // Progress's tag stats survive past the 14-day sessionRecords window (Section 27).
+  function writeChecklistTagRollup(day) {
+    const items = (day.items || []).filter(function (it) { return it.type === 'checklist'; });
+    if (!items.length) return;
+    const byTag = {};
+    items.forEach(function (it) {
+      (it.tagIds || []).forEach(function (tagId) {
+        if (!byTag[tagId]) byTag[tagId] = { completedCount: 0, totalCount: 0 };
+        byTag[tagId].totalCount++;
+        if (it.state === 'completed') byTag[tagId].completedCount++;
+      });
+    });
+    if (!Object.keys(byTag).length) return;
+    const existing = (typeof DateHub !== 'undefined') ? DateHub.get(day.date) : null;
+    const rollup = Object.assign({}, existing && existing.itineraryTagRollup);
+    Object.keys(byTag).forEach(function (tagId) { rollup[tagId] = byTag[tagId]; });
+    if (typeof DateHub !== 'undefined') DateHub.update(day.date, { itineraryTagRollup: rollup });
+  }
+  
   // ---------- state machine transitions (§13) ----------
 
   // Flips 'unpresented' -> 'awaiting_choice' and persists immediately, so a reload mid-decision
@@ -115,7 +135,8 @@ const ItineraryData = (function () {
         plannedEnd: def.plannedEnd,
         state: 'pending',
         actualStart: null,
-        actualEnd: null
+        actualEnd: null,
+        tagIds: def.tagIds || []
       };
     });
     return setToday({ status: 'itinerary_selected', templateId: templateId, items: items, diyChosen: false });
@@ -152,7 +173,9 @@ const ItineraryData = (function () {
       patch.status = 'completed';
       patch.completedAt = Date.now();
     }
-    return setToday(patch);
+    const nextDay = setToday(patch);
+    if (patch.status === 'completed') writeChecklistTagRollup(nextDay);
+    return nextDay;
   }
 
   // ---------- adaptive timing (§18, Phase 8) ----------
@@ -204,7 +227,9 @@ const ItineraryData = (function () {
     while (cursor < toDateStr && guard < 3660) {
       if (!summaries[cursor]) {
         const day = (stored && stored.date === cursor) ? stored : defaultDay(cursor);
-        summaries[cursor] = finalizeDay(day);
+        const finalized = finalizeDay(day);
+        summaries[cursor] = finalized;
+        writeChecklistTagRollup(finalized);
       }
       cursor = shiftDateStr(cursor, 1);
       guard++;
