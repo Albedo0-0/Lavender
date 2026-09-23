@@ -438,6 +438,7 @@ const Assistant = (function () {
   function wirePixelEntityDrag() {
     let dragging = false;
     let moved = false;
+    let suppressClick = false;
     let startPointer = { x: 0, y: 0 };
     let startPos = { x: 0, y: 0 };
 
@@ -462,10 +463,13 @@ const Assistant = (function () {
       if (moved) {
         const rect = pixelEntityEl.getBoundingClientRect();
         savePixelEntityPosition({ x: rect.left, y: rect.top });
-      } else {
-        openMain(); // a genuine click (movement stayed under the threshold), not a drag
       }
+      suppressClick = moved;
     }
+    pixelEntityEl.addEventListener('click', function () {
+      if (suppressClick) { suppressClick = false; return; }
+      openMain();
+    });
     pixelEntityEl.addEventListener('pointerup', endDrag);
     pixelEntityEl.addEventListener('pointercancel', endDrag);
   }
