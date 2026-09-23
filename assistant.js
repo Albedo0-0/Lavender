@@ -325,7 +325,7 @@ const Assistant = (function () {
     Alarm.openList();
   }
 
-  function handleIconClick() { openMain(); }
+  
 
   // ---------- Pixel companion entity (Section 9/10 — "Assistant Makeover") ----------
   // A persistent, localized, draggable DOM element separate from the existing static
@@ -397,15 +397,27 @@ const Assistant = (function () {
     }, 700);
   }
 
+  // Docks beside the Search button: centered on the header's reserved slot (#header-assistant-slot).
+  // Measured as if unscrolled, since the entity itself is position:fixed (viewport-anchored).
   function defaultPixelEntityPosition() {
-    const musicBtn = document.getElementById('player-music-btn');
-    if (musicBtn) {
-      const rect = musicBtn.getBoundingClientRect();
-      return { x: Math.max(4, rect.left - PIXEL_CANVAS_SIZE - 10), y: Math.max(4, rect.top) };
+    const slot = document.getElementById('header-assistant-slot');
+    if (slot) {
+      const rect = slot.getBoundingClientRect();
+     return {
+        x: rect.left + (rect.width - PIXEL_CANVAS_SIZE) / 2,
+       y: rect.top + (window.pageYOffset || 0) + (rect.height - PIXEL_CANVAS_SIZE) / 2
+      };
     }
     return { x: 12, y: 12 };
   }
 
+    // Keeps the default (never-dragged) position glued to the slot as the header layout settles.
+  function redockPixelEntity() {
+    if (!pixelEntityEl) return;
+    if ((State.get().settings || {}).assistantPosition) return;
+    applyPixelEntityPosition(clampToViewport(defaultPixelEntityPosition()));
+  }
+  
   function clampToViewport(pos) {
     const maxX = Math.max(0, window.innerWidth - PIXEL_CANVAS_SIZE - 8);
     const maxY = Math.max(0, window.innerHeight - PIXEL_CANVAS_SIZE - 8);
@@ -486,14 +498,16 @@ const Assistant = (function () {
     startIdleLoop();
 
     window.addEventListener('resize', function () {
+      if (!(State.get().settings || {}).assistantPosition) { redockPixelEntity(); return; }
       const rect = pixelEntityEl.getBoundingClientRect();
       applyPixelEntityPosition(clampToViewport({ x: rect.left, y: rect.top }));
     });
+    window.addEventListener('load', redockPixelEntity);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(redockPixelEntity);
   }
 
   function init() {
-    const btn = document.getElementById('assistant-icon');
-    if (btn) btn.addEventListener('click', handleIconClick);
+    
     const searchBtn = document.getElementById('header-search-btn');
     if (searchBtn) searchBtn.addEventListener('click', openSearch);
     mountPixelEntity();
