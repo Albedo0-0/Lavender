@@ -186,6 +186,8 @@ const AssistantData = (function () {
     const sleepRec = (typeof SleepData !== 'undefined') ? SleepData.getRecord(dateStr) : null;
     const sleepHours = (sleepRec && sleepRec.completed) ? Math.round((sleepRec.durationMin / 60) * 10) / 10 : null;
     const tasksForDate = PlannerData.getTasksForDate(dateStr);
+    const itinerary = (typeof ProgressData !== 'undefined' && typeof ProgressData.getItineraryAdherence === 'function')
+      ? ProgressData.getItineraryAdherence(dateStr) : null;
     return {
       date: dateStr,
       studyMs: stats.studyMs,
@@ -194,7 +196,8 @@ const AssistantData = (function () {
       hydrationScore: water,
       sleepHours: sleepHours,
       tasksTotal: tasksForDate.length,
-      tasksCompleted: tasksForDate.filter(function (t) { return t.completed; }).length
+      tasksCompleted: tasksForDate.filter(function (t) { return t.completed; }).length,
+      itinerary: itinerary
     };
   }
 
