@@ -108,16 +108,19 @@ const ItineraryOrchestrator = (function () {
   function promptEarlyCompletion(item, actualEndMs, earlyByMs) {
     if (typeof Modal === 'undefined') return;
     const mins = Math.max(1, Math.round(earlyByMs / 60000));
+    // High-priority + persistent (Itinerary notification priority): this is exactly the
+    // "Auto-adjust prompt" decision — it must appear first and stay up over any lower-priority
+    // Study/Planner notification until the user explicitly picks an option below.
     Modal.open(
       '<h3 class="section-heading">Finished early</h3>' +
       '<p>\u201c' + (item.label || 'This item') + '\u201d finished about ' + mins + ' minute' + (mins === 1 ? '' : 's') +
       ' early. Use the recovered time to move the rest of today\u2019s itinerary earlier, or keep it on the original schedule?</p>' +
       '<button id="itinerary-early-keep-btn" class="btn btn-secondary">Keep schedule unchanged</button> ' +
       '<button id="itinerary-early-adjust-btn" class="btn btn-primary">Auto-adjust remaining tasks</button>',
-      { size: 'md' }
+      { size: 'md', priority: 'high', persistent: true }
     );
     function afterChoice() {
-      Modal.close();
+      Modal.close({ resolve: true });
       if (typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openTodayView === 'function') ItineraryToday.openTodayView();
     }
     const keepBtn = document.getElementById('itinerary-early-keep-btn');
@@ -266,16 +269,19 @@ const ItineraryOrchestrator = (function () {
     ItineraryData.updateItemState(item.itemId, { lateChoiceAsked: true });
     if (typeof Modal === 'undefined') { if (item.type === 'study') ensureStudyTask(item); activateItem(item); return; }
     const lateMs = nowMs() - startMs;
+    // High-priority + persistent (Itinerary notification priority): an important Itinerary
+    // decision — must appear first and stay up over any lower-priority Study/Planner
+    // notification (including that same item's own Study start/end prompt) until resolved below.
     Modal.open(
       '<h3 class="section-heading">Starting late</h3>' +
       '<p>\u201c' + (item.label || 'This item') + '\u201d was due to start earlier. Continue on the ' +
       'original schedule, or shift the rest of today\u2019s itinerary forward to match?</p>' +
       '<button id="itinerary-late-keep-btn" class="btn btn-secondary">Keep original schedule</button> ' +
       '<button id="itinerary-late-shift-btn" class="btn btn-primary">Shift remaining items forward</button>',
-      { size: 'md' }
+      { size: 'md', priority: 'high', persistent: true }
     );
     function proceed() {
-      Modal.close();
+      Modal.close({ resolve: true });
       if (item.type === 'study') ensureStudyTask(item);
       activateItem(item);
     }
