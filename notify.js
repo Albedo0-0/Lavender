@@ -62,10 +62,23 @@ const Notify = (function () {
     return (now || Date.now()) + intervalMs;
   }
 
+  // Priority lock — held while an Itinerary decision prompt (late-start, Auto-adjust, gate) is
+  // visible. Lower-priority callers (Study/Planner handlePrompt) check isItineraryActive() and
+  // defer instead of replacing the active notification. The lock is reference-counted so nested
+  // lock()/unlock() pairs (e.g. gate → auto-adjust → gate) stay balanced.
+  let _itineraryLockCount = 0;
+
+  function lockItinerary() { _itineraryLockCount++; }
+  function unlockItinerary() { if (_itineraryLockCount > 0) _itineraryLockCount--; }
+  function isItineraryActive() { return _itineraryLockCount > 0; }
+
   return {
     requestPermission: requestPermission,
     deliver: deliver,
     isDue: isDue,
-    nextFireAt: nextFireAt
+    nextFireAt: nextFireAt,
+    lockItinerary: lockItinerary,
+    unlockItinerary: unlockItinerary,
+    isItineraryActive: isItineraryActive
   };
 })();
