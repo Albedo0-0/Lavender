@@ -715,6 +715,11 @@ TimeEngine.logUnrecordedBreak(minutes, note);
   }
 
   function handlePrompt() {
+    // Itinerary notification priority: while an Itinerary decision prompt (late-start,
+    // Auto-adjust) is up, it holds Modal's persistent lock — defer entirely and retry next tick
+    // rather than covering/replacing it. promptToken is left untouched so the same prompt is
+    // correctly re-shown once the lock clears.
+    if (typeof Modal !== 'undefined' && Modal.isLocked && Modal.isLocked()) return;
     const prompt = TimeEngine.getPrompt();
     if (timeInputOpen && document.getElementById('study-time-minutes')) return;
     if (questionsInputOpen && document.getElementById('study-questions-count')) return;
