@@ -173,6 +173,7 @@ const Itinerary = (function () {
   // if every row is collapsed. Only one row expands at a time — keeps the inline-form wiring
   // simple and mirrors the old modal's "one form open at a time" behavior.
   let expandedItemId = null;
+  let _renderedItemIds = new Set();
   // Where Save/Cancel return to — "one editor, two entry points" (Section 16): Alarm's
   // Itineraries tab passes its own list re-render; the Phase 6 morning gate passes its own
   // re-render instead, so "Create Itinerary" from the gate comes back to the gate, not to Alarm.
@@ -751,10 +752,15 @@ const Itinerary = (function () {
 
     // Replace the list rows
     if (listEl) {
+      const prevIds = _renderedItemIds;
       const rows = draftItems.length
         ? draftItems.map(itemRowHtml).join('')
         : '<p class="empty-state">Drag a tile from the palette to add your first item.</p>';
       listEl.innerHTML = rows;
+      _renderedItemIds = new Set(draftItems.map(function(it) { return it.itemId; }));
+      listEl.querySelectorAll('.itinerary-item-row').forEach(function(row) {
+        if (prevIds.has(row.dataset.id)) row.style.animation = 'none';
+      });
       listEl.scrollTop = scrollTop;
     }
 
@@ -792,6 +798,7 @@ const Itinerary = (function () {
   // interactions call refreshBuilder() instead to avoid the modal-reload bug.
   function renderBuilder() {
     Modal.open(builderHtml(), { size: 'lg' });
+    _renderedItemIds = new Set(draftItems.map(function(it) { return it.itemId; }));
     wireBuilderInteractions();
   }
 
@@ -806,6 +813,7 @@ const Itinerary = (function () {
     draftItems = (template.items || []).map(function (it) { return Object.assign({}, it); });
     draftDayStartTime = template.dayStartTime || DEFAULT_DAY_START;
     expandedItemId = null;
+    _renderedItemIds = new Set();
     renderBuilder();
   }
 
