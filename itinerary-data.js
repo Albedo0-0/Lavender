@@ -131,6 +131,9 @@ const ItineraryData = (function () {
   function presentGate() {
     const day = getToday();
     if (day.status !== 'unpresented') return day;
+    // Lock once when transitioning into awaiting_choice — the status flip below makes this
+    // branch unreachable on subsequent ticks, so the lock is acquired exactly once per gate.
+    if (typeof Notify !== 'undefined') Notify.lockItinerary();
     return setToday({ status: 'awaiting_choice' });
   }
 
@@ -140,6 +143,7 @@ const ItineraryData = (function () {
   function chooseTemplate(templateId) {
     const day = getToday();
     if (day.status !== 'awaiting_choice') return day;
+    if (typeof Notify !== 'undefined') Notify.unlockItinerary();
     const template = (typeof ItineraryTemplateData !== 'undefined') ? ItineraryTemplateData.getById(templateId) : null;
     if (!template) return day;
     const items = (template.items || []).map(function (def) {
@@ -163,6 +167,7 @@ const ItineraryData = (function () {
   function chooseDIY() {
     const day = getToday();
     if (day.status !== 'awaiting_choice') return day;
+    if (typeof Notify !== 'undefined') Notify.unlockItinerary();
     const nextDay = setToday({ status: 'diy_selected', templateId: null, items: [], checklist: [], diyChosen: true });
     writeItinerarySummary(nextDay);
     return nextDay;
