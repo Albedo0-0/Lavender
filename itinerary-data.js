@@ -181,10 +181,17 @@ const ItineraryData = (function () {
     const day = getToday();
     if (day.status !== 'in_progress') return day;
     let changed = false;
+    const nowTimeStr = (function () { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); })();
     const items = day.items.map(function (it) {
       if (it.itemId !== itemId) return it;
       changed = true;
-      return Object.assign({}, it, fields);
+      const merged = Object.assign({}, it, fields);
+      // Auto-stamp actual times when not explicitly supplied; plannedStart/plannedEnd are
+      // immutable (original schedule) so the early-delta calculation remains valid after
+      // completion (Section 12/18 — preserve original planned times separately).
+      if (fields.state === 'active' && !merged.actualStart) merged.actualStart = nowTimeStr;
+      if ((fields.state === 'completed' || fields.state === 'skipped') && !merged.actualEnd) merged.actualEnd = nowTimeStr;
+      return merged;
     });
     if (!changed) return day;
     const patch = { items: items };
@@ -287,6 +294,27 @@ const ItineraryData = (function () {
   // TimeEngine.applyShift keeps relative gaps intact (Section 3.1/18). No-op when the day's
   // chosen template is fixed-mode (adaptive:false) — later items then simply show as "delayed"
   // without their displayed time moving (Section 18's Test Day example).
+  // Returns milliseconds recovered by an item that finished before its plannedEnd (positive =
+  // finished early, 0 = on time or late). Call after updateItemState sets actualEnd.
+  // Used by the caller (orchestrator/Today) to decide whether to show the auto-adjust prompt.
+  function getEarlyDeltaMs(itemId) {
+    const day = getToday();
+    const item = (day.items || []).find(function (it) { return it.itemId === itemId; });
+    if (!item || !item.plannedEnd || !item.actualEnd) return 0;
+    const base = todayStr() + 'T';
+    const planned = new Date(base + item.plannedEnd + ':00').getTime();
+    const actual = new Date(base + item.actualEnd + ':00').getTime();
+    return Math.max(0, planned - actual);
+  }
+
+  // Called when the user picks "Auto-adjust remaining tasks" after an early finish.
+  // Shifts all pending/active items earlier by recoveredMs; completed items are never rescheduled
+  // (adjustedStart/adjustedEnd already skips them — Patch 2). No-op for fixed-mode templates.
+  function applyEarlyAdjust(recoveredMs) {
+    if (!recoveredMs || recoveredMs <= 0) return getToday();
+    return applyItineraryShift(-recoveredMs);
+  }
+
   function applyItineraryShift(deltaMs) {
     const day = getToday();
     if (day.status !== 'in_progress') return day;
@@ -305,8 +333,18 @@ const ItineraryData = (function () {
   // Current adjusted HH:MM for an item's planned start/end, folding in today's cumulative
   // shiftMs — read-only display helpers, same role Study's own UI already gives
   // sessionRecords[...].adjustedStart/adjustedEnd (Section 18).
-  function adjustedStart(item) { return shiftTimeStr(item.plannedStart, getShiftMs()); }
-  function adjustedEnd(item) { return shiftTimeStr(item.plannedEnd, getShiftMs()); }
+  // Completed/skipped items keep their original planned times for display — their actualStart/
+  // actualEnd is the canonical execution record. Only pending/active items have the accumulated
+  // shiftMs applied, so auto-adjusting after an early finish never retroactively moves a
+  // completed item's displayed schedule slot (Section 18).
+  function adjustedStart(item) {
+    if (item.state === 'completed' || item.state === 'skipped') return item.plannedStart;
+    return shiftTimeStr(item.plannedStart, getShiftMs());
+  }
+  function adjustedEnd(item) {
+    if (item.state === 'completed' || item.state === 'skipped') return item.plannedEnd;
+    return shiftTimeStr(item.plannedEnd, getShiftMs());
+  }
 
   // ---------- rollover (§13) ----------
 
@@ -355,6 +393,8 @@ const ItineraryData = (function () {
     removeSyncedItem: removeSyncedItem,
     getShiftMs: getShiftMs,
     applyItineraryShift: applyItineraryShift,
+    getEarlyDeltaMs: getEarlyDeltaMs,
+    applyEarlyAdjust: applyEarlyAdjust,
     adjustedStart: adjustedStart,
     adjustedEnd: adjustedEnd,
     onRolloverFinalize: onRolloverFinalize
