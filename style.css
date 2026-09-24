@@ -253,7 +253,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
     linear-gradient(180deg, var(--color-cream-050), var(--color-cream-200));
   border-bottom: 2px solid var(--color-kraft-400);
   box-shadow: var(--shadow-sm);
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 20;
 }
 #app-header-left { display: flex; align-items: center; gap: var(--space-3); }
