@@ -245,12 +245,10 @@ const ItineraryOrchestrator = (function () {
       const durationMs = Math.max(60000, timeStrToMs(todayStr(), item.plannedEnd) - timeStrToMs(todayStr(), item.plannedStart));
       TimeEngine.startGlobalBreak(Math.round(durationMs / 60000), item.label || 'Break');
     }
-    // 'checklist'/'custom': no existing screen to open (Section 17 point 3's list has no home
-    // for these two) — the itinerary's own Today view IS the appropriate place to surface them,
-    // so a strictly guided day opens it automatically rather than leaving the item silently
-    // active wherever the user happens to be; the user still confirms via "Mark Done" there once
-    // they've actually done the thing (never auto-completed on open).
-    if ((item.type === 'checklist' || item.type === 'custom') && typeof ItineraryToday !== 'undefined') {
+     // 'checklist'/'custom'/'nav': no existing screen leaves the user with a visible "Mark Done"/
+    // "Skip" control — checklist/custom have no home screen of their own, and nav navigates away
+    // from Today entirely (B9). All three reopen Today so the confirm controls are always reachable.
+    if ((item.type === 'checklist' || item.type === 'custom' || item.type === 'nav') && typeof ItineraryToday !== 'undefined') {
       ItineraryToday.openTodayView();
     }
   }
