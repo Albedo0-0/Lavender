@@ -179,7 +179,7 @@ const ItineraryToday = (function () {
     if (it.syncedFromPlanner && (it.state === 'pending' || it.state === 'active')) {
       actions += '<button class="btn btn-danger itinerary-today-remove-btn" data-id="' + it.itemId + '" title="Remove from today and unschedule in Planner">Remove</button>';
     }
-    return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + '">' +
+    return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + '" data-item-id="' + esc(it.itemId) + '">' +
       '<span class="chip itinerary-today-item-time' + (shifted ? ' itinerary-today-item-shifted' : '') + '">' + esc(start || '') + '\u2013' + esc(end || '') + '</span> ' +
       '<span class="itinerary-today-item-label">' + esc(it.label) + '</span> ' +
       '<span class="chip">' + (STATE_LABELS[it.state] || it.state) + '</span> ' +
@@ -255,13 +255,23 @@ const ItineraryToday = (function () {
   // still the thing showing (the gate and other modals own their own content otherwise) and
   // never while it's mid-decision (awaiting_choice/unpresented are the gate's own screens).
   function refreshIfOpen() {
-    if (!document.getElementById('itinerary-today-live')) return;
+    const live = document.getElementById('itinerary-today-live');
+    if (!live) return;
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
     const day = ItineraryData.getToday();
     if (day.status === 'unpresented' || day.status === 'awaiting_choice' || day.status === 'diy_selected') return;
-    const content = document.getElementById('modal-content');
-    if (!content) return;
-    content.innerHTML = todayViewHtml(day);
+    // Collect item ids already rendered so their rows don't replay the entrance animation (B6).
+    const existing = {};
+    live.querySelectorAll('.itinerary-today-item-row[data-item-id]').forEach(function (el) {
+      existing[el.dataset.itemId] = true;
+    });
+    // Replace only the live subtree — not the full modal-content — so the header, START, and
+    // Change-plan controls are never torn down and rewired on every heartbeat tick.
+    live.innerHTML = todayBodyHtml(day);
+    // Suppress the fade-in on rows that were already showing; only genuinely new rows animate.
+    live.querySelectorAll('.itinerary-today-item-row[data-item-id]').forEach(function (el) {
+      if (existing[el.dataset.itemId]) el.style.animation = 'none';
+    });
     attachTodayViewListeners();
   }
 
