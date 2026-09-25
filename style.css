@@ -4710,6 +4710,18 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 .itinerary-gate-suggested-chip { background: var(--color-sage-300); }
 
+/* B11: non-blocking pinned-time overlap warning, styled like .form-error but a neutral warning
+   rather than a hard error. */
+.form-warning {
+  font-size: var(--text-xs);
+  color: var(--color-accent-rust);
+  background: rgba(181, 86, 107, 0.10);
+  border: 1px solid var(--color-accent-rust-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  margin-top: 4px;
+}
+
 /* ---- Itinerary Builder: side-panel palette + drag & drop (revision) ---- */
 .itinerary-builder-layout {
   display: flex;
@@ -4763,6 +4775,25 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 }
 .itinerary-palette-tile-icon { font-size: var(--text-lg); line-height: 1.2; }
 .itinerary-palette-tile-label { line-height: 1.2; }
+
+/* Should-change: no responsive breakpoint existed for the builder's side-panel layout, leaving
+   very little room for the list/expanded fields on a phone-width screen. Stack it and turn the
+   palette into a horizontal scroll strip instead of a pinned 128px column. */
+@media (max-width: 560px) {
+  .itinerary-builder-layout {
+    flex-direction: column;
+  }
+  .itinerary-palette {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    width: 100%;
+    position: static;
+  }
+  .itinerary-palette-tile {
+    flex: 0 0 auto;
+  }
+}
 
 .itinerary-builder-main { flex: 1 1 auto; min-width: 0; }
 
