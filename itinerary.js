@@ -39,10 +39,7 @@ const Itinerary = (function () {
   };
   const DEFAULT_DURATION = { study: 30, 'planner-task': 30, target: 10, break: 10, journal: 15, water: 5, checklist: 5, custom: 15, nav: 5 };
   const DEFAULT_DAY_START = '07:00';
-  // MIME type used to mark a drag originating from a palette tile (a new item), distinct from a
-  // plain text/plain payload used when dragging an existing row to reorder it — this is how the
-  // single list drop handler tells "create new" apart from "reorder existing" (Section 16).
-  const NEW_ITEM_MIME = 'application/x-itinerary-new-type';
+  
 
   // §20 fixed allow-list — the 6 Nav.switchTo screens plus the modal-opening entry points
   // already in index.html/module init()s. Built here (Phase 5) per Section 20; invocation
@@ -468,7 +465,7 @@ const Itinerary = (function () {
     return '<div class="itinerary-palette" id="itinerary-palette">' +
       '<div class="itinerary-palette-heading micro-label">Item Types</div>' +
       ITEM_TYPES.map(function (t) {
-        return '<div class="itinerary-palette-tile" draggable="true" data-type="' + t + '" title="Drag into the itinerary, or click to add">' +
+        return '<div class="itinerary-palette-tile" data-type="' + t + '" title="Drag into the itinerary, or click to add">' +
           '<span class="itinerary-palette-tile-icon" aria-hidden="true">' + (PALETTE_ICONS[t] || '\u2022') + '</span>' +
           '<span class="itinerary-palette-tile-label">' + TYPE_LABELS[t] + '</span>' +
         '</div>';
@@ -608,8 +605,7 @@ const Itinerary = (function () {
     if (!list) return;
     list.addEventListener('dragover', function (e) {
       e.preventDefault();
-      const isNewTile = Array.prototype.indexOf.call(e.dataTransfer.types, NEW_ITEM_MIME) >= 0;
-      e.dataTransfer.dropEffect = isNewTile ? 'copy' : 'move';
+      e.dataTransfer.dropEffect = 'move';
       list.classList.add('itinerary-list-dragover');
     });
     list.addEventListener('dragleave', function (e) {
@@ -618,17 +614,7 @@ const Itinerary = (function () {
     list.addEventListener('drop', function (e) {
       e.preventDefault();
       list.classList.remove('itinerary-list-dragover');
-      const dropIndex = computeDropIndex(list, e.clientY);
-      const newType = e.dataTransfer.getData(NEW_ITEM_MIME);
-      if (newType) {
-        // Dropping a palette tile creates the corresponding item in the exact slot dropped,
-        // and expands it in place so its fields are immediately visible/editable.
-        const item = createDefaultItem(newType);
-        draftItems.splice(dropIndex, 0, item);
-        expandedItemId = item.itemId;
-        refreshBuilder();
-        return;
-      }
+        const dropIndex = computeDropIndex(list, e.clientY);
       const reorderIndexRaw = e.dataTransfer.getData('text/plain');
       if (reorderIndexRaw !== '') {
         const dragIndex = Number(reorderIndexRaw);
