@@ -107,6 +107,7 @@ const ItineraryOrchestrator = (function () {
   // moves, never whether the completion itself is recorded.
   function promptEarlyCompletion(item, actualEndMs, earlyByMs) {
     if (typeof Modal === 'undefined') return;
+    if (typeof Notify !== 'undefined') Notify.lockItinerary();
     const mins = Math.max(1, Math.round(earlyByMs / 60000));
     // High-priority + persistent (Itinerary notification priority): this is exactly the
     // "Auto-adjust prompt" decision — it must appear first and stay up over any lower-priority
@@ -120,6 +121,7 @@ const ItineraryOrchestrator = (function () {
       { size: 'md', priority: 'high', persistent: true }
     );
     function afterChoice() {
+      if (typeof Notify !== 'undefined') Notify.unlockItinerary();
       Modal.close({ resolve: true });
       if (typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openTodayView === 'function') ItineraryToday.openTodayView();
     }
@@ -269,6 +271,7 @@ const ItineraryOrchestrator = (function () {
   function promptLateStart(item, startMs) {
     ItineraryData.updateItemState(item.itemId, { lateChoiceAsked: true });
     if (typeof Modal === 'undefined') { if (item.type === 'study') ensureStudyTask(item); activateItem(item); return; }
+    if (typeof Notify !== 'undefined') Notify.lockItinerary();
     const lateMs = nowMs() - startMs;
     // High-priority + persistent (Itinerary notification priority): an important Itinerary
     // decision — must appear first and stay up over any lower-priority Study/Planner
@@ -282,6 +285,7 @@ const ItineraryOrchestrator = (function () {
       { size: 'md', priority: 'high', persistent: true }
     );
     function proceed() {
+      if (typeof Notify !== 'undefined') Notify.unlockItinerary();
       Modal.close({ resolve: true });
       if (item.type === 'study') ensureStudyTask(item);
       activateItem(item);
