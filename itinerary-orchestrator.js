@@ -204,9 +204,10 @@ const ItineraryOrchestrator = (function () {
     // exists at all.
     PlannerData.updateTask(task.taskId, { sourceItineraryItemId: item.itemId });
     ItineraryData.updateItemState(item.itemId, { refId: task.taskId });
+    item.refId = task.taskId;
   }
 
-  // Opens the relevant existing screen/modal for a non-study item (Section 17 point 3). Closes
+  // Opens the relevant existing screen/modal
   // the shared Modal first when the target is a full screen switch (journal, or a nav item whose
   // destination is a screen) — Nav.switchTo never touches the modal overlay itself, and the
   // Itinerary Today view may still be the thing on top of it. Water/Target/other nav destinations
