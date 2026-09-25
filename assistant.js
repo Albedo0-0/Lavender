@@ -67,6 +67,16 @@ const Assistant = (function () {
     document.querySelectorAll('#assistant-menu button').forEach(function (btn) {
       btn.addEventListener('click', function () { routeTo(btn.dataset.go); });
     });
+    // B12: todayNeedsChoice is evaluated once at render time and goes stale while the menu stays
+    // open (e.g. the user opens Assistant before choosing a template, and the gate fires while the
+    // menu is up). Poll at the same cadence as the main heartbeat and patch the class live so the
+    // ribbon reflects real state for as long as the menu is visible.
+    var ribbonPollHandle = window.setInterval(function () {
+      var ribbon = document.querySelector('.assistant-ribbon-today');
+      if (!ribbon) { window.clearInterval(ribbonPollHandle); return; }
+      var needs = (typeof ItineraryToday !== 'undefined') && ItineraryToday.isAwaitingChoice();
+      ribbon.classList.toggle('assistant-ribbon-highlight', !!needs);
+    }, 1000);
   }
 
   function routeTo(key) {
