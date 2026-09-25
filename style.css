@@ -4744,6 +4744,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   color: var(--color-text);
   user-select: none;
   touch-action: none;
+  -webkit-user-drag: none;
   transition: transform 0.3s var(--ease-soft), box-shadow 0.3s var(--ease-soft), opacity 0.3s var(--ease-soft);
 }
 .itinerary-palette-tile:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
