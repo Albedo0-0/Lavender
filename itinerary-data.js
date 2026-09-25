@@ -231,21 +231,39 @@ const ItineraryData = (function () {
     if (typeof PlannerData === 'undefined' || typeof PlannerData.getTasksForDate !== 'function') return day;
     const todaysTasks = PlannerData.getTasksForDate(todayStr());
     if (!todaysTasks.length) return day;
+    const tasksById = {};
+    todaysTasks.forEach(function (t) { tasksById[t.taskId] = t; });
+    function labelForTask(t) {
+      return t.subject
+        ? (t.subject + ' \u00b7 ' + t.topicName + ' \u00b7 ' + (typeof PlannerData.taskLabel === 'function' ? PlannerData.taskLabel(t) : ''))
+        : (typeof PlannerData.taskLabel === 'function' ? PlannerData.taskLabel(t) : (t.title || 'Task'));
+    }
+    // B8: refresh an already-referenced synced item whose source task's own schedule/label has
+    // since changed in Planner — only while still 'pending', since once it's active/completed/
+    // skipped its actual times are canonical (Section 12) and must never be overwritten by a
+    // later Planner-side edit.
+    let refreshed = false;
+    const refreshedItems = (day.items || []).map(function (it) {
+      if (!it.syncedFromPlanner || it.type !== 'planner-task' || it.state !== 'pending' || !it.refId) return it;
+      const t = tasksById[it.refId];
+      if (!t) return it;
+      const newLabel = labelForTask(t);
+      if (it.plannedStart === (t.startTime || null) && it.plannedEnd === (t.stopTime || null) && it.label === newLabel) return it;
+      refreshed = true;
+      return Object.assign({}, it, { plannedStart: t.startTime || null, plannedEnd: t.stopTime || null, label: newLabel });
+    });
     const referencedTaskIds = {};
-    (day.items || []).forEach(function (it) {
+    refreshedItems.forEach(function (it) {
       if (it.refId && (it.type === 'planner-task' || it.type === 'study')) referencedTaskIds[it.refId] = true;
     });
     const missing = todaysTasks.filter(function (t) { return !t.completed && !referencedTaskIds[t.taskId]; });
-    if (!missing.length) return day;
+    if (!missing.length && !refreshed) return day;
     const newItems = missing.map(function (t) {
-      const label = t.subject
-        ? (t.subject + ' \u00b7 ' + t.topicName + ' \u00b7 ' + (typeof PlannerData.taskLabel === 'function' ? PlannerData.taskLabel(t) : ''))
-        : (typeof PlannerData.taskLabel === 'function' ? PlannerData.taskLabel(t) : (t.title || 'Task'));
       return {
         itemId: 'sync-' + t.taskId,
         type: 'planner-task',
         refId: t.taskId,
-        label: label,
+        label: labelForTask(t),
         plannedStart: t.startTime || null,
         plannedEnd: t.stopTime || null,
         state: 'pending',
@@ -255,7 +273,7 @@ const ItineraryData = (function () {
         syncedFromPlanner: true
       };
     });
-    const merged = (day.items || []).concat(newItems).sort(function (a, b) {
+    const merged = refreshedItems.concat(newItems).sort(function (a, b) {
       const as = a.plannedStart || '99:99', bs = b.plannedStart || '99:99';
       return as < bs ? -1 : (as > bs ? 1 : 0);
     });
