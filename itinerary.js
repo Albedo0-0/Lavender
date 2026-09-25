@@ -113,8 +113,11 @@ const Itinerary = (function () {
       const pinned = it.type === 'checklist' && it.checkAt;
       const start = pinned ? timeStrToMinutes(it.checkAt) : cursor;
       const end = start + (Number(it.durationMin) || 0);
+      // B11: flag (non-blocking) a pinned "Check At" time that lands before the running cursor —
+      // i.e. it overlaps or precedes the item(s) immediately ahead of it in sequence.
+      const checkAtWarning = !!(pinned && start < cursor);
       cursor = end;
-      return Object.assign({}, it, { plannedStart: minutesToTimeStr(start), plannedEnd: minutesToTimeStr(end) });
+      return Object.assign({}, it, { plannedStart: minutesToTimeStr(start), plannedEnd: minutesToTimeStr(end), checkAtWarning: checkAtWarning });
     });
   }
 
@@ -307,7 +310,8 @@ const Itinerary = (function () {
     if (type === 'checklist' || type === 'custom') {
       const labelField = '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
       if (type !== 'checklist') return labelField;
-      const checkAtField = '<label>Check at (optional)<br><input type="time" class="input itinerary-field-checkat" data-id="' + it.itemId + '" value="' + esc(it.checkAt || '') + '"></label>';
+      const checkAtField = '<label>Check at (optional)<br><input type="time" class="input itinerary-field-checkat" data-id="' + it.itemId + '" value="' + esc(it.checkAt || '') + '"></label>' +
+        (it.checkAtWarning ? '<p class="form-warning">This time overlaps with, or comes before, the item ahead of it.</p>' : '');
       const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
       const tagIds = it.tagIds || [];
       const tagChips = allTags.map(function (tag) {
@@ -710,6 +714,9 @@ const Itinerary = (function () {
     });
     document.querySelectorAll('.itinerary-item-remove-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        // Destructive-action confirmation: removal discards all of that item's edited fields
+        // instantly with no undo, so confirm first (Should-change UX list).
+        if (!window.confirm('Remove this item? Its fields will be discarded.')) return;
         if (expandedItemId === btn.dataset.id) expandedItemId = null;
         draftItems = draftItems.filter(function (it) { return it.itemId !== btn.dataset.id; });
         refreshBuilder();
