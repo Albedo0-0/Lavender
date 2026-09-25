@@ -9,6 +9,9 @@
 //   schedule: { type: 'once'|'daily'|'weekdays'|'date', days: [...], date: '...' },
 //                                      // mirrors AlarmData's recurrence shape 1:1 (no `time` field —
 //                                      // a template says WHICH DAY it applies to, not a clock trigger)
+//   adaptive: bool,                   // true (default) = auto-adjust remaining items on late/early start;
+//                                      // false = fixed schedule, ItineraryData.applyItineraryShift() no-ops.
+//                                      // Exposed in alarm.js's template form (Phase G / B10).
 //   createdAt, updatedAt
 // }
 const ItineraryTemplateData = (function () {
