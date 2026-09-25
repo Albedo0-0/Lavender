@@ -80,7 +80,12 @@ const ItineraryData = (function () {
       });
     }
     if (day.status === 'unpresented' || day.status === 'awaiting_choice' || day.status === 'itinerary_selected') {
+      // awaiting_choice is the only one of these three that ever locked (via presentGate) and
+      // never unlocked — chooseTemplate/chooseDIY already unlock on the other two paths out of
+      // awaiting_choice (B7).
+      if (day.status === 'awaiting_choice' && typeof Notify !== 'undefined') Notify.unlockItinerary();
       return Object.assign({}, day, { status: 'abandoned' });
+    }
     }
     return day;
   }
