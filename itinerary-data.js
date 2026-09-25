@@ -86,7 +86,6 @@ const ItineraryData = (function () {
       if (day.status === 'awaiting_choice' && typeof Notify !== 'undefined') Notify.unlockItinerary();
       return Object.assign({}, day, { status: 'abandoned' });
     }
-    }
     return day;
   }
 
