@@ -17,6 +17,9 @@ const Modal = (function () {
   function isLocked() { return !!lock; }
 
   function open(html, opts) {
+    // Refuse to overwrite an unresolved persistent lock (B3) — mirrors close()'s own
+    // { resolve: true } escape hatch, so only the lock holder resolving it can replace it.
+    if (lock && !(opts && opts.resolve)) return;
     const overlay = document.getElementById('modal-overlay');
     const content = document.getElementById('modal-content');
     if (!overlay || !content) return;
