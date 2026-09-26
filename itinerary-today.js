@@ -168,12 +168,18 @@ const ItineraryToday = (function () {
     if (it.syncedFromPlanner && (it.state === 'pending' || it.state === 'active')) {
       actions += '<button class="btn btn-danger itinerary-today-remove-btn" data-id="' + it.itemId + '" title="Remove from today and unschedule in Planner">Remove &amp; Unschedule</button>';
     }
+    const priorityChip = (it.type === 'checklist' && it.priority && it.priority !== 'normal')
+      ? '<span class="chip itinerary-item-priority-' + esc(it.priority) + '">' + esc(it.priority) + '</span> ' : '';
+    const dueChip = (it.type === 'checklist' && it.dueTime) ? '<span class="chip">Due ' + esc(it.dueTime) + '</span> ' : '';
+    const noteLine = (it.type === 'checklist' && it.note) ? '<div class="itinerary-today-item-note">' + esc(it.note) + '</div>' : '';
     return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + '" data-item-id="' + esc(it.itemId) + '">' +
       '<span class="chip itinerary-today-item-time' + (shifted ? ' itinerary-today-item-shifted' : '') + '">' + esc(start || '') + '\u2013' + esc(end || '') + '</span> ' +
+      priorityChip + dueChip +
       '<span class="itinerary-today-item-label">' + esc(it.label) + '</span> ' +
       '<span class="chip">' + (STATE_LABELS[it.state] || it.state) + '</span> ' +
       (it.syncedFromPlanner ? '<span class="chip itinerary-today-synced-chip">From Planner</span> ' : '') +
       actions +
+      noteLine +
     '</div>';
   }
 
