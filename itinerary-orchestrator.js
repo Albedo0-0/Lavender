@@ -77,12 +77,8 @@ const ItineraryOrchestrator = (function () {
   // seconds "late" because the heartbeat polls once a second isn't a real late start.
   const LATE_THRESHOLD_MS = 60000;
 
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
-  function todayStr() {
-    const t = new Date();
-    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
-  }
-  function timeStrToMs(dateStr, hhmm) { return new Date(dateStr + 'T' + hhmm + ':00').getTime(); }
+function todayStr() { return ItineraryTime.todayStr(); }
+  function timeStrToMs(dateStr, hhmm) { return ItineraryTime.timeStrToMs(dateStr, hhmm); }
   function nowMs() { return Date.now(); }
 
   function isResolved(it) { return it.state === 'completed' || it.state === 'skipped' || it.state === 'rescheduled'; }
