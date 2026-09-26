@@ -93,13 +93,7 @@ const Itinerary = (function () {
     const h = Math.floor(m / 60), mm = m % 60;
     return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
   }
-  function formatDuration(min) {
-    min = Math.round(min || 0);
-    const h = Math.floor(min / 60), m = min % 60;
-    if (h && m) return h + 'h ' + m + 'm';
-    if (h) return h + 'h';
-    return m + 'm';
-  }
+  function formatDuration(min) { return ItineraryTime.formatDuration(min); }
 
   // Recomputes plannedStart/plannedEnd for every draft item, sequentially, from dayStartTime.
   // Re-run on every add/remove/edit/resize/reorder per Section 16 — in-memory only.
