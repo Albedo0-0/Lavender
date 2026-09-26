@@ -321,27 +321,6 @@ const ItineraryData = (function () {
   // TimeEngine.applyShift keeps relative gaps intact (Section 3.1/18). No-op when the day's
   // chosen template is fixed-mode (adaptive:false) — later items then simply show as "delayed"
   // without their displayed time moving (Section 18's Test Day example).
-  // Returns milliseconds recovered by an item that finished before its plannedEnd (positive =
-  // finished early, 0 = on time or late). Call after updateItemState sets actualEnd.
-  // Used by the caller (orchestrator/Today) to decide whether to show the auto-adjust prompt.
-  function getEarlyDeltaMs(itemId) {
-    const day = getToday();
-    const item = (day.items || []).find(function (it) { return it.itemId === itemId; });
-    if (!item || !item.plannedEnd || !item.actualEnd) return 0;
-    const base = todayStr() + 'T';
-    const planned = new Date(base + item.plannedEnd + ':00').getTime();
-    const actual = new Date(base + item.actualEnd + ':00').getTime();
-    return Math.max(0, planned - actual);
-  }
-
-  // Called when the user picks "Auto-adjust remaining tasks" after an early finish.
-  // Shifts all pending/active items earlier by recoveredMs; completed items are never rescheduled
-  // (adjustedStart/adjustedEnd already skips them — Patch 2). No-op for fixed-mode templates.
-  function applyEarlyAdjust(recoveredMs) {
-    if (!recoveredMs || recoveredMs <= 0) return getToday();
-    return applyItineraryShift(-recoveredMs);
-  }
-
   function applyItineraryShift(deltaMs) {
     const day = getToday();
     if (day.status !== 'in_progress') return day;
@@ -420,8 +399,6 @@ const ItineraryData = (function () {
     removeSyncedItem: removeSyncedItem,
     getShiftMs: getShiftMs,
     applyItineraryShift: applyItineraryShift,
-    getEarlyDeltaMs: getEarlyDeltaMs,
-    applyEarlyAdjust: applyEarlyAdjust,
     adjustedStart: adjustedStart,
     adjustedEnd: adjustedEnd,
     onRolloverFinalize: onRolloverFinalize
