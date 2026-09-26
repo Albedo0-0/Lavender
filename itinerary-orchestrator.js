@@ -39,6 +39,11 @@ const ItineraryOrchestrator = (function () {
   // advance/activate until the decision is explicitly resolved and this is cleared back to null.
   let pendingDecision = null;
 
+  // Phase C / P7: tracks which itinerary item (if any) started the currently-active Global
+  // Break, so skipItem() only ever ends a Break that this exact item owns — never an unrelated
+  // Break started elsewhere. Set on activation, cleared on that item's own resolution.
+  let activeBreakItemId = null;
+
   function transitionEl() {
     let el = document.getElementById('itinerary-transition-toast');
     if (!el) {
@@ -157,6 +162,7 @@ const ItineraryOrchestrator = (function () {
   function resolveItem(item, fields) {
     delete journalSnapshots[item.itemId];
     delete waterSnapshots[item.itemId];
+    if (activeBreakItemId === item.itemId) activeBreakItemId = null;
     ItineraryData.updateItemState(item.itemId, fields);
   }
 
@@ -185,8 +191,14 @@ const ItineraryOrchestrator = (function () {
   function skipItem(itemId) {
     const day = ItineraryData.getToday();
     const item = (day.items || []).find(function (it) { return it.itemId === itemId; });
-    if (!item || (item.state !== 'active' && item.state !== 'pending')) return;
-    if (item.type === 'break') {
+    // Phase C / P3: Skip is only ever valid on the current (active) item — a 'pending' item is
+    // upcoming, and skipping it out of order could shift timings/skip the wrong slot. The UI no
+    // longer renders a Skip control on upcoming items either (itinerary-today.js); this is the
+    // authoritative guard.
+    if (!item || item.state !== 'active') return;
+    // Phase C / P7: only end the Global Break if THIS item is the one that started it — never an
+    // unrelated Break started elsewhere.
+    if (item.type === 'break' && activeBreakItemId === item.itemId) {
       const gb = TimeEngine.getGlobalBreak();
       if (gb && gb.active) TimeEngine.endGlobalBreak();
     }
@@ -252,6 +264,7 @@ const ItineraryOrchestrator = (function () {
       // second timer. Duration is the item's own planned span; shifting doesn't change a span's
       // length, so plannedEnd - plannedStart is exact regardless of accumulated shiftMs.
       const durationMs = Math.max(60000, timeStrToMs(todayStr(), item.plannedEnd) - timeStrToMs(todayStr(), item.plannedStart));
+      activeBreakItemId = item.itemId;
       TimeEngine.startGlobalBreak(Math.round(durationMs / 60000), item.label || 'Break');
     }
      // 'checklist'/'custom'/'nav': no existing screen leaves the user with a visible "Mark Done"/
