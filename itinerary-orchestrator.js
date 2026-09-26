@@ -227,7 +227,9 @@ const ItineraryOrchestrator = (function () {
     // exists at all.
     PlannerData.updateTask(task.taskId, { sourceItineraryItemId: item.itemId });
     ItineraryData.updateItemState(item.itemId, { refId: task.taskId });
-    item.refId = task.taskId;
+    // Phase D / P6: item.refId is no longer mutated directly here. The canonical store write
+    // above (updateItemState) is the one source of truth; the in-memory object is re-read from
+    // the store by checkStudyLike on the next tick via currentItem(), so no direct mutation needed.
   }
 
   // Opens the relevant existing screen/modal
