@@ -162,16 +162,17 @@ const ItineraryToday = (function () {
     const start = (typeof ItineraryData.adjustedStart === 'function') ? (ItineraryData.adjustedStart(it) || it.plannedStart) : it.plannedStart;
     const end = (typeof ItineraryData.adjustedEnd === 'function') ? (ItineraryData.adjustedEnd(it) || it.plannedEnd) : it.plannedEnd;
     const shifted = start !== it.plannedStart || end !== it.plannedEnd;
-    let actions = '';
+        let actions = '';
     if (typeof ItineraryOrchestrator !== 'undefined') {
       if (it.state === 'active') {
         if (MANUAL_CONFIRM_TYPES[it.type]) {
           actions += '<button class="btn btn-primary itinerary-today-done-btn" data-id="' + it.itemId + '">Mark Done</button> ';
         }
         actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '">Skip</button> ';
-      } else if (it.state === 'pending') {
-        actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '">Skip</button> ';
       }
+      // Phase C / P3: pending (upcoming) items no longer expose Skip — skipping a future item out
+      // of order could shift remaining timings incorrectly or cause out-of-order execution. Skip
+      // is only ever valid on the current item, enforced in ItineraryOrchestrator.skipItem too.
     }
     // Planner-synced items (new): a distinct Remove action, separate from Skip, that also
     // unschedules the underlying Planner task for today (ItineraryData.removeSyncedItem) —
