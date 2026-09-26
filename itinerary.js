@@ -18,10 +18,16 @@
 //
 // itineraryItemDef (what this module writes into itineraryTemplates[id].items[]):
 //   { itemId, type, refId, label, durationMin, plannedStart, plannedEnd,
+//     startTime,                      // ANY item type — optional pinned clock time it surfaces at
+//                                      // instead of flowing from the running cursor (see recomputeTimes).
+//                                      // Independently editable per item; leaving it null preserves the
+//                                      // old back-to-back flow. checkAt (legacy, checklist-only) is still
+//                                      // read as a fallback for templates saved before this field existed.
 //     subject, topicName, taskType,   // study items only — the Planner task blueprint (Section 16)
 //     destination,                    // nav items only — { kind:'screen', screen } | { kind:'modal', opener } (Section 20)
-//     tagIds, checkAt }               // checklist items only — canonical Tags refs + an optional
-//                                      // pinned clock time this item surfaces at (see recomputeTimes)
+//     tagIds,                         // checklist items only — canonical Tags refs
+//     dueTime, note, priority }       // checklist items only — optional deadline, free-text note,
+//                                      // and 'low'|'normal'|'high' (default 'normal')
 // Editing happens on an in-memory draft only ("no store write per keystroke", Section 16) —
 // nothing is persisted until the top-level Save button.
 const Itinerary = (function () {
