@@ -328,7 +328,7 @@ const ItineraryData = (function () {
 
   function shiftTimeStr(hhmm, shiftMs) {
     if (!hhmm) return hhmm;
-    const ms = new Date(todayStr() + 'T' + hhmm + ':00').getTime() + (shiftMs || 0);
+    const ms = ItineraryTime.timeStrToMs(todayStr(), hhmm) + (shiftMs || 0);
     const d = new Date(ms);
     return pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
