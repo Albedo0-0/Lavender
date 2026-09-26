@@ -96,23 +96,27 @@ const Itinerary = (function () {
   }
   function formatDuration(min) { return ItineraryTime.formatDuration(min); }
 
-  // Recomputes plannedStart/plannedEnd for every draft item, sequentially, from dayStartTime.
+  // Recomputes plannedStart/plannedEnd for every draft item from dayStartTime. Itinerary is a
+  // compiled daily schedule of independently-timed items, not a conveyor belt of mandatory
+  // consecutive tasks: any item may carry its own explicit startTime (any type — was previously
+  // checklist-only via checkAt, kept below for backward compatibility with already-saved
+  // templates). An item with no explicit startTime still simply flows from the running cursor
+  // (previous item's end), so untouched items behave exactly as before. A gap forms naturally
+  // whenever a pinned time is later than the cursor; an overlap is flagged (non-blocking — the
+  // user resolves it by changing a time) whenever a pinned time lands at or before the cursor,
+  // which also catches a long duration running into the next item's pinned start, and two items
+  // pinned to the same time.
   // Re-run on every add/remove/edit/resize/reorder per Section 16 — in-memory only.
   function recomputeTimes(items, dayStartTime) {
     let cursor = timeStrToMinutes(dayStartTime);
     return items.map(function (it) {
-      // A checklist item with an explicit "Check At" time is pinned to that clock time instead
-      // of the running cursor — it surfaces at the assigned time of day, not at whatever slot
-      // sequential placement would otherwise give it. The cursor still advances past it (to that
-      // pinned start + its own duration) so later items keep flowing sequentially from there.
-      const pinned = it.type === 'checklist' && it.checkAt;
-      const start = pinned ? timeStrToMinutes(it.checkAt) : cursor;
+      const pinnedTime = it.startTime || (it.type === 'checklist' ? it.checkAt : null);
+      const pinned = !!pinnedTime;
+      const start = pinned ? timeStrToMinutes(pinnedTime) : cursor;
       const end = start + (Number(it.durationMin) || 0);
-      // B11: flag (non-blocking) a pinned "Check At" time that lands before the running cursor —
-      // i.e. it overlaps or precedes the item(s) immediately ahead of it in sequence.
-      const checkAtWarning = !!(pinned && start < cursor);
+      const timeWarning = !!(pinned && start < cursor);
       cursor = end;
-      return Object.assign({}, it, { plannedStart: ItineraryTime.minutesToTimeStr(start), plannedEnd: ItineraryTime.minutesToTimeStr(end), checkAtWarning: checkAtWarning });
+      return Object.assign({}, it, { plannedStart: ItineraryTime.minutesToTimeStr(start), plannedEnd: ItineraryTime.minutesToTimeStr(end), timeWarning: timeWarning });
     });
   }
 
@@ -185,7 +189,7 @@ const Itinerary = (function () {
       itemId: genId(), type: type, refId: null,
       label: TYPE_LABELS[type] || type,
       durationMin: DEFAULT_DURATION[type] || 15,
-      plannedStart: null, plannedEnd: null
+      plannedStart: null, plannedEnd: null, startTime: null
     };
     if (type === 'study') {
       item.subject = (typeof PlannerData !== 'undefined' && PlannerData.SUBJECTS[0]) || '';
@@ -210,7 +214,13 @@ const Itinerary = (function () {
       item.label = dest.label;
     } else if (type === 'checklist' || type === 'custom') {
       item.label = '';
-      if (type === 'checklist') { item.tagIds = []; item.checkAt = null; item.tagsEnabled = false; }
+      if (type === 'checklist') {
+        item.tagIds = [];
+        item.tagsEnabled = false;
+        item.note = '';
+        item.priority = 'normal';
+        item.dueTime = null;
+      }
     }
     return item;
   }
@@ -305,11 +315,18 @@ const Itinerary = (function () {
     if (type === 'checklist' || type === 'custom') {
       const labelField = '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
       if (type !== 'checklist') return labelField;
-      const checkAtField = '<label>Check at (optional)<br><input type="time" class="input itinerary-field-checkat" data-id="' + it.itemId + '" value="' + esc(it.checkAt || '') + '"></label>' +
-        (it.checkAtWarning ? '<p class="form-warning">This time overlaps with, or comes before, the item ahead of it.</p>' : '');
+      const dueField = '<label>Due (optional)<br><input type="time" class="input itinerary-field-due" data-id="' + it.itemId + '" value="' + esc(it.dueTime || '') + '"></label>';
+      const noteField = '<label>Note (optional)<br><input type="text" class="input itinerary-field-note" data-id="' + it.itemId + '" value="' + esc(it.note || '') + '" placeholder="Details\u2026"></label>';
+      const priority = it.priority || 'normal';
+      const priorityField = '<div class="chip-row itinerary-field-priority-row">' +
+        ['low', 'normal', 'high'].map(function (p) {
+          return '<label class="chip"><input type="radio" name="itinerary-field-priority-' + it.itemId + '" class="itinerary-field-priority" data-id="' + it.itemId + '" value="' + p + '"' + (p === priority ? ' checked' : '') + '> ' + (p.charAt(0).toUpperCase() + p.slice(1)) + '</label>';
+        }).join('') +
+      '</div>';
+      const extraFields = dueField + noteField + priorityField;
       const tagsEnabled = !!(it.tagsEnabled || (it.tagIds && it.tagIds.length > 0));
       const toggleTagsBtn = '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary itinerary-field-tags-toggle-btn" data-id="' + it.itemId + '">' + (tagsEnabled ? 'Remove tags' : 'Add tags') + '</button></div>';
-      if (!tagsEnabled) return labelField + checkAtField + toggleTagsBtn;
+      if (!tagsEnabled) return labelField + extraFields + toggleTagsBtn;
       const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
       const tagIds = it.tagIds || [];
       const tagChips = allTags.map(function (tag) {
@@ -324,7 +341,7 @@ const Itinerary = (function () {
           '<button type="button" class="btn btn-secondary itinerary-new-tag-btn" data-id="' + it.itemId + '">+ New tag</button>' +
         '</div>' +
       '</div>';
-      return labelField + checkAtField + toggleTagsBtn + tagsField;
+      return labelField + extraFields + toggleTagsBtn + tagsField;
     }
     return ''; // break/journal/water — no extra fields, just duration below
   }
@@ -428,9 +445,28 @@ const Itinerary = (function () {
         refreshBuilder();
       });
     });
-    document.querySelectorAll('.itinerary-field-checkat').forEach(function (inp) {
+    document.querySelectorAll('.itinerary-item-starttime-input').forEach(function (inp) {
       inp.addEventListener('change', function () {
-        updateItemField(inp.dataset.id, { checkAt: inp.value || null });
+        updateItemField(inp.dataset.id, { startTime: inp.value || null });
+        refreshBuilder();
+      });
+    });
+    document.querySelectorAll('.itinerary-field-due').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        updateItemField(inp.dataset.id, { dueTime: inp.value || null });
+        refreshBuilder();
+      });
+    });
+    document.querySelectorAll('.itinerary-field-note').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        updateItemField(inp.dataset.id, { note: inp.value.trim() });
+        refreshBuilder();
+      });
+    });
+    document.querySelectorAll('.itinerary-field-priority').forEach(function (r) {
+      r.addEventListener('change', function () {
+        if (!r.checked) return;
+        updateItemField(r.dataset.id, { priority: r.value });
         refreshBuilder();
       });
     });
@@ -453,10 +489,15 @@ const Itinerary = (function () {
   function itemRowHtml(it, index) {
     const expanded = it.itemId === expandedItemId;
     const timeRange = (it.plannedStart || '') + '\u2013' + (it.plannedEnd || '');
+    const pinnedTime = it.startTime || (it.type === 'checklist' ? it.checkAt : null);
+    const priorityChip = (it.type === 'checklist' && it.priority && it.priority !== 'normal')
+      ? '<span class="chip itinerary-item-priority-chip itinerary-item-priority-' + esc(it.priority) + '">' + esc(it.priority) + '</span> ' : '';
+    const dueChip = (it.type === 'checklist' && it.dueTime) ? '<span class="chip itinerary-item-due-chip">Due ' + esc(it.dueTime) + '</span> ' : '';
     const header =
       '<span class="itinerary-item-drag-handle" title="Drag to reorder">\u283F</span> ' +
-      '<span class="itinerary-item-time chip">' + timeRange + '</span> ' +
+      '<span class="itinerary-item-time chip' + (it.timeWarning ? ' itinerary-item-time-conflict' : '') + '">' + timeRange + '</span> ' +
       '<span class="itinerary-item-type chip">' + (TYPE_LABELS[it.type] || it.type) + '</span> ' +
+      priorityChip + dueChip +
       '<span class="itinerary-item-label">' + esc(it.label || '(untitled)') + '</span> ' +
       '<span class="itinerary-item-duration">' + formatDuration(it.durationMin) + '</span> ' +
       '<button class="itinerary-item-toggle-btn btn btn-secondary" data-id="' + it.itemId + '">' + (expanded ? 'Done' : 'Edit') + '</button>' +
@@ -464,6 +505,8 @@ const Itinerary = (function () {
     const body = expanded
       ? '<div class="itinerary-item-expanded-fields">' +
           itemFormFieldsInlineHtml(it) +
+          '<label>Start at (optional)<br><input type="time" class="input itinerary-item-starttime-input" data-id="' + it.itemId + '" value="' + esc(pinnedTime || '') + '"></label>' +
+          (it.timeWarning ? '<p class="form-warning">This time overlaps with, or comes before, the item ahead of it. Change either time to resolve it.</p>' : '') +
           '<label>Duration (minutes)<br><input type="number" class="input itinerary-item-duration-input" data-id="' + it.itemId + '" min="5" step="5" value="' + (Number(it.durationMin) || 0) + '"></label>' +
         '</div>'
       : '';
