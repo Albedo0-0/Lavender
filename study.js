@@ -449,6 +449,25 @@ function renderClock() {
     }
   }
 
+  const EARLY_COMPLETE_THRESHOLD_MS = 60000;
+  function showEarlyCompleteDecision(earlyByMs, btn) {
+    const mins = Math.max(1, Math.round(earlyByMs / 60000));
+    Modal.open(
+      '<h3>Finished early</h3>' +
+      '<p>About ' + mins + ' minute' + (mins === 1 ? '' : 's') + ' early. Use the recovered time to move the rest of today\u2019s schedule earlier, or keep it on the original schedule?</p>' +
+      '<div class="study-prompt-actions">' +
+        '<button id="study-early-keep">Keep schedule unchanged</button>' +
+        '<button id="study-early-adjust">Auto-adjust remaining</button>' +
+      '</div>'
+    );
+    function finish() { TimeEngine.completeActive(); Modal.close(); }
+    document.getElementById('study-early-keep').addEventListener('click', finish);
+    document.getElementById('study-early-adjust').addEventListener('click', function () {
+      TimeEngine.applyShift(-earlyByMs);
+      finish();
+    });
+  }
+
   // Focus Mode (§4): large clock + only Links / Completed / Pause / Do it later.
   function renderFocusMode(active) {
     const container = document.getElementById('study-session-panel');
@@ -475,6 +494,10 @@ function renderClock() {
       const btn = e.currentTarget;
       if (btn.disabled) return;
       btn.disabled = true;
+      const cur = TimeEngine.getActiveSession();
+      const endMs = cur ? (cur.adjustedEndAt || timeStrToMs(cur.date, cur.adjustedEnd)) : null;
+      const earlyByMs = endMs ? endMs - Date.now() : 0;
+      if (earlyByMs > EARLY_COMPLETE_THRESHOLD_MS) { showEarlyCompleteDecision(earlyByMs, btn); return; }
       TimeEngine.completeActive();
     });
     document.getElementById('study-focus-pause').addEventListener('click', function (e) {
