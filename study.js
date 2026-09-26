@@ -494,20 +494,37 @@ function renderClock() {
       const btn = e.currentTarget;
       if (btn.disabled) return;
       btn.disabled = true;
-      const cur = TimeEngine.getActiveSession();
-      const endMs = cur ? (cur.adjustedEndAt || timeStrToMs(cur.date, cur.adjustedEnd)) : null;
-      const earlyByMs = endMs ? endMs - Date.now() : 0;
-      if (earlyByMs > EARLY_COMPLETE_THRESHOLD_MS) { showEarlyCompleteDecision(earlyByMs, btn); return; }
-      TimeEngine.completeActive();
+      try {
+        const cur = TimeEngine.getActiveSession();
+        if (!cur) return; // session already ended elsewhere (e.g. item removed/unscheduled) — nothing to complete
+        const endMs = cur.adjustedEndAt || timeStrToMs(cur.date, cur.adjustedEnd);
+        const earlyByMs = endMs ? endMs - Date.now() : 0;
+        if (earlyByMs > EARLY_COMPLETE_THRESHOLD_MS) { showEarlyCompleteDecision(earlyByMs, btn); return; }
+        TimeEngine.completeActive();
+      } catch (err) {
+        console.warn('study-focus-complete click failed — re-enabling button', err);
+      } finally {
+        if (document.getElementById('study-focus-complete') === btn) btn.disabled = false;
+      }
     });
     document.getElementById('study-focus-pause').addEventListener('click', function (e) {
       const btn = e.currentTarget;
       if (btn.disabled) return;
       btn.disabled = true;
-      const cur = TimeEngine.getActiveSession();
-      if (cur && cur.state === 'paused') TimeEngine.resumeActive(); else TimeEngine.pauseActive();
+      try {
+        const cur = TimeEngine.getActiveSession();
+        if (!cur) return;
+        if (cur.state === 'paused') TimeEngine.resumeActive(); else TimeEngine.pauseActive();
+      } catch (err) {
+        console.warn('study-focus-pause click failed — re-enabling button', err);
+      } finally {
+        if (document.getElementById('study-focus-pause') === btn) btn.disabled = false;
+      }
     });
-    document.getElementById('study-focus-later').addEventListener('click', function () { confirmDoItLater(active.taskId); });
+    document.getElementById('study-focus-later').addEventListener('click', function () {
+      try { confirmDoItLater(active.taskId); }
+      catch (err) { console.warn('study-focus-later click failed', err); }
+    });
   }
 
   function renderFocusClock() {
