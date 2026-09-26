@@ -18,11 +18,7 @@
 const ItineraryToday = (function () {
   function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); }
 
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
-  function todayStr() {
-    const t = new Date();
-    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
-  }
+  function todayStr() { return ItineraryTime.todayStr(); }
 
   // ---------- time / counters (mirrors itinerary.js's builder counters, Section 16, but reads
   // the already-snapshotted dailyItinerary.items instead of an in-progress draft) ----------
@@ -39,13 +35,7 @@ const ItineraryToday = (function () {
     if (d < 0) d += 1440; // a day that runs past midnight — same convention as the builder
     return d;
   }
-  function formatDuration(min) {
-    min = Math.round(min || 0);
-    const h = Math.floor(min / 60), m = min % 60;
-    if (h && m) return h + 'h ' + m + 'm';
-    if (h) return h + 'h';
-    return m + 'm';
-  }
+  function formatDuration(min) { return ItineraryTime.formatDuration(min); }
 
   // Same read-only estimate the builder uses (Section 16/30: never writes expLedger itself). A
   // 'study' item hasn't become a real Planner task yet at this layer (that wiring is Phase 7's
