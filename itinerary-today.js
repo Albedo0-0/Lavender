@@ -220,7 +220,10 @@ const ItineraryToday = (function () {
     return '<h3 class="section-heading">Today</h3><div id="itinerary-today-live">' + todayBodyHtml(day) + '</div><br>' + startBtn + changeBtn;
   }
 
-  function attachTodayViewListeners() {
+    // Static listeners: wired once per modal open (start/change-plan) — never re-attached on
+  // heartbeat refreshes because those buttons live outside #itinerary-today-live and their DOM
+  // nodes are never torn down by refreshIfOpen (Phase B / P2).
+  function attachStaticListeners() {
     const startBtn = document.getElementById('itinerary-today-start-btn');
     if (startBtn) startBtn.addEventListener('click', function () { ItineraryData.startItinerary(); openTodayView(); });
     const changeBtn = document.getElementById('itinerary-today-change-btn');
@@ -228,6 +231,12 @@ const ItineraryToday = (function () {
     // "must go through the same confirmation the morning gate uses" is satisfied because
     // openGate() is that same confirmation screen, not a silent swap.
     if (changeBtn) changeBtn.addEventListener('click', openGate);
+  }
+
+  // Dynamic listeners: wired to freshly-rendered item rows inside #itinerary-today-live after
+  // every content replacement. Each call operates on new DOM nodes so there is no accumulation
+  // (Phase B / P2).
+  function attachDynamicListeners() {
     document.querySelectorAll('.itinerary-today-done-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { ItineraryOrchestrator.markItemDone(btn.dataset.id); refreshIfOpen(); });
     });
@@ -245,7 +254,8 @@ const ItineraryToday = (function () {
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
     const day = ItineraryData.getToday();
     Modal.open(todayViewHtml(day), { size: 'lg' });
-    attachTodayViewListeners();
+    attachStaticListeners();
+    attachDynamicListeners();
   }
 
   // Section 17/18's automatic progression (orchestrator ticks; a break ending naturally; a
@@ -272,7 +282,9 @@ const ItineraryToday = (function () {
     live.querySelectorAll('.itinerary-today-item-row[data-item-id]').forEach(function (el) {
       if (existing[el.dataset.itemId]) el.style.animation = 'none';
     });
-    attachTodayViewListeners();
+    // Dynamic listeners only — static (start/change-plan) buttons are outside the refreshed
+    // subtree and were already wired once in openTodayView (Phase B / P2).
+    attachDynamicListeners();
   }
 
   // Single entry point for Assistant's "Today" ribbon (Section 13's persistent affordance) — routes
