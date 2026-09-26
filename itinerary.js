@@ -209,7 +209,7 @@ const Itinerary = (function () {
       item.label = dest.label;
     } else if (type === 'checklist' || type === 'custom') {
       item.label = '';
-      if (type === 'checklist') { item.tagIds = []; item.checkAt = null; }
+      if (type === 'checklist') { item.tagIds = []; item.checkAt = null; item.tagsEnabled = false; }
     }
     return item;
   }
@@ -306,6 +306,9 @@ const Itinerary = (function () {
       if (type !== 'checklist') return labelField;
       const checkAtField = '<label>Check at (optional)<br><input type="time" class="input itinerary-field-checkat" data-id="' + it.itemId + '" value="' + esc(it.checkAt || '') + '"></label>' +
         (it.checkAtWarning ? '<p class="form-warning">This time overlaps with, or comes before, the item ahead of it.</p>' : '');
+      const tagsEnabled = !!(it.tagsEnabled || (it.tagIds && it.tagIds.length > 0));
+      const toggleTagsBtn = '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary itinerary-field-tags-toggle-btn" data-id="' + it.itemId + '">' + (tagsEnabled ? 'Remove tags' : 'Add tags') + '</button></div>';
+      if (!tagsEnabled) return labelField + checkAtField + toggleTagsBtn;
       const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
       const tagIds = it.tagIds || [];
       const tagChips = allTags.map(function (tag) {
@@ -320,12 +323,21 @@ const Itinerary = (function () {
           '<button type="button" class="btn btn-secondary itinerary-new-tag-btn" data-id="' + it.itemId + '">+ New tag</button>' +
         '</div>' +
       '</div>';
-      return labelField + checkAtField + tagsField;
+      return labelField + checkAtField + toggleTagsBtn + tagsField;
     }
     return ''; // break/journal/water — no extra fields, just duration below
   }
 
   function wireExpandedFields() {
+    document.querySelectorAll('.itinerary-field-tags-toggle-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.id;
+        const it = draftItems.find(function (x) { return x.itemId === id; });
+        const wasEnabled = !!(it && (it.tagsEnabled || (it.tagIds && it.tagIds.length > 0)));
+        updateItemField(id, { tagsEnabled: !wasEnabled, tagIds: wasEnabled ? [] : (it && it.tagIds || []) });
+        refreshBuilder();
+      });
+    });
     document.querySelectorAll('.itinerary-field-tag-toggle').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.dataset.id;
