@@ -147,6 +147,7 @@ function todayStr() { return ItineraryTime.todayStr(); }
   // first instead of silently reshuffling the rest of the day.
   function foldLag(item, actualEndMs, resolvedState) {
     if (!item.plannedEnd) return;
+    if ((item.type === 'study' || item.type === 'planner-task') && resolvedState === 'completed') return;
     const expected = timeStrToMs(todayStr(), item.plannedEnd) + ItineraryData.getEffectiveShiftMs(item);
     const lagMs = actualEndMs - expected;
     if (resolvedState === 'completed' && lagMs < -EARLY_THRESHOLD_MS) {
