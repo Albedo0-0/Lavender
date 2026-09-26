@@ -140,6 +140,7 @@ function todayStr() { return ItineraryTime.todayStr(); }
     if (!keepBtn && !adjustBtn) { afterChoice(); return; }
     if (keepBtn) keepBtn.addEventListener('click', afterChoice);
     if (adjustBtn) adjustBtn.addEventListener('click', function () { foldLagNow(item, actualEndMs); afterChoice(); });
+  }
 
   // Central lag-folding decision for a resolution: skips, and on-time/late completions, fold
   // automatically (existing behavior, unchanged). A genuinely early COMPLETION (not a skip) asks
@@ -335,6 +336,12 @@ function todayStr() { return ItineraryTime.todayStr(); }
       const endMs = rec.actualEnd || nowMs();
       resolveItem(item, { state: 'completed', actualStart: rec.actualStart || item.actualStart, actualEnd: endMs });
       foldLag(item, endMs, 'completed');
+      return;
+    }
+    if (rec && (rec.state === 'rescheduled' || rec.state === 'stale')) {
+      const endMs = rec.actualEnd || nowMs();
+      resolveItem(item, { state: 'skipped', actualStart: rec.actualStart || item.actualStart, actualEnd: endMs });
+      foldLag(item, endMs, 'skipped');
     }
   }
 
@@ -440,7 +447,22 @@ function todayStr() { return ItineraryTime.todayStr(); }
     activateItem(item);
   }
 
-  function init() { TimeEngine.subscribe(tick, SUBSCRIBER_ID); }
+  function resetOnRollover() {
+    if (pendingDecision) {
+      if (typeof Notify !== 'undefined') Notify.unlockItinerary();
+      if (typeof Modal !== 'undefined') Modal.close({ resolve: true });
+    }
+    pendingDecision = null;
+    clearTransition();
+    activeBreakItemId = null;
+  }
+
+  function init() {
+    TimeEngine.subscribe(tick, SUBSCRIBER_ID);
+    if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.onRollover === 'function') {
+      TimeEngine.onRollover(resetOnRollover, SUBSCRIBER_ID);
+    }
+  }
 
   return { init: init, markItemDone: markItemDone, skipItem: skipItem };
 })();
