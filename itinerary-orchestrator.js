@@ -31,8 +31,13 @@ const ItineraryOrchestrator = (function () {
   // first unresolved item, in order). Deliberately NOT applied to the very first item of the
   // day: START ITINERARY is already its own explicit "go" action (Section 17), so that one
   // engages immediately, same as before this change.
-  const TRANSITION_MS = 3000;
+   const TRANSITION_MS = 3000;
   let transition = null; // { itemId, until, label } while a countdown is showing
+
+  // Central execution lock (Phase A / P1+P4): set while a late-start or early-completion decision
+  // modal is open and unresolved. tick() checks this first and stops immediately — nothing may
+  // advance/activate until the decision is explicitly resolved and this is cleared back to null.
+  let pendingDecision = null;
 
   function transitionEl() {
     let el = document.getElementById('itinerary-transition-toast');
@@ -107,6 +112,7 @@ const ItineraryOrchestrator = (function () {
   // moves, never whether the completion itself is recorded.
   function promptEarlyCompletion(item, actualEndMs, earlyByMs) {
     if (typeof Modal === 'undefined') return;
+    pendingDecision = item.itemId;
     if (typeof Notify !== 'undefined') Notify.lockItinerary();
     const mins = Math.max(1, Math.round(earlyByMs / 60000));
     // High-priority + persistent (Itinerary notification priority): this is exactly the
@@ -121,15 +127,18 @@ const ItineraryOrchestrator = (function () {
       { size: 'md', priority: 'high', persistent: true }
     );
     function afterChoice() {
+      pendingDecision = null;
       if (typeof Notify !== 'undefined') Notify.unlockItinerary();
       Modal.close({ resolve: true });
       if (typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openTodayView === 'function') ItineraryToday.openTodayView();
     }
     const keepBtn = document.getElementById('itinerary-early-keep-btn');
     const adjustBtn = document.getElementById('itinerary-early-adjust-btn');
+    // Modal failed to actually open (e.g. DOM missing, or refused due to an existing unresolved
+    // lock) — don't leave pendingDecision/the Notify lock stuck forever with no button to click.
+    if (!keepBtn && !adjustBtn) { afterChoice(); return; }
     if (keepBtn) keepBtn.addEventListener('click', afterChoice);
     if (adjustBtn) adjustBtn.addEventListener('click', function () { foldLagNow(item, actualEndMs); afterChoice(); });
-  }
 
   // Central lag-folding decision for a resolution: skips, and on-time/late completions, fold
   // automatically (existing behavior, unchanged). A genuinely early COMPLETION (not a skip) asks
@@ -269,6 +278,7 @@ const ItineraryOrchestrator = (function () {
   function promptLateStart(item, startMs) {
     ItineraryData.updateItemState(item.itemId, { lateChoiceAsked: true });
     if (typeof Modal === 'undefined') { if (item.type === 'study') ensureStudyTask(item); activateItem(item); return; }
+    pendingDecision = item.itemId;
     if (typeof Notify !== 'undefined') Notify.lockItinerary();
     const lateMs = nowMs() - startMs;
     // High-priority + persistent (Itinerary notification priority): an important Itinerary
@@ -283,6 +293,7 @@ const ItineraryOrchestrator = (function () {
       { size: 'md', priority: 'high', persistent: true }
     );
     function proceed() {
+      pendingDecision = null;
       if (typeof Notify !== 'undefined') Notify.unlockItinerary();
       Modal.close({ resolve: true });
       if (item.type === 'study') ensureStudyTask(item);
@@ -290,6 +301,9 @@ const ItineraryOrchestrator = (function () {
     }
     const keepBtn = document.getElementById('itinerary-late-keep-btn');
     const shiftBtn = document.getElementById('itinerary-late-shift-btn');
+    // Modal failed to actually open (e.g. DOM missing, or refused due to an existing unresolved
+    // lock) — don't leave pendingDecision/the Notify lock stuck forever with no button to click.
+    if (!keepBtn && !shiftBtn) { proceed(); return; }
     if (keepBtn) keepBtn.addEventListener('click', proceed);
     if (shiftBtn) shiftBtn.addEventListener('click', function () {
       ItineraryData.applyItineraryShift(lateMs);
@@ -371,6 +385,9 @@ const ItineraryOrchestrator = (function () {
   }
 
   function tick() {
+    // Phase A / P1: nothing may advance/activate while a decision (late-start, early-completion)
+    // is still open and unresolved.
+    if (pendingDecision) return;
     // Keep today's itinerary synchronized with Planner (new requirement) on every heartbeat —
     // cheap no-op unless there's genuinely a new unreferenced Planner task for today, per
     // ItineraryData.syncPlannerTasks' own early-return.
