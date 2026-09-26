@@ -17,12 +17,9 @@
 const ItineraryData = (function () {
   const SUBSCRIBER_ID = 'itinerary';
 
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function pad(n) { return ItineraryTime.pad(n); }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
-  function todayStr() {
-    const t = new Date();
-    return toDateStr(t.getFullYear(), t.getMonth(), t.getDate());
-  }
+  function todayStr() { return ItineraryTime.todayStr(); }
   function shiftDateStr(dateStr, delta) {
     const d = new Date(dateStr + 'T00:00:00');
     d.setDate(d.getDate() + delta);
