@@ -238,6 +238,125 @@ const ItineraryData = (function () {
     return nextDay;
   }
 
+  // ---------- Plan the rest of today (Phase 8, optional catch-up suggestion) ----------
+  // Pure, stateless, deterministic: reads today's items and the current clock only, never
+  // writes State. Applying a returned suggestion goes through updateItemState() above — the
+  // same single write path every other item edit already uses.
+
+  function timeStrToMin(t) {
+    if (!t) return null;
+    const p = t.split(':');
+    return (+p[0]) * 60 + (+p[1]);
+  }
+  function minToTimeStr(min) {
+    min = ((min % 1440) + 1440) % 1440;
+    return pad(Math.floor(min / 60)) + ':' + pad(min % 60);
+  }
+  function catchUpItemSpan(it) {
+    const s = timeStrToMin(it.plannedStart);
+    if (s === null) return null;
+    const e = timeStrToMin(it.plannedEnd);
+    const dur = (e === null) ? (typeof it.durationMin === 'number' ? it.durationMin : 0) : (e >= s ? e - s : e + 1440 - s);
+    return { start: s, dur: dur };
+  }
+
+  // Rule set, applied in order: never touch completed/skipped/rescheduled history; never move an
+  // already-running item (its footprint is reserved instead); a still-future pending item that
+  // doesn't conflict with anything keeps its original time; an overdue pending item, or one that
+  // now genuinely conflicts with a reserved/placed block, moves to the next free slot at or after
+  // now; an item with no realistic slot left today is left alone rather than forced past midnight.
+  function computeCatchUpPlan() {
+    const day = getToday();
+    if (day.status !== 'in_progress') return { needed: false, reason: 'not-running', changes: [] };
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const items = day.items || [];
+    const placed = [];
+    const movable = [];
+
+    items.forEach(function (it) {
+      if (it.state === 'completed' || it.state === 'skipped' || it.state === 'rescheduled') return;
+      const span = catchUpItemSpan(it);
+      if (it.state === 'active') {
+        const start = span ? span.start : nowMin;
+        const end = span ? start + span.dur : nowMin;
+        placed.push({ start: Math.min(start, nowMin), end: Math.max(end, nowMin) });
+        return;
+      }
+      if (it.state !== 'pending' || !span) return;
+      movable.push({ item: it, origStart: span.start, dur: span.dur });
+    });
+
+    if (!movable.length) return { needed: false, reason: 'nothing-to-plan', changes: [] };
+    movable.sort(function (a, b) { return a.origStart - b.origStart; });
+
+    function overlaps(aS, aE, bS, bE) { return aS < bE && bS < aE; }
+    function fits(start, dur) {
+      const end = start + dur;
+      for (let i = 0; i < placed.length; i++) { if (overlaps(start, end, placed[i].start, placed[i].end)) return false; }
+      return true;
+    }
+    function nextFreeSlot(earliest, dur) {
+      let candidate = earliest, guard = 0;
+      while (guard < 200) {
+        guard++;
+        if (candidate + dur > 1440) return null;
+        let blocker = null;
+        for (let i = 0; i < placed.length; i++) {
+          if (overlaps(candidate, candidate + dur, placed[i].start, placed[i].end)) { blocker = placed[i]; break; }
+        }
+        if (!blocker) return candidate;
+        candidate = blocker.end;
+      }
+      return null;
+    }
+
+    const changes = [];
+    movable.forEach(function (m) {
+      const overdue = m.origStart < nowMin;
+      let start = m.origStart, slot;
+      if (overdue) {
+        slot = nextFreeSlot(nowMin, m.dur);
+        if (slot === null) return;
+        start = slot;
+      } else if (!fits(start, m.dur)) {
+        slot = nextFreeSlot(Math.max(start, nowMin), m.dur);
+        if (slot === null) return;
+        start = slot;
+      }
+      placed.push({ start: start, end: start + m.dur });
+      if (start !== m.origStart) {
+        changes.push({
+          itemId: m.item.itemId,
+          label: m.item.label,
+          originalStart: m.item.plannedStart,
+          originalEnd: m.item.plannedEnd,
+          newStart: minToTimeStr(start),
+          newEnd: (m.item.plannedEnd != null) ? minToTimeStr(start + m.dur) : null
+        });
+      }
+    });
+
+    if (!changes.length) return { needed: false, reason: 'no-changes-needed', changes: [] };
+    return { needed: true, changes: changes };
+  }
+
+  // Apply = a direct one-time edit per changed item via updateItemState (identical to a manual
+  // builder edit) — no shiftMs, no cascade, no second write path. Re-checks live state per item
+  // so nothing is touched if it stopped being pending between preview and Apply.
+  function applyCatchUpPlan(changes) {
+    const day = getToday();
+    if (day.status !== 'in_progress') return day;
+    (changes || []).forEach(function (c) {
+      const live = (day.items || []).find(function (it) { return it.itemId === c.itemId; });
+      if (!live || live.state !== 'pending') return;
+      const fields = { plannedStart: c.newStart };
+      if (c.newEnd != null) fields.plannedEnd = c.newEnd;
+      updateItemState(c.itemId, fields);
+    });
+    return getToday();
+  }
+
   // ---------- Planner sync (new) ----------
   // Keeps today's itinerary synchronized with Planner: any task PlannerData already has
   // scheduled for today that isn't yet referenced by an itinerary item is pulled in as a new
@@ -378,6 +497,8 @@ const ItineraryData = (function () {
     updateItemState: updateItemState,
     syncPlannerTasks: syncPlannerTasks,
     removeSyncedItem: removeSyncedItem,
-    onRolloverFinalize: onRolloverFinalize
+    onRolloverFinalize: onRolloverFinalize,
+    computeCatchUpPlan: computeCatchUpPlan,
+    applyCatchUpPlan: applyCatchUpPlan
   };
 })();
