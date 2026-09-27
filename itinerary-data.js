@@ -14,7 +14,7 @@
 //               // chooseTemplate(id, true) goes awaiting_choice -> in_progress directly, skipping
 //               // itinerary_selected (Phase 6/Finding 7); the two-step path stays available for
 //               // any caller that omits the flag.
-//   templateId, adaptive: bool,      // snapshotted from template at selection time (Phase 4/Finding 15)
+//   templateId,
 //   items: [ { itemId, type, refId, label, plannedStart, plannedEnd, state, actualStart, actualEnd } ],
 //   checklist: [], diyChosen, startedAt, completedAt
 // }
@@ -35,13 +35,11 @@ const ItineraryData = (function () {
       date: dateStr,
       status: 'unpresented',
       templateId: null,
-      adaptive: true, // snapshotted from template at chooseTemplate time (Phase 4/Finding 15)
       items: [],
       checklist: [],
       diyChosen: false,
       startedAt: null,
-      completedAt: null,
-      shiftMs: 0
+      completedAt: null
     };
   }
 
@@ -181,11 +179,7 @@ const ItineraryData = (function () {
         syncedFromPlanner: false
       });
     });
-    // Phase 4 / Finding 15: snapshot adaptive at selection time so a later template deletion
-    // cannot silently change the behavior of an already-created day. applyItineraryShift reads
-    // day.adaptive directly instead of re-fetching the source template (see below).
-    const adaptive = template.adaptive !== false;
-    const patch = { status: 'itinerary_selected', templateId: templateId, adaptive: adaptive, items: items, diyChosen: false };
+    const patch = { status: 'itinerary_selected', templateId: templateId, items: items, diyChosen: false };
     if (startImmediately) {
       patch.status = 'in_progress';
       patch.startedAt = Date.now();
@@ -337,58 +331,7 @@ const ItineraryData = (function () {
     return nextDay;
   }
 
-  // ---------- adaptive timing (§18, Phase 8; ownership split per Phase A/Priority 1) ----------
-  // Itinerary's own lag tracker, canonical ONLY for item types TimeEngine doesn't manage
-  // (break/journal/water/target/checklist/custom/nav). Study/planner-task items are real
-  // TimeEngine timing, so their shift is read from (and written to) TimeEngine.engine.shiftMs
-  // instead — see effectiveShiftMs() below and the orchestrator's matching applyResolvedShift().
-
-  function getShiftMs() { return getToday().shiftMs || 0; }
-
-  // Phase A (Itinerary simplification, Priority 1) — resolves which system's shift is canonical
-  // for a given item. Study/planner-task timing is real TimeEngine timing (a Planner task +
-  // sessionRecord), so TimeEngine.engine.shiftMs is the single source of truth for those types;
-  // recomputing a second, independently-drifting shift from ItineraryData's own shiftMs for the
-  // same item was the duplication Section 1 flags as the likely cause of glitchy auto-adjust.
-  // Every other item type (break/journal/water/target/checklist/custom/nav) has no TimeEngine
-  // counterpart, so ItineraryData.shiftMs remains their only/canonical shift source.
-  function effectiveShiftMs(item) {
-    if (item && (item.type === 'study' || item.type === 'planner-task') &&
-        typeof TimeEngine !== 'undefined' && typeof TimeEngine.getShiftMs === 'function') {
-      return TimeEngine.getShiftMs();
-    }
-    return getShiftMs();
-  }
-
-  // Composes from each item's ORIGINAL planned time (not stacking deltas), the same way
-  // TimeEngine.applyShift keeps relative gaps intact (Section 3.1/18). No-op when the day's
-  // chosen template is fixed-mode (adaptive:false) — later items then simply show as "delayed"
-  // without their displayed time moving (Section 18's Test Day example).
-  function applyItineraryShift(deltaMs) {
-    const day = getToday();
-    if (day.status !== 'in_progress') return day;
-    // Phase 4 / Finding 15: use the snapshotted adaptive flag written at chooseTemplate time —
-    // the source template may have been deleted or edited since, and must not affect today's run.
-    if (day.adaptive === false) return day;
-    return setToday({ shiftMs: (day.shiftMs || 0) + deltaMs });
-  }
-
-  function shiftTimeStr(hhmm, shiftMs) {
-    if (!hhmm) return hhmm;
-    const ms = ItineraryTime.timeStrToMs(todayStr(), hhmm) + (shiftMs || 0);
-    const d = new Date(ms);
-    return pad(d.getHours()) + ':' + pad(d.getMinutes());
-  }
-
-  // Current adjusted HH:MM for an item's planned start/end, folding in today's cumulative
-  // shiftMs — read-only display helpers, same role Study's own UI already gives
-  // sessionRecords[...].adjustedStart/adjustedEnd (Section 18).
-  // Completed/skipped items keep their original planned times for display — their actualStart/
-  // actualEnd is the canonical execution record. Only pending/active items have the accumulated
-  // shiftMs applied, so auto-adjusting after an early finish never retroactively moves a
-  // completed item's displayed schedule slot (Section 18).
-  function adjustedStart(item) {
-    if (item.state === 'completed' || item.state === 'skipped') return item.plannedStart;
+  // ---------- rollover (§13) ----------
     return shiftTimeStr(item.plannedStart, effectiveShiftMs(item));
   }
   function adjustedEnd(item) {
@@ -441,11 +384,6 @@ const ItineraryData = (function () {
     updateItemState: updateItemState,
     syncPlannerTasks: syncPlannerTasks,
     removeSyncedItem: removeSyncedItem,
-    getShiftMs: getShiftMs,
-    getEffectiveShiftMs: effectiveShiftMs,
-    applyItineraryShift: applyItineraryShift,
-    adjustedStart: adjustedStart,
-    adjustedEnd: adjustedEnd,
     onRolloverFinalize: onRolloverFinalize
   };
 })();
