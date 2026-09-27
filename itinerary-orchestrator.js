@@ -1,19 +1,19 @@
-// itinerary-orchestrator.js — Sequential Execution (Itinerary Phase 7) + Adaptive Timing (Phase 8).
+// itinerary-orchestrator.js — Independent per-item execution (Itinerary Simplification Phase 2).
 // Depends on: State, TimeEngine, ItineraryData, ItineraryTemplateData, PlannerData, TargetsData,
 // JournalData, WaterData, Nav, Water, Targets, Itinerary (for invokeDestination), Modal. Must load
 // after all of those.
 //
-// Section 17's central rule: study items are executed by the EXISTING TimeEngine/Study/Planner —
-// this module's only job for a 'study' item is to make sure the underlying Planner task exists
-// (lazily, exactly once, when the item becomes current) and then mirror TimeEngine's own session
-// state back into the itinerary item. For every other item type (break/journal/water/target/
-// checklist/custom/nav) this module IS the sequential executor, driven by the same single
-// TimeEngine heartbeat (subscribe id 'itinerary' — no second timer, Section 4/38).
+// Each item is independently timed and independently started (Section 1/3 of the simplification
+// reference). There is no "current item" and no sequential gate: any pending item can be started
+// directly from Today via startItem(), and every active item is ticked independently on the same
+// single TimeEngine heartbeat (subscribe id 'itinerary' — no second timer). Starting, completing,
+// or missing one item never moves any other item's plannedStart/plannedEnd.
 //
-// "Current item" = the first item in dailyItinerary.items whose state is not yet resolved
-// (completed/skipped/rescheduled) — items only ever advance one at a time, in order (Section 17
-// point 4). An item is only acted on once its (adjusted) planned start time has arrived AND every
-// item before it has resolved (Section 17 point 1).
+// study items are still executed by the EXISTING TimeEngine/Study/Planner — this module's only
+// job for a 'study' item is to make sure the underlying Planner task exists (lazily, exactly once,
+// on activation) and then mirror TimeEngine's own session state back into the itinerary item. For
+// every other item type (break/journal/water/target/checklist/custom/nav) this module is the
+// executor for that one item, independent of any other item's state.
 const ItineraryOrchestrator = (function () {
   const SUBSCRIBER_ID = 'itinerary';
 
@@ -36,14 +36,6 @@ function todayStr() { return ItineraryTime.todayStr(); }
   function nowMs() { return Date.now(); }
 
   function isResolved(it) { return it.state === 'completed' || it.state === 'skipped' || it.state === 'rescheduled'; }
-
-  function currentItem(day) {
-    const items = day.items || [];
-    for (let i = 0; i < items.length; i++) {
-      if (!isResolved(items[i])) return items[i];
-    }
-    return null;
-  }
 
 
   function resolveItem(item, fields) {
@@ -114,7 +106,8 @@ function todayStr() { return ItineraryTime.todayStr(); }
     ItineraryData.updateItemState(item.itemId, { refId: task.taskId });
     // Phase D / P6: item.refId is no longer mutated directly here. The canonical store write
     // above (updateItemState) is the one source of truth; the in-memory object is re-read from
-    // the store by checkStudyLike on the next tick via currentItem(), so no direct mutation needed.
+    // the store by checkStudyLike on the next tick, since tick() re-reads ItineraryData.getToday()
+    // every time rather than holding onto a stale reference.
   }
 
   // Opens the relevant existing screen/modal
@@ -239,19 +232,27 @@ function todayStr() { return ItineraryTime.todayStr(); }
     // 'checklist'/'custom'/'nav': no automatic signal — waits for markItemDone()/skipItem().
   }
 
+  // Every active item is ticked independently, every heartbeat — no "current item", no ordering.
+  // Pending items are never auto-activated here; a pending item whose scheduled time has passed
+  // just renders as "missed" (itinerary-today.js) until the user starts it (or skips/leaves it).
   function tick() {
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
 
     const day = ItineraryData.getToday();
     if (day.status !== 'in_progress') return;
-    const item = currentItem(day);
-    if (!item) return;
+    (day.items || []).forEach(function (item) {
+      if (item.state === 'active') tickActive(item);
+    });
+  }
 
-    if (item.state === 'active') { tickActive(item); return; }
-
-    const startMs = item.plannedStart ? timeStrToMs(todayStr(), item.plannedStart) : nowMs();
-    if (nowMs() < startMs) return;
-
+  // Manual per-item start (Today's per-item Start button, Section 4/Locked Behavior "users can
+  // manually start individual executable items"). Any pending item can be started regardless of
+  // its own scheduled time or any other item's state — starting it never shifts anything else.
+  function startItem(itemId) {
+    const day = ItineraryData.getToday();
+    if (day.status !== 'in_progress') return;
+    const item = (day.items || []).find(function (it) { return it.itemId === itemId; });
+    if (!item || item.state !== 'pending') return;
     if (item.type === 'study') ensureStudyTask(item);
     activateItem(item);
   }
@@ -267,5 +268,5 @@ function todayStr() { return ItineraryTime.todayStr(); }
     }
   }
 
-  return { init: init, markItemDone: markItemDone, skipItem: skipItem };
+  return { init: init, markItemDone: markItemDone, skipItem: skipItem, startItem: startItem };
 })();
