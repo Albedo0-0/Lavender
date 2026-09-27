@@ -20,6 +20,29 @@ const ItineraryToday = (function () {
 
   function todayStr() { return ItineraryTime.todayStr(); }
 
+  // Section 4 (Today Status Model) — quiet, render-time-only derivations. None of these are
+  // persisted; item.state itself never becomes 'missed' or 'late'.
+  const LATE_THRESHOLD_MS = 5 * 60 * 1000;
+  function plannedStartMs(it) { return it.plannedStart ? ItineraryTime.timeStrToMs(todayStr(), it.plannedStart) : null; }
+  function isMissed(it) {
+    if (it.state !== 'pending') return false;
+    const ms = plannedStartMs(it);
+    return ms !== null && Date.now() > ms;
+  }
+  function isLate(it) {
+    if (it.state !== 'active' || !it.actualStart) return false;
+    const ms = plannedStartMs(it);
+    return ms !== null && (it.actualStart - ms) > LATE_THRESHOLD_MS;
+  }
+  function nextPendingItemId(items) {
+    let best = null;
+    items.forEach(function (it) {
+      if (it.state !== 'pending' || !it.plannedStart) return;
+      if (!best || it.plannedStart < best.plannedStart) best = it;
+    });
+    return best ? best.itemId : null;
+  }
+
   // ---------- time / counters (mirrors itinerary.js's builder counters, Section 16, but reads
   // the already-snapshotted dailyItinerary.items instead of an in-progress draft) ----------
 
@@ -143,21 +166,24 @@ const ItineraryToday = (function () {
   // Section 18 — reads the orchestrator's adjusted display time the same way Study's own UI
   // already reads sessionRecords[...].adjustedStart/adjustedEnd, falling back to the planned
   // time before Phase 7/8 wiring exists or while the orchestrator module isn't loaded.
-  function itemRowHtml(it) {
+  // Section 4 (Today Status Model) — status classes are a pure render-time derivation on top of
+  // item.state; 'missed'/'late'/'next' are never written back to the item itself.
+  function itemRowHtml(it, isNext) {
     const start = it.plannedStart;
     const end = it.plannedEnd;
-    const shifted = false;
-        let actions = '';
+    const missed = isMissed(it);
+    const late = isLate(it);
+    let actions = '';
     if (typeof ItineraryOrchestrator !== 'undefined') {
+      if (it.state === 'pending') {
+        actions += '<button class="btn btn-primary itinerary-today-start-item-btn" data-id="' + it.itemId + '">Start</button> ';
+      }
       if (it.state === 'active') {
         if (MANUAL_CONFIRM_TYPES[it.type]) {
           actions += '<button class="btn btn-primary itinerary-today-done-btn" data-id="' + it.itemId + '">Mark Done</button> ';
         }
         actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '">Skip</button> ';
       }
-      // Phase C / P3: pending (upcoming) items no longer expose Skip — skipping a future item out
-      // of order could shift remaining timings incorrectly or cause out-of-order execution. Skip
-      // is only ever valid on the current item, enforced in ItineraryOrchestrator.skipItem too.
     }
     // Planner-synced items (new): a distinct Remove action, separate from Skip, that also
     // unschedules the underlying Planner task for today (ItineraryData.removeSyncedItem) —
@@ -172,11 +198,12 @@ const ItineraryToday = (function () {
       ? '<span class="chip itinerary-item-priority-' + esc(it.priority) + '">' + esc(it.priority) + '</span> ' : '';
     const dueChip = (it.type === 'checklist' && it.dueTime) ? '<span class="chip">Due ' + esc(it.dueTime) + '</span> ' : '';
     const noteLine = (it.type === 'checklist' && it.note) ? '<div class="itinerary-today-item-note">' + esc(it.note) + '</div>' : '';
-    return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + '" data-item-id="' + esc(it.itemId) + '">' +
-      '<span class="chip itinerary-today-item-time' + (shifted ? ' itinerary-today-item-shifted' : '') + '">' + esc(start || '') + '\u2013' + esc(end || '') + '</span> ' +
+    const statusClass = missed ? ' itinerary-today-item-missed' : (late ? ' itinerary-today-item-late' : '');
+    return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + statusClass + (isNext ? ' itinerary-today-item-next' : '') + '" data-item-id="' + esc(it.itemId) + '">' +
+      '<span class="chip itinerary-today-item-time">' + esc(start || '') + '\u2013' + esc(end || '') + '</span> ' +
       priorityChip + dueChip +
       '<span class="itinerary-today-item-label">' + esc(it.label) + '</span> ' +
-      '<span class="chip">' + (STATE_LABELS[it.state] || it.state) + '</span> ' +
+      '<span class="chip">' + (missed ? 'Missed' : (late ? 'Late' : (STATE_LABELS[it.state] || it.state))) + '</span> ' +
       (it.syncedFromPlanner ? '<span class="chip itinerary-today-synced-chip">From Planner</span> ' : '') +
       actions +
       noteLine +
@@ -193,11 +220,12 @@ const ItineraryToday = (function () {
     const current = items.filter(function (it) { return it.state === 'active'; });
     const upcoming = items.filter(function (it) { return it.state === 'pending'; });
     const done = items.filter(function (it) { return it.state === 'completed' || it.state === 'skipped' || it.state === 'rescheduled'; });
+    const nextId = nextPendingItemId(upcoming);
 
     return countersHtml(items) + '<br>' +
-      (current.length ? '<h4 class="section-heading">Now</h4>' + current.map(itemRowHtml).join('') : '') +
-      (upcoming.length ? '<h4 class="section-heading">Up next</h4>' + upcoming.map(itemRowHtml).join('') : '') +
-      (done.length ? '<h4 class="section-heading">Done</h4>' + done.map(itemRowHtml).join('') : '');
+      (current.length ? '<h4 class="section-heading">Now</h4>' + current.map(function (it) { return itemRowHtml(it, false); }).join('') : '') +
+      (upcoming.length ? '<h4 class="section-heading">Up next</h4>' + upcoming.map(function (it) { return itemRowHtml(it, it.itemId === nextId); }).join('') : '') +
+      (done.length ? '<h4 class="section-heading">Done</h4>' + done.map(function (it) { return itemRowHtml(it, false); }).join('') : '');
   }
 
   // START ITINERARY is the single control (Section 17) — no per-item Start buttons anywhere in
@@ -234,6 +262,9 @@ const ItineraryToday = (function () {
   // every content replacement. Each call operates on new DOM nodes so there is no accumulation
   // (Phase B / P2).
   function attachDynamicListeners() {
+    document.querySelectorAll('.itinerary-today-start-item-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { ItineraryOrchestrator.startItem(btn.dataset.id); refreshIfOpen(); });
+    });
     document.querySelectorAll('.itinerary-today-done-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { ItineraryOrchestrator.markItemDone(btn.dataset.id); refreshIfOpen(); });
     });
