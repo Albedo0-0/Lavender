@@ -41,7 +41,10 @@
 
   --color-accent-rust: #b5566b;
   --color-accent-rust-soft: #c97b62;
-
+  --color-status-missed: #f6e3e1;
+  --color-status-missed-border: #d99a91;
+  --color-status-late: #f4e8c4;
+  --color-status-late-border: #cf9f3f;
   --color-ink: #3a3226;
   --color-ink-soft: #6b6252;
   --color-border: #ddd3bd;
@@ -4700,13 +4703,25 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 .itinerary-item-duration { opacity: 0.75; font-size: var(--text-xs); }
 .itinerary-counters { display: inline-block; }
 
-/* Today view item states (Section 14) — a quiet color cue only, no icon system. */
+/* Today view item states (Section 14/4) — a quiet color cue only, no icon system. */
 @keyframes itineraryFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .itinerary-item-row, .itinerary-gate-template-row, .itinerary-today-item-row { animation: itineraryFadeIn 0.35s var(--ease-soft) both; }
-.itinerary-today-item-row { transition: opacity 0.4s var(--ease-soft), border-color 0.4s var(--ease-soft); }
+.itinerary-today-item-row { transition: opacity 0.4s var(--ease-soft), border-color 0.4s var(--ease-soft), background-color 0.4s var(--ease-soft); }
 .itinerary-today-item-active { border-color: var(--color-accent-rust-soft); }
-.itinerary-today-item-completed { opacity: 0.6; text-decoration: line-through; }
+.itinerary-today-item-completed { opacity: 0.6; text-decoration: line-through; border-color: var(--color-sage-400); }
 .itinerary-today-item-skipped, .itinerary-today-item-rescheduled { opacity: 0.55; text-decoration: line-through; }
+.itinerary-today-item-missed { border-color: var(--color-status-missed-border); background: var(--color-status-missed); }
+.itinerary-today-item-late { border-color: var(--color-status-late-border); background: var(--color-status-late); }
+.itinerary-today-item-next .itinerary-today-item-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-rust);
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
 
 .itinerary-gate-suggested-chip { background: var(--color-sage-300); }
 
