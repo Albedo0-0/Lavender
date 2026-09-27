@@ -96,10 +96,12 @@ const ItineraryData = (function () {
     if (!items.length) return;
     const byTag = {};
     items.forEach(function (it) {
-      (it.tagIds || []).forEach(function (tagId) {
-        if (!byTag[tagId]) byTag[tagId] = { completedCount: 0, totalCount: 0 };
-        byTag[tagId].totalCount++;
-        if (it.state === 'completed') byTag[tagId].completedCount++;
+      const rows = it.rows || (it.tagIds || []).map(function (tagId) { return { tagId: tagId, done: it.state === 'completed' }; });
+      rows.forEach(function (row) {
+        if (!row.tagId) return;
+        if (!byTag[row.tagId]) byTag[row.tagId] = { completedCount: 0, totalCount: 0 };
+        byTag[row.tagId].totalCount++;
+        if (row.done) byTag[row.tagId].completedCount++;
       });
     });
     if (!Object.keys(byTag).length) return;
