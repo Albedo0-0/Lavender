@@ -171,6 +171,7 @@ const ItineraryToday = (function () {
   // Which checklist items currently have their row list expanded on Today — module-scope so it
   // survives refreshIfOpen()'s innerHTML replacement of #itinerary-today-live each heartbeat.
   const expandedChecklistItemIds = {};
+  let catchUpPreview = null;
 
   // Section 18 — reads the orchestrator's adjusted display time the same way Study's own UI
   // already reads sessionRecords[...].adjustedStart/adjustedEnd, falling back to the planned
@@ -229,6 +230,53 @@ const ItineraryToday = (function () {
     '</div>';
   }
 
+  function catchUpRowHtml(it, newStart, newEnd, changed) {
+    return '<div class="list-row">' +
+      '<span class="chip">' + esc(newStart || '') + '\u2013' + esc(newEnd || '') + '</span> ' +
+      '<span class="itinerary-today-item-label"' + (changed ? ' style="font-weight:600"' : '') + '>' + esc(it.label) + '</span>' +
+      (changed ? ' <span class="chip">Moved</span>' : '') +
+    '</div>';
+  }
+
+  // Preview only: computeCatchUpPlan() never writes; Apply/Keep Original are the only two paths
+  // that can change anything, and Keep Original (or just closing/reopening Today) discards
+  // catchUpPreview with no data touched at all.
+  function catchUpSectionHtml(day) {
+    if (!catchUpPreview) {
+      return '<button id="itinerary-today-catchup-btn" class="btn btn-secondary">Plan the rest of today</button><br><br>';
+    }
+    if (!catchUpPreview.needed) {
+      return '<div class="itinerary-today-catchup-panel">' +
+        '<p class="empty-state">No catch-up plan needed \u2014 today still looks workable.</p>' +
+        '<button id="itinerary-today-catchup-dismiss-btn" class="btn btn-secondary">OK</button>' +
+      '</div>';
+    }
+    const changesById = {};
+    catchUpPreview.changes.forEach(function (c) { changesById[c.itemId] = c; });
+    const relevant = (day.items || []).filter(function (it) { return it.state === 'pending'; })
+      .sort(function (a, b) { return (a.plannedStart || '99:99') < (b.plannedStart || '99:99') ? -1 : 1; });
+    const currentCol = relevant.map(function (it) {
+      return catchUpRowHtml(it, it.plannedStart, it.plannedEnd, !!changesById[it.itemId]);
+    }).join('');
+    const suggestedCol = relevant.slice().sort(function (a, b) {
+      const ca = changesById[a.itemId] ? changesById[a.itemId].newStart : a.plannedStart;
+      const cb = changesById[b.itemId] ? changesById[b.itemId].newStart : b.plannedStart;
+      return (ca || '99:99') < (cb || '99:99') ? -1 : 1;
+    }).map(function (it) {
+      const c = changesById[it.itemId];
+      return catchUpRowHtml(it, c ? c.newStart : it.plannedStart, c ? c.newEnd : it.plannedEnd, !!c);
+    }).join('');
+    return '<div class="itinerary-today-catchup-panel">' +
+      '<h4 class="section-heading">Plan the rest of today</h4>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:16px">' +
+        '<div style="flex:1 1 260px;min-width:240px"><h5 class="section-heading">Current plan</h5>' + currentCol + '</div>' +
+        '<div style="flex:1 1 260px;min-width:240px"><h5 class="section-heading">Suggested plan</h5>' + suggestedCol + '</div>' +
+      '</div>' +
+      '<button id="itinerary-today-catchup-apply-btn" class="btn btn-primary">Apply Suggestion</button> ' +
+      '<button id="itinerary-today-catchup-keep-btn" class="btn btn-secondary">Keep Original</button>' +
+    '</div>';
+  }
+
   function todayBodyHtml(day) {
     if (day.status === 'diy_selected') {
       return '<p class="empty-state">You chose to do it yourself today \u2014 no itinerary to run.</p>';
@@ -242,6 +290,7 @@ const ItineraryToday = (function () {
     const nextId = nextPendingItemId(upcoming);
 
     return countersHtml(items) + '<br>' +
+      (day.status === 'in_progress' ? catchUpSectionHtml(day) : '') +
       (current.length ? '<h4 class="section-heading">Now</h4>' + current.map(function (it) { return itemRowHtml(it, false); }).join('') : '') +
       (upcoming.length ? '<h4 class="section-heading">Up next</h4>' + upcoming.map(function (it) { return itemRowHtml(it, it.itemId === nextId); }).join('') : '') +
       (done.length ? '<h4 class="section-heading">Done</h4>' + done.map(function (it) { return itemRowHtml(it, false); }).join('') : '');
@@ -309,9 +358,25 @@ const ItineraryToday = (function () {
         refreshIfOpen();
       });
     });
+    const catchupBtn = document.getElementById('itinerary-today-catchup-btn');
+    if (catchupBtn) catchupBtn.addEventListener('click', function () {
+      catchUpPreview = ItineraryData.computeCatchUpPlan();
+      refreshIfOpen();
+    });
+    const catchupDismissBtn = document.getElementById('itinerary-today-catchup-dismiss-btn');
+    if (catchupDismissBtn) catchupDismissBtn.addEventListener('click', function () { catchUpPreview = null; refreshIfOpen(); });
+    const catchupApplyBtn = document.getElementById('itinerary-today-catchup-apply-btn');
+    if (catchupApplyBtn) catchupApplyBtn.addEventListener('click', function () {
+      ItineraryData.applyCatchUpPlan(catchUpPreview.changes);
+      catchUpPreview = null;
+      refreshIfOpen();
+    });
+    const catchupKeepBtn = document.getElementById('itinerary-today-catchup-keep-btn');
+    if (catchupKeepBtn) catchupKeepBtn.addEventListener('click', function () { catchUpPreview = null; refreshIfOpen(); });
   }
 
   function openTodayView() {
+    catchUpPreview = null;
     // Pick up any Planner task scheduled for today that isn't reflected yet, so opening this
     // view never lags a heartbeat behind (new Planner \u2194 Itinerary sync requirement).
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
