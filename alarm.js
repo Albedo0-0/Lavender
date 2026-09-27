@@ -190,10 +190,7 @@ const Alarm = (function () {
          '<div id="itinerary-template-date-field" style="display:' + (type === 'date' ? 'block' : 'none') + '">' +
         '<input type="date" id="itinerary-template-date-input" class="input" value="' + (schedule.date || '') + '">' +
       '</div><br>' +
-      // B10: the data layer (ItineraryTemplateData.create/applyItineraryShift) has fully
-      // supported a fixed-schedule ("adaptive: false") mode all along; this checkbox is the
-      // only UI that was missing to reach it.
-      '<label><input type="checkbox" id="itinerary-template-adaptive-input"' + (!template || template.adaptive !== false ? ' checked' : '') + '> Adaptive timing (auto-adjust remaining items when running late or early)</label><br><br>' +
+      
       '<p class="empty-state">' + (template ? 'Use the \u201cItems\u201d button on the list to edit what\u2019s inside this itinerary.' : 'Items are added next, right after you save this.') + '</p>' + +
       '<div id="itinerary-template-form-error" class="form-error"></div>' +
       '<button id="itinerary-template-save-btn" class="btn btn-primary">Save</button> <button id="itinerary-template-cancel-btn" class="btn btn-secondary">Cancel</button>';
@@ -229,7 +226,7 @@ const Alarm = (function () {
         schedule.date = document.getElementById('itinerary-template-date-input').value;
       }
 
-      const fields = { name: name, schedule: schedule, adaptive: document.getElementById('itinerary-template-adaptive-input').checked };
+      const fields = { name: name, schedule: schedule };
       const wasNew = !editingTemplateId;
       const result = editingTemplateId ? ItineraryTemplateData.update(editingTemplateId, fields) : ItineraryTemplateData.create(fields);
 
