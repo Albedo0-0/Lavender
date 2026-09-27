@@ -23,14 +23,20 @@ const ItineraryToday = (function () {
   // Section 4 (Today Status Model) — quiet, render-time-only derivations. None of these are
   // persisted; item.state itself never becomes 'missed' or 'late'.
   const LATE_THRESHOLD_MS = 5 * 60 * 1000;
+  const BUILD_FINISH_GRACE_MS = 30 * 60 * 1000; // suppress late for startOnBuildFinish within 30 min
   function plannedStartMs(it) { return it.plannedStart ? ItineraryTime.timeStrToMs(todayStr(), it.plannedStart) : null; }
   function isMissed(it) {
     if (it.state !== 'pending') return false;
+    if (it.startOnBuildFinish) return false;
     const ms = plannedStartMs(it);
     return ms !== null && Date.now() > ms;
   }
   function isLate(it) {
     if (it.state !== 'active' || !it.actualStart) return false;
+    if (it.startOnBuildFinish) {
+      const ms = plannedStartMs(it);
+      if (ms !== null && (it.actualStart - ms) < BUILD_FINISH_GRACE_MS) return false;
+    }
     const ms = plannedStartMs(it);
     return ms !== null && (it.actualStart - ms) > LATE_THRESHOLD_MS;
   }
