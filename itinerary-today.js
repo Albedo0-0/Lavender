@@ -144,9 +144,9 @@ const ItineraryToday = (function () {
   // already reads sessionRecords[...].adjustedStart/adjustedEnd, falling back to the planned
   // time before Phase 7/8 wiring exists or while the orchestrator module isn't loaded.
   function itemRowHtml(it) {
-    const start = (typeof ItineraryData.adjustedStart === 'function') ? (ItineraryData.adjustedStart(it) || it.plannedStart) : it.plannedStart;
-    const end = (typeof ItineraryData.adjustedEnd === 'function') ? (ItineraryData.adjustedEnd(it) || it.plannedEnd) : it.plannedEnd;
-    const shifted = start !== it.plannedStart || end !== it.plannedEnd;
+    const start = it.plannedStart;
+    const end = it.plannedEnd;
+    const shifted = false;
         let actions = '';
     if (typeof ItineraryOrchestrator !== 'undefined') {
       if (it.state === 'active') {
