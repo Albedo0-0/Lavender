@@ -332,14 +332,6 @@ const ItineraryData = (function () {
   }
 
   // ---------- rollover (§13) ----------
-    return shiftTimeStr(item.plannedStart, effectiveShiftMs(item));
-  }
-  function adjustedEnd(item) {
-    if (item.state === 'completed' || item.state === 'skipped') return item.plannedEnd;
-    return shiftTimeStr(item.plannedEnd, effectiveShiftMs(item));
-  }
-
-  // ---------- rollover (§13) ----------
 
   // Mirrors GamificationData.onRolloverCatchUp's multi-day-gap walk: TimeEngine.onRollover fires
   // once even if several midnights were missed, carrying the true (fromDateStr, toDateStr) pair.
