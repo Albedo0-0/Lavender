@@ -145,6 +145,7 @@ const Alarm = (function () {
         '<span class="itinerary-template-row-name">' + t.name + '</span> ' +
         '<span class="itinerary-template-row-recurrence chip">' + recurrenceSummary(t.schedule) + '</span> ' +
         '<span class="itinerary-template-row-count chip">' + (t.items ? t.items.length : 0) + ' items</span> ' +
+        '<button class="itinerary-template-start-btn btn btn-primary" data-id="' + t.templateId + '">Start</button>' +
         '<button class="itinerary-template-items-btn btn btn-secondary" data-id="' + t.templateId + '">Items</button>' +
         '<button class="itinerary-template-edit-btn btn btn-secondary" data-id="' + t.templateId + '">Edit</button>' +
         '<button class="itinerary-template-delete-btn btn btn-danger" data-id="' + t.templateId + '">Delete</button>' +
@@ -169,6 +170,19 @@ const Alarm = (function () {
     });
     document.querySelectorAll('.itinerary-template-delete-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { ItineraryTemplateData.remove(btn.dataset.id); openItineraryList(); });
+    });
+    document.querySelectorAll('.itinerary-template-start-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (typeof ItineraryData === 'undefined') return;
+        const today = ItineraryData.getToday();
+        if (today.status === 'in_progress') {
+          if (!window.confirm('An itinerary is already running today. Replace it with this one?')) return;
+        }
+        ItineraryData.presentGate();
+        ItineraryData.chooseTemplate(btn.dataset.id, true);
+        Modal.close();
+        if (typeof ItineraryToday !== 'undefined') ItineraryToday.openTodayView();
+      });
     });
   }
 
