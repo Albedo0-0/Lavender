@@ -437,6 +437,11 @@ const Itinerary = (function () {
         refreshBuilder();
       });
     });
+    document.querySelectorAll('.itinerary-item-startOnBuildFinish-chk').forEach(function (chk) {
+      chk.addEventListener('change', function () {
+        updateItemField(chk.dataset.id, { startOnBuildFinish: chk.checked });
+      });
+    });
     
     document.querySelectorAll('.itinerary-field-label').forEach(function (inp) {
       inp.addEventListener('change', function () {
@@ -472,6 +477,7 @@ const Itinerary = (function () {
       ? '<div class="itinerary-item-expanded-fields">' +
           itemFormFieldsInlineHtml(it) +
           '<label>Start at (optional)<br><input type="time" class="input itinerary-item-starttime-input" data-id="' + it.itemId + '" value="' + esc(pinnedTime || '') + '"></label>' +
+          (index === 0 ? '<label class="itinerary-field-start-on-build"><input type="checkbox" class="itinerary-item-startOnBuildFinish-chk" data-id="' + it.itemId + '"' + (it.startOnBuildFinish ? ' checked' : '') + '> Start this task when I finish building the Itinerary</label>' : '') +
           (it.timeWarning ? '<p class="form-warning">This time overlaps with, or comes before, the item ahead of it. Change either time to resolve it.</p>' : '') +
           '<label>Duration (minutes)<br><input type="number" class="input itinerary-item-duration-input" data-id="' + it.itemId + '" min="5" step="5" value="' + (Number(it.durationMin) || 0) + '"></label>' +
         '</div>'
