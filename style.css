@@ -2487,12 +2487,9 @@ button.planner-history-fav-toggle.active {
 
 .study-focus-actions button {
   padding: 8px 16px;
-  border: 1px solid #ddd;
   border-radius: 4px;
-  background: #fff;
   cursor: pointer;
 }
-
 .study-focus-actions button:hover {
   border-color: #6b8a4a;
 }
