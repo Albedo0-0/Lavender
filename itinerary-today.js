@@ -162,6 +162,9 @@ const ItineraryToday = (function () {
   // Types with no existing system to report a real completion of their own (Section 17 point 3)
   // — the itinerary's own Mark Done button is the authoritative confirm for these.
   const MANUAL_CONFIRM_TYPES = { checklist: true, custom: true, nav: true };
+  // Which checklist items currently have their row list expanded on Today — module-scope so it
+  // survives refreshIfOpen()'s innerHTML replacement of #itinerary-today-live each heartbeat.
+  const expandedChecklistItemIds = {};
 
   // Section 18 — reads the orchestrator's adjusted display time the same way Study's own UI
   // already reads sessionRecords[...].adjustedStart/adjustedEnd, falling back to the planned
@@ -194,19 +197,29 @@ const ItineraryToday = (function () {
     if (it.syncedFromPlanner && (it.state === 'pending' || it.state === 'active')) {
       actions += '<button class="btn btn-danger itinerary-today-remove-btn" data-id="' + it.itemId + '" title="Remove from today and unschedule in Planner">Remove &amp; Unschedule</button>';
     }
-    const priorityChip = (it.type === 'checklist' && it.priority && it.priority !== 'normal')
-      ? '<span class="chip itinerary-item-priority-' + esc(it.priority) + '">' + esc(it.priority) + '</span> ' : '';
-    const dueChip = (it.type === 'checklist' && it.dueTime) ? '<span class="chip">Due ' + esc(it.dueTime) + '</span> ' : '';
-    const noteLine = (it.type === 'checklist' && it.note) ? '<div class="itinerary-today-item-note">' + esc(it.note) + '</div>' : '';
+    const checklistRows = (it.type === 'checklist') ? (it.rows || []) : [];
+    const checklistChip = checklistRows.length
+      ? '<span class="chip itinerary-today-checklist-progress-chip">' + checklistRows.filter(function (r) { return r.done; }).length + '/' + checklistRows.length + '</span> ' : '';
+    const checklistToggleBtn = checklistRows.length
+      ? '<button class="btn btn-secondary itinerary-today-checklist-toggle-btn" data-id="' + it.itemId + '">' + (expandedChecklistItemIds[it.itemId] ? 'Hide items' : 'Show items') + '</button> ' : '';
+    const checklistRowsBlock = (checklistRows.length && expandedChecklistItemIds[it.itemId])
+      ? '<div class="itinerary-today-checklist-rows">' + checklistRows.map(function (row) {
+          return '<label class="itinerary-today-checklist-row' + (row.done ? ' itinerary-today-checklist-row-done' : '') + '">' +
+            '<input type="checkbox" class="itinerary-today-checklist-row-check" data-id="' + it.itemId + '" data-row-id="' + row.id + '"' + (row.done ? ' checked' : '') + (it.state === 'active' ? '' : ' disabled') + '> ' +
+            esc(row.text || '(untitled)') +
+          '</label>';
+        }).join('') + '</div>'
+      : '';
     const statusClass = missed ? ' itinerary-today-item-missed' : (late ? ' itinerary-today-item-late' : '');
     return '<div class="itinerary-today-item-row list-row itinerary-today-item-' + esc(it.state) + statusClass + (isNext ? ' itinerary-today-item-next' : '') + '" data-item-id="' + esc(it.itemId) + '">' +
       '<span class="chip itinerary-today-item-time">' + esc(start || '') + '\u2013' + esc(end || '') + '</span> ' +
-      priorityChip + dueChip +
+      checklistChip +
       '<span class="itinerary-today-item-label">' + esc(it.label) + '</span> ' +
       '<span class="chip">' + (missed ? 'Missed' : (late ? 'Late' : (STATE_LABELS[it.state] || it.state))) + '</span> ' +
       (it.syncedFromPlanner ? '<span class="chip itinerary-today-synced-chip">From Planner</span> ' : '') +
+      checklistToggleBtn +
       actions +
-      noteLine +
+      checklistRowsBlock +
     '</div>';
   }
 
@@ -273,6 +286,22 @@ const ItineraryToday = (function () {
     });
     document.querySelectorAll('.itinerary-today-remove-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { ItineraryData.removeSyncedItem(btn.dataset.id); refreshIfOpen(); });
+    });
+    document.querySelectorAll('.itinerary-today-checklist-toggle-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        expandedChecklistItemIds[btn.dataset.id] = !expandedChecklistItemIds[btn.dataset.id];
+        refreshIfOpen();
+      });
+    });
+    document.querySelectorAll('.itinerary-today-checklist-row-check').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const day = ItineraryData.getToday();
+        const item = (day.items || []).find(function (it) { return it.itemId === cb.dataset.id; });
+        if (!item || item.state !== 'active') return;
+        const rows = (item.rows || []).map(function (r) { return r.id === cb.dataset.rowId ? Object.assign({}, r, { done: !r.done }) : r; });
+        ItineraryData.updateItemState(item.itemId, { rows: rows });
+        refreshIfOpen();
+      });
     });
   }
 
