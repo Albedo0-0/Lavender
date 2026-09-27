@@ -25,16 +25,15 @@
 //                                      // read as a fallback for templates saved before this field existed.
 //     subject, topicName, taskType,   // study items only — the Planner task blueprint (Section 16)
 //     destination,                    // nav items only — { kind:'screen', screen } | { kind:'modal', opener } (Section 20)
-//     tagIds,                         // checklist items only — canonical Tags refs
-//     dueTime, note, priority }       // checklist items only — optional deadline, free-text note,
-//                                      // and 'low'|'normal'|'high' (default 'normal')
+//     rows }                          // checklist items only — [{ id, text, done, tagId }], one
+//                                      // canonical Tag ref per row; no due/note/priority (Section 5)
 // Editing happens on an in-memory draft only ("no store write per keystroke", Section 16) —
 // nothing is persisted until the top-level Save button.
 const Itinerary = (function () {
   const ITEM_TYPES = ['study', 'planner-task', 'target', 'break', 'journal', 'water', 'checklist', 'custom', 'nav'];
   const TYPE_LABELS = {
     study: 'Study', 'planner-task': 'Planner Task (existing)', target: 'Target (existing)',
-    break: 'Break', journal: 'Journal', water: 'Water', checklist: 'Checklist Entry',
+    break: 'Break', journal: 'Journal', water: 'Water', checklist: 'Checklist',
     custom: 'Custom', nav: 'Go To\u2026'
   };
   // Small pictographic hint per palette tile — decorative only, TYPE_LABELS above is the source
@@ -215,11 +214,7 @@ const Itinerary = (function () {
     } else if (type === 'checklist' || type === 'custom') {
       item.label = '';
       if (type === 'checklist') {
-        item.tagIds = [];
-        item.tagsEnabled = false;
-        item.note = '';
-        item.priority = 'normal';
-        item.dueTime = null;
+        item.rows = [{ id: genId(), text: '', done: false, tagId: null }];
       }
     }
     return item;
@@ -237,7 +232,8 @@ const Itinerary = (function () {
       if (it.type === 'study' && !it.topicName) return 'Give every Study item a topic.';
       if (it.type === 'planner-task' && !it.refId) return 'Pick an existing task for every Planner Task item.';
       if (it.type === 'target' && !it.refId) return 'Pick an existing target for every Target item.';
-      if ((it.type === 'checklist' || it.type === 'custom') && !it.label) return 'Give every ' + TYPE_LABELS[it.type] + ' item a label.';
+      if (it.type === 'custom' && !it.label) return 'Give every ' + TYPE_LABELS[it.type] + ' item a label.';
+      if (it.type === 'checklist' && !(it.rows || []).some(function (r) { return r.text; })) return 'Give the checklist at least one row with a title.';
       if (it.type === 'nav' && !it.destination) return 'Pick a destination for every Go To\u2026 item.';
     }
     return null;
@@ -313,80 +309,70 @@ const Itinerary = (function () {
       return '<label>Go to<br><select class="input itinerary-field-nav" data-id="' + it.itemId + '">' + navOptionsHtml(selectedKey) + '</select></label>';
     }
     if (type === 'checklist' || type === 'custom') {
-      const labelField = '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
-      if (type !== 'checklist') return labelField;
-      const dueField = '<label>Due (optional)<br><input type="time" class="input itinerary-field-due" data-id="' + it.itemId + '" value="' + esc(it.dueTime || '') + '"></label>';
-      const noteField = '<label>Note (optional)<br><input type="text" class="input itinerary-field-note" data-id="' + it.itemId + '" value="' + esc(it.note || '') + '" placeholder="Details\u2026"></label>';
-      const priority = it.priority || 'normal';
-      const priorityField = '<div class="chip-row itinerary-field-priority-row">' +
-        ['low', 'normal', 'high'].map(function (p) {
-          return '<label class="chip"><input type="radio" name="itinerary-field-priority-' + it.itemId + '" class="itinerary-field-priority" data-id="' + it.itemId + '" value="' + p + '"' + (p === priority ? ' checked' : '') + '> ' + (p.charAt(0).toUpperCase() + p.slice(1)) + '</label>';
+      if (type !== 'checklist') {
+        return '<label>Label<br><input type="text" class="input itinerary-field-label" data-id="' + it.itemId + '" value="' + esc(it.label || '') + '"></label>';
+      }
+      const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
+      const rows = it.rows || [];
+      const tagOptionsHtml = function (selectedTagId) {
+        return '<option value="">No tag</option>' + allTags.map(function (tag) {
+          return '<option value="' + tag.tagId + '"' + (tag.tagId === selectedTagId ? ' selected' : '') + '>' + esc(tag.name) + '</option>';
+        }).join('');
+      };
+      return '<div class="itinerary-checklist-rows">' +
+        rows.map(function (row) {
+          return '<div class="itinerary-checklist-row" data-row-id="' + row.id + '">' +
+            '<input type="text" class="input itinerary-checklist-row-text" data-id="' + it.itemId + '" data-row-id="' + row.id + '" placeholder="Row title" value="' + esc(row.text || '') + '">' +
+            '<select class="input itinerary-checklist-row-tag" data-id="' + it.itemId + '" data-row-id="' + row.id + '">' + tagOptionsHtml(row.tagId) + '</select>' +
+            '<button type="button" class="btn btn-secondary itinerary-checklist-row-add-btn" data-id="' + it.itemId + '" data-row-id="' + row.id + '">+</button>' +
+            (rows.length > 1 ? '<button type="button" class="btn btn-danger itinerary-checklist-row-remove-btn" data-id="' + it.itemId + '" data-row-id="' + row.id + '">\u2212</button>' : '') +
+          '</div>';
         }).join('') +
       '</div>';
-      const extraFields = dueField + noteField + priorityField;
-      const tagsEnabled = !!(it.tagsEnabled || (it.tagIds && it.tagIds.length > 0));
-      const toggleTagsBtn = '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary itinerary-field-tags-toggle-btn" data-id="' + it.itemId + '">' + (tagsEnabled ? 'Remove tags' : 'Add tags') + '</button></div>';
-      if (!tagsEnabled) return labelField + extraFields + toggleTagsBtn;
-      const allTags = (typeof TagsData !== 'undefined') ? TagsData.getAllTagsList() : [];
-      const tagIds = it.tagIds || [];
-      const tagChips = allTags.map(function (tag) {
-        const on = tagIds.indexOf(tag.tagId) !== -1;
-        return '<button type="button" class="tag-chip chip itinerary-field-tag-toggle' + (on ? ' tag-chip-active' : '') + '" data-id="' + it.itemId + '" data-tag-id="' + tag.tagId + '" style="border-color:' + tag.color + ';background:' + (on ? tag.color : 'transparent') + '">' + esc(tag.name) + '</button>';
-      }).join('');
-      const tagsField = '<div class="itinerary-field-tags"><span class="micro-label">Tags</span>' +
-        '<div class="chip-row itinerary-field-tags-row">' + (tagChips || '') + '</div>' +
-        '<div class="tag-create-row" style="display:flex;gap:6px;align-items:center;margin-top:6px;">' +
-          '<input type="text" class="input itinerary-new-tag-name" data-id="' + it.itemId + '" placeholder="New tag name\u2026" style="flex:1;min-width:0;">' +
-          '<input type="color" class="input itinerary-new-tag-color" data-id="' + it.itemId + '" value="#a78bfa" style="width:36px;padding:2px;">' +
-          '<button type="button" class="btn btn-secondary itinerary-new-tag-btn" data-id="' + it.itemId + '">+ New tag</button>' +
-        '</div>' +
-      '</div>';
-      return labelField + extraFields + toggleTagsBtn + tagsField;
     }
     return ''; // break/journal/water — no extra fields, just duration below
   }
 
-  function wireExpandedFields() {
-    document.querySelectorAll('.itinerary-field-tags-toggle-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const id = btn.dataset.id;
+  function checklistLabelFromRows(rows) {
+      const withText = (rows || []).filter(function (r) { return r.text; });
+      if (!withText.length) return '';
+      return withText.length === 1 ? withText[0].text : (withText[0].text + ' +' + (withText.length - 1) + ' more');
+    }
+    document.querySelectorAll('.itinerary-checklist-row-text').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        const id = inp.dataset.id;
         const it = draftItems.find(function (x) { return x.itemId === id; });
-        const wasEnabled = !!(it && (it.tagsEnabled || (it.tagIds && it.tagIds.length > 0)));
-        updateItemField(id, { tagsEnabled: !wasEnabled, tagIds: wasEnabled ? [] : (it && it.tagIds || []) });
+        const rows = ((it && it.rows) || []).map(function (r) { return r.id === inp.dataset.rowId ? Object.assign({}, r, { text: inp.value.trim() }) : r; });
+        updateItemField(id, { rows: rows, label: checklistLabelFromRows(rows) });
         refreshBuilder();
       });
     });
-    document.querySelectorAll('.itinerary-field-tag-toggle').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const id = btn.dataset.id;
-        const tagId = btn.dataset.tagId;
+    document.querySelectorAll('.itinerary-checklist-row-tag').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        const id = sel.dataset.id;
         const it = draftItems.find(function (x) { return x.itemId === id; });
-        const current = (it && it.tagIds) || [];
-        const next = current.indexOf(tagId) !== -1
-          ? current.filter(function (t) { return t !== tagId; })
-          : current.concat([tagId]);
-        updateItemField(id, { tagIds: next });
+        const rows = ((it && it.rows) || []).map(function (r) { return r.id === sel.dataset.rowId ? Object.assign({}, r, { tagId: sel.value || null }) : r; });
+        updateItemField(id, { rows: rows });
         refreshBuilder();
       });
     });
-    document.querySelectorAll('.itinerary-new-tag-btn').forEach(function (btn) {
+    document.querySelectorAll('.itinerary-checklist-row-add-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.dataset.id;
-        const row = btn.closest('.tag-create-row') || btn.parentNode;
-        const nameInp = row.querySelector('.itinerary-new-tag-name');
-        const colorInp = row.querySelector('.itinerary-new-tag-color');
-        const name = nameInp ? nameInp.value.trim() : '';
-        if (!name) { if (nameInp) nameInp.focus(); return; }
-        const color = colorInp ? colorInp.value : '#a78bfa';
-        let tagId;
-        if (typeof TagsData !== 'undefined' && typeof TagsData.getOrCreateTagByName === 'function') {
-          const tag = TagsData.getOrCreateTagByName(name, color);
-          tagId = tag && tag.tagId;
-        }
-        if (!tagId) return;
         const it = draftItems.find(function (x) { return x.itemId === id; });
-        const current = (it && it.tagIds) || [];
-        if (current.indexOf(tagId) === -1) updateItemField(id, { tagIds: current.concat([tagId]) });
+        const rows = ((it && it.rows) || []).slice();
+        const idx = rows.findIndex(function (r) { return r.id === btn.dataset.rowId; });
+        rows.splice(idx + 1, 0, { id: genId(), text: '', done: false, tagId: null });
+        updateItemField(id, { rows: rows, label: checklistLabelFromRows(rows) });
+        refreshBuilder();
+      });
+    });
+    document.querySelectorAll('.itinerary-checklist-row-remove-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.id;
+        const it = draftItems.find(function (x) { return x.itemId === id; });
+        const rows = ((it && it.rows) || []).filter(function (r) { return r.id !== btn.dataset.rowId; });
+        updateItemField(id, { rows: rows, label: checklistLabelFromRows(rows) });
         refreshBuilder();
       });
     });
@@ -451,25 +437,7 @@ const Itinerary = (function () {
         refreshBuilder();
       });
     });
-    document.querySelectorAll('.itinerary-field-due').forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        updateItemField(inp.dataset.id, { dueTime: inp.value || null });
-        refreshBuilder();
-      });
-    });
-    document.querySelectorAll('.itinerary-field-note').forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        updateItemField(inp.dataset.id, { note: inp.value.trim() });
-        refreshBuilder();
-      });
-    });
-    document.querySelectorAll('.itinerary-field-priority').forEach(function (r) {
-      r.addEventListener('change', function () {
-        if (!r.checked) return;
-        updateItemField(r.dataset.id, { priority: r.value });
-        refreshBuilder();
-      });
-    });
+    
     document.querySelectorAll('.itinerary-field-label').forEach(function (inp) {
       inp.addEventListener('change', function () {
         updateItemField(inp.dataset.id, { label: inp.value.trim() });
@@ -490,14 +458,12 @@ const Itinerary = (function () {
     const expanded = it.itemId === expandedItemId;
     const timeRange = (it.plannedStart || '') + '\u2013' + (it.plannedEnd || '');
     const pinnedTime = it.startTime || (it.type === 'checklist' ? it.checkAt : null);
-    const priorityChip = (it.type === 'checklist' && it.priority && it.priority !== 'normal')
-      ? '<span class="chip itinerary-item-priority-chip itinerary-item-priority-' + esc(it.priority) + '">' + esc(it.priority) + '</span> ' : '';
-    const dueChip = (it.type === 'checklist' && it.dueTime) ? '<span class="chip itinerary-item-due-chip">Due ' + esc(it.dueTime) + '</span> ' : '';
+    const rowsChip = (it.type === 'checklist') ? '<span class="chip itinerary-item-rows-chip">' + ((it.rows || []).length) + ' rows</span> ' : '';
     const header =
       '<span class="itinerary-item-drag-handle" title="Drag to reorder">\u283F</span> ' +
       '<span class="itinerary-item-time chip' + (it.timeWarning ? ' itinerary-item-time-conflict' : '') + '">' + timeRange + '</span> ' +
       '<span class="itinerary-item-type chip">' + (TYPE_LABELS[it.type] || it.type) + '</span> ' +
-      priorityChip + dueChip +
+      rowsChip +
       '<span class="itinerary-item-label">' + esc(it.label || '(untitled)') + '</span> ' +
       '<span class="itinerary-item-duration">' + formatDuration(it.durationMin) + '</span> ' +
       '<button class="itinerary-item-toggle-btn btn btn-secondary" data-id="' + it.itemId + '">' + (expanded ? 'Done' : 'Edit') + '</button>' +
@@ -853,7 +819,13 @@ const Itinerary = (function () {
     if (!template) return;
     editingTemplateId = templateId;
     editingReturnFn = (typeof returnFn === 'function') ? returnFn : null;
-    draftItems = (template.items || []).map(function (it) { return Object.assign({}, it); });
+    draftItems = (template.items || []).map(function (it) {
+      const copy = Object.assign({}, it);
+      if (copy.type === 'checklist' && !copy.rows) {
+        copy.rows = [{ id: genId(), text: copy.label || '', done: false, tagId: (copy.tagIds && copy.tagIds[0]) || null }];
+      }
+      return copy;
+    });
     draftDayStartTime = template.dayStartTime || DEFAULT_DAY_START;
     expandedItemId = null;
     _renderedItemIds = new Set();
