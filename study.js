@@ -460,9 +460,12 @@ function renderClock() {
         '<button id="study-early-adjust">Auto-adjust remaining</button>' +
       '</div>'
     );
+    const keepBtn = document.getElementById('study-early-keep');
+    const adjustBtn = document.getElementById('study-early-adjust');
+    if (!keepBtn || !adjustBtn) return; // Modal didn't actually open (e.g. refused) — nothing to wire
     function finish() { TimeEngine.completeActive(); Modal.close(); }
-    document.getElementById('study-early-keep').addEventListener('click', finish);
-    document.getElementById('study-early-adjust').addEventListener('click', function () {
+    keepBtn.addEventListener('click', finish);
+    adjustBtn.addEventListener('click', function () {
       TimeEngine.applyShift(-earlyByMs);
       finish();
     });
@@ -483,9 +486,9 @@ function renderClock() {
         '<div id="study-focus-remaining" class="study-focus-remaining"></div>' +
         (active.state === 'paused' ? '<p class="study-paused-note">Paused</p>' : '') +
         '<div class="study-focus-actions">' +
-          '<button id="study-focus-complete">Completed</button>' +
-          '<button id="study-focus-pause">' + (active.state === 'paused' ? 'Resume' : 'Pause') + '</button>' +
-          '<button id="study-focus-later">Do it later</button>' +
+          '<button id="study-focus-complete" class="btn btn-primary">Completed</button>' +
+          '<button id="study-focus-pause" class="btn btn-secondary">' + (active.state === 'paused' ? 'Resume' : 'Pause') + '</button>' +
+          '<button id="study-focus-later" class="btn btn-secondary">Do it later</button>' +
         '</div>' +
       '</div>';
 
@@ -558,8 +561,11 @@ function renderClock() {
         '<button id="study-later-cancel">Cancel</button>' +
       '</div>'
     );
-    document.getElementById('study-later-proceed').addEventListener('click', function () { openDoItLaterModal(taskId); });
-    document.getElementById('study-later-cancel').addEventListener('click', function () { Modal.close(); });
+    const proceedBtn = document.getElementById('study-later-proceed');
+    const cancelBtn = document.getElementById('study-later-cancel');
+    if (!proceedBtn || !cancelBtn) return; // Modal didn't actually open (e.g. refused) — nothing to wire
+    proceedBtn.addEventListener('click', function () { openDoItLaterModal(taskId); });
+    cancelBtn.addEventListener('click', function () { Modal.close(); });
   }
 
   function openDoItLaterModal(taskId) {
@@ -574,7 +580,9 @@ function renderClock() {
       '</div>' +
       '<button id="study-later-confirm">Reschedule</button>'
     );
-    document.getElementById('study-later-confirm').addEventListener('click', function () {
+    const confirmBtn = document.getElementById('study-later-confirm');
+    if (!confirmBtn) { doItLaterOpen = false; return; } // Modal didn't actually open (e.g. refused) — nothing to wire
+    confirmBtn.addEventListener('click', function () {
       const dateVal = document.getElementById('study-later-date').value;
       const startVal = document.getElementById('study-later-start').value;
       const stopVal = document.getElementById('study-later-stop').value;
