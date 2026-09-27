@@ -754,12 +754,7 @@ TimeEngine.logUnrecordedBreak(minutes, note);
     Modal.open('<h3>On a short break</h3><p>No response, so a 5-minute break started automatically. Back in ' + remainMin + ' min \u2014 you\'ll be asked again.</p>');
   }
 
-  function handlePrompt() {
-    // Itinerary notification priority: while an Itinerary decision prompt (late-start,
-    // Auto-adjust) is up, it holds Modal's persistent lock — defer entirely and retry next tick
-    // rather than covering/replacing it. promptToken is left untouched so the same prompt is
-    // correctly re-shown once the lock clears.
-    if (typeof Notify !== 'undefined' && Notify.isItineraryActive()) return;
+function handlePrompt() {
     const prompt = TimeEngine.getPrompt();
     if (timeInputOpen && document.getElementById('study-time-minutes')) return;
     if (questionsInputOpen && document.getElementById('study-questions-count')) return;
