@@ -417,10 +417,12 @@ const Assistant = (function () {
     const slot = document.getElementById('header-assistant-slot');
     if (slot) {
       const rect = slot.getBoundingClientRect();
-      return {
-        x: rect.left + (rect.width - PIXEL_CANVAS_SIZE) / 2,
-        y: rect.top + (rect.height - PIXEL_CANVAS_SIZE) / 2
-      };
+      if (rect.width > 0 || rect.height > 0) {
+        return {
+          x: rect.left + (rect.width - PIXEL_CANVAS_SIZE) / 2,
+          y: rect.top + (rect.height - PIXEL_CANVAS_SIZE) / 2
+        };
+      }
     }
     return { x: 12, y: 12 };
   }
