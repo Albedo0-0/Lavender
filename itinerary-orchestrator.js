@@ -212,7 +212,11 @@ function todayStr() { return ItineraryTime.todayStr(); }
      // 'checklist'/'custom'/'nav': no existing screen leaves the user with a visible "Mark Done"/
     // "Skip" control — checklist/custom have no home screen of their own, and nav navigates away
     // from Today entirely (B9). All three reopen Today so the confirm controls are always reachable.
-    if ((item.type === 'checklist' || item.type === 'custom' || item.type === 'nav') && typeof ItineraryToday !== 'undefined') {
+    // Checklist additionally auto-expands its own row list (existing checklist flow) instead of
+    // leaving the user to expand it manually.
+    if (item.type === 'checklist' && typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openChecklistItem === 'function') {
+      ItineraryToday.openChecklistItem(item);
+    } else if ((item.type === 'checklist' || item.type === 'custom' || item.type === 'nav') && typeof ItineraryToday !== 'undefined') {
       ItineraryToday.openTodayView();
     }
   }
