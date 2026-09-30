@@ -139,8 +139,6 @@ const ItineraryToday = (function () {
     );
 
     document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
-
-    document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         ItineraryData.chooseTemplate(btn.dataset.id);
         openTodayView();
@@ -429,7 +427,7 @@ const ItineraryToday = (function () {
   function open() {
     const status = ItineraryData.getToday().status;
     if (status === 'unpresented' || status === 'awaiting_choice') {
-      Modal.open('<h3 class="section-heading">Today</h3><p class="empty-state">No Itinerary planned for today.</p>', { size: 'xl' });
+      openGate();
       return;
     }
     openTodayView();
