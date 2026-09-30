@@ -4766,7 +4766,10 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   position: sticky;
   top: 0;
   max-height: 60vh;
-  overflow-y: auto;
+  overflow-y: scroll;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .itinerary-palette-heading { margin-bottom: var(--space-1); }
 .itinerary-palette-tile {
@@ -4783,7 +4786,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   font-size: var(--text-xs);
   color: var(--color-text);
   user-select: none;
-  touch-action: none;
+  touch-action: pan-y;
   -webkit-user-drag: none;
   transition: transform 0.3s var(--ease-soft), box-shadow 0.3s var(--ease-soft), opacity 0.3s var(--ease-soft);
 }
