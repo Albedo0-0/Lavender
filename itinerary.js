@@ -552,16 +552,17 @@ const Itinerary = (function () {
     '</div>';
   }
 
-  function builderHtml() {
+function builderHtml() {
     draftItems = recomputeTimes(draftItems, draftDayStartTime);
-    const rows = draftItems.length ? draftItems.map(itemRowHtml).join('') : '<p class="empty-state">Drag a tile from the palette to add your first item.</p>';
-    return '<h3 class="section-heading">Itinerary Builder</h3>' +
-      '<div class="itinerary-builder-layout">' +
+    const rows = draftItems.length ? draftItems.map(itemRowHtml).join('') : '';
+    const dropSlot = '<div class=\"itinerary-drop-slot\" id=\"itinerary-drop-slot\" title=\"Drop here or click a tile to add\">[ + ]</div>';
+    return '<h3 class=\"section-heading\">Itinerary Builder</h3>' +
+      '<div class=\"itinerary-builder-layout\">' +
         paletteHtml() +
-        '<div class="itinerary-builder-main">' +
-          '<label>Day starts at<br><input type="time" id="itinerary-daystart-input" class="input" value="' + draftDayStartTime + '"></label><br><br>' +
+        '<div class=\"itinerary-builder-main\">' +
+          '<label>Day starts at<br><input type=\"time\" id=\"itinerary-daystart-input\" class=\"input\" value=\"' + draftDayStartTime + '\"></label><br><br>' +
           countersHtml(draftItems) + '<br><br>' +
-          '<div class="itinerary-list-panel" id="itinerary-items-list">' + rows + '</div>' +
+          '<div class=\"itinerary-list-panel\" id=\"itinerary-items-list\">' + rows + dropSlot + '</div>' +
         '</div>' +
       '</div><br>' +
       '<div id="itinerary-builder-error" class="form-error"></div>' +
@@ -688,7 +689,7 @@ const Itinerary = (function () {
       list.classList.add('itinerary-list-dragover');
     });
     list.addEventListener('dragleave', function (e) {
-      if (e.target === list) list.classList.remove('itinerary-list-dragover');
+      if (e.target === list || e.target.id === 'itinerary-drop-slot') list.classList.remove('itinerary-list-dragover');
     });
     list.addEventListener('drop', function (e) {
       e.preventDefault();
@@ -821,10 +822,9 @@ const Itinerary = (function () {
     // Replace the list rows
     if (listEl) {
       const prevIds = _renderedItemIds;
-      const rows = draftItems.length
-        ? draftItems.map(itemRowHtml).join('')
-        : '<p class="empty-state">Drag a tile from the palette to add your first item.</p>';
-      listEl.innerHTML = rows;
+      const rows = draftItems.map(itemRowHtml).join('');
+      const dropSlot = '<div class=\"itinerary-drop-slot\" id=\"itinerary-drop-slot\" title=\"Drop here or click a tile to add\">[ + ]</div>';
+      listEl.innerHTML = rows + dropSlot;
       _renderedItemIds = new Set(draftItems.map(function(it) { return it.itemId; }));
       listEl.querySelectorAll('.itinerary-item-row').forEach(function(row) {
         if (prevIds.has(row.dataset.id)) row.style.animation = 'none';
