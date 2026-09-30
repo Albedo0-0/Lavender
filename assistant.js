@@ -507,8 +507,8 @@ const Assistant = (function () {
     pixelEntityEl.appendChild(pixelCanvasEl);
     document.body.appendChild(pixelEntityEl);
 
-    const saved = (State.get().settings || {}).assistantPosition;
-    applyPixelEntityPosition(clampToViewport(saved || defaultPixelEntityPosition()));
+    State.patch('settings', { assistantPosition: null });
+    applyPixelEntityPosition(clampToViewport(defaultPixelEntityPosition()));
 
     pixelEntityEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMain(); }
