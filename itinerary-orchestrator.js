@@ -216,7 +216,7 @@ function todayStr() { return ItineraryTime.todayStr(); }
     // leaving the user to expand it manually.
     if (item.type === 'checklist' && typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openChecklistItem === 'function') {
       ItineraryToday.openChecklistItem(item);
-    } else if ((item.type === 'checklist' || item.type === 'custom' || item.type === 'nav') && typeof ItineraryToday !== 'undefined') {
+    } else if (item.type === 'custom' && typeof ItineraryToday !== 'undefined') {
       ItineraryToday.openTodayView();
     }
   }
