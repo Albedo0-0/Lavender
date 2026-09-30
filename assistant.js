@@ -494,8 +494,9 @@ const Assistant = (function () {
     pixelEntityEl.id = 'assistant-pixel-entity';
     pixelEntityEl.setAttribute('role', 'button');
     pixelEntityEl.setAttribute('tabindex', '0');
-    pixelEntityEl.setAttribute('aria-label', Settings.assistantLabel() || 'Assistant');
-    pixelEntityEl.title = Settings.assistantLabel() || 'Assistant';
+    var _label = (typeof Settings !== 'undefined' && typeof Settings.assistantLabel === 'function') ? (Settings.assistantLabel() || 'Assistant') : 'Assistant';
+    pixelEntityEl.setAttribute('aria-label', _label);
+    pixelEntityEl.title = _label;
 
     pixelCanvasEl = document.createElement('canvas');
     pixelCanvasEl.width = PIXEL_CANVAS_SIZE;
