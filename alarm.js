@@ -52,7 +52,7 @@ const Alarm = (function () {
   }
 
   function openList() {
-    Modal.open(listHtml());
+    Modal.open(listHtml(), { size: 'xl' });
     wireTabs();
     document.getElementById('alarm-add-btn').addEventListener('click', function () { openForm(null); });
     document.querySelectorAll('.alarm-enabled-toggle').forEach(function (cb) {
@@ -100,7 +100,7 @@ const Alarm = (function () {
   function openForm(id) {
     editingId = id;
     const alarm = id ? AlarmData.getById(id) : null;
-    Modal.open(formHtml(alarm));
+    Modal.open(formHtml(alarm), { size: 'xl' });
 
     const select = document.getElementById('alarm-recurrence-select');
     select.addEventListener('change', function () {
@@ -157,7 +157,7 @@ const Alarm = (function () {
   }
 
   function openItineraryList() {
-    Modal.open(itineraryListHtml());
+    Modal.open(itineraryListHtml(), { size: 'xl' });
     wireTabs();
     document.getElementById('itinerary-template-add-btn').addEventListener('click', function () { openItineraryForm(null); });
     document.querySelectorAll('.itinerary-template-items-btn').forEach(function (btn) {
@@ -222,7 +222,7 @@ const Alarm = (function () {
     editingTemplateId = id;
     const backFn = (typeof returnFn === 'function') ? returnFn : openItineraryList;
     const template = id ? ItineraryTemplateData.getById(id) : null;
-    Modal.open(itineraryFormHtml(template));
+    Modal.open(itineraryFormHtml(template), { size: 'xl' });
 
     const select = document.getElementById('itinerary-template-schedule-select');
     select.addEventListener('change', function () {
