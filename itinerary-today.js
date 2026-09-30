@@ -388,6 +388,13 @@ const ItineraryToday = (function () {
     attachDynamicListeners();
   }
 
+  // Existing checklist flow: opens Today and auto-expands this item's row list, so starting a
+  // checklist item doesn't require a second "Show items" click.
+  function openChecklistItem(item) {
+    if (item && item.itemId) expandedChecklistItemIds[item.itemId] = true;
+    openTodayView();
+  }
+
   // Section 17/18's automatic progression (orchestrator ticks; a break ending naturally; a
   // water/journal/target completion landing while the user is elsewhere) needs the open Today
   // view to reflect it without waiting for the next manual open. Driven off the same TimeEngine
@@ -421,7 +428,10 @@ const ItineraryToday = (function () {
   // to the gate while the day is still undecided, and to the live Today view once it isn't.
   function open() {
     const status = ItineraryData.getToday().status;
-    if (status === 'unpresented' || status === 'awaiting_choice') { openGate(); return; }
+    if (status === 'unpresented' || status === 'awaiting_choice') {
+      Modal.open('<h3 class="section-heading">Today</h3><p class="empty-state">No Itinerary planned for today.</p>', { size: 'xl' });
+      return;
+    }
     openTodayView();
   }
 
@@ -444,6 +454,7 @@ const ItineraryToday = (function () {
     open: open,
     openGate: openGate,
     openTodayView: openTodayView,
+    openChecklistItem: openChecklistItem,
     isAwaitingChoice: isAwaitingChoice
   };
 })();
