@@ -556,6 +556,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 #modal-content.modal-sm { max-width: 300px; }
 #modal-content.modal-md { max-width: 440px; }
 #modal-content.modal-lg { max-width: 640px; }
+#modal-content.modal-xl { max-width: 900px; }
 #modal-content.modal-danger { border-color: var(--color-accent-rust-soft); }
 
 /* Generic header / title / close — opt-in classes for modal content that
@@ -4722,6 +4723,19 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 .itinerary-gate-suggested-chip { background: var(--color-sage-300); }
 
+/* Phase A: Today modal switches to size 'xl' and gets extra breathing room — a separate rule
+   from the shared .itinerary-item-row/.itinerary-gate-template-row/.itinerary-today-item-row
+   block above, so the builder's own rows are untouched. */
+#itinerary-today-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.itinerary-today-item-row {
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+}
+
 /* B11: non-blocking pinned-time overlap warning, styled like .form-error but a neutral warning
    rather than a hard error. */
 .form-warning {
@@ -4811,6 +4825,8 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 .itinerary-list-panel {
   min-height: 64px;
+  max-height: 42vh;
+  overflow-y: auto;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
@@ -4889,6 +4905,38 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   color: var(--color-primary-hover);
   font-weight: 600;
 }
+
+/* ---- Itinerary status pills (Phase A) — bottom-center, stacked, dark notifications for
+   session-started/missed/running-late events. z-index sits above normal content but below
+   #modal-overlay (1000). itinerary-orchestrator.js also skips the animation classes outright
+   under prefers-reduced-motion, on top of the global override below. */
+#itinerary-pill-container {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-5);
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+.itinerary-pill {
+  background: var(--color-ink);
+  color: #fff;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  max-width: min(90vw, 360px);
+  text-align: center;
+  opacity: 0;
+  animation: itineraryPillIn 0.25s var(--ease-soft) forwards;
+}
+.itinerary-pill-out { animation: itineraryPillOut 0.25s var(--ease-soft) forwards; }
+@keyframes itineraryPillIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes itineraryPillOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(6px); } }
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
