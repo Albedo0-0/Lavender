@@ -135,8 +135,10 @@ const ItineraryToday = (function () {
       '<div id="itinerary-gate-templates">' + gateTemplateListHtml() + '</div><br>' +
       '<button id="itinerary-gate-diy-btn" class="btn btn-secondary">I\u2019ll do it myself</button> ' +
       '<button id="itinerary-gate-create-btn" class="btn btn-primary">+ Create Itinerary</button>',
-      { size: 'lg' }
+         { size: 'xl' }
     );
+
+    document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
 
     document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -381,7 +383,7 @@ const ItineraryToday = (function () {
     // view never lags a heartbeat behind (new Planner \u2194 Itinerary sync requirement).
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
     const day = ItineraryData.getToday();
-    Modal.open(todayViewHtml(day), { size: 'lg' });
+    Modal.open(todayViewHtml(day), { size: 'xl' });
     attachStaticListeners();
     attachDynamicListeners();
   }
