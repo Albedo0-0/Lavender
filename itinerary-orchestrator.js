@@ -43,12 +43,59 @@ function todayStr() { return ItineraryTime.todayStr(); }
 
   function isResolved(it) { return it.state === 'completed' || it.state === 'skipped' || it.state === 'rescheduled'; }
 
+  // ---------- status pills (Phase A) — small bottom-screen notifications, module-scoped here
+  // per the plan (not a new file, not a change to notify.js). isMissed/isLate replicate
+  // itinerary-today.js's own render-time logic (same thresholds) rather than importing it, since
+  // this copy needs its own one-shot-per-item firing state instead of a render-time derivation.
+  const LATE_THRESHOLD_MS = 5 * 60 * 1000;
+  const BUILD_FINISH_GRACE_MS = 30 * 60 * 1000;
+  const missedPillFired = {};
+  const latePillFired = {};
+
+  function plannedStartMs(it) { return it.plannedStart ? timeStrToMs(todayStr(), it.plannedStart) : null; }
+  function isMissed(it) {
+    if (it.state !== 'pending') return false;
+    if (it.startOnBuildFinish) return false;
+    const ms = plannedStartMs(it);
+    return ms !== null && nowMs() > ms;
+  }
+  function isLate(it) {
+    if (it.state !== 'active' || !it.actualStart) return false;
+    if (it.startOnBuildFinish) {
+      const ms = plannedStartMs(it);
+      if (ms !== null && (it.actualStart - ms) < BUILD_FINISH_GRACE_MS) return false;
+    }
+    const ms = plannedStartMs(it);
+    return ms !== null && (it.actualStart - ms) > LATE_THRESHOLD_MS;
+  }
+
+  // Fires only the three pill events named in the plan. Never touches notify.js — in-app pill
+  // rendering stays this module's own job, per its comment.
+  function showPill(message) {
+    const container = document.getElementById('itinerary-pill-container');
+    if (!container) return;
+    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pill = document.createElement('div');
+    pill.className = 'itinerary-pill';
+    pill.textContent = message;
+    if (reduced) pill.style.animation = 'none';
+    container.appendChild(pill);
+    const READ_MS = 3000;
+    setTimeout(function () {
+      if (!pill.parentNode) return;
+      if (reduced) { pill.remove(); return; }
+      pill.classList.add('itinerary-pill-out');
+      pill.addEventListener('animationend', function () { if (pill.parentNode) pill.remove(); }, { once: true });
+    }, READ_MS);
+  }
 
   function resolveItem(item, fields) {
     delete journalSnapshots[item.itemId];
     delete waterSnapshots[item.itemId];
     if (activeBreakItemId === item.itemId) activeBreakItemId = null;
     delete studyLaunchRetries[item.itemId];
+    delete missedPillFired[item.itemId];
+    delete latePillFired[item.itemId];
     ItineraryData.updateItemState(item.itemId, fields);
   }
 
@@ -170,11 +217,11 @@ function todayStr() { return ItineraryTime.todayStr(); }
     }
   }
 
-  function activateItem(item) {
+    function activateItem(item) {
     ItineraryData.updateItemState(item.itemId, { state: 'active', actualStart: nowMs() });
     openForType(item);
+    showPill('Session started: ' + (item.label || 'item'));
   }
-
   // ---------- per-type completion detection (only while item.state === 'active') ----------
 
   // Automatic per-type completions record the same way manual ones do (Early Completion +
@@ -260,7 +307,20 @@ function todayStr() { return ItineraryTime.todayStr(); }
     const day = ItineraryData.getToday();
     if (day.status !== 'in_progress') return;
     (day.items || []).forEach(function (item) {
-      if (item.state === 'active') tickActive(item);
+      if (item.state === 'pending') {
+        if (!missedPillFired[item.itemId] && isMissed(item)) {
+          missedPillFired[item.itemId] = true;
+          showPill('Missed: ' + (item.label || 'item'));
+        }
+        return;
+      }
+      if (item.state === 'active') {
+        if (!latePillFired[item.itemId] && isLate(item)) {
+          latePillFired[item.itemId] = true;
+          showPill('Running late: ' + (item.label || 'item'));
+        }
+        tickActive(item);
+      }
     });
   }
 
@@ -279,6 +339,8 @@ function todayStr() { return ItineraryTime.todayStr(); }
   function resetOnRollover() {
     activeBreakItemId = null;
     Object.keys(studyLaunchRetries).forEach(function (k) { delete studyLaunchRetries[k]; });
+    Object.keys(missedPillFired).forEach(function (k) { delete missedPillFired[k]; });
+    Object.keys(latePillFired).forEach(function (k) { delete latePillFired[k]; });
   }
 
   function init() {
