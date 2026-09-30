@@ -307,7 +307,7 @@ const ItineraryToday = (function () {
       ? '<button id="itinerary-today-change-btn" class="btn btn-secondary">Change plan</button>' : '';    // The id="itinerary-today-live" marker lets refreshIfOpen() find and replace just this
     // view's content in place (no Modal.open(), so no re-triggered open sound/focus-steal) —
     // see refreshIfOpen below.
-    return '<h3 class="section-heading">Today</h3><div id="itinerary-today-live">' + todayBodyHtml(day) + '</div><br>' + startBtn + changeBtn;
+    return '<div class="modal-header"><button id="itinerary-today-back-btn" class="btn-secondary">\u2190 Back</button></div><h3 class="section-heading">Today</h3><div id="itinerary-today-live">' + todayBodyHtml(day) + '</div><br>' + startBtn + changeBtn;
   }
 
     // Static listeners: wired once per modal open (start/change-plan) — never re-attached on
@@ -331,7 +331,7 @@ const ItineraryToday = (function () {
   // (Phase B / P2).
   function attachDynamicListeners() {
     document.querySelectorAll('.itinerary-today-start-item-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { ItineraryOrchestrator.startItem(btn.dataset.id); refreshIfOpen(); });
+      btn.addEventListener('click', function () { ItineraryOrchestrator.startItem(btn.dataset.id); });
     });
     document.querySelectorAll('.itinerary-today-done-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { ItineraryOrchestrator.markItemDone(btn.dataset.id); refreshIfOpen(); });
@@ -382,6 +382,8 @@ const ItineraryToday = (function () {
     if (typeof ItineraryData.syncPlannerTasks === 'function') ItineraryData.syncPlannerTasks();
     const day = ItineraryData.getToday();
     Modal.open(todayViewHtml(day), { size: 'xl' });
+    var backBtn = document.getElementById('itinerary-today-back-btn');
+    if (backBtn) backBtn.addEventListener('click', function () { if (typeof Assistant !== 'undefined') Assistant.openMain(); else Modal.close(); });
     attachStaticListeners();
     attachDynamicListeners();
   }
