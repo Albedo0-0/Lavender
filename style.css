@@ -4765,6 +4765,8 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   border-radius: var(--radius-md);
   position: sticky;
   top: 0;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 .itinerary-palette-heading { margin-bottom: var(--space-1); }
 .itinerary-palette-tile {
@@ -4825,8 +4827,6 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 .itinerary-list-panel {
   min-height: 64px;
-  max-height: 42vh;
-  overflow-y: auto;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-2);
