@@ -506,26 +506,21 @@ const Assistant = (function () {
     pixelCanvasEl.className = 'assistant-pixel-entity-canvas';
     pixelEntityEl.appendChild(pixelCanvasEl);
     document.body.appendChild(pixelEntityEl);
-
-    State.patch('settings', { assistantPosition: null });
-    applyPixelEntityPosition(clampToViewport(defaultPixelEntityPosition()));
+const slot = document.getElementById('header-assistant-slot');
+    if (slot && slot.parentNode) {
+      slot.parentNode.insertBefore(pixelEntityEl, slot);
+    } else {
+      document.body.appendChild(pixelEntityEl);
+    }
+    pixelEntityEl.classList.add('assistant-pixel-entity-docked');
 
     pixelEntityEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMain(); }
     });
-    wirePixelEntityDrag();
+    pixelEntityEl.addEventListener('click', openMain);
 
     refreshPixelEntitySkin();
     startIdleLoop();
-
-    window.addEventListener('resize', function () {
-      if (!(State.get().settings || {}).assistantPosition) { redockPixelEntity(); return; }
-      const rect = pixelEntityEl.getBoundingClientRect();
-      applyPixelEntityPosition(clampToViewport({ x: rect.left, y: rect.top }));
-    });
-    window.addEventListener('load', redockPixelEntity);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(redockPixelEntity);
-  }
 
   function init() {
     
