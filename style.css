@@ -530,7 +530,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   -webkit-backdrop-filter: blur(2px);
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+    z-index: 9600;
   animation: modalOverlayIn 200ms ease-out;
 }
 #modal-overlay.modal-closing {
