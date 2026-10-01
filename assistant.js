@@ -408,90 +408,16 @@ const Assistant = (function () {
   }
 
   // Docks beside the Search button: centered on the header's reserved slot (#header-assistant-slot).
-  // getBoundingClientRect() already returns viewport-relative coordinates, and the entity itself
-  // is position:fixed (viewport-anchored) — adding the page's scroll offset here double-counted
-  // scroll, so on a scrolled page (or on mobile, where a scroll can trigger a 'resize' via the
-  // address bar collapsing) the button would dock somewhere other than the slot, reading as "the
-  // button moves when the page is scrolled". Viewport coordinates only, unscrolled.
-  function defaultPixelEntityPosition() {
-    const slot = document.getElementById('header-assistant-slot');
-    if (slot) {
-      const rect = slot.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0) {
-        return {
-          x: rect.left + (rect.width - PIXEL_CANVAS_SIZE) / 2,
-          y: rect.top + (rect.height - PIXEL_CANVAS_SIZE) / 2
-        };
-      }
-    }
-    return { x: 12, y: 12 };
-  }
-
-    // Keeps the default (never-dragged) position glued to the slot as the header layout settles.
-  function redockPixelEntity() {
-    if (!pixelEntityEl) return;
-    if ((State.get().settings || {}).assistantPosition) return;
-    applyPixelEntityPosition(clampToViewport(defaultPixelEntityPosition()));
-  }
   
-  function clampToViewport(pos) {
-    const maxX = Math.max(0, window.innerWidth - PIXEL_CANVAS_SIZE - 8);
-    const maxY = Math.max(0, window.innerHeight - PIXEL_CANVAS_SIZE - 8);
-    return { x: Math.min(Math.max(0, pos.x), maxX), y: Math.min(Math.max(0, pos.y), maxY) };
-  }
 
-  function applyPixelEntityPosition(pos) {
-    if (!pixelEntityEl) return;
-    pixelEntityEl.style.left = pos.x + 'px';
-    pixelEntityEl.style.top = pos.y + 'px';
-  }
-
-  function savePixelEntityPosition(pos) {
-    if (typeof State === 'undefined' || typeof State.patch !== 'function') return;
-    State.patch('settings', { assistantPosition: { x: Math.round(pos.x), y: Math.round(pos.y) } });
-  }
-
-  function wirePixelEntityDrag() {
-    let dragging = false;
-    let moved = false;
-    let suppressClick = false;
-    let startPointer = { x: 0, y: 0 };
-    let startPos = { x: 0, y: 0 };
-
-    pixelEntityEl.addEventListener('pointerdown', function (e) {
-      dragging = true;
-      moved = false;
-      startPointer = { x: e.clientX, y: e.clientY };
-      const rect = pixelEntityEl.getBoundingClientRect();
-      startPos = { x: rect.left, y: rect.top };
-      pixelEntityEl.setPointerCapture(e.pointerId);
-    });
-    pixelEntityEl.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      const dx = e.clientX - startPointer.x, dy = e.clientY - startPointer.y;
-      if (!moved && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) { moved = true; pixelEntityEl.classList.add('assistant-pixel-entity-dragging'); }
-      if (moved) applyPixelEntityPosition(clampToViewport({ x: startPos.x + dx, y: startPos.y + dy }));
-    });
-    function endDrag(e) {
-      if (!dragging) return;
-      dragging = false;
-      pixelEntityEl.classList.remove('assistant-pixel-entity-dragging');
-      if (moved) {
-        const rect = pixelEntityEl.getBoundingClientRect();
-        savePixelEntityPosition({ x: rect.left, y: rect.top });
-      }
-      suppressClick = moved;
-    }
-    pixelEntityEl.addEventListener('click', function () {
-      if (suppressClick) { suppressClick = false; return; }
-      openMain();
-    });
-    pixelEntityEl.addEventListener('pointerup', endDrag);
-    pixelEntityEl.addEventListener('pointercancel', endDrag);
-  }
-
+  // Docks permanently inside the header's reserved slot (#header-assistant-slot), beside Search.
+  // No drag, no saved/persisted position — it is a fixed member of the header, not a free-floating
+  // element, so there is no stale-position state that can ever pull it elsewhere (e.g. Study).
   function mountPixelEntity() {
     if (pixelEntityEl || typeof AssistantLVPackData === 'undefined') return;
+    const slot = document.getElementById('header-assistant-slot');
+    if (!slot) return;
+
     pixelEntityEl = document.createElement('div');
     pixelEntityEl.id = 'assistant-pixel-entity';
     pixelEntityEl.setAttribute('role', 'button');
@@ -505,15 +431,9 @@ const Assistant = (function () {
     pixelCanvasEl.height = PIXEL_CANVAS_SIZE;
     pixelCanvasEl.className = 'assistant-pixel-entity-canvas';
     pixelEntityEl.appendChild(pixelCanvasEl);
-    document.body.appendChild(pixelEntityEl);
-const slot = document.getElementById('header-assistant-slot');
-    if (slot) {
-      slot.removeAttribute('aria-hidden');
-      slot.appendChild(pixelEntityEl);
-    } else {
-      document.body.appendChild(pixelEntityEl);
-    }
-    pixelEntityEl.classList.add('assistant-pixel-entity-docked');
+
+    slot.removeAttribute('aria-hidden');
+    slot.appendChild(pixelEntityEl);
 
     pixelEntityEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMain(); }
@@ -522,6 +442,7 @@ const slot = document.getElementById('header-assistant-slot');
 
     refreshPixelEntitySkin();
     startIdleLoop();
+  }
 
   function init() {
     
