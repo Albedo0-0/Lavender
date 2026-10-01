@@ -4982,7 +4982,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 }
 .itinerary-checklist-title { color: #3a3226; margin-top: 0; }
 .itinerary-checklist-paper .empty-state { color: #6b5f4a; }
-.itinerary-checklist-row {
+.itinerary-checklist-paper .itinerary-checklist-row {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -4991,7 +4991,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   font-size: 1.1rem;
   cursor: pointer;
 }
-.itinerary-checklist-row input[type="checkbox"] { width: 22px; height: 22px; flex: 0 0 auto; }
-.itinerary-checklist-row-done .itinerary-checklist-row-text { text-decoration: line-through; opacity: 0.6; }
+.itinerary-checklist-paper .itinerary-checklist-row input[type="checkbox"] { width: 22px; height: 22px; flex: 0 0 auto; }
+.itinerary-checklist-paper .itinerary-checklist-row-done .itinerary-checklist-row-text { text-decoration: line-through; opacity: 0.6; }
 .itinerary-checklist-actions { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .itinerary-checklist-again-msg { color: #a3473a; font-size: 0.9rem; }
