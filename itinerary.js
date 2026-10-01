@@ -193,10 +193,10 @@ const Itinerary = (function () {
       plannedStart: null, plannedEnd: null, startTime: null
     };
     if (type === 'study') {
-      item.subject = (typeof PlannerData !== 'undefined' && PlannerData.SUBJECTS[0]) || '';
+      item.subject = '';
       item.topicName = '';
       item.taskType = 'theory';
-      item.label = item.subject + ' \u00b7 (choose topic)';
+      item.label = 'Study session';
     } else if (type === 'planner-task') {
       const tasks = (typeof PlannerData !== 'undefined') ? PlannerData.getTodayTasks().concat(PlannerData.getUpcomingTasks()) : [];
       if (tasks[0]) {
@@ -231,7 +231,7 @@ const Itinerary = (function () {
   function validateDraftItems(items) {
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      if (it.type === 'study' && !it.topicName) return 'Give every Study item a topic.';
+        if (it.type === 'study' && it.topicName && !it.subject) return 'Add a subject for the topic on every Study item, or clear the topic.';
       if (it.type === 'planner-task' && !it.refId) return 'Pick an existing task for every Planner Task item.';
       if (it.type === 'target' && !it.refId) return 'Pick an existing target for every Target item.';
       if (it.type === 'custom' && !it.label) return 'Give every ' + TYPE_LABELS[it.type] + ' item a label.';
@@ -245,8 +245,18 @@ const Itinerary = (function () {
 
   function topicDatalistHtml(subject) {
     const grouped = PlannerData.getTopicsBySubject();
-    const topics = grouped[subject] || [];
+    const topics = subject
+      ? (grouped[subject] || [])
+      : Object.keys(grouped).reduce(function (all, s) { return all.concat(grouped[s]); }, []);
     return topics.map(function (t) { return '<option value="' + esc(t.topicName) + '">'; }).join('');
+  }
+
+  function subjectDatalistHtml() {
+    return PlannerData.getAllSubjects().map(function (s) { return '<option value="' + esc(s) + '">'; }).join('');
+  }
+
+  function studyLabel(subject, topicName) {
+    return subject ? (subject + ' \u00b7 ' + (topicName || '(choose topic)')) : (topicName || 'Study session');
   }
 
   function plannerTaskOptionsHtml(selectedTaskId) {
@@ -287,11 +297,10 @@ const Itinerary = (function () {
   function itemFormFieldsInlineHtml(it) {
     const type = it.type;
     if (type === 'study') {
-      const subject = it.subject || PlannerData.SUBJECTS[0];
+      const subject = it.subject || '';
       const taskType = it.taskType || 'theory';
-      return '<label>Subject<br><select class="input itinerary-field-subject" data-id="' + it.itemId + '">' +
-          PlannerData.SUBJECTS.map(function (s) { return '<option value="' + s + '"' + (s === subject ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
-        '</select></label>' +
+      return '<label>Subject (optional)<br><input type="text" class="input itinerary-field-subject" data-id="' + it.itemId + '" list="itinerary-item-subject-options-' + it.itemId + '" value="' + esc(subject) + '"></label>' +
+        '<datalist id="itinerary-item-subject-options-' + it.itemId + '">' + subjectDatalistHtml() + '</datalist>' +
         '<label>Topic<br><input type="text" class="input itinerary-field-topic" data-id="' + it.itemId + '" list="itinerary-item-topic-options-' + it.itemId + '" value="' + esc(it.topicName || '') + '"></label>' +
         '<datalist id="itinerary-item-topic-options-' + it.itemId + '">' + topicDatalistHtml(subject) + '</datalist>' +
         '<div class="chip-row itinerary-field-tasktype-row">' +
@@ -433,9 +442,9 @@ const Itinerary = (function () {
       inp.addEventListener('change', function () {
         const id = inp.dataset.id;
         const it = draftItems.find(function (x) { return x.itemId === id; });
-        const subject = (it && it.subject) || PlannerData.SUBJECTS[0];
+        const subject = (it && it.subject) || '';
         const topicName = inp.value.trim();
-        updateItemField(id, { topicName: topicName, label: subject + ' \u00b7 ' + (topicName || '(choose topic)') });
+        updateItemField(id, { topicName: topicName, label: studyLabel(subject, topicName) });
         refreshBuilder();
       });
     });
@@ -443,9 +452,9 @@ const Itinerary = (function () {
       sel.addEventListener('change', function () {
         const id = sel.dataset.id;
         const it = draftItems.find(function (x) { return x.itemId === id; });
-        const subject = sel.value;
+        const subject = sel.value.trim();
         const topicName = (it && it.topicName) || '';
-        updateItemField(id, { subject: subject, label: subject + ' \u00b7 ' + (topicName || '(choose topic)') });
+        updateItemField(id, { subject: subject, label: studyLabel(subject, topicName) });
         refreshBuilder();
       });
     });
