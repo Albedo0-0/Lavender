@@ -4882,15 +4882,13 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 /* ---- Assistant pixel companion entity (Itinerary Phase 10) ---- */
 #assistant-pixel-entity {
-  position: fixed;
-  z-index: 60;
+  position: static;
   width: 40px;
   height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: grab;
-  touch-action: none;
+  cursor: pointer;
   background: transparent;
   border: none;
   padding: 0;
