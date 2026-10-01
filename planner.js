@@ -85,11 +85,10 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   function renderSubjectModeBody(body) {
     body.innerHTML =
       '<div class="planner-compact-row">' +
-        '<select id="planner-subject" class="input" title="Subject">' +
-          '<option value="Biology">Bio</option>' +
-          '<option value="Chemistry">Chem</option>' +
-          '<option value="Physics">Phys</option>' +
-        '</select>' +
+                '<input type="text" id="planner-subject" class="input" list="planner-subject-options" placeholder="Subject" title="Subject" value="Biology">' +
+        '<datalist id="planner-subject-options">' +
+          PlannerData.getAllSubjects().map(function (s) { return '<option value="' + s + '">'; }).join('') +
+        '</datalist>' +
         '<input type="text" id="planner-topic" class="input" list="planner-topic-options" placeholder="Topic">' +
         '<datalist id="planner-topic-options"></datalist>' +
       '</div>' +
@@ -103,7 +102,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '<button id="planner-save-task" class="btn btn-primary"' + ((typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) ? ' disabled' : '') + '>Add Task</button>';
 
     updateTopicOptions();
-    document.getElementById('planner-subject').addEventListener('change', updateTopicOptions);
+    document.getElementById('planner-subject').addEventListener('input', updateTopicOptions);
     document.getElementById('planner-save-task').addEventListener('click', handleSaveSubjectTask);
   }
 
@@ -254,7 +253,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
 
   function handleSaveSubjectTask() {
     if (typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before scheduling a task.'); return; }
-    const subject = document.getElementById('planner-subject').value;
+    const subject = document.getElementById('planner-subject').value.trim();
     const topicName = document.getElementById('planner-topic').value.trim();
     const dateStr = document.getElementById('planner-date').value;
     const startTime = document.getElementById('planner-start-time').value;
@@ -263,8 +262,8 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const taskType = taskTypeInput ? taskTypeInput.value : 'theory';
     const note = document.getElementById('planner-note').value;
 
-    if (!topicName || !dateStr) {
-      alert('Please enter a topic and a date.');
+        if (!subject || !topicName || !dateStr) {
+      alert('Please enter a subject, a topic and a date.');
       return;
     }
 
