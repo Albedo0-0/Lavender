@@ -97,6 +97,20 @@ function todayStr() { return ItineraryTime.todayStr(); }
     delete missedPillFired[item.itemId];
     delete latePillFired[item.itemId];
     ItineraryData.updateItemState(item.itemId, fields);
+    // Planner-linked completion (cross-system consistency): a 'study'/'planner-task' item
+    // completed from Itinerary shares its refId with the underlying Planner taskId (the
+    // single canonical ID already used by Planner, Calendar, and TimeEngine's sessionRecords
+    // — see itinerary-data.js syncPlannerTasks). Mirror completion through Planner's own
+    // toggleComplete so the task leaves Planner's active queries (Today/Pending/Upcoming)
+    // the same way a manual Planner/Calendar checkbox does, while staying in tasks{} as
+    // history. Guarded against an already-completed task so this never flips it back to
+    // incomplete (toggleComplete is a toggle), and scoped to only the two Planner-linked
+    // item types so target/journal/water/break/checklist/custom/nav items are untouched.
+    if (fields.state === 'completed' && (item.type === 'study' || item.type === 'planner-task') && item.refId &&
+        typeof PlannerData !== 'undefined' && typeof PlannerData.getTask === 'function' && typeof PlannerData.toggleComplete === 'function') {
+      const linkedTask = PlannerData.getTask(item.refId);
+      if (linkedTask && !linkedTask.completed) PlannerData.toggleComplete(item.refId);
+    }
   }
 
   // ---------- manual confirmation (called from ItineraryToday's "Mark Done"/"Skip" buttons) ----------
