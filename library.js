@@ -55,7 +55,7 @@ const Library = (function () {
       '</div>';
     }
 
-    html += '<div class="planner-history-subject-list list-row-group">' + PlannerData.SUBJECTS.map(function (subject) {
+    html += '<div class="planner-history-subject-list list-row-group">' + PlannerData.getAllSubjects().map(function (subject) {
       return '<button class="planner-history-subject-btn list-row" data-subject="' + subject + '">' + subject + '</button>';
     }).join('') + '</div>';
 
