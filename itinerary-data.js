@@ -251,6 +251,51 @@ const ItineraryData = (function () {
     return nextDay;
   }
 
+    // Mid-day edit of today's plan (Itinerary Improvement Phase B). Merges builder output into the
+  // live items without touching execution records: resolved and active items are kept exactly as
+  // they are, Planner-synced items the builder never knew about are kept, and genuinely new
+  // items start 'pending'. Never calls chooseTemplate; no other item's time is moved.
+  function editTodayItems(newItems) {
+    const day = getToday();
+    if (day.status !== 'in_progress' && day.status !== 'itinerary_selected') return day;
+    if (!Array.isArray(newItems)) return day;
+    const liveById = {};
+    (day.items || []).forEach(function (it) { liveById[it.itemId] = it; });
+    const incomingIds = {};
+    const merged = newItems.map(function (def) {
+      incomingIds[def.itemId] = true;
+      const live = liveById[def.itemId];
+      if (live && live.state !== 'pending') return live;
+      return Object.assign({}, def, {
+        state: 'pending',
+        actualStart: null,
+        actualEnd: null,
+        refId: def.refId || (live && live.refId) || null,
+        tagIds: def.tagIds || [],
+        syncedFromPlanner: !!(live && live.syncedFromPlanner)
+      });
+    });
+    (day.items || []).forEach(function (it) {
+      if (incomingIds[it.itemId]) return;
+      if (it.state !== 'pending' || it.syncedFromPlanner) merged.push(it);
+    });
+    merged.sort(function (a, b) {
+      const as = a.plannedStart || '99:99', bs = b.plannedStart || '99:99';
+      return as < bs ? -1 : (as > bs ? 1 : 0);
+    });
+    const patch = { items: merged };
+    if (day.status === 'in_progress' && merged.length && itemsAllResolved(merged)) {
+      patch.status = 'completed';
+      patch.completedAt = Date.now();
+    }
+    const nextDay = setToday(patch);
+    if (patch.status === 'completed') {
+      writeChecklistTagRollup(nextDay);
+      writeItinerarySummary(nextDay);
+    }
+    return nextDay;
+  }
+  
   // ---------- Plan the rest of today (Phase 8, optional catch-up suggestion) ----------
   // Pure, stateless, deterministic: reads today's items and the current clock only, never
   // writes State. Applying a returned suggestion goes through updateItemState() above — the
@@ -480,10 +525,13 @@ const ItineraryData = (function () {
     const summaries = Object.assign({}, getSummaries());
     let cursor = fromDateStr;
     let guard = 0; // sanity cap so a corrupt/garbage date pair can never loop forever
+    const usedTemplateIds = {};
     while (cursor < toDateStr && guard < 3660) {
       if (!summaries[cursor]) {
         const day = (stored && stored.date === cursor) ? stored : defaultDay(cursor);
         const finalized = finalizeDay(day);
+        if (finalized.templateId) usedTemplateIds[finalized.templateId] = true;
+        (finalized.previousRuns || []).forEach(function (r) { if (r && r.templateId) usedTemplateIds[r.templateId] = true; });
         summaries[cursor] = finalized;
         writeChecklistTagRollup(finalized);
         writeItinerarySummary(finalized);
@@ -492,6 +540,20 @@ const ItineraryData = (function () {
       guard++;
     }
     State.set({ dailyItinerarySummaries: summaries, dailyItinerary: null });
+    // Itinerary Improvement Phase B: drop one-day templates once their day has passed. Only
+    // itineraryTemplates is touched; summaries / DateHub history are never modified here.
+    if (typeof ItineraryTemplateData !== 'undefined') {
+      const removedTemplateIds = [];
+      ItineraryTemplateData.getList().forEach(function (t) {
+        const s = t.schedule || {};
+        const expired = (s.type === 'once' && usedTemplateIds[t.templateId]) ||
+          (s.type === 'date' && s.date && s.date < toDateStr);
+        if (!expired) return;
+        ItineraryTemplateData.remove(t.templateId);
+        removedTemplateIds.push(t.templateId);
+      });
+      if (removedTemplateIds.length) console.log('[itinerary] removed expired one-day templates: ' + removedTemplateIds.join(', '));
+    }
   }
 
   // Wire into TimeEngine's Feature 12 rollover signal once, under a stable id (Section 4's
@@ -508,6 +570,7 @@ const ItineraryData = (function () {
     chooseDIY: chooseDIY,
     startItinerary: startItinerary,
     updateItemState: updateItemState,
+    editTodayItems: editTodayItems,
     syncPlannerTasks: syncPlannerTasks,
     removeSyncedItem: removeSyncedItem,
     onRolloverFinalize: onRolloverFinalize,
