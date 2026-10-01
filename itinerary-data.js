@@ -39,7 +39,8 @@ const ItineraryData = (function () {
       checklist: [],
       diyChosen: false,
       startedAt: null,
-      completedAt: null
+      completedAt: null,
+      suppressedRefIds: []
     };
   }
 
@@ -454,7 +455,9 @@ const ItineraryData = (function () {
     refreshedItems.forEach(function (it) {
       if (it.refId && (it.type === 'planner-task' || it.type === 'study')) referencedTaskIds[it.refId] = true;
     });
-    const missing = todaysTasks.filter(function (t) { return !t.completed && !referencedTaskIds[t.taskId]; });
+        const suppressedSet = {};
+    (day.suppressedRefIds || []).forEach(function (id) { suppressedSet[id] = true; });
+    const missing = todaysTasks.filter(function (t) { return !t.completed && !referencedTaskIds[t.taskId] && !suppressedSet[t.taskId]; });
     if (!missing.length && !refreshed) return day;
     const newItems = missing.map(function (t) {
       return {
@@ -495,6 +498,9 @@ const ItineraryData = (function () {
     if (!item) return day;
     const items = day.items.filter(function (it) { return it.itemId !== itemId; });
     const patch = { items: items };
+    if (item.syncedFromPlanner && item.refId) {
+      patch.suppressedRefIds = (day.suppressedRefIds || []).concat([item.refId]);
+    }
     if (day.status === 'in_progress' && itemsAllResolved(items)) {
       patch.status = 'completed';
       patch.completedAt = Date.now();
