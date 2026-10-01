@@ -388,11 +388,77 @@ const ItineraryToday = (function () {
     attachDynamicListeners();
   }
 
-  // Existing checklist flow: opens Today and auto-expands this item's row list, so starting a
-  // checklist item doesn't require a second "Show items" click.
+    // Dedicated paper-style checklist panel (Itinerary Improvement Phase B). Opened by the
+  // orchestrator when a checklist item activates and again when its "Check again at" time
+  // arrives. Row ticks persist immediately through ItineraryData.updateItemState, so nothing is
+  // lost if the panel is closed; Save resolves the item through the orchestrator's markItemDone.
   function openChecklistItem(item) {
-    if (item && item.itemId) expandedChecklistItemIds[item.itemId] = true;
-    openTodayView();
+    if (!item || !item.itemId) { openTodayView(); return; }
+    function liveItem() {
+      return (ItineraryData.getToday().items || []).find(function (it) { return it.itemId === item.itemId; }) || item;
+    }
+    const live = liveItem();
+    const active = live.state === 'active';
+    const rows = live.rows || [];
+    const rowsHtml = rows.length
+      ? rows.map(function (row) {
+          return '<label class="itinerary-checklist-row' + (row.done ? ' itinerary-checklist-row-done' : '') + '">' +
+            '<input type="checkbox" class="itinerary-checklist-check" data-row-id="' + esc(row.id) + '"' + (row.done ? ' checked' : '') + (active ? '' : ' disabled') + '> ' +
+            '<span class="itinerary-checklist-row-text">' + esc(row.text || '(untitled)') + '</span>' +
+          '</label>';
+        }).join('')
+      : '<p class="empty-state">This checklist has no rows.</p>';
+    const actionsHtml = active
+      ? '<div class="itinerary-checklist-actions">' +
+          '<button id="itinerary-checklist-save-btn" class="btn btn-primary">Save</button> ' +
+          '<button id="itinerary-checklist-again-btn" class="btn btn-secondary">Check again at</button> ' +
+          '<span id="itinerary-checklist-again-panel" style="display:none">' +
+            '<input type="time" id="itinerary-checklist-again-time"> ' +
+            '<button id="itinerary-checklist-again-confirm-btn" class="btn btn-primary">Set</button> ' +
+            '<span id="itinerary-checklist-again-msg" class="itinerary-checklist-again-msg"></span>' +
+          '</span>' +
+        '</div>'
+      : '';
+    Modal.open(
+      '<div class="itinerary-checklist-paper"><h3 class="section-heading itinerary-checklist-title">' + esc(live.label) + '</h3>' +
+      rowsHtml + actionsHtml + '</div>',
+      { size: 'xl' }
+    );
+
+    document.querySelectorAll('.itinerary-checklist-check').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const cur = liveItem();
+        if (cur.state !== 'active') return;
+        const nextRows = (cur.rows || []).map(function (r) {
+          return String(r.id) === cb.dataset.rowId ? Object.assign({}, r, { done: cb.checked }) : r;
+        });
+        ItineraryData.updateItemState(cur.itemId, { rows: nextRows });
+        const label = cb.closest('.itinerary-checklist-row');
+        if (label) label.classList.toggle('itinerary-checklist-row-done', cb.checked);
+      });
+    });
+
+    const saveBtn = document.getElementById('itinerary-checklist-save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', function () {
+      if (typeof ItineraryOrchestrator !== 'undefined') ItineraryOrchestrator.markItemDone(item.itemId);
+      else ItineraryData.updateItemState(item.itemId, { state: 'completed' });
+      Modal.close();
+    });
+
+    const againBtn = document.getElementById('itinerary-checklist-again-btn');
+    const againPanel = document.getElementById('itinerary-checklist-again-panel');
+    if (againBtn && againPanel) againBtn.addEventListener('click', function () {
+      againPanel.style.display = (againPanel.style.display === 'none') ? 'inline' : 'none';
+    });
+    const againConfirmBtn = document.getElementById('itinerary-checklist-again-confirm-btn');
+    if (againConfirmBtn) againConfirmBtn.addEventListener('click', function () {
+      const val = document.getElementById('itinerary-checklist-again-time').value;
+      const msg = document.getElementById('itinerary-checklist-again-msg');
+      const ms = val ? ItineraryTime.timeStrToMs(todayStr(), val) : null;
+      if (!ms || ms <= Date.now()) { msg.textContent = 'Pick a time later today.'; return; }
+      ItineraryData.updateItemState(item.itemId, { checkAgainAt: ms });
+      Modal.close();
+    });
   }
 
   // Section 17/18's automatic progression (orchestrator ticks; a break ending naturally; a
