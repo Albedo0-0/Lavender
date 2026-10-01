@@ -151,7 +151,9 @@ function todayStr() { return ItineraryTime.todayStr(); }
     if (item.type !== 'study' || item.refId) return;
     const start = item.plannedStart;
     const end = item.plannedEnd;
-    const task = PlannerData.createSingleTask(item.subject, item.topicName, item.taskType || 'theory', todayStr(), '', start, end);
+    const task = (item.topicName && item.subject)
+      ? PlannerData.createSingleTask(item.subject, item.topicName, item.taskType || 'theory', todayStr(), '', start, end)
+      : PlannerData.createCustomTask(item.label || 'Study session', todayStr(), '', start, end);
     if (!task) return;
     // Additive, non-breaking tag (Section 22) — lets a future view find "which itinerary item
     // does this session belong to" without PlannerData/TimeEngine needing to know Itinerary
