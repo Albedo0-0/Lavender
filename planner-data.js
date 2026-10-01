@@ -61,12 +61,20 @@ const PlannerData = (function () {
     const grouped = { Biology: [], Chemistry: [], Physics: [] };
     Object.keys(topics).forEach(function (id) {
       const t = topics[id];
-      if (grouped[t.subject]) grouped[t.subject].push(t);
+      if (!t.subject) return;
+      if (!grouped[t.subject]) grouped[t.subject] = [];
+      grouped[t.subject].push(t);
     });
-    SUBJECTS.forEach(function (s) {
+    Object.keys(grouped).forEach(function (s) {
       grouped[s].sort(function (a, b) { return a.topicName.localeCompare(b.topicName); });
     });
     return grouped;
+  }
+
+  // Canonical subjects first, then any custom subject that has at least one topic.
+  function getAllSubjects() {
+    const extra = Object.keys(getTopicsBySubject()).filter(function (s) { return SUBJECTS.indexOf(s) === -1; });
+    return SUBJECTS.concat(extra.sort());
   }
 
   function getTasksForTopic(topicId) {
@@ -404,7 +412,8 @@ function slotLabel(t) {
     getAllTopics: getAllTopics,
     getOrCreateTopic: getOrCreateTopic,
     findTopic: findTopic,
-    getTopicsBySubject: getTopicsBySubject,
+        getTopicsBySubject: getTopicsBySubject,
+    getAllSubjects: getAllSubjects,
     getTasksForTopic: getTasksForTopic,
     renameTopic: renameTopic,
     deleteTopic: deleteTopic,
