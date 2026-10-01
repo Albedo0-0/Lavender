@@ -299,7 +299,17 @@ function todayStr() { return ItineraryTime.todayStr(); }
     if (item.type === 'journal') { checkJournal(item); return; }
     if (item.type === 'water') { checkWater(item); return; }
     if (item.type === 'target') { checkTarget(item); return; }
-    // 'checklist'/'custom'/'nav': no automatic signal — waits for markItemDone()/skipItem().
+    if (item.type === 'checklist') {
+      // "Check again at": polled on this same heartbeat (no timer, no generalAlarms entry).
+      // Deferred while a priority-locked modal is up; the stamp is only cleared once we reopen.
+      if (item.checkAgainAt && nowMs() >= item.checkAgainAt) {
+        if (typeof Modal !== 'undefined' && typeof Modal.isLocked === 'function' && Modal.isLocked()) return;
+        ItineraryData.updateItemState(item.itemId, { checkAgainAt: null });
+        if (typeof ItineraryToday !== 'undefined' && typeof ItineraryToday.openChecklistItem === 'function') ItineraryToday.openChecklistItem(item);
+      }
+      return;
+    }
+    // 'custom'/'nav': no automatic signal — waits for markItemDone()/skipItem().
   }
 
   // Every active item is ticked independently, every heartbeat — no "current item", no ordering.
