@@ -507,8 +507,9 @@ const Assistant = (function () {
     pixelEntityEl.appendChild(pixelCanvasEl);
     document.body.appendChild(pixelEntityEl);
 const slot = document.getElementById('header-assistant-slot');
-    if (slot && slot.parentNode) {
-      slot.parentNode.insertBefore(pixelEntityEl, slot);
+    if (slot) {
+      slot.removeAttribute('aria-hidden');
+      slot.appendChild(pixelEntityEl);
     } else {
       document.body.appendChild(pixelEntityEl);
     }
