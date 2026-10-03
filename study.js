@@ -485,16 +485,17 @@ function renderClock() {
   }
 
   // Focus Mode (§4): large clock + only Links / Completed / Pause / Do it later.
-  function renderFocusMode(active) {
+function renderFocusMode(active) {
     const container = document.getElementById('study-session-panel');
     const task = PlannerData.getAllTasks()[active.taskId];
     const clockPanel = document.getElementById('study-clock-panel');
     if (clockPanel) clockPanel.style.display = 'none';
     applyChromeVisibility();
 
+    const itineraryTitle = itineraryTitleForTask(active.taskId);
     container.innerHTML =
       '<div class="study-focus-mode">' +
-        '<p class="study-active-label">' + (itineraryTitleForTask(active.taskId) || taskLabelFull(task)) + '</p>' +
+        '<p class="study-active-label">' + (itineraryTitle || taskLabelFull(task)) + '</p>' +
            '<div id="study-focus-clock" class="study-focus-clock"></div>' +
         '<div id="study-focus-remaining" class="study-focus-remaining"></div>' +
         (active.state === 'paused' ? '<p class="study-paused-note">Paused</p>' : '') +
@@ -502,6 +503,7 @@ function renderClock() {
           '<button id="study-focus-complete" class="btn btn-primary">Completed</button>' +
           '<button id="study-focus-pause" class="btn btn-secondary">' + (active.state === 'paused' ? 'Resume' : 'Pause') + '</button>' +
           '<button id="study-focus-later" class="btn btn-secondary">Do it later</button>' +
+          (itineraryTitle ? '<button id="study-focus-back-to-itinerary" class="btn btn-secondary">Back to Itinerary</button>' : '') +
         '</div>' +
       '</div>';
 
@@ -543,6 +545,10 @@ function renderClock() {
     document.getElementById('study-focus-later').addEventListener('click', function () {
       try { confirmDoItLater(active.taskId); }
       catch (err) { console.warn('study-focus-later click failed', err); }
+    });
+    const backToItineraryBtn = document.getElementById('study-focus-back-to-itinerary');
+    if (backToItineraryBtn) backToItineraryBtn.addEventListener('click', function () {
+      if (typeof ItineraryToday !== 'undefined' && ItineraryToday.openTodayView) ItineraryToday.openTodayView();
     });
   }
 
