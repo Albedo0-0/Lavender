@@ -1,4 +1,6 @@
 // calendar.js — monthly grid + Date Hub modal (Feature 1). Depends on: State, Storage, DateHub, Modal, Nav.
+// Phase B / B-8: also reads hub.itinerarySummary (written by itinerary-data.js's
+// writeItinerarySummary) to show a per-day itinerary outcome.
 
 const Calendar = (function () {
   let viewYear, viewMonth; // viewMonth is 0-indexed
@@ -16,6 +18,15 @@ const Calendar = (function () {
     const d = new Date(dateStr + 'T00:00:00');
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     return monthNames[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  // Phase B / B-8 — guarded for undefined/null so dates with no itinerary data (including any
+  // day that finalized before Phase A's rollover subscriber-id fix) render nothing.
+  function itinerarySummaryLabel(summary) {
+    if (!summary) return '';
+    if (summary.diyChosen) return 'Itinerary: did it myself';
+    const c = summary.counts || {};
+    return 'Itinerary: ' + (c.completed || 0) + '/' + (c.total || 0) + ' done';
   }
 
   function render() {
@@ -180,6 +191,13 @@ const Calendar = (function () {
         cell.appendChild(preview);
       }
 
+      if (hub.itinerarySummary) {
+        const itPreview = document.createElement('div');
+        itPreview.className = 'cal-itinerary-preview';
+        itPreview.textContent = itinerarySummaryLabel(hub.itinerarySummary);
+        cell.appendChild(itPreview);
+      }
+
       cell.addEventListener('click', function () {
         openDateHub(dateStr);
       });
@@ -269,7 +287,8 @@ const Calendar = (function () {
           '<h3 class="section-heading">' + formatLong(dateStr) + '</h3>' +
           '<button id="datehub-close" class="datehub-close btn btn-secondary" aria-label="Close">&times;</button>' +
         '</div>' +
-         '<div class="datehub-todo-section">' +
+         (hub.itinerarySummary ? '<div class="datehub-itinerary-summary">' + itinerarySummaryLabel(hub.itinerarySummary) + '</div>' : '') +
+        '<div class="datehub-todo-section">' +
           '<label class="datehub-label datehub-todo-heading section-heading">To Do</label>' +
           renderTodoList(dateStr) +
         '</div>' +
