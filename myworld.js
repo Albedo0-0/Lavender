@@ -182,7 +182,7 @@ const MyWorld = (function () {
 
   /** The capability object handed to the active pack's lifecycle/event calls — the only channel it has back into the core. */
   function packEngineContext() {
-    return { growActiveTree: growActiveTree, getTreeStages: getTreeStages };
+    return { growActiveTree: growActiveTree, getTreeStages: getTreeStages, openJournal: function () { closeFullscreen(); if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('journal'); } };
   }
 
   /**
