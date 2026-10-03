@@ -529,6 +529,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     const dateLine = (t.completed
       ? 'Scheduled: ' + t.date + ' \u2014 Completed: ' + t.completedDate
       : 'Scheduled: ' + t.date) + (slot ? ' \u00B7 ' + slot : '');
+    // Phase B / B-9: ItineraryData is a global already loaded by this point in the page — a
+    // defensive typeof check, same pattern this file already uses for Study.
+    const inItinerary = typeof ItineraryData !== 'undefined' &&
+      (ItineraryData.getToday().items || []).some(function (it) { return it.refId === t.taskId; });
+    const itineraryChip = inItinerary ? '<span class="chip planner-itinerary-chip">In today\u2019s itinerary</span> ' : '';
 
     const sessionActive = typeof Study !== 'undefined' && Study.isSessionActive && Study.isSessionActive();
     const studyBtn = (t.startTime && !t.completed)
@@ -548,7 +553,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</label>' +
       '<div class="planner-task-sub">' + dateLine + '</div>' +
       (t.note ? '<div class="planner-task-note">' + t.note + '</div>' : '') +
-      studyBtn + reschedBtn + editBtn + deleteBtn +
+      itineraryChip + studyBtn + reschedBtn + editBtn + deleteBtn +
     '</div>';
   }
 
