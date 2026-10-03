@@ -43,7 +43,7 @@ function todayStr() { return ItineraryTime.todayStr(); }
 
   function isResolved(it) { return it.state === 'completed' || it.state === 'skipped'; }
 
-  // ---------- status pills (Phase A) — small bottom-screen notifications, module-scoped here
+  // ---------- status pills (Phase A) — small floating top-of-screen popup notifications, module-scoped here
   // per the plan (not a new file, not a change to notify.js). The missed/late rules live in
   // ItineraryTime (shared with itinerary-today.js); only the one-shot-per-item firing state below
   // is orchestrator-specific.
@@ -61,13 +61,46 @@ function todayStr() { return ItineraryTime.todayStr(); }
     pill.textContent = message;
     if (reduced) pill.style.animation = 'none';
     container.appendChild(pill);
-    const READ_MS = 3000;
-    setTimeout(function () {
-      if (!pill.parentNode) return;
+    // Popup lifecycle (one timer per pill, no global timer): auto-dismiss after ~1 minute if
+    // ignored, or dismiss early with an upward swipe. Listeners live on the pill itself and go
+    // away with it.
+    const READ_MS = 60000;
+    const SWIPE_PX = 40;
+    let autoTimer = null;
+    let gone = false;
+    function dismiss() {
+      if (gone || !pill.parentNode) return;
+      gone = true;
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+      pill.style.translate = '';
       if (reduced) { pill.remove(); return; }
       pill.classList.add('itinerary-pill-out');
       pill.addEventListener('animationend', function () { if (pill.parentNode) pill.remove(); }, { once: true });
-    }, READ_MS);
+    }
+    autoTimer = setTimeout(dismiss, READ_MS);
+
+    let startY = 0, dy = 0, pid = null, moved = false;
+    pill.addEventListener('pointerdown', function (e) {
+      if (gone) return;
+      pid = e.pointerId; startY = e.clientY; dy = 0; moved = false;
+      try { pill.setPointerCapture(pid); } catch (err) { /* best-effort */ }
+    });
+    pill.addEventListener('pointermove', function (e) {
+      if (pid === null || e.pointerId !== pid) return;
+      dy = Math.min(0, e.clientY - startY);
+      if (Math.abs(dy) > 6) moved = true;
+      if (moved) pill.style.translate = '0 ' + dy + 'px';
+    });
+    function endSwipe(e) {
+      if (pid === null || e.pointerId !== pid) return;
+      try { pill.releasePointerCapture(pid); } catch (err) { /* best-effort */ }
+      pid = null;
+      if (!moved) return;
+      if (e.type === 'pointerup' && -dy >= SWIPE_PX) dismiss();
+      else pill.style.translate = '';
+    }
+    pill.addEventListener('pointerup', endSwipe);
+    pill.addEventListener('pointercancel', endSwipe);
   }
 
   function resolveItem(item, fields) {
@@ -142,7 +175,6 @@ function todayStr() { return ItineraryTime.todayStr(); }
   }
   function endLinkedSessionById(itemId) {
     endLinkedSession((ItineraryData.getToday().items || []).find(function (it) { return it.itemId === itemId; }));
-  }
   }
 
   // ---------- activation (fires exactly once, at the pending -> active transition) ----------
