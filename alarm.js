@@ -7,6 +7,14 @@
 // would double-fire (and, here, potentially double-open the fire modal) on every tick.
 const Alarm = (function () {
   const SUBSCRIBER_ID = 'alarm';
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
   let editingId = null;
 
   const DAY_LABELS = { SU: 'Sun', MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat' };
@@ -78,7 +86,7 @@ const Alarm = (function () {
     const recurrence = alarm ? alarm.recurrence : { type: 'once' };
     const type = recurrence.type;
     return '<h3 class="section-heading">' + (alarm ? 'Edit Alarm' : 'Add Alarm') + '</h3>' +
-      '<label>Text<br><input type="text" id="alarm-text-input" class="input" value="' + (alarm ? alarm.text : '') + '"></label><br><br>' +
+      '<label>Text<br><input type="text" id="alarm-text-input" class="input" value="' + (alarm ? esc(alarm.text) : '') + '"></label><br><br>' +
       '<label>Time<br><input type="time" id="alarm-time-input" class="input" value="' + (alarm ? alarm.time : '') + '"></label><br><br>' +
       '<label>Repeat<br><select id="alarm-recurrence-select" class="input">' +
         ['once', 'daily', 'weekdays', 'date'].map(function (t) {
@@ -142,7 +150,7 @@ const Alarm = (function () {
     const templates = ItineraryTemplateData.getList();
     const rows = templates.length ? templates.map(function (t) {
       return '<div class="itinerary-template-row list-row" data-id="' + t.templateId + '">' +
-        '<span class="itinerary-template-row-name">' + t.name + '</span> ' +
+        '<span class="itinerary-template-row-name">' + esc(t.name) + '</span> ' +
         '<span class="itinerary-template-row-recurrence chip">' + recurrenceSummary(t.schedule) + '</span> ' +
         '<span class="itinerary-template-row-count chip">' + (t.items ? t.items.length : 0) + ' items</span> ' +
         '<button class="itinerary-template-start-btn btn btn-primary" data-id="' + t.templateId + '">Start</button>' +
@@ -192,7 +200,7 @@ const Alarm = (function () {
     const schedule = template ? template.schedule : { type: 'once' };
     const type = schedule.type;
     return '<h3 class="section-heading">' + (template ? 'Edit Itinerary Template' : 'Add Itinerary Template') + '</h3>' +
-      '<label>Name<br><input type="text" id="itinerary-template-name-input" class="input" value="' + (template ? template.name : '') + '"></label><br><br>' +
+      '<label>Name<br><input type="text" id="itinerary-template-name-input" class="input" value="' + (template ? esc(template.name) : '') + '"></label><br><br>' +
       '<label>Applies on<br><select id="itinerary-template-schedule-select" class="input">' +
         ['once', 'daily', 'weekdays', 'date'].map(function (t) {
           return '<option value="' + t + '"' + (t === type ? ' selected' : '') + '>' +
@@ -207,7 +215,7 @@ const Alarm = (function () {
         '<input type="date" id="itinerary-template-date-input" class="input" value="' + (schedule.date || '') + '">' +
       '</div><br>' +
       
-      '<p class="empty-state">' + (template ? 'Use the \u201cItems\u201d button on the list to edit what\u2019s inside this itinerary.' : 'Items are added next, right after you save this.') + '</p>' + +
+      '<p class="empty-state">' + (template ? 'Use the \u201cItems\u201d button on the list to edit what\u2019s inside this itinerary.' : 'Items are added next, right after you save this.') + '</p>' +
       '<div id="itinerary-template-form-error" class="form-error"></div>' +
       '<button id="itinerary-template-save-btn" class="btn btn-primary">Save</button> <button id="itinerary-template-cancel-btn" class="btn btn-secondary">Cancel</button>';
   }
