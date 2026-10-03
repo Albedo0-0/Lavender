@@ -79,25 +79,56 @@ function todayStr() { return ItineraryTime.todayStr(); }
     }
     autoTimer = setTimeout(dismiss, READ_MS);
 
-    let startY = 0, dy = 0, pid = null, moved = false;
+    // Phone-style swipe: follows the finger (up / left / right), fades as it goes, and flies
+    // off on release past the threshold or on a quick flick; otherwise springs back.
+    let sx = 0, sy = 0, dx = 0, dy = 0, pid = null, moved = false, t0 = 0;
+    function flingOut(fx) {
+      if (gone || !pill.parentNode) return;
+      gone = true;
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+      pill.style.pointerEvents = 'none';
+      if (reduced) { pill.remove(); return; }
+      const far = Math.max(window.innerWidth, 400);
+      pill.style.animation = 'none';
+      pill.style.transition = 'translate 0.18s ease-out, opacity 0.18s ease-out';
+      pill.style.translate = (fx ? (fx > 0 ? far : -far) + 'px 0px' : '0px -200px');
+      pill.style.opacity = '0';
+      setTimeout(function () { if (pill.parentNode) pill.remove(); }, 220);
+    }
     pill.addEventListener('pointerdown', function (e) {
       if (gone) return;
-      pid = e.pointerId; startY = e.clientY; dy = 0; moved = false;
-      try { pill.setPointerCapture(pid); } catch (err) { /* best-effort */ }
+      pid = e.pointerId; sx = e.clientX; sy = e.clientY; dx = 0; dy = 0; moved = false; t0 = Date.now();
+      pill.style.transition = '';
     });
     pill.addEventListener('pointermove', function (e) {
-      if (pid === null || e.pointerId !== pid) return;
-      dy = Math.min(0, e.clientY - startY);
-      if (Math.abs(dy) > 6) moved = true;
-      if (moved) pill.style.translate = '0 ' + dy + 'px';
+      if (pid === null || e.pointerId !== pid || gone) return;
+      dx = e.clientX - sx;
+      dy = Math.min(0, e.clientY - sy);
+      if (!moved && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
+        moved = true;
+        pill.style.animation = 'none';
+        pill.style.opacity = '1';
+        try { pill.setPointerCapture(pid); } catch (err) { /* best-effort */ }
+      }
+      if (moved) {
+        pill.style.translate = dx + 'px ' + dy + 'px';
+        pill.style.opacity = String(Math.max(0.2, 1 - Math.hypot(dx, dy) / 220));
+      }
     });
     function endSwipe(e) {
       if (pid === null || e.pointerId !== pid) return;
       try { pill.releasePointerCapture(pid); } catch (err) { /* best-effort */ }
       pid = null;
-      if (!moved) return;
-      if (e.type === 'pointerup' && -dy >= SWIPE_PX) dismiss();
-      else pill.style.translate = '';
+      if (!moved || gone) return;
+      const dist = Math.hypot(dx, dy);
+      const speed = dist / Math.max(1, Date.now() - t0);
+      if (dist >= SWIPE_PX || (speed > 0.5 && dist > 15)) {
+        flingOut(Math.abs(dx) > Math.abs(dy) ? dx : 0);
+      } else {
+        pill.style.transition = 'translate 0.15s ease-out, opacity 0.15s ease-out';
+        pill.style.translate = '0px 0px';
+        pill.style.opacity = '1';
+      }
     }
     pill.addEventListener('pointerup', endSwipe);
     pill.addEventListener('pointercancel', endSwipe);
