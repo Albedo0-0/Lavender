@@ -19,7 +19,7 @@
 //   checklist: [], diyChosen, startedAt, completedAt
 // }
 const ItineraryData = (function () {
-  const SUBSCRIBER_ID = 'itinerary';
+  const SUBSCRIBER_ID = 'itinerary-data';
 
   function pad(n) { return ItineraryTime.pad(n); }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
@@ -76,7 +76,7 @@ const ItineraryData = (function () {
   function finalizeDay(day) {
     if (day.status === 'in_progress') {
       return Object.assign({}, day, {
-        status: itemsAllResolved(day.items) ? 'completed' : 'partially_completed',
+        status: (day.items && day.items.length && itemsAllResolved(day.items)) ? 'completed' : 'partially_completed',
         completedAt: day.completedAt || Date.now()
       });
     }
@@ -412,6 +412,11 @@ const ItineraryData = (function () {
       const fields = { plannedStart: c.newStart };
       if (c.newEnd != null) fields.plannedEnd = c.newEnd;
       updateItemState(c.itemId, fields);
+      if (live.syncedFromPlanner && live.refId && typeof PlannerData !== 'undefined' && typeof PlannerData.updateTask === 'function') {
+        const plannerFields = { startTime: c.newStart };
+        if (c.newEnd != null) plannerFields.stopTime = c.newEnd;
+        PlannerData.updateTask(live.refId, plannerFields);
+      }
     });
     return getToday();
   }
@@ -445,7 +450,13 @@ const ItineraryData = (function () {
     const refreshedItems = (day.items || []).map(function (it) {
       if (!it.syncedFromPlanner || it.type !== 'planner-task' || it.state !== 'pending' || !it.refId) return it;
       const t = tasksById[it.refId];
-      if (!t) return it;
+      if (!t) {
+        if (typeof PlannerData.getTask === 'function' && !PlannerData.getTask(it.refId)) {
+          refreshed = true;
+          return Object.assign({}, it, { state: 'skipped', actualEnd: Date.now() });
+        }
+        return it;
+      }
       const newLabel = labelForTask(t);
       if (it.plannedStart === (t.startTime || null) && it.plannedEnd === (t.stopTime || null) && it.label === newLabel) return it;
       refreshed = true;
@@ -457,7 +468,7 @@ const ItineraryData = (function () {
     });
         const suppressedSet = {};
     (day.suppressedRefIds || []).forEach(function (id) { suppressedSet[id] = true; });
-    const missing = todaysTasks.filter(function (t) { return !t.completed && !referencedTaskIds[t.taskId] && !suppressedSet[t.taskId]; });
+    const missing = todaysTasks.filter(function (t) { return !t.completed && !t.archived && !referencedTaskIds[t.taskId] && !suppressedSet[t.taskId]; });
     if (!missing.length && !refreshed) return day;
     const newItems = missing.map(function (t) {
       return {
@@ -501,7 +512,7 @@ const ItineraryData = (function () {
     if (item.syncedFromPlanner && item.refId) {
       patch.suppressedRefIds = (day.suppressedRefIds || []).concat([item.refId]);
     }
-    if (day.status === 'in_progress' && itemsAllResolved(items)) {
+    if (day.status === 'in_progress' && items.length && itemsAllResolved(items)) {
       patch.status = 'completed';
       patch.completedAt = Date.now();
     }
