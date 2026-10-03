@@ -222,8 +222,10 @@ function todayStr() { return ItineraryTime.todayStr(); }
       // length, so plannedEnd - plannedStart is exact regardless of accumulated shiftMs.
       const durationMs = Math.max(60000, timeStrToMs(todayStr(), item.plannedEnd) - timeStrToMs(todayStr(), item.plannedStart));
       if (typeof Modal !== 'undefined') Modal.close();
-      activeBreakItemId = item.itemId;
-      TimeEngine.startGlobalBreak(Math.round(durationMs / 60000), item.label || 'Break');
+      const breakStarted = TimeEngine.startGlobalBreak(Math.round(durationMs / 60000), item.label || 'Break');
+      if (breakStarted) {
+        activeBreakItemId = item.itemId;
+      }
     }
      // 'checklist'/'custom'/'nav': no existing screen leaves the user with a visible "Mark Done"/
     // "Skip" control — checklist/custom have no home screen of their own, and nav navigates away
@@ -249,6 +251,10 @@ function todayStr() { return ItineraryTime.todayStr(); }
   // finish needs to ask before reshuffling the rest of the day.
   function checkStudyLike(item) {
     if (!item.refId) return; // 'study' item not yet turned into a task (shouldn't happen post-activation)
+    if (typeof PlannerData !== 'undefined' && typeof PlannerData.getTask === 'function' && !PlannerData.getTask(item.refId)) {
+      resolveItem(item, { state: 'skipped', actualEnd: nowMs() });
+      return;
+    }
     if (studyLaunchRetries[item.itemId] !== undefined) {
       if (studyLaunchRetries[item.itemId]++ >= STUDY_LAUNCH_MAX_RETRIES) delete studyLaunchRetries[item.itemId];
       else launchStudy(item);
@@ -374,6 +380,17 @@ function todayStr() { return ItineraryTime.todayStr(); }
   }
 
   function init() {
+    if (!activeBreakItemId) {
+      const today = ItineraryData.getToday();
+      if (today && today.items) {
+        const activeBreak = today.items.find(function (it) {
+          return it.type === 'break' && it.state === 'active';
+        });
+        if (activeBreak) {
+          activeBreakItemId = activeBreak.itemId;
+        }
+      }
+    }
     TimeEngine.subscribe(tick, SUBSCRIBER_ID);
     if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.onRollover === 'function') {
       TimeEngine.onRollover(resetOnRollover, SUBSCRIBER_ID);
