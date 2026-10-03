@@ -129,8 +129,19 @@ function todayStr() { return ItineraryTime.todayStr(); }
       const gb = TimeEngine.getGlobalBreak();
       if (gb && gb.active) TimeEngine.endGlobalBreak();
     }
+    endLinkedSession(item); // closes the running Study session too
     const now = nowMs();
     resolveItem(item, { state: 'skipped', actualEnd: now });
+  }
+
+  // Ends the live TimeEngine session behind a study / planner-task item (no completion). No-op otherwise.
+  function endLinkedSession(item) {
+    if (!item || (item.type !== 'study' && item.type !== 'planner-task') || !item.refId) return;
+    if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.skipActive === 'function') TimeEngine.skipActive(item.refId);
+  }
+  function endLinkedSessionById(itemId) {
+    endLinkedSession((ItineraryData.getToday().items || []).find(function (it) { return it.itemId === itemId; }));
+  }
   }
 
   // ---------- activation (fires exactly once, at the pending -> active transition) ----------
@@ -380,5 +391,5 @@ function todayStr() { return ItineraryTime.todayStr(); }
     }
   }
 
-  return { init: init, markItemDone: markItemDone, skipItem: skipItem, startItem: startItem };
+  return { init: init, markItemDone: markItemDone, skipItem: skipItem, startItem: startItem, endLinkedSession: endLinkedSessionById };
 })();
