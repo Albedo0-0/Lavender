@@ -208,7 +208,9 @@ const MyWorldLV1 = (function () {
     if (!campsite) return;
     const dx = px - campsite.fireX;
     const dy = py - (campsite.fireY - 2);
-    if (dx * dx + dy * dy <= 25) toggle(isLit(), engine);
+    if (dx * dx + dy * dy <= 25) { toggle(isLit(), engine); return; }
+    const tentRow = Math.floor(py - (campsite.y - 14));
+    if (tentRow >= 0 && tentRow < 14 && Math.abs(px - campsite.x) <= Math.max(1, Math.round((tentRow + 1) / 14 * 7)) && engine && engine.openJournal) engine.openJournal();
   }
 
   const api = {
