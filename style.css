@@ -585,7 +585,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   box-shadow: var(--shadow-md);
   box-sizing: border-box;
   overflow-wrap: anywhere;
-  touch-action: pan-x pinch-zoom;
+  overscroll-behavior: contain;
 }
 
 /* Generic header / title / close — opt-in classes for modal content that
