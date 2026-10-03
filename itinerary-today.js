@@ -213,7 +213,7 @@ const ItineraryToday = (function () {
         if (it.type === 'checklist') {
           actions += '<button class="btn btn-primary itinerary-today-open-checklist-btn" data-id="' + it.itemId + '">Open checklist</button> ';
         }
-        actions += '<button class="btn btn-secondary itinerary-today-skip-btn"
+        actions += '<button class="btn btn-secondary itinerary-today-skip-btn">';
       }
     }
     // Planner-synced items (new): a distinct Remove action, separate from Skip, that also
