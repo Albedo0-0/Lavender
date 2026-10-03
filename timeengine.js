@@ -15,7 +15,7 @@
 //     plannedStart, plannedEnd,      // 'HH:MM' as originally scheduled in Planner
 //     adjustedStart, adjustedEnd,    // 'HH:MM' current, shifts with breaks/pauses
 //     actualStart, actualEnd,        // timestamps (ms) or null
-//     state: 'scheduled'|'active'|'paused'|'completed'|'rescheduled'|'stale',
+//     state: 'scheduled'|'active'|'paused'|'completed'|'rescheduled'|'stale'|'skipped',
 //     studyMs, breakMs,              // accumulated (finalized) durations
 //     activeSince, pausedSince,      // timestamps (ms) or null — live deltas computed from these
 //     endPromptFired, createdAt,
@@ -229,7 +229,7 @@ const TimeEngine = (function () {
 
   function findOpenRecordForTask(taskId, dateStr) {
     return getRecordsForDate(dateStr).find(function (r) {
-      return r.taskId === taskId && r.state !== 'rescheduled' && r.state !== 'completed' && r.state !== 'stale';
+      return r.taskId === taskId && r.state !== 'rescheduled' && r.state !== 'completed' && r.state !== 'stale' && r.state !== 'skipped';
     }) || null;
   }
 
@@ -243,7 +243,7 @@ const TimeEngine = (function () {
   function findRecordForTask(taskId, dateStr) {
     const recs = getRecordsForDate(dateStr).filter(function (r) { return r.taskId === taskId; });
     if (!recs.length) return null;
-    const live = recs.find(function (r) { return r.state !== 'rescheduled' && r.state !== 'stale'; });
+    const live = recs.find(function (r) { return r.state !== 'rescheduled' && r.state !== 'stale' && r.state !== 'skipped'; });
     return live || recs[recs.length - 1];
   }
 
@@ -253,6 +253,8 @@ const TimeEngine = (function () {
     const engine = getEngine();
     tasks.forEach(function (task) {
       if (findOpenRecordForTask(task.taskId, today)) return;
+      // Skipped from Itinerary: don't re-create/re-prompt a session for a task whose slot is still scheduled today.
+      if (getRecordsForDate(today).some(function (r) { return r.taskId === task.taskId && r.state === 'skipped'; })) return;
       const rec = {
         sessionId: genId('sess'),
         taskId: task.taskId,
@@ -467,6 +469,20 @@ const TimeEngine = (function () {
     setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
     notify();
   }
+
+  // Ends the running/paused session for taskId WITHOUT completing the task (Itinerary Skip / Remove).
+  function skipActive(taskId) {
+    const active = getActiveSession();
+    if (!active || active.taskId !== taskId) return false;
+    const studyMs = safeMs(active.studyMs) + (active.state === 'active' ? safeElapsed(active.activeSince, Date.now()) : 0);
+    let breakMs = safeMs(active.breakMs);
+    if (active.state === 'paused') breakMs += safeElapsed(active.pausedSince, Date.now());
+    updateRecord(active.sessionId, { state: 'skipped', actualEnd: Date.now(), studyMs: studyMs, breakMs: breakMs, activeSince: null, pausedSince: null });
+    setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
+    notify();
+    return true;
+  }
+  
   // "Do it later" — works on the active session's task OR any scheduled task for today.
   // Returns true on success, false if the task's slot would overlap an existing slot on the
   // target date (nothing is touched in that case — caller should tell the user and let them
@@ -818,6 +834,7 @@ const TimeEngine = (function () {
     pauseActive: pauseActive,
     resumeActive: resumeActive,
     completeActive: completeActive,
+    skipActive: skipActive,
     doItLater: doItLater,
     // Exposed for Itinerary's orchestrator (Section 18/late-start handling, Phase A/Priority 1)
     // so a late study/planner-task item's start (and its own early/on-time/late completion via
