@@ -328,6 +328,18 @@ function todayStr() { return ItineraryTime.todayStr(); }
     // 'custom'/'nav': no automatic signal — waits for markItemDone()/skipItem().
   }
 
+const CHECKLIST_AUTO_START_GRACE_MS = 10 * 60 * 1000;
+  function checklistDueNow(item) {
+    if (item.type !== 'checklist' || item.startOnBuildFinish) return false;
+    const startMs = ItineraryTime.plannedStartMs(item);
+    if (startMs === null) return false;
+    const endMs = item.plannedEnd ? timeStrToMs(todayStr(), item.plannedEnd) : null;
+    const limit = (endMs !== null && endMs > startMs) ? endMs : startMs + CHECKLIST_AUTO_START_GRACE_MS;
+    const now = nowMs();
+    if (now < startMs || now >= limit) return false;
+    return !(typeof Modal !== 'undefined' && typeof Modal.isLocked === 'function' && Modal.isLocked());
+  }
+
   // Every active item is ticked independently, every heartbeat — no "current item", no ordering.
   // Pending items are never auto-activated here; a pending item whose scheduled time has passed
   // just renders as "missed" (itinerary-today.js) until the user starts it (or skips/leaves it).
@@ -336,8 +348,10 @@ function todayStr() { return ItineraryTime.todayStr(); }
 
     const day = ItineraryData.getToday();
     if (day.status !== 'in_progress') return;
+     let autoOpened = false; // at most one checklist pops per tick
     (day.items || []).forEach(function (item) {
       if (item.state === 'pending') {
+        if (!autoOpened && checklistDueNow(item)) { autoOpened = true; activateItem(item); return; }
         if (!missedPillFired[item.itemId] && ItineraryTime.isMissed(item, nowMs())) {
           missedPillFired[item.itemId] = true;
           showPill('Missed: ' + (item.label || 'item'));
