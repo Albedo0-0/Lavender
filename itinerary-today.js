@@ -210,7 +210,10 @@ const ItineraryToday = (function () {
         if (MANUAL_CONFIRM_TYPES[it.type]) {
           actions += '<button class="btn btn-primary itinerary-today-done-btn" data-id="' + it.itemId + '">Mark Done</button> ';
         }
-        actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '"' + (it.syncedFromPlanner ? ' title="Skip this item \u2014 the Planner task keeps its scheduled date and time"' : '') + '>Skip</button> ';
+        if (it.type === 'checklist') {
+          actions += '<button class="btn btn-primary itinerary-today-open-checklist-btn" data-id="' + it.itemId + '">Open checklist</button> ';
+        }
+        actions += '<button class="btn btn-secondary itinerary-today-skip-btn"
       }
     }
     // Planner-synced items (new): a distinct Remove action, separate from Skip, that also
@@ -383,6 +386,12 @@ const ItineraryToday = (function () {
         if (typeof ItineraryOrchestrator !== 'undefined' && ItineraryOrchestrator.endLinkedSession) ItineraryOrchestrator.endLinkedSession(btn.dataset.id);
         ItineraryData.removeSyncedItem(btn.dataset.id);
         refreshIfOpen();
+      });
+    });
+    document.querySelectorAll('.itinerary-today-open-checklist-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const item = (ItineraryData.getToday().items || []).find(function (it) { return it.itemId === btn.dataset.id; });
+        if (item) openChecklistItem(item);
       });
     });
     document.querySelectorAll('.itinerary-today-checklist-toggle-btn').forEach(function (btn) {
