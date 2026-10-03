@@ -148,9 +148,11 @@ const Alarm = (function () {
 
   function itineraryListHtml() {
     const templates = ItineraryTemplateData.getList();
+    const todayTemplateId = (typeof ItineraryData !== 'undefined') ? ItineraryData.getToday().templateId : null;
     const rows = templates.length ? templates.map(function (t) {
       return '<div class="itinerary-template-row list-row" data-id="' + t.templateId + '">' +
         '<span class="itinerary-template-row-name">' + esc(t.name) + '</span> ' +
+        (t.templateId === todayTemplateId ? '<span class="chip itinerary-template-today-badge">Today</span> ' : '') +
         '<span class="itinerary-template-row-recurrence chip">' + recurrenceSummary(t.schedule) + '</span> ' +
         '<span class="itinerary-template-row-count chip">' + (t.items ? t.items.length : 0) + ' items</span> ' +
         '<button class="itinerary-template-start-btn btn btn-primary" data-id="' + t.templateId + '">Start</button>' +
@@ -183,15 +185,30 @@ const Alarm = (function () {
       btn.addEventListener('click', function () {
         if (typeof ItineraryData === 'undefined') return;
         const today = ItineraryData.getToday();
-        if (today.status === 'in_progress') {
-          if (!window.confirm('An itinerary is already running today. Replace it with this one?')) return;
+        function proceed() {
+          // Never touch today's state if the template can't be found (avoids stranding the day).
+          if (typeof ItineraryTemplateData !== 'undefined' && !ItineraryTemplateData.getById(btn.dataset.id)) return;
+          ItineraryData.presentGate(true);
+          // Phase B / B-6: two-step (itinerary_selected, same as the gate's "Choose") instead of
+          // startImmediately, so Alarm and the gate end at the same reviewed Today screen.
+          ItineraryData.chooseTemplate(btn.dataset.id);
+          if (typeof ItineraryToday !== 'undefined') ItineraryToday.openTodayView();
+          else Modal.close();
         }
-        // Never touch today's state if the template can't be found (avoids stranding the day).
-        if (typeof ItineraryTemplateData !== 'undefined' && !ItineraryTemplateData.getById(btn.dataset.id)) return;
-        ItineraryData.presentGate(true);
-        ItineraryData.chooseTemplate(btn.dataset.id, true);
-        Modal.close();
-        if (typeof ItineraryToday !== 'undefined') ItineraryToday.openTodayView();
+        if (today.status === 'in_progress') {
+          // Phase B / B-4: Modal-based confirmation in place of window.confirm.
+          Modal.open(
+            '<h3 class="section-heading">Replace today\u2019s itinerary?</h3>' +
+            '<p>An itinerary is already running today. Replace it with this one?</p>' +
+            '<button id="itinerary-replace-confirm-btn" class="btn btn-primary">Replace</button> ' +
+            '<button id="itinerary-replace-cancel-btn" class="btn btn-secondary">Cancel</button>',
+            { size: 'md' }
+          );
+          document.getElementById('itinerary-replace-confirm-btn').addEventListener('click', proceed);
+          document.getElementById('itinerary-replace-cancel-btn').addEventListener('click', openItineraryList);
+          return;
+        }
+        proceed();
       });
     });
   }
