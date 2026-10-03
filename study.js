@@ -366,6 +366,7 @@ function renderClock() {
       else if (rec && rec.state === 'active') status = 'In progress';
       else if (rec && rec.state === 'paused') status = 'Paused';
       else if (rec && rec.state === 'rescheduled') status = 'Moved to another day';
+      else if (rec && rec.state === 'skipped') status = 'Skipped';
       const slotTime = rec ? (rec.adjustedStart + '\u2013' + rec.adjustedEnd) : (t.startTime + '\u2013' + t.stopTime);
       const reschedBtn = !t.completed ? '<button class="study-alarm-resched-btn" data-task-id="' + t.taskId + '">Reschedule</button>' : '';
       const deleteBtn = '<button class="study-alarm-delete-btn" data-task-id="' + t.taskId + '">Delete</button>';
