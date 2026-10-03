@@ -78,6 +78,7 @@ function todayStr() { return ItineraryTime.todayStr(); }
     delete missedPillFired[item.itemId];
     delete latePillFired[item.itemId];
     ItineraryData.updateItemState(item.itemId, fields);
+    if (ItineraryData.getToday().status === 'completed') showPill('Itinerary complete \u2014 nice work');
     // Planner-linked completion (cross-system consistency): a 'study'/'planner-task' item
     // completed from Itinerary shares its refId with the underlying Planner taskId (the
     // single canonical ID already used by Planner, Calendar, and TimeEngine's sessionRecords
