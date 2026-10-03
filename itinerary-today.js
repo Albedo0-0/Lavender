@@ -379,7 +379,11 @@ const ItineraryToday = (function () {
       btn.addEventListener('click', function () { ItineraryOrchestrator.skipItem(btn.dataset.id); refreshIfOpen(); });
     });
     document.querySelectorAll('.itinerary-today-remove-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { ItineraryData.removeSyncedItem(btn.dataset.id); refreshIfOpen(); });
+      btn.addEventListener('click', function () {
+        if (typeof ItineraryOrchestrator !== 'undefined' && ItineraryOrchestrator.endLinkedSession) ItineraryOrchestrator.endLinkedSession(btn.dataset.id);
+        ItineraryData.removeSyncedItem(btn.dataset.id);
+        refreshIfOpen();
+      });
     });
     document.querySelectorAll('.itinerary-today-checklist-toggle-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
