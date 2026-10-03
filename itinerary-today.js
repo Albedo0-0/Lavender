@@ -99,7 +99,18 @@ const ItineraryToday = (function () {
       '</div>';
   }
 
-  // ---------- Morning gate (Section 14/15) ----------
+// ---------- Morning gate (Section 14/15) ----------
+
+  // Phase B / B-1: which gate template rows currently have their item preview expanded —
+  // module-scope so it survives the gate's own re-render on toggle.
+  const expandedTemplatePreviewIds = {};
+
+  function templateItemPreviewRowHtml(it) {
+    return '<div class="list-row itinerary-gate-preview-row">' +
+      '<span class="chip">' + esc(it.plannedStart || '') + '\u2013' + esc(it.plannedEnd || '') + '</span> ' +
+      '<span class="itinerary-today-item-label">' + esc(it.label || '') + '</span>' +
+    '</div>';
+  }
 
   // Matching templates (today's schedule) first, everything else saved as a fallback list —
   // Section 15's "filtered first to whatever matches today's schedule, then all saved templates".
@@ -109,11 +120,20 @@ const ItineraryToday = (function () {
     const rest = ItineraryTemplateData.getList().filter(function (t) { return matchingIds.indexOf(t.templateId) === -1; });
 
     function row(t, isMatch) {
+      const items = t.items || [];
+      const previewBtn = items.length
+        ? '<button class="btn btn-secondary itinerary-gate-preview-btn" data-id="' + t.templateId + '">' + (expandedTemplatePreviewIds[t.templateId] ? 'Hide items' : 'Preview') + '</button> '
+        : '';
+      const previewBlock = (items.length && expandedTemplatePreviewIds[t.templateId])
+        ? '<div class="itinerary-gate-preview-list">' + items.map(templateItemPreviewRowHtml).join('') + '</div>'
+        : '';
       return '<div class="itinerary-gate-template-row list-row" data-id="' + t.templateId + '">' +
         '<span class="itinerary-gate-template-name">' + esc(t.name) + '</span> ' +
         (isMatch ? '<span class="chip itinerary-gate-suggested-chip">Suggested</span> ' : '') +
         '<span class="chip">' + (t.items ? t.items.length : 0) + ' items</span> ' +
+        previewBtn +
         '<button class="itinerary-gate-choose-btn btn btn-primary" data-id="' + t.templateId + '">Choose</button>' +
+        previewBlock +
       '</div>';
     }
 
@@ -128,8 +148,29 @@ const ItineraryToday = (function () {
   // immediately (presentGate() is idempotent, so re-showing this later — the persistent
   // affordance from Section 13 — never re-triggers a transition). Never a full-screen block:
   // it's a normal closable modal, matching "Lavender is asking, not blocking".
+  // Phase B / B-1: toggles a gate row's item-list preview in place, without closing the gate.
+  function wireGateTemplateButtons() {
+    document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        ItineraryData.chooseTemplate(btn.dataset.id);
+        openTodayView();
+      });
+    });
+    document.querySelectorAll('.itinerary-gate-preview-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        expandedTemplatePreviewIds[btn.dataset.id] = !expandedTemplatePreviewIds[btn.dataset.id];
+        const container = document.getElementById('itinerary-gate-templates');
+        if (container) container.innerHTML = gateTemplateListHtml();
+        wireGateTemplateButtons();
+      });
+    });
+  }
+
   function openGate() {
-    ItineraryData.presentGate();
+    // Phase B / B-5: pass allowRestart so the gate is also reachable to replace an already
+    // 'in_progress' day (Today's new "Change plan" button, below) — a no-op extension for every
+    // existing caller, since presentGate's reenterable branch is unaffected by this flag.
+    ItineraryData.presentGate(true);
     Modal.open(
       '<h3 class="section-heading">Good morning \u2014 plan today</h3>' +
       '<div id="itinerary-gate-templates">' + gateTemplateListHtml() + '</div><br>' +
@@ -138,12 +179,7 @@ const ItineraryToday = (function () {
          { size: 'xl' }
     );
 
-    document.querySelectorAll('.itinerary-gate-choose-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        ItineraryData.chooseTemplate(btn.dataset.id);
-        openTodayView();
-      });
-    });
+    wireGateTemplateButtons();
     document.getElementById('itinerary-gate-diy-btn').addEventListener('click', function () {
       ItineraryData.chooseDIY();
       Modal.close();
@@ -167,7 +203,7 @@ const ItineraryToday = (function () {
 
   // Types with no existing system to report a real completion of their own (Section 17 point 3)
   // — the itinerary's own Mark Done button is the authoritative confirm for these.
-  const MANUAL_CONFIRM_TYPES = { checklist: true, custom: true, nav: true };
+  const MANUAL_CONFIRM_TYPES = { custom: true, nav: true };
   // Which checklist items currently have their row list expanded on Today — module-scope so it
   // survives refreshIfOpen()'s innerHTML replacement of #itinerary-today-live each heartbeat.
   const expandedChecklistItemIds = {};
@@ -192,7 +228,7 @@ const ItineraryToday = (function () {
         if (MANUAL_CONFIRM_TYPES[it.type]) {
           actions += '<button class="btn btn-primary itinerary-today-done-btn" data-id="' + it.itemId + '">Mark Done</button> ';
         }
-        actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '">Skip</button> ';
+        actions += '<button class="btn btn-secondary itinerary-today-skip-btn" data-id="' + it.itemId + '"' + (it.syncedFromPlanner ? ' title="Skip this item \u2014 the Planner task keeps its scheduled date and time"' : '') + '>Skip</button> ';
       }
     }
     // Planner-synced items (new): a distinct Remove action, separate from Skip, that also
@@ -236,6 +272,26 @@ const ItineraryToday = (function () {
       '<span class="itinerary-today-item-label"' + (changed ? ' style="font-weight:600"' : '') + '>' + esc(it.label) + '</span>' +
       (changed ? ' <span class="chip">Moved</span>' : '') +
     '</div>';
+  }
+
+  // Phase B / B-11: previous-run visibility, read-only. No action buttons, no listeners that
+  // write state — this only ever displays an already-archived day.previousRuns entry.
+  let previousRunsExpanded = false;
+  function previousRunItemRowHtml(it) {
+    return '<div class="list-row itinerary-today-prevrun-row">' +
+      '<span class="chip itinerary-today-item-time">' + esc(it.plannedStart || '') + '\u2013' + esc(it.plannedEnd || '') + '</span> ' +
+      '<span class="itinerary-today-item-label">' + esc(it.label) + '</span> ' +
+      '<span class="chip">' + (STATE_LABELS[it.state] || it.state) + '</span>' +
+    '</div>';
+  }
+  function previousRunsSectionHtml(day) {
+    const runs = day.previousRuns || [];
+    if (!runs.length) return '';
+    const last = runs[runs.length - 1];
+    const items = last.items || [];
+    return '<h4 class="section-heading">Earlier today ' +
+      '<button id="itinerary-today-prevruns-toggle-btn" class="btn btn-secondary">' + (previousRunsExpanded ? 'Hide' : 'Show') + '</button></h4>' +
+      (previousRunsExpanded ? items.map(previousRunItemRowHtml).join('') : '');
   }
 
   // Preview only: computeCatchUpPlan() never writes; Apply/Keep Original are the only two paths
@@ -293,7 +349,8 @@ const ItineraryToday = (function () {
       (day.status === 'in_progress' ? catchUpSectionHtml(day) : '') +
       (current.length ? '<h4 class="section-heading">Now</h4>' + current.map(function (it) { return itemRowHtml(it, false); }).join('') : '') +
       (upcoming.length ? '<h4 class="section-heading">Up next</h4>' + upcoming.map(function (it) { return itemRowHtml(it, it.itemId === nextId); }).join('') : '') +
-      (done.length ? '<h4 class="section-heading">Done</h4>' + done.map(function (it) { return itemRowHtml(it, false); }).join('') : '');
+      (done.length ? '<h4 class="section-heading">Done</h4>' + done.map(function (it) { return itemRowHtml(it, false); }).join('') : '') +
+      previousRunsSectionHtml(day);
   }
 
   // START ITINERARY is the single control (Section 17) — no per-item Start buttons anywhere in
@@ -303,7 +360,7 @@ const ItineraryToday = (function () {
   function todayViewHtml(day) {
     const startBtn = (day.status === 'itinerary_selected')
       ? '<button id="itinerary-today-start-btn" class="btn btn-primary">START ITINERARY</button> ' : '';
-    const changeBtn = (day.status === 'itinerary_selected' || day.status === 'diy_selected')
+    const changeBtn = (day.status === 'itinerary_selected' || day.status === 'diy_selected' || day.status === 'in_progress')
       ? '<button id="itinerary-today-change-btn" class="btn btn-secondary">Change plan</button>' : '';    // The id="itinerary-today-live" marker lets refreshIfOpen() find and replace just this
     // view's content in place (no Modal.open(), so no re-triggered open sound/focus-steal) —
     // see refreshIfOpen below.
@@ -357,6 +414,11 @@ const ItineraryToday = (function () {
         ItineraryData.updateItemState(item.itemId, { rows: rows });
         refreshIfOpen();
       });
+    });
+    const prevRunsToggleBtn = document.getElementById('itinerary-today-prevruns-toggle-btn');
+    if (prevRunsToggleBtn) prevRunsToggleBtn.addEventListener('click', function () {
+      previousRunsExpanded = !previousRunsExpanded;
+      refreshIfOpen();
     });
     const catchupBtn = document.getElementById('itinerary-today-catchup-btn');
     if (catchupBtn) catchupBtn.addEventListener('click', function () {
