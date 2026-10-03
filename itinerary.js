@@ -1,5 +1,7 @@
 // itinerary.js — Itinerary Builder UI (Itinerary Phase 5, revised). Depends on: State, Modal,
 // ItineraryTemplateData, PlannerData, TargetsData, GamificationData, Nav.
+// Phase B / B-2: also defensively reads the global ItineraryData (typeof-guarded, no new import
+// mechanism — same pattern alarm.js/study.js already use) to show an "in use today" notice.
 //
 // "One editor, two entry points" (Section 16): this builder edits an itineraryTemplates entry's
 // items[] + dayStartTime. Right now the only entry point is Alarm's Itineraries tab (its "Items"
@@ -565,7 +567,12 @@ function builderHtml() {
     draftItems = recomputeTimes(draftItems, draftDayStartTime);
     const rows = draftItems.length ? draftItems.map(itemRowHtml).join('') : '';
     const dropSlot = '<div class=\"itinerary-drop-slot\" id=\"itinerary-drop-slot\" title=\"Drop here or click a tile to add\">[ + ]</div>';
-    return '<h3 class=\"section-heading\">Itinerary Builder</h3>' +
+    const todayForNotice = (typeof ItineraryData !== 'undefined') ? ItineraryData.getToday() : null;
+    const inUseNotice = (todayForNotice && editingTemplateId && todayForNotice.templateId === editingTemplateId &&
+        (todayForNotice.status === 'itinerary_selected' || todayForNotice.status === 'in_progress'))
+      ? '<p class="form-warning">This template is currently in use today. Changes here won\u2019t affect today\u2019s running plan.</p>'
+      : '';
+    return '<h3 class=\"section-heading\">Itinerary Builder</h3>' + inUseNotice +
       '<div class=\"itinerary-builder-layout\">' +
         paletteHtml() +
         '<div class=\"itinerary-builder-main\">' +
