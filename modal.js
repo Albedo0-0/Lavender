@@ -49,9 +49,16 @@ const Modal = (function () {
     isPopup = !!(opts && (opts.popup || opts.persistent));
     overlay.classList.toggle('modal-popup', isPopup);
     content.style.translate = '';
+    content.style.opacity = '';
+    content.style.transition = '';
     if (opts && opts.size) content.classList.add('modal-' + opts.size);
     content.innerHTML = html;
     overlay.style.display = 'flex';
+    // Popup cards that fit take any-direction swipes (touch-action none); a scrollable one
+    // keeps vertical scrolling and accepts horizontal swipes only.
+    content.style.touchAction = isPopup
+      ? (content.scrollHeight > content.clientHeight + 1 ? 'pan-y' : 'none')
+      : '';
     // Move focus into the modal so screen readers announce it and Escape/Tab work immediately,
     // without requiring every caller to remember to do this themselves.
     content.setAttribute('tabindex', '-1');
@@ -79,7 +86,7 @@ const Modal = (function () {
       closeTimer = null;
       overlay.style.display = 'none';
       overlay.classList.remove('modal-closing');
-      if (content) content.style.translate = '';
+      if (content) { content.style.translate = ''; content.style.opacity = ''; content.style.transition = ''; }
       if (content) content.classList.remove('modal-closing');
     }, 180);
     if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus({ preventScroll: true });
@@ -93,20 +100,29 @@ const Modal = (function () {
       if (e.target === overlay) close();
     });
     // Upward-swipe dismissal for popup-mode modals (bound once; delegated on the shared content).
+    // Swipe-to-dismiss for popup-mode modals (bound once; delegated on the shared content).
     const content = document.getElementById('modal-content');
     if (content) {
-      let sy = 0, dy = 0, pid = null, moved = false;
+      let sx = 0, sy = 0, dx = 0, dy = 0, pid = null, moved = false, t0 = 0;
       content.addEventListener('pointerdown', function (e) {
         if (!isPopup || lock) return;
         if (e.target.closest && e.target.closest('input, textarea, select')) return;
-        pid = e.pointerId; sy = e.clientY; dy = 0; moved = false;
+        pid = e.pointerId; sx = e.clientX; sy = e.clientY; dx = 0; dy = 0; moved = false; t0 = Date.now();
+        content.style.transition = '';
       });
       content.addEventListener('pointermove', function (e) {
         if (pid === null || e.pointerId !== pid) return;
+        dx = e.clientX - sx;
         dy = Math.min(0, e.clientY - sy);
-        if (Math.abs(dy) > 6) {
-          if (!moved) { moved = true; try { content.setPointerCapture(pid); } catch (err) { /* best-effort */ } }
-          content.style.translate = '0 ' + dy + 'px';
+        if (!moved && Math.max(Math.abs(dx), Math.abs(dy)) > 8) {
+          // A scrollable card's vertical drag is a scroll, not a dismiss.
+          if (content.style.touchAction === 'pan-y' && Math.abs(dy) > Math.abs(dx)) { pid = null; return; }
+          moved = true;
+          try { content.setPointerCapture(pid); } catch (err) { /* best-effort */ }
+        }
+        if (moved) {
+          content.style.translate = dx + 'px ' + dy + 'px';
+          content.style.opacity = String(Math.max(0.2, 1 - Math.hypot(dx, dy) / 240));
         }
       });
       function endSwipe(e) {
@@ -114,10 +130,21 @@ const Modal = (function () {
         try { content.releasePointerCapture(pid); } catch (err) { /* best-effort */ }
         pid = null;
         if (!moved) return;
-        if (e.type === 'pointerup' && -dy >= POPUP_SWIPE_PX) close();
-        else content.style.translate = '';
         content.__swiped = true;
         window.setTimeout(function () { content.__swiped = false; }, 0);
+        const dist = Math.hypot(dx, dy);
+        const speed = dist / Math.max(1, Date.now() - t0);
+        if (dist >= POPUP_SWIPE_PX || (speed > 0.5 && dist > 15)) {
+          const far = Math.max(window.innerWidth, 400);
+          content.style.transition = 'translate 0.18s ease-out, opacity 0.18s ease-out';
+          content.style.translate = Math.abs(dx) > Math.abs(dy) ? ((dx > 0 ? far : -far) + 'px 0px') : '0px -200px';
+          content.style.opacity = '0';
+          close();
+        } else {
+          content.style.transition = 'translate 0.15s ease-out, opacity 0.15s ease-out';
+          content.style.translate = '0px 0px';
+          content.style.opacity = '1';
+        }
       }
       content.addEventListener('pointerup', endSwipe);
       content.addEventListener('pointercancel', endSwipe);
