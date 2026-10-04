@@ -3500,7 +3500,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 /* labels for icon-only utilities (Break already has text) */
 #utility-drawer button::after { font-family: var(--font-hand); font-size: 17px; font-weight: 700; }
 #unrecorded-study-icon::after { content: 'Unrecorded Study'; }
-#water-icon::after            { content: 'Water'; }
+#habits-icon::after           { content: 'Habits'; }
 #notepad-icon::after          { content: 'Notepad'; }
 #paintbrush-icon::after       { content: 'Cosmetics'; }
 #backup-export-btn::after     { content: 'Export'; }
@@ -3511,7 +3511,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 /* order + alternating hang angle */
 #global-break-btn      { --i: 0; --rot: -2.5deg; --sway: 0px; }
 #unrecorded-study-icon { --i: 1; --rot: 2deg;    --sway: -14px; }
-#water-icon            { --i: 2; --rot: -2deg;   --sway: -3px; }
+#habits-icon           { --i: 2; --rot: -2deg;   --sway: -3px; }
 #notepad-icon          { --i: 3; --rot: 2.5deg;  --sway: -14px; }
 #paintbrush-icon       { --i: 4; --rot: -2.5deg; --sway: 0px; }
 #backup-export-btn     { --i: 5; --rot: 2deg;    --sway: -14px; }
@@ -5400,3 +5400,31 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 .itinerary-checklist-paper .itinerary-checklist-row-done .itinerary-checklist-row-text { text-decoration: line-through; opacity: 0.6; }
 .itinerary-checklist-actions { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .itinerary-checklist-again-msg { color: #a3473a; font-size: 0.9rem; }
+
+/* Habit Tracker — colour uses the same color-mix pastel rule as .cal-colored */
+#habits-root .hab-nav { display: flex; align-items: center; justify-content: center; gap: var(--space-2); font-size: .85rem; opacity: .75; }
+#habits-root .hab-nav button { background: none; border: 0; box-shadow: none; font-size: 1.2rem; color: inherit; cursor: pointer; padding: 0 var(--space-2); }
+#habits-root .hab-nav button:disabled { opacity: .25; cursor: default; }
+#habits-root .hab-days, #habits-root .hab-row { display: grid; grid-template-columns: minmax(64px, 1.3fr) repeat(7, minmax(26px, 1fr)); gap: 6px; align-items: center; }
+#habits-root .hab-days { margin-top: var(--space-2); font-size: .7rem; opacity: .45; text-align: center; }
+#habits-root .hab-days .hab-today-label { opacity: 1; font-weight: 700; }
+#habits-list { max-height: min(55vh, 420px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: var(--space-2) 0; padding: 2px; }
+#habits-root .hab-title-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
+#habits-root .hab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; cursor: grab; user-select: none; -webkit-touch-callout: none; }
+#habits-root .hab-row.hab-dragging { opacity: .6; background: color-mix(in srgb, var(--hab-color) 20%, transparent); border-radius: 6px; }
+#habits-root .hab-mini { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; line-height: 1; font-size: .75rem; border-radius: 50%; cursor: pointer; }
+#habits-root .hab-cell {
+  position: relative; aspect-ratio: 1; min-height: 26px; padding: 0; border-radius: 6px; cursor: pointer;
+  font-size: .7rem; color: var(--color-brown-700); box-shadow: none;
+  background: linear-gradient(to top, color-mix(in srgb, var(--hab-color) 32%, var(--color-cream-050)) var(--hab-fill), var(--color-cream-050) var(--hab-fill));
+  border: 1px solid color-mix(in srgb, var(--hab-color) 55%, var(--color-border));
+  user-select: none; -webkit-touch-callout: none;
+}
+#habits-root .hab-cell:disabled { opacity: .35; cursor: default; }
+#habits-root .hab-cell.hab-today { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hab-color) 70%, var(--color-sage-600)); }
+#habits-root .hab-cell.hab-full::after { content: ''; position: absolute; left: 50%; top: 46%; width: 5px; height: 9px; border: solid var(--color-brown-700); border-width: 0 2px 2px 0; transform: translate(-50%, -50%) rotate(45deg); opacity: .7; }
+#habits-root .hab-controls { display: flex; justify-content: flex-end; gap: var(--space-2); }
+#habits-root .hab-ctl { width: 30px; height: 30px; padding: 0; border-radius: 50%; cursor: pointer; opacity: .7; }
+#habits-root .hab-ctl-on { opacity: 1; }
+.hab-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.hab-form label { display: flex; flex-direction: column; gap: 2px; font-size: .85rem; }
