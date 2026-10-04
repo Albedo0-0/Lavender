@@ -206,6 +206,8 @@ const Journal = (function () {
     if (!currentDate) currentDate = todayStr();
 
     const entry = JournalData.getEntry(currentDate);
+    const draft = entry.saved ? null : getDraft(currentDate);
+    if (draft) Object.assign(entry, draft);
     const important = JournalData.isImportant(currentDate);
     const blueFire = JournalData.isBlueFire(currentDate);
     const readOnly = !!entry.saved;
@@ -318,7 +320,50 @@ const Journal = (function () {
     return escapeHtml(s).replace(/"/g, '&quot;');
   }
 
+  // Unsaved drafts: typed values are kept (per date) so leaving the Journal never loses them.
+  // Drafts live outside journalEntries, so they stay editable and stay out of backups until Save.
+  const DRAFT_KEY = 'lavender_journal_drafts';
+  function loadDrafts() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      const obj = raw ? JSON.parse(raw) : {};
+      return (obj && typeof obj === 'object') ? obj : {};
+    } catch (e) { return {}; }
+  }
+  function storeDrafts(obj) {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(obj)); } catch (e) { /* storage unavailable */ }
+  }
+  function getDraft(dateStr) { return loadDrafts()[dateStr] || null; }
+  function setDraft(dateStr, partial) {
+    const all = loadDrafts();
+    all[dateStr] = Object.assign({}, all[dateStr], partial);
+    storeDrafts(all);
+  }
+  function clearDraft(dateStr) {
+    const all = loadDrafts();
+    if (all[dateStr]) { delete all[dateStr]; storeDrafts(all); }
+  }
+  function wireDraftEvents() {
+    const map = [
+      ['journal-quote', 'input', 'morningQuote'],
+      ['journal-weather', 'change', 'weather'],
+      ['journal-mood', 'change', 'mood'],
+      ['journal-diary-text', 'input', 'diaryText'],
+      ['journal-manifestation-text', 'input', 'manifestationText']
+    ];
+    map.forEach(function (m) {
+      const el = document.getElementById(m[0]);
+      if (!el || el.disabled) return;
+      el.addEventListener(m[1], function () {
+        const patch = {};
+        patch[m[2]] = (m[2] === 'weather' || m[2] === 'mood') ? (el.value || null) : el.value;
+        setDraft(currentDate, patch);
+      });
+    });
+  }
+
   function wireMainEvents() {
+    wireDraftEvents();
     document.getElementById('journal-prev-date').addEventListener('click', function () {
       currentDate = shiftDateStr(currentDate, -1);
       render();
@@ -347,6 +392,7 @@ const Journal = (function () {
           manifestationText: document.getElementById('journal-manifestation-text').value,
           saved: true
         });
+        clearDraft(currentDate);
         if (typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
         render();
       });
