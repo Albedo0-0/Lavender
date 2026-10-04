@@ -67,6 +67,82 @@ const MyWorldContent = (function () {
     pond: true,
     ambience: { birds: true, butterflies: true, fireflies: true, leaves: true, shimmer: true, motes: true },
     lvPack: 'lv1',
+    journalSkin: {
+      title: "The Meadow Traveller's Journal",
+      fonts: { title: 'pixel', body: 'pixel', write: 'write' },
+      colors: {
+        paper: '#f3ecd0', paperDark: '#ddd2a8', ink: '#35382a', inkSoft: '#66694f',
+        frame: '#4f7a3a', frameDark: '#2b4527', frameLight: '#86b05a',
+        accent: '#c8583c', accentText: '#fff6e0', bubble: '#fbf7e4', field: '#f8f2d8'
+      },
+      ambient: { firefly: true, color: '#ffe27a' },
+      header: {
+        scale: 3,
+        palette: { a: '#bfe0f0', b: '#d6ecf2', c: '#ffffff', f: '#8fb98a', n: '#6aa652', h: '#8ed05a', g: '#4a7c48', y: '#f2c94c', p: '#e88ac0', w: '#fff4f0' },
+        rows: [
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          'aaaaaaaaaccccaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          'aaaaaaaaccccccaaaaaaaaaaaaaaaaaacccccaaaaaaaaaaa',
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacccccccaaaaaaaaaa',
+          'fffffffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff',
+          'ffffffffffffffffffffffaaaaaaaaaaaaaaaaaaaaafffff',
+          'ffffffffffffffffffffffffffbbbbbbhhhhbbbbbfffffff',
+          'fffffffffffffffffffffffffffffhhhnnnnhhhhffffffff',
+          'hhhfffffffffffffffffffffffhhhnnnnnnnnnnnhhhhhhhh',
+          'nnnhhhfffffffffhhhhhhhhhhhnnnnnnnnnnnnnnnnnnnnnn',
+          'nnnhnnyhhhhhhhhnnnnhnnpnnnnhnnwnnnnhnnynnnnhnnnn',
+          'nhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhhnhh',
+          'gggggggggggggggggggggggggggggggggggggggggggggggg',
+          'gggggggggggggggggggggggggggggggggggggggggggggggg'
+        ]
+      },
+      signature: {
+        scale: 3,
+        palette: { t: '#c49c6c', u: '#926c4a', k: '#28201a', f: '#d9503c', p: '#5a3a22' },
+        rows: [
+          '......pfff..',
+          '......pff...',
+          '......p.....',
+          '.....tu.....',
+          '....ttuu....',
+          '...tttuuu...',
+          '..ttttuuuu..',
+          '.tttttuuuuu.',
+          'ttttttuuuuuu',
+          'tttttkkuuuuu',
+          'tttttkkuuuuu',
+          'tttttkkuuuuu'
+        ]
+      },
+      accent: {
+        scale: 3,
+        palette: { s: '#b9795a', d: '#7a4a38', b: '#d8cf9a', e: '#3b3a2a' },
+        rows: [
+          '...dddd...e.',
+          '..dsssd...e.',
+          '.dsddssd..b.',
+          '.dsdssdsd.b.',
+          '.dsddsssd.bb',
+          '..dsssssd.bb',
+          'bbbdddddbbbb',
+          '.bbbbbbbbbbb'
+        ]
+      },
+      bottom: {
+        scale: 3,
+        palette: { v: '#3f8a3a', w: '#2f6e33', l: '#8ed05a', y: '#f2c94c', p: '#e88ac0' },
+        rows: [
+          '...................l....',
+          '...................ll...',
+          '.......y...l...p.vvv...y',
+          '...l...v...ll.vvvwwwvvvv',
+          'lv.ll......vvvwww...wwwl',
+          'wwvvv...vvvwww.........w',
+          '..wwwvvvwww....ll.......',
+          '.....wwll...............'
+        ]
+      }
+    },
     seeds: { stars: 20240517, clouds: 4242 },
     sky: [
       { h: 0,     top: '#0b0e24', mid: '#131a3a', bot: '#232a52' },
@@ -151,6 +227,66 @@ const MyWorldContent = (function () {
     return Array.isArray(c) && c.length === 3 && c.every(function (n) { return isNum(n) && n >= 0 && n <= 255; });
   }
 
+  const JOURNAL_FONT_KEYS = ['pixel', 'write', 'hand', 'serif', 'sans'];
+  const JOURNAL_COLOR_KEYS = ['paper', 'paperDark', 'ink', 'inkSoft', 'frame', 'frameDark', 'frameLight', 'accent', 'accentText', 'bubble', 'field'];
+  const JOURNAL_WEATHER_KEYS = ['Sunny', 'Cloudy', 'Rainy', 'Cold'];
+  const JOURNAL_SPRITE_SLOTS = ['header', 'signature', 'accent', 'bottom'];
+
+  function isJournalSprite(s) {
+    if (!isObj(s) || !isObj(s.palette) || !Array.isArray(s.rows)) return false;
+    if (s.rows.length < 1 || s.rows.length > 64) return false;
+    if (s.scale !== undefined && !(isNum(s.scale) && s.scale >= 1 && s.scale <= 6 && Math.floor(s.scale) === s.scale)) return false;
+    const keys = Object.keys(s.palette);
+    if (!keys.every(function (k) { return k.length === 1 && k !== '.' && isHex(s.palette[k]); })) return false;
+    const w = typeof s.rows[0] === 'string' ? s.rows[0].length : 0;
+    if (w < 1 || w > 128) return false;
+    return s.rows.every(function (r) {
+      if (typeof r !== 'string' || r.length !== w) return false;
+      for (let i = 0; i < r.length; i++) {
+        const c = r.charAt(i);
+        if (c !== '.' && !Object.prototype.hasOwnProperty.call(s.palette, c)) return false;
+      }
+      return true;
+    });
+  }
+
+  /** Data-only Journal skin (optional on a world). Every field is optional; anything malformed rejects the pack. */
+  function validateJournalSkin(k) {
+    if (!isObj(k)) return 'journalSkin';
+    if (k.title !== undefined && (typeof k.title !== 'string' || !k.title.trim() || k.title.length > 60)) return 'journalSkin.title';
+    if (k.fonts !== undefined) {
+      if (!isObj(k.fonts)) return 'journalSkin.fonts';
+      const fk = Object.keys(k.fonts);
+      for (let i = 0; i < fk.length; i++) {
+        if (['title', 'body', 'write'].indexOf(fk[i]) < 0 || JOURNAL_FONT_KEYS.indexOf(k.fonts[fk[i]]) < 0) return 'journalSkin.fonts.' + fk[i];
+      }
+    }
+    if (k.colors !== undefined) {
+      if (!isObj(k.colors)) return 'journalSkin.colors';
+      const ck = Object.keys(k.colors);
+      for (let i = 0; i < ck.length; i++) {
+        if (JOURNAL_COLOR_KEYS.indexOf(ck[i]) < 0 || !isHex(k.colors[ck[i]])) return 'journalSkin.colors.' + ck[i];
+      }
+    }
+    if (k.ambient !== undefined) {
+      if (!isObj(k.ambient)) return 'journalSkin.ambient';
+      if (k.ambient.firefly !== undefined && typeof k.ambient.firefly !== 'boolean') return 'journalSkin.ambient.firefly';
+      if (k.ambient.color !== undefined && !isHex(k.ambient.color)) return 'journalSkin.ambient.color';
+    }
+    for (let i = 0; i < JOURNAL_SPRITE_SLOTS.length; i++) {
+      const slot = JOURNAL_SPRITE_SLOTS[i];
+      if (k[slot] !== undefined && !isJournalSprite(k[slot])) return 'journalSkin.' + slot;
+    }
+    if (k.weather !== undefined) {
+      if (!isObj(k.weather)) return 'journalSkin.weather';
+      const wk = Object.keys(k.weather);
+      for (let i = 0; i < wk.length; i++) {
+        if (JOURNAL_WEATHER_KEYS.indexOf(wk[i]) < 0 || !isJournalSprite(k.weather[wk[i]])) return 'journalSkin.weather.' + wk[i];
+      }
+    }
+    return '';
+  }
+
   function validateWorld(d) {
     if (typeof d.tree !== 'string' || !d.tree) return 'tree';
     if (!isNum(d.baseHeight) || d.baseHeight < 90 || d.baseHeight > 400) return 'baseHeight';
@@ -163,7 +299,10 @@ const MyWorldContent = (function () {
         if (d.ambience[AMB_KEYS[i]] !== undefined && typeof d.ambience[AMB_KEYS[i]] !== 'boolean') return 'ambience.' + AMB_KEYS[i];
       }
     }
-    if (!isObj(d.seeds) || !isNum(d.seeds.stars) || !isNum(d.seeds.clouds)) return 'seeds';
+    if (d.journalSkin !== undefined) {
+      const jerr = validateJournalSkin(d.journalSkin);
+      if (jerr) return jerr;
+    }
     if (!isObj(d.seeds) || !isNum(d.seeds.stars) || !isNum(d.seeds.clouds)) return 'seeds';
     if (!Array.isArray(d.sky) || d.sky.length < 3) return 'sky';
     for (let i = 0; i < d.sky.length; i++) {
