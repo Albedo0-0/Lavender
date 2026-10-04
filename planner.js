@@ -610,6 +610,7 @@ function openForTopic(subject, topicId) {
     const topics = grouped[subject] || [];
     const topic = topics.find(function (t) { return t.topicId === topicId; });
     if (!topic) return;
+    addMode = 'subject'; // the subject/topic prefill below needs the Subject/Chapter form
     activeTab = 'today';
     pendingOpenDate = null;
     renderForm();
