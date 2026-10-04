@@ -8,6 +8,47 @@ const Journal = (function () {
   let timerInterval = null;
   let journalHasRenderedOnce = false;
 
+  // In-world book presentation state (presentation only — see openBook below).
+  let bookLayer = null;
+  let bookBackdropDown = false;
+  let screenHome = null;
+  let screenNext = null;
+  let lockHome = null;
+  let lockNext = null;
+  const spriteCache = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
+
+  const FONT_STACKS = {
+    pixel: "'Pixelify Sans', 'Courier New', monospace",
+    write: "'VT323', 'Courier New', monospace",
+    hand: "'Kalam', cursive",
+    serif: "'Lora', serif",
+    sans: "'DM Sans', sans-serif"
+  };
+  const COLOR_KEYS = ['paper', 'paperDark', 'ink', 'inkSoft', 'frame', 'frameDark', 'frameLight', 'accent', 'accentText', 'bubble', 'field'];
+  const DEFAULT_COLORS = {
+    paper: '#f6efe0', paperDark: '#e2d6bb', ink: '#3a3226', inkSoft: '#6b6252',
+    frame: '#7b5e3f', frameDark: '#3f2f21', frameLight: '#a9865a',
+    accent: '#a5603c', accentText: '#fffdf8', bubble: '#fffdf6', field: '#faf4e4'
+  };
+  const DEFAULT_WEATHER = {
+    Sunny: {
+      scale: 3, palette: { y: '#f2c94c', o: '#e8a63c' },
+      rows: ['....oo....', '.o..yy..o.', '..yyyyyy..', '..yyyyyy..', 'oyyyyyyyyo', 'oyyyyyyyyo', '..yyyyyy..', '..yyyyyy..', '.o..yy..o.', '....oo....']
+    },
+    Cloudy: {
+      scale: 3, palette: { w: '#e8ecf6', g: '#aeb8d0' },
+      rows: ['..........', '...gggg...', '..gwwwwg..', '.gwwwwwwg.', 'gwwwwwwwwg', 'gwwwwwwwwg', '.gggggggg.', '..........']
+    },
+    Rainy: {
+      scale: 3, palette: { w: '#e8ecf6', g: '#aeb8d0', b: '#5cc8f0' },
+      rows: ['...gggg...', '..gwwwwg..', '.gwwwwwwg.', 'gwwwwwwwwg', '.gggggggg.', '..b..b..b.', '.b..b..b..', '..b..b..b.', '.b..b..b..']
+    },
+    Cold: {
+      scale: 3, palette: { s: '#bfe3f5' },
+      rows: ['....s....', '.s..s..s.', '..s.s.s..', '...sss...', 'sssssssss', '...sss...', '..s.s.s..', '.s..s..s.', '....s....']
+    }
+  };
+
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
   function todayStr() {
@@ -238,6 +279,7 @@ const Journal = (function () {
     renderPhotos();
     renderChallengeSection();
     renderSleepSection();
+    decorateBookContent();
   }
 
   function render() {
@@ -478,9 +520,213 @@ function renderPhotos() {
     render();
   }
 
+  function isHexColor(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
+
+  function getWorldSkin() {
+    let def = null;
+    try {
+      if (typeof MyWorldContent !== 'undefined' && MyWorldContent && MyWorldContent.getActive) def = MyWorldContent.getActive('world');
+    } catch (e) { def = null; }
+    const skin = (def && def.journalSkin && typeof def.journalSkin === 'object') ? def.journalSkin : {};
+    return { name: (def && typeof def.name === 'string') ? def.name : '', skin: skin };
+  }
+
+  function spriteUrl(sprite) {
+    if (spriteCache && spriteCache.has(sprite)) return spriteCache.get(sprite);
+    const rows = sprite.rows;
+    const h = rows.length;
+    const w = rows[0].length;
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const ch = rows[y].charAt(x);
+        const col = sprite.palette[ch];
+        if (ch !== '.' && col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); }
+      }
+    }
+    const url = 'url(' + c.toDataURL('image/png') + ')';
+    if (spriteCache) spriteCache.set(sprite, url);
+    return url;
+  }
+
+  function validSprite(sprite) {
+    return !!(sprite && sprite.palette && Array.isArray(sprite.rows) && sprite.rows.length && typeof sprite.rows[0] === 'string' && sprite.rows[0].length);
+  }
+
+  function paintSprite(el, sprite) {
+    if (!el) return;
+    if (!validSprite(sprite)) { el.style.display = 'none'; return; }
+    const sc = sprite.scale || 3;
+    el.style.display = '';
+    el.style.width = (sprite.rows[0].length * sc) + 'px';
+    el.style.height = (sprite.rows.length * sc) + 'px';
+    el.style.backgroundImage = spriteUrl(sprite);
+    el.style.backgroundSize = '100% 100%';
+  }
+
+  function paintTile(el, sprite) {
+    if (!el) return;
+    if (!validSprite(sprite)) { el.style.display = 'none'; return; }
+    const sc = sprite.scale || 3;
+    el.style.display = '';
+    el.style.height = (sprite.rows.length * sc) + 'px';
+    el.style.backgroundImage = spriteUrl(sprite);
+    el.style.backgroundSize = (sprite.rows[0].length * sc) + 'px ' + (sprite.rows.length * sc) + 'px';
+  }
+
+  // The Journal book is presentation only: the one canonical #screen-journal element (and its one
+  // lock button) are re-parented into a book shell inside the My World host while it is open, and
+  // put back exactly where they were on close. No second renderer, state, save path or storage.
+  function openBook(host) {
+    if (bookLayer || !host) return;
+    const screen = document.getElementById('screen-journal');
+    if (!screen || !screen.parentNode) return;
+
+    if (openedViaCalendar) { openedViaCalendar = false; } else { currentDate = todayStr(); }
+
+    const ws = getWorldSkin();
+    const skin = ws.skin;
+    const fonts = skin.fonts || {};
+    const amb = skin.ambient || {};
+
+    const layer = document.createElement('div');
+    layer.className = 'journal-book-layer';
+    const skinColors = skin.colors || {};
+    COLOR_KEYS.forEach(function (k) {
+      layer.style.setProperty('--jb-' + k, isHexColor(skinColors[k]) ? skinColors[k] : DEFAULT_COLORS[k]);
+    });
+    layer.style.setProperty('--jb-font-title', FONT_STACKS[fonts.title] || FONT_STACKS.pixel);
+    layer.style.setProperty('--jb-font-body', FONT_STACKS[fonts.body] || FONT_STACKS.pixel);
+    layer.style.setProperty('--jb-font-write', FONT_STACKS[fonts.write] || FONT_STACKS.write);
+    if (isHexColor(amb.color)) layer.style.setProperty('--jb-firefly', amb.color);
+
+    layer.innerHTML =
+      '<div class="journal-book" role="dialog" aria-modal="true" aria-label="Journal" tabindex="-1">' +
+        '<div class="jb-cover">' +
+          '<div class="jb-paper">' +
+            '<div class="jb-header">' +
+              '<div class="jb-scene" aria-hidden="true">' +
+                '<div class="jb-scenery"></div>' +
+                '<div class="jb-signature"></div>' +
+                (amb.firefly ? '<div class="jb-firefly"></div>' : '') +
+              '</div>' +
+              '<div class="jb-lock-slot"></div>' +
+              '<button type="button" class="jb-close" aria-label="Close journal">\u2715</button>' +
+              '<h2 class="jb-title"></h2>' +
+            '</div>' +
+            '<div class="jb-page"></div>' +
+            '<div class="jb-footer" aria-hidden="true">' +
+              '<div class="jb-vines"></div>' +
+              '<div class="jb-snail"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    const title = (typeof skin.title === 'string' && skin.title.trim())
+      ? skin.title.trim()
+      : (ws.name ? ws.name + ' Journal' : 'Journal');
+    layer.querySelector('.jb-title').textContent = title;
+
+    const scenery = layer.querySelector('.jb-scenery');
+    const signature = layer.querySelector('.jb-signature');
+    paintTile(scenery, skin.header);
+    paintSprite(signature, skin.signature);
+    paintTile(layer.querySelector('.jb-vines'), skin.bottom);
+    paintSprite(layer.querySelector('.jb-snail'), skin.accent);
+    if (!validSprite(skin.header)) {
+      const scene = layer.querySelector('.jb-scene');
+      if (!validSprite(skin.signature)) scene.style.display = 'none';
+      else scene.style.minHeight = (skin.signature.rows.length * (skin.signature.scale || 3) + 4) + 'px';
+    }
+
+    screenHome = screen.parentNode;
+    screenNext = screen.nextSibling;
+    layer.querySelector('.jb-page').appendChild(screen);
+    screen.style.display = 'block';
+
+    const lockBtn = document.getElementById('journal-lock-toggle');
+    if (lockBtn && lockBtn.parentNode) {
+      lockHome = lockBtn.parentNode;
+      lockNext = lockBtn.nextSibling;
+      layer.querySelector('.jb-lock-slot').appendChild(lockBtn);
+      lockBtn.style.display = 'inline-block';
+    }
+
+    layer.addEventListener('pointerdown', function (e) { bookBackdropDown = (e.target === layer); });
+    layer.addEventListener('click', function (e) {
+      if (e.target === layer && bookBackdropDown) closeBook();
+      bookBackdropDown = false;
+    });
+    layer.querySelector('.jb-close').addEventListener('click', function () { closeBook(); });
+
+    host.appendChild(layer);
+    bookLayer = layer;
+    if (typeof Modal !== 'undefined' && Modal.setHost) Modal.setHost(host);
+    document.addEventListener('keydown', onBookKey);
+    if (typeof MiscSound !== 'undefined') MiscSound.play('uiOpen');
+
+    renderContent();
+    const bookEl = layer.querySelector('.journal-book');
+    if (bookEl && bookEl.focus) bookEl.focus({ preventScroll: true });
+  }
+
+  function closeBook() {
+    if (!bookLayer) return;
+    const layer = bookLayer;
+    bookLayer = null;
+    document.removeEventListener('keydown', onBookKey);
+
+    const overlay = document.getElementById('modal-overlay');
+    if (typeof Modal !== 'undefined' && overlay && window.getComputedStyle(overlay).display !== 'none') Modal.close();
+
+    const screen = document.getElementById('screen-journal');
+    if (screen && screenHome) {
+      screenHome.insertBefore(screen, (screenNext && screenNext.parentNode === screenHome) ? screenNext : null);
+      screen.style.display = 'none';
+    }
+    const lockBtn = document.getElementById('journal-lock-toggle');
+    if (lockBtn && lockHome) {
+      lockHome.insertBefore(lockBtn, (lockNext && lockNext.parentNode === lockHome) ? lockNext : null);
+      lockBtn.style.display = 'none';
+    }
+    screenHome = screenNext = lockHome = lockNext = null;
+
+    if (typeof Modal !== 'undefined' && Modal.setHost) Modal.setHost(null);
+    if (layer.parentNode) layer.parentNode.removeChild(layer);
+    if (typeof MiscSound !== 'undefined') MiscSound.play('uiClose');
+  }
+
+  function isBookOpen() { return !!bookLayer; }
+
+  function onBookKey(e) {
+    if (e.key !== 'Escape' || !bookLayer) return;
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay && window.getComputedStyle(overlay).display !== 'none') return;
+    closeBook();
+  }
+
+  // Adds the pixel weather icon beside the (unchanged) weather select while the book is open.
+  function decorateBookContent() {
+    if (!bookLayer) return;
+    const sel = document.getElementById('journal-weather');
+    if (!sel || !sel.parentNode) return;
+    const skinWeather = getWorldSkin().skin.weather || {};
+    const icon = document.createElement('span');
+    icon.className = 'journal-weather-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    sel.parentNode.insertBefore(icon, sel);
+    function paint() { paintSprite(icon, skinWeather[sel.value] || DEFAULT_WEATHER[sel.value] || null); }
+    paint();
+    sel.addEventListener('change', paint);
+  }
+
   function isReady() {
     return initialized;
   }
 
-  return { init: init, render: render, openDate: openDate, enterViaNav: enterViaNav, isReady: isReady };
+  return { init: init, render: render, openDate: openDate, enterViaNav: enterViaNav, isReady: isReady, openBook: openBook, closeBook: closeBook, isBookOpen: isBookOpen };
 })();
