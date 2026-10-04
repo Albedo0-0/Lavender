@@ -1,5 +1,5 @@
 // water.js — Water Tracker UI (§B.4). Depends on: State, Modal, Notify, WaterData, TimeEngine.
-// Icon button lives outside the tab screens (#water-icon, see index.html). Reminder loop rides
+// Log entry now goes through Utility Drawer -> Habits (habits.js). Reminder loop rides
 // the shared TimeEngine heartbeat (Feature 11, foreground-only, §3.3) and delivers via the shared
 // Notify layer (§3.1) plus an in-app modal offering Done (log intake) / Later (snooze 10 min, §4.4).
 //
@@ -55,19 +55,7 @@ const Water = (function () {
     if (WaterData.isReminderDueNow(new Date())) showReminderPrompt();
   }
 
-  function handleIconClick() {
-    openPicker('Log water');
-  }
-
-  let _iconBtnRef = null;
-
   function init() {
-    const btn = document.getElementById('water-icon');
-    if (btn) {
-      if (_iconBtnRef) _iconBtnRef.removeEventListener('click', handleIconClick);
-      btn.addEventListener('click', handleIconClick);
-      _iconBtnRef = btn;
-    }
     // Single-heartbeat migration (Feature 11): ride TimeEngine's tick instead of our own
     // setInterval. Passing the stable id 'water' means calling init() again (re-render/reopen)
     // replaces this callback in TimeEngine's registry rather than accumulating a second one.
