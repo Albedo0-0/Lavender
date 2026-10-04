@@ -3353,9 +3353,7 @@ button.library-archive-target-btn {
   flex-wrap: wrap;
 }
 
-#utility-drawer.utility-drawer-hidden {
-  display: none !important;
-}
+/* hidden state is handled by the hanging-charm block below */
 
 .utility-drawer-group {
   display: flex;
@@ -3401,6 +3399,129 @@ button.library-archive-target-btn {
   border-color: var(--color-sage-300);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+/* ===== Utility hanging charm (presentation only) ===== */
+@keyframes utility-charm-spin { to { transform: rotate(360deg); } }
+
+#utility-menu-btn {
+  position: relative; z-index: 2;
+  width: 38px; height: 38px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 20px; line-height: 1;
+  background: var(--color-cream-050);
+  border: 2px solid var(--color-kraft-400);
+  border-radius: 52% 48% 50% 50%;
+  box-shadow: 1px 2px 0 rgba(63,47,33,.18), var(--shadow-sm);
+}
+#utility-menu-btn:hover { background: var(--color-sage-100); border-color: var(--color-sage-400); transform: none; animation: utility-charm-spin 3s linear infinite; }
+body:has(#utility-drawer:not(.utility-drawer-hidden)) #utility-menu-btn { background: var(--color-sage-100); animation: utility-charm-spin 5s linear infinite; }
+
+/* header dims too, but stays above the backdrop so the charm remains clickable */
+#app-header::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+  background: rgba(58,50,38,.28);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  transition: opacity .3s ease;
+}
+body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header { z-index: 61; }
+body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opacity: 1; }
+
+#utility-drawer {
+  --step: clamp(36px, 6vh, 52px);
+  position: fixed; top: 54px; right: 18px; width: 38px; height: 0;
+  display: block; padding: 0; gap: 0;
+  background: none; border: 0; box-shadow: none;
+  z-index: 60; visibility: visible;
+  transition: visibility 0s linear 0s;
+}
+#utility-drawer.utility-drawer-hidden { visibility: hidden; pointer-events: none; transition: visibility 0s linear .6s; }
+
+/* backdrop (click target === drawer, closed by nav.js) */
+#utility-drawer::before {
+  content: ''; position: fixed; inset: 0; z-index: -1;
+  background: rgba(58,50,38,.28);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  opacity: 1; transition: opacity .3s ease;
+}
+#utility-drawer.utility-drawer-hidden::before { opacity: 0; }
+
+/* the string */
+#utility-drawer::after {
+  content: ''; position: absolute; z-index: -1; left: 50%; top: -8px; margin-left: -1px;
+  height: calc(var(--step) * 8 + 26px);
+  border-left: 2px dashed var(--color-kraft-500);
+  transform-origin: top; transform: scaleY(1); transition: transform .5s ease;
+}
+#utility-drawer.utility-drawer-hidden::after { transform: scaleY(0); }
+
+#utility-drawer .utility-drawer-group { display: contents; }
+#utility-drawer .utility-drawer-divider { display: none; }
+
+#utility-drawer button {
+  position: absolute; top: 0; right: -8px; width: 168px; height: 34px; box-sizing: border-box; margin: 0;
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  padding: 0 12px; text-align: left; white-space: nowrap; line-height: 1;
+  font-family: var(--font-hand); font-size: 15px; font-weight: 700;
+  color: var(--color-brown-700);
+  background: repeating-linear-gradient(0deg, rgba(169,134,90,.07) 0 1px, transparent 1px 8px), var(--color-cream-050);
+  border: 1px solid var(--color-kraft-400);
+  border-radius: 4px 9px 5px 8px;
+  box-shadow: 2px 3px 0 rgba(63,47,33,.16);
+  transform-origin: calc(100% - 28px) 0;
+  transform: translateY(calc(var(--i) * var(--step))) translateX(var(--sway)) rotate(var(--rot));
+  opacity: 1;
+  transition: transform .55s cubic-bezier(.34,1.56,.64,1), opacity .3s ease, background-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition-delay: calc(var(--i) * 55ms);
+}
+#utility-drawer button:hover {
+  background: var(--color-sage-100); border-color: var(--color-sage-400);
+  box-shadow: 3px 4px 0 rgba(63,47,33,.2);
+  transform: translateY(calc(var(--i) * var(--step))) translateX(var(--sway)) rotate(0deg) scale(1.04);
+  transition-delay: 0s;
+}
+#utility-drawer button:active {
+  transform: translateY(calc(var(--i) * var(--step))) translateX(var(--sway)) rotate(0deg) scale(.96);
+}
+#utility-drawer button:focus-visible { outline: 2px solid var(--color-sage-600); outline-offset: 2px; }
+#utility-drawer.utility-drawer-hidden button {
+  transform: translateY(-6px) scale(.3) rotate(-14deg); opacity: 0;
+  transition: transform .25s ease-in, opacity .2s ease-in;
+  transition-delay: calc((8 - var(--i)) * 18ms);
+}
+
+/* washi tape at the hang point */
+#utility-drawer button::before {
+  content: ''; position: absolute; top: -6px; right: 11px; width: 34px; height: 11px;
+  background: rgba(168,176,135,.6); transform: rotate(-3deg); pointer-events: none;
+}
+#utility-drawer button:nth-of-type(even)::before { background: rgba(217,196,163,.75); transform: rotate(3deg); }
+
+/* labels for icon-only utilities (Break already has text) */
+#utility-drawer button::after { font-family: var(--font-hand); font-size: 14px; font-weight: 700; }
+#unrecorded-study-icon::after { content: 'Unrecorded Study'; }
+#water-icon::after            { content: 'Water'; }
+#notepad-icon::after          { content: 'Notepad'; }
+#paintbrush-icon::after       { content: 'Cosmetics'; }
+#backup-export-btn::after     { content: 'Export'; }
+#backup-restore-btn::after    { content: 'Restore'; }
+#settings-icon::after         { content: 'Settings'; }
+#fullscreen-btn::after        { content: 'Fullscreen'; }
+
+/* order + alternating hang angle */
+#global-break-btn      { --i: 0; --rot: -2.5deg; --sway: 0px; }
+#unrecorded-study-icon { --i: 1; --rot: 2deg;    --sway: -14px; }
+#water-icon            { --i: 2; --rot: -2deg;   --sway: -3px; }
+#notepad-icon          { --i: 3; --rot: 2.5deg;  --sway: -14px; }
+#paintbrush-icon       { --i: 4; --rot: -2.5deg; --sway: 0px; }
+#backup-export-btn     { --i: 5; --rot: 2deg;    --sway: -14px; }
+#backup-restore-btn    { --i: 6; --rot: -2deg;   --sway: -3px; }
+#settings-icon         { --i: 7; --rot: 2.5deg;  --sway: -14px; }
+#fullscreen-btn        { --i: 8; --rot: -2deg;   --sway: 0px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #utility-drawer button, #utility-drawer::after { transition-duration: .01s !important; transition-delay: 0s !important; }
+  #utility-menu-btn, #utility-menu-btn:hover, body:has(#utility-drawer:not(.utility-drawer-hidden)) #utility-menu-btn { animation: none; }
 }
 
 /* Backup / Restore (Feature 14) — structure/grid/table stay bespoke (Phase 12
