@@ -51,3 +51,799 @@
   background: rgba(10, 12, 30, 0.6);
   outline: none;
 }
+
+/* ======================================================================
+   Journal book — in-world pixel journal (presentation only).
+   The canonical #screen-journal is re-parented into .jb-page while open.
+   Skin colours/fonts arrive as --jb-* custom properties set by journal.js.
+   ====================================================================== */
+
+.myworld-fullscreen-host #modal-overlay,
+.journal-book-layer {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+.journal-book-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 12px)
+    calc(env(safe-area-inset-right, 0px) + 12px)
+    calc(env(safe-area-inset-bottom, 0px) + 12px)
+    calc(env(safe-area-inset-left, 0px) + 12px);
+  background: rgba(10, 12, 30, 0.34);
+  cursor: default;
+}
+
+.journal-book {
+  position: relative;
+  width: min(980px, 100%);
+  height: min(780px, 100%);
+  display: flex;
+  outline: none;
+  animation: jbBookIn 0.22s ease-out;
+}
+
+@keyframes jbBookIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.journal-book::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(8px);
+  background: rgba(8, 10, 24, 0.5);
+  clip-path: polygon(0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px));
+  pointer-events: none;
+}
+
+.jb-cover {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  box-sizing: border-box;
+  padding: 12px 12px 12px 26px;
+  background: var(--jb-frame);
+  clip-path: polygon(0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px, 100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%, 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px));
+  box-shadow: inset 0 0 0 4px var(--jb-frameDark);
+}
+
+.jb-cover::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 30px;
+  right: 7px;
+  bottom: 7px;
+  border: 2px dashed var(--jb-frameLight);
+  pointer-events: none;
+}
+
+.jb-cover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 18px;
+  background: var(--jb-frameDark);
+  box-shadow: inset -4px 0 0 var(--jb-frameLight);
+  pointer-events: none;
+}
+
+.jb-paper {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--jb-paper);
+  color: var(--jb-ink);
+  font-family: var(--jb-font-body);
+  box-shadow: inset 0 0 0 2px var(--jb-paperDark);
+  clip-path: polygon(0 6px, 3px 6px, 3px 3px, 6px 3px, 6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px));
+}
+
+/* ---- header: scenery band, signature charm, title (date sits right beneath it) ---- */
+
+.jb-header {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.jb-scene {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.jb-scenery {
+  width: 100%;
+  background-repeat: repeat-x;
+  background-position: left bottom;
+  image-rendering: pixelated;
+}
+
+.jb-signature {
+  position: absolute;
+  left: 56px;
+  bottom: 2px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.jb-firefly {
+  position: absolute;
+  left: 22%;
+  top: 46%;
+  width: 4px;
+  height: 4px;
+  background: var(--jb-firefly, #ffe27a);
+  box-shadow: 0 0 0 2px rgba(255, 226, 122, 0.28), 0 0 8px 3px rgba(255, 226, 122, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  animation: jbFirefly 28s linear infinite;
+}
+
+@keyframes jbFirefly {
+  0%, 56% { opacity: 0; transform: translate(0, 0); }
+  60% { opacity: 0.9; }
+  68% { transform: translate(16px, -8px); opacity: 0.35; }
+  76% { transform: translate(34px, 2px); opacity: 0.95; }
+  84% { transform: translate(52px, -10px); opacity: 0.4; }
+  92% { transform: translate(78px, -2px); opacity: 0.85; }
+  96%, 100% { opacity: 0; transform: translate(96px, -6px); }
+}
+
+.jb-title {
+  margin: 8px 56px 0;
+  text-align: center;
+  font-family: var(--jb-font-title);
+  font-weight: 700;
+  font-size: clamp(19px, 3.6vw, 30px);
+  line-height: 1.15;
+  letter-spacing: 1px;
+  color: var(--jb-ink);
+  text-shadow: 2px 2px 0 var(--jb-paperDark);
+}
+
+.jb-lock-slot {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 2;
+}
+
+.jb-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-family: var(--jb-font-title);
+  font-size: 15px;
+  line-height: 26px;
+  text-align: center;
+  color: var(--jb-accentText);
+  background: var(--jb-accent);
+  border: 2px solid var(--jb-frameDark);
+  border-radius: 0;
+  box-shadow: 0 3px 0 var(--jb-frameDark);
+  cursor: pointer;
+}
+
+.jb-close:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--jb-frameDark);
+}
+
+.jb-close:focus-visible,
+.journal-book #journal-lock-toggle:focus-visible {
+  outline: 2px solid var(--jb-ink);
+  outline-offset: 2px;
+}
+
+.journal-book #journal-lock-toggle {
+  position: static;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 26px;
+  text-align: center;
+  background: var(--jb-paper);
+  border: 2px solid var(--jb-frameDark);
+  border-radius: 0;
+  box-shadow: 0 3px 0 var(--jb-frameDark);
+  cursor: pointer;
+  z-index: auto;
+}
+
+/* ---- page: the canonical #screen-journal lives here ---- */
+
+.jb-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  box-sizing: border-box;
+  padding: 0 clamp(12px, 3vw, 30px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--jb-frame) var(--jb-paperDark);
+  color: var(--jb-ink);
+}
+
+.journal-book #screen-journal {
+  display: flex !important;
+  flex-flow: row wrap;
+  align-content: flex-start;
+  gap: 8px 18px;
+  position: relative;
+  perspective: none;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 20px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-family: var(--jb-font-body);
+  color: var(--jb-ink);
+}
+
+.journal-book #screen-journal::before,
+.journal-book #screen-journal::after,
+.journal-book .journal-page-overlay {
+  display: none;
+}
+
+.journal-book #screen-journal .journal-diary {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.journal-book .journal-label {
+  margin: 0 0 4px;
+  font-family: var(--jb-font-title);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--jb-inkSoft);
+}
+
+.journal-book .journal-locked-placeholder {
+  margin: 28px auto;
+  font-family: var(--jb-font-write);
+  font-size: 22px;
+  color: var(--jb-inkSoft);
+  background: var(--jb-bubble);
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 -3px 0 0 var(--jb-ink), 0 3px 0 0 var(--jb-ink), -3px 0 0 0 var(--jb-ink), 3px 0 0 0 var(--jb-ink);
+}
+
+/* ---- date stamp (topbar stays directly under the title) ---- */
+
+.journal-book .journal-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 -4px 6px;
+  padding: 8px 6px;
+  border: 0;
+  border-bottom: 2px dashed var(--jb-paperDark);
+  border-radius: 0;
+  background: var(--jb-paper);
+}
+
+.journal-book .journal-topbar::after {
+  display: none;
+}
+
+.journal-book .journal-date-label {
+  position: relative;
+  overflow: hidden;
+  padding: 0 14px 3px;
+  font-family: var(--jb-font-title);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: none;
+  color: var(--jb-ink);
+  background: var(--jb-bubble);
+  border: 2px solid var(--jb-ink);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 var(--jb-paperDark);
+  transform: rotate(-1.5deg);
+}
+
+.journal-book .journal-date-label::before {
+  content: '';
+  display: block;
+  height: 6px;
+  margin: 0 -14px 3px;
+  background: var(--jb-accent);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+}
+
+.journal-book .journal-important-tag {
+  font-family: var(--jb-font-write);
+  font-size: 17px;
+  color: var(--jb-accent);
+  background: var(--jb-bubble);
+  border: 2px solid var(--jb-accent);
+  border-radius: 0;
+}
+
+/* ---- pixel buttons ---- */
+
+.journal-book #screen-journal button {
+  margin: 4px 6px 7px;
+  padding: 6px 14px 8px;
+  font-family: var(--jb-font-title);
+  font-size: 14px;
+  line-height: 1.1;
+  color: var(--jb-accentText);
+  background: var(--jb-accent);
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 -3px 0 0 var(--jb-frameDark), 0 3px 0 0 var(--jb-frameDark), -3px 0 0 0 var(--jb-frameDark), 3px 0 0 0 var(--jb-frameDark), inset 0 -3px 0 0 rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.journal-book #screen-journal button:active {
+  transform: translateY(2px);
+}
+
+.journal-book #screen-journal button:focus-visible {
+  outline: 2px solid var(--jb-ink);
+  outline-offset: 4px;
+}
+
+.journal-book #screen-journal button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.journal-book .journal-topbar button#journal-prev-date,
+.journal-book .journal-topbar button#journal-next-date {
+  width: 30px;
+  height: 30px;
+  margin: 4px 8px;
+  padding: 0;
+}
+
+.journal-book #screen-journal .journal-change-pass-btn {
+  margin: 0 0 0 auto;
+  padding: 0;
+  font-family: var(--jb-font-write);
+  font-size: 17px;
+  color: var(--jb-inkSoft);
+  background: none;
+  box-shadow: none;
+  text-decoration: underline;
+}
+
+.journal-book #screen-journal .journal-photo-remove {
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--jb-accentText);
+  box-shadow: 0 0 0 2px var(--jb-frameDark);
+}
+
+/* ---- quote = pixel speech bubble ---- */
+
+.journal-book .journal-morning {
+  position: relative;
+  margin: 8px 4px 16px;
+  padding: 8px 14px 10px;
+  background: var(--jb-bubble);
+  box-shadow: 0 -3px 0 0 var(--jb-ink), 0 3px 0 0 var(--jb-ink), -3px 0 0 0 var(--jb-ink), 3px 0 0 0 var(--jb-ink);
+}
+
+.journal-book .journal-morning::before,
+.journal-book .journal-morning::after {
+  content: '';
+  position: absolute;
+  background: var(--jb-bubble);
+  pointer-events: none;
+}
+
+.journal-book .journal-morning::before {
+  left: 30px;
+  bottom: -3px;
+  width: 12px;
+  height: 3px;
+  box-shadow: -3px 0 0 0 var(--jb-ink), 3px 0 0 0 var(--jb-ink), 0 3px 0 0 var(--jb-ink);
+}
+
+.journal-book .journal-morning::after {
+  left: 33px;
+  bottom: -6px;
+  width: 6px;
+  height: 3px;
+  box-shadow: -3px 0 0 0 var(--jb-ink), 3px 0 0 0 var(--jb-ink), 0 3px 0 0 var(--jb-ink);
+}
+
+.journal-book .journal-morning input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 0;
+  font-family: var(--jb-font-write);
+  font-size: 22px;
+  color: var(--jb-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.journal-book .journal-morning input:focus {
+  outline: none;
+  box-shadow: 0 2px 0 0 var(--jb-accent);
+}
+
+.journal-book .journal-morning input::placeholder,
+.journal-book #screen-journal textarea::placeholder {
+  color: var(--jb-inkSoft);
+  opacity: 0.7;
+}
+
+/* ---- weather + mood cards ---- */
+
+.journal-book .journal-row {
+  gap: 18px;
+  margin: 0 4px 8px;
+}
+
+.journal-book .journal-weather,
+.journal-book .journal-mood {
+  min-width: 140px;
+  padding: 8px 12px 10px;
+  background: var(--jb-bubble);
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 -3px 0 0 var(--jb-ink), 0 3px 0 0 var(--jb-ink), -3px 0 0 0 var(--jb-ink), 3px 0 0 0 var(--jb-ink);
+}
+
+.journal-book .journal-weather::before,
+.journal-book .journal-mood::before {
+  display: none;
+}
+
+.journal-book .journal-weather select,
+.journal-book .journal-mood select,
+.journal-book .journal-sleep-row input[type="time"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 26px 2px 2px;
+  font-family: var(--jb-font-write);
+  font-size: 21px;
+  color: var(--jb-ink);
+  background-color: transparent;
+  border: 0;
+  border-bottom: 2px dashed var(--jb-paperDark);
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.journal-book .journal-weather select,
+.journal-book .journal-mood select {
+  background-image:
+    linear-gradient(var(--jb-ink), var(--jb-ink)),
+    linear-gradient(var(--jb-ink), var(--jb-ink)),
+    linear-gradient(var(--jb-ink), var(--jb-ink));
+  background-repeat: no-repeat;
+  background-size: 9px 3px, 5px 3px, 1px 3px;
+  background-position: right 5px top calc(50% - 3px), right 7px top 50%, right 9px top calc(50% + 3px);
+}
+
+.journal-book .journal-weather select:disabled,
+.journal-book .journal-mood select:disabled,
+.journal-book #screen-journal textarea:disabled,
+.journal-book .journal-morning input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: var(--jb-ink);
+}
+
+.journal-book .journal-weather select {
+  padding-left: 36px;
+}
+
+.journal-book .journal-weather-icon {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* ---- diary: pixel paper with ruled lines ---- */
+
+.journal-book .journal-diary {
+  margin: 4px 4px 10px;
+}
+
+.journal-book .journal-diary textarea {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+  box-sizing: border-box;
+  padding: 4px 10px;
+  font-family: var(--jb-font-write);
+  font-size: 23px;
+  line-height: 28px;
+  color: var(--jb-ink);
+  caret-color: var(--jb-accent);
+  background-color: var(--jb-field);
+  background-image: repeating-linear-gradient(
+    var(--jb-field) 0px,
+    var(--jb-field) 27px,
+    var(--jb-paperDark) 27px,
+    var(--jb-paperDark) 28px
+  );
+  background-attachment: local;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 -3px 0 0 var(--jb-inkSoft), 0 3px 0 0 var(--jb-inkSoft), -3px 0 0 0 var(--jb-inkSoft), 3px 0 0 0 var(--jb-inkSoft);
+  resize: vertical;
+}
+
+.journal-book .journal-diary textarea:focus,
+.journal-book .journal-manifestation textarea:focus {
+  outline: none;
+  box-shadow: 0 -3px 0 0 var(--jb-accent), 0 3px 0 0 var(--jb-accent), -3px 0 0 0 var(--jb-accent), 3px 0 0 0 var(--jb-accent);
+}
+
+/* ---- photos, manifestation, challenge, sleep ---- */
+
+.journal-book .journal-photos {
+  margin: 0 4px;
+}
+
+.journal-book .journal-photo-empty {
+  font-family: var(--jb-font-write);
+  font-size: 18px;
+  color: var(--jb-inkSoft);
+}
+
+.journal-book .journal-photo-item {
+  background: var(--jb-bubble);
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 -2px 0 0 var(--jb-ink), 0 2px 0 0 var(--jb-ink), -2px 0 0 0 var(--jb-ink), 2px 0 0 0 var(--jb-ink), 4px 4px 0 0 var(--jb-paperDark);
+}
+
+.journal-book #screen-journal input[type="file"] {
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--jb-font-write);
+  font-size: 17px;
+  color: var(--jb-inkSoft);
+}
+
+.journal-book #screen-journal input[type="file"]::file-selector-button {
+  margin-right: 8px;
+  padding: 3px 10px 4px;
+  font-family: var(--jb-font-title);
+  font-size: 12px;
+  color: var(--jb-accentText);
+  background: var(--jb-accent);
+  border: 2px solid var(--jb-frameDark);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.journal-book .journal-manifestation,
+.journal-book .journal-challenge {
+  margin: 8px 4px 0;
+  padding: 10px 14px 12px;
+  background: var(--jb-bubble);
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  box-shadow: 0 -3px 0 0 var(--jb-inkSoft), 0 3px 0 0 var(--jb-inkSoft), -3px 0 0 0 var(--jb-inkSoft), 3px 0 0 0 var(--jb-inkSoft);
+}
+
+.journal-book .journal-challenge::after {
+  display: none;
+}
+
+.journal-book .journal-manifestation .journal-label {
+  font-family: var(--jb-font-title);
+  color: var(--jb-inkSoft);
+}
+
+.journal-book .journal-manifestation textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 2px 2px;
+  font-family: var(--jb-font-write);
+  font-size: 21px;
+  line-height: 24px;
+  color: var(--jb-ink);
+  background: transparent;
+  border: 0;
+  border-top: 2px dashed var(--jb-paperDark);
+  border-radius: 0;
+  resize: vertical;
+}
+
+.journal-book .journal-challenge-line,
+.journal-book .journal-challenge-question,
+.journal-book .journal-challenge-result {
+  font-family: var(--jb-font-write);
+  font-size: 20px;
+  color: var(--jb-ink);
+}
+
+.journal-book .journal-challenge-timer {
+  font-family: var(--jb-font-title);
+  font-size: 22px;
+  color: var(--jb-accent);
+}
+
+.journal-book .journal-save-row {
+  margin: 6px 4px 0;
+}
+
+.journal-book .journal-save-row:has(#journal-edit-btn)::after {
+  font-family: var(--jb-font-title);
+  color: var(--jb-accent);
+  border-color: var(--jb-accent);
+  border-radius: 0;
+}
+
+.journal-book .journal-sleep-section {
+  margin: 8px 4px 0;
+  border-top: 2px dashed var(--jb-paperDark);
+}
+
+.journal-book .journal-sleep-row {
+  font-family: var(--jb-font-write);
+  font-size: 20px;
+  color: var(--jb-ink);
+}
+
+.journal-book .journal-sleep-row input[type="time"] {
+  width: auto;
+  padding-right: 4px;
+  background-image: none;
+}
+
+.journal-book .journal-sleep-section .journal-label {
+  font-size: 13px;
+  color: var(--jb-inkSoft);
+}
+
+.journal-book .journal-sleep-dur {
+  font-family: var(--jb-font-write);
+  color: var(--jb-accent);
+}
+
+/* ---- footer: bottom decoration + small accent ---- */
+
+.jb-footer {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 30px;
+  pointer-events: none;
+}
+
+.jb-vines {
+  width: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: repeat-x;
+  background-position: left bottom;
+  image-rendering: pixelated;
+}
+
+.jb-snail {
+  position: absolute;
+  right: 28px;
+  bottom: 3px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+/* ---- dialogs opened from inside the host (lock / photo preview) stay above the book ---- */
+
+.myworld-fullscreen-host #modal-overlay {
+  z-index: 9600;
+}
+
+@media (max-width: 640px) {
+  .journal-book .journal-manifestation,
+  .journal-book .journal-challenge {
+    flex: 1 1 100%;
+  }
+  .journal-book .journal-weather,
+  .journal-book .journal-mood {
+    flex: 1 1 100%;
+  }
+  .jb-cover {
+    padding: 10px 10px 10px 22px;
+  }
+  .jb-cover::before {
+    left: 26px;
+  }
+  .jb-title {
+    margin: 8px 44px 0;
+  }
+  .jb-signature {
+    left: 50px;
+  }
+}
+
+@media (max-height: 520px) {
+  .jb-scene,
+  .jb-footer {
+    display: none;
+  }
+  .jb-header {
+    min-height: 46px;
+  }
+  .jb-title {
+    margin-top: 8px;
+    margin-bottom: 2px;
+    font-size: 18px;
+  }
+  .journal-book .journal-diary textarea {
+    min-height: 150px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journal-book {
+    animation: none;
+  }
+  .jb-firefly {
+    display: none;
+  }
+}
