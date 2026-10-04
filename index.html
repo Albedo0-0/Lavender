@@ -45,7 +45,7 @@
   <div class="utility-drawer-group" data-group="study">
     <button id="global-break-btn" title="Take a break">Break</button>
     <button id="unrecorded-study-icon" title="Unrecorded Study">&#128221;+</button>
-    <button id="water-icon" title="Log water">&#128167;</button>
+    <button id="habits-icon" title="Habits">&#10003;</button>
   </div>
   <div class="utility-drawer-divider"></div>
 <div class="utility-drawer-group" data-group="personal">
@@ -150,6 +150,7 @@
 <script src="storage.js"></script>
 <script src="state.js"></script>
   <script src="notify.js"></script>
+  <script src="habit-data.js"></script>
   <script src="sleep-data.js"></script>
   <script src="water-data.js"></script>
   <script src="alarm-data.js"></script>
@@ -169,6 +170,7 @@
   <script src="targets.js"></script>
   <script src="sleep.js"></script>
   <script src="water.js"></script>
+  <script src="habits.js"></script>
   <script src="alarm.js"></script>
   <script src="itinerary.js"></script>
   <script src="journal.js"></script>
@@ -220,10 +222,12 @@
   <script>
      MyWorldContent.restoreImportedPacks().catch(function () {}).then(function () {
     State.init();
+    HabitData.init();
     Nav.init();
     Modal.init();
     
     Water.init();
+    Habits.init();
     Alarm.init();
     TimeEngine.init();
     if (typeof ItineraryToday !== 'undefined') ItineraryToday.init();
