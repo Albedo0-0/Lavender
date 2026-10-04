@@ -5428,3 +5428,14 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 #habits-root .hab-ctl-on { opacity: 1; }
 .hab-form { display: flex; flex-direction: column; gap: var(--space-2); }
 .hab-form label { display: flex; flex-direction: column; gap: 2px; font-size: .85rem; }
+
+
+#habits-root button:hover, #habits-root button:active { transform: none; }
+#habits-root .hab-cell, #habits-root .hab-title { touch-action: manipulation; }
+#habits-root .hab-mini, #habits-root .hab-ctl {
+  color: var(--color-brown-700); background: var(--color-cream-050);
+  border: 1px solid var(--color-kraft-400); box-shadow: none;
+}
+#habits-root .hab-mini:hover, #habits-root .hab-ctl:hover, #habits-root .hab-ctl-on {
+  background: var(--color-sage-100); border-color: var(--color-sage-400);
+}
