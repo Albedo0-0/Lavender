@@ -49,6 +49,18 @@ if (utilBtn && utilDrawer) {
   utilBtn.addEventListener('click', function () {
     utilDrawer.classList.toggle('utility-drawer-hidden');
   });
+  const utilityDrawerOpen = function () { return !utilDrawer.classList.contains('utility-drawer-hidden'); };
+  const closeUtilityDrawer = function () { utilDrawer.classList.add('utility-drawer-hidden'); };
+  document.addEventListener('click', function (e) {
+    if (!utilityDrawerOpen() || utilBtn.contains(e.target)) return;
+    if (e.target === utilDrawer || e.target.closest('#utility-drawer button') || !utilDrawer.contains(e.target)) closeUtilityDrawer();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !utilityDrawerOpen()) return;
+    const ov = document.getElementById('modal-overlay');
+    if (ov && getComputedStyle(ov).display !== 'none') return; // Modal owns Escape while open
+    closeUtilityDrawer();
+  });
 }
 
     
