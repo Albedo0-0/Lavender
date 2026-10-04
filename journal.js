@@ -274,13 +274,11 @@ const Journal = (function () {
           : '<button id="journal-save-btn">Save</button>') +
       '</div>' +
 
-       '<div class="journal-challenge" id="journal-challenge-section"></div>' +
-      '<div class="journal-sleep-section" id="journal-sleep-section"></div>';
+       '<div class="journal-challenge" id="journal-challenge-section"></div>';
 
     wireMainEvents(entry);
     renderPhotos();
     renderChallengeSection();
-    renderSleepSection();
     decorateBookContent();
   }
 
@@ -530,34 +528,7 @@ function renderPhotos() {
     });
   }
 
-  function renderSleepSection() {
-    const section = document.getElementById('journal-sleep-section');
-    if (!section) return;
-    const dateStr = currentDate;
-    const rec = SleepData.getRecord(dateStr);
-    function fmtDur(min) {
-      if (min === null || min === undefined) return '\u2013';
-      const h = Math.floor(min / 60), m = min % 60;
-      return h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
-    }
-    section.innerHTML =
-      '<label class="journal-label">Sleep</label>' +
-      '<div class="journal-sleep-row">' +
-        '<label>Bedtime&nbsp;<input type="time" id="journal-sleep-bed" value="' + (rec.sleepTime || '') + '"></label>' +
-        '&nbsp;&nbsp;' +
-        '<label>Wake&nbsp;<input type="time" id="journal-sleep-wake" value="' + (rec.wakeTime || '') + '"></label>' +
-        '&nbsp;&nbsp;' +
-        (rec.completed ? '<span class="journal-sleep-dur">' + fmtDur(rec.durationMin) + '</span>' : '') +
-        '<button id="journal-sleep-save">Save</button>' +
-      '</div>';
-    document.getElementById('journal-sleep-save').addEventListener('click', function () {
-      const bed = document.getElementById('journal-sleep-bed').value;
-      const wake = document.getElementById('journal-sleep-wake').value;
-      if (bed && wake) { SleepData.saveRecord(dateStr, { sleepTime: bed, wakeTime: wake }); }
-      renderSleepSection();
-    });
-  }
-
+  
   function init() {
     const lockBtn = document.getElementById('journal-lock-toggle');
     if (lockBtn) lockBtn.addEventListener('click', handleLockToggle);
