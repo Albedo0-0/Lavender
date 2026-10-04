@@ -21,7 +21,9 @@ const State = (function () {
     favoriteTopics: [], // History nav: topicIds marked as favorite
     waterEvents: {}, // Water (§B.4): dateStr -> [{ id, category, value, at }]
     waterReminder: null, // Water (§B.4): { date, lastFiredAt, lastCategory, snoozedUntil } — reset per date
-    sleepRecords: {}, // Sleep (§B.5): dateStr -> { date, sleepTime, wakeTime, durationMin, completed, dismissed }
+    habits: {}, // Habits: habitId -> habit definition (canonical; archived:true = soft-deleted, logs kept) — see habit-data.js
+    habitLogs: {}, // Habits: habitId + '__' + dateStr -> daily log (count, completed, target, events/subStates) — PTPE reads this
+    habitsMigrated: false, // Habits: legacy waterEvents/sleepRecords folded into habitLogs (idempotent, legacy keys kept as archive)
     generalAlarms: {}, // General Alarm (§B.6): alarmId -> { id, text, time, recurrence, enabled, lastFiredDate, snoozedUntil }
     itineraryTemplates: {}, // Itinerary (Phase 2 key, CRUD built Phase 3): templateId -> { templateId, name, schedule, adaptive, items: [...] } — reusable day-templates (Light Day, Heavy Day, etc.), built in Alarm's UI
     dailyItinerary: null, // Itinerary (Phase 2 key, state machine built Phase 4): today's itinerary — { date, status, templateId, items, checklist, diyChosen, startedAt, completedAt }. Read via ItineraryData.getToday(), which compares .date to todayStr() and returns a fresh 'unpresented' shell when stale, mirroring WaterData.getReminderState()'s per-date pattern. Null until Phase 4 backfills the first shell.
