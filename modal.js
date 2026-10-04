@@ -158,5 +158,14 @@ const Modal = (function () {
     });
   }
 
-  return { open: open, close: close, init: init, isLocked: isLocked };
+  // Re-parents the shared overlay (e.g. into the My World host, so dialogs opened from the in-world
+  // Journal appear above it). Pass nothing to return it to <body>. Same single Modal, no second system.
+  function setHost(el) {
+    const overlay = document.getElementById('modal-overlay');
+    if (!overlay) return;
+    const target = el || document.body;
+    if (overlay.parentNode !== target) target.appendChild(overlay);
+  }
+
+  return { open: open, close: close, init: init, isLocked: isLocked, setHost: setHost };
 })();
