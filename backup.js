@@ -82,6 +82,11 @@ const Backup = (function () {
       sleep: {
         sleepRecords: s.sleepRecords
       },
+      habits: {
+        habits: s.habits,
+        habitLogs: s.habitLogs,
+        habitsMigrated: s.habitsMigrated
+      },
       gamification: {
         totalExp: s.gamification.totalExp,
         lastSettledDate: s.gamification.lastSettledDate,
@@ -313,6 +318,28 @@ const Backup = (function () {
     return true;
   }
 
+  function validHabit(rec) {
+    if (typeof rec.habitId !== 'string' || !rec.habitId) return false;
+    if (rec.systemKey != null && rec.systemKey !== 'water' && rec.systemKey !== 'sleep') return false;
+    if (rec.type !== undefined && ['binary', 'target', 'counter'].indexOf(rec.type) === -1) return false;
+    return true;
+  }
+
+  // habitLogs are keyed habitId + '__' + dateStr; the key must match the record's own habitId/date.
+  function cleanHabitLogs(rawMap) {
+    const out = {};
+    if (!isPlainObject(rawMap)) return out;
+    Object.keys(rawMap).forEach(function (key) {
+      const rec = rawMap[key];
+      if (!isPlainObject(rec)) return;
+      if (typeof rec.habitId !== 'string' || !rec.habitId || !isValidDateStr(rec.date)) return;
+      if (key !== rec.habitId + '__' + rec.date) return;
+      if (rec.count != null && !isNonNegNum(rec.count)) return;
+      out[key] = rec;
+    });
+    return out;
+  }
+
   function validDailySummary(rec) {
     if (rec.studyMs !== undefined && !isNonNegNum(rec.studyMs)) return false;
     if (rec.breakMs !== undefined && !isNonNegNum(rec.breakMs)) return false;
@@ -349,6 +376,7 @@ const Backup = (function () {
     const st = isPlainObject(parsed.study) ? parsed.study : {};
     const w = isPlainObject(parsed.water) ? parsed.water : {};
     const sl = isPlainObject(parsed.sleep) ? parsed.sleep : {};
+    const hb = isPlainObject(parsed.habits) ? parsed.habits : {};
     const a = isPlainObject(parsed.assistant) ? parsed.assistant : {};
     const al = isPlainObject(parsed.alarms) ? parsed.alarms : {};
 
@@ -373,6 +401,9 @@ const Backup = (function () {
       studyLog: st.studyLog,
       waterEvents: w.waterEvents,
       sleepRecords: sl.sleepRecords,
+      habits: hb.habits,
+      habitLogs: hb.habitLogs,
+      habitsMigrated: hb.habitsMigrated,
       expLedger: (isPlainObject(parsed.gamification) ? parsed.gamification.expLedger : undefined),
       assistantNotes: a.assistantNotes,
       generalAlarms: al.generalAlarms,
@@ -413,6 +444,9 @@ const Backup = (function () {
       studyLog: cleanDateKeyedArrayMap(flat.studyLog, null),
       waterEvents: cleanDateKeyedArrayMap(flat.waterEvents, validWaterEvent),
       sleepRecords: cleanDateKeyedMap(flat.sleepRecords, { dateField: 'date', recordValidator: validSleepRecord }),
+      habits: cleanIdMap(flat.habits, 'habitId', validHabit),
+      habitLogs: cleanHabitLogs(flat.habitLogs),
+      habitsMigrated: typeof flat.habitsMigrated === 'boolean' ? flat.habitsMigrated : undefined,
       dailySummaries: cleanDateKeyedMap(flat.dailySummaries, { dateField: 'date', recordValidator: validDailySummary }),
       generalAlarms: cleanIdMap(flat.generalAlarms, 'id', validAlarm),
       assistantNotes: cleanIdMap(flat.assistantNotes, 'id', validAssistantNote),
@@ -541,6 +575,22 @@ const Backup = (function () {
     livePlaylist.forEach(function (t) { livePlaylistIds[t.id] = true; });
     const mergedPlaylist = livePlaylist.concat((c.musicPlaylist || []).filter(function (t) { return !livePlaylistIds[t.id]; }));
 
+    // Habits: live wins per habit / per log; backup-only records are added. A backup-only log whose
+    // habit exists nowhere after merging is orphaned and dropped (same rule as tasks/subtargets).
+    const mergedHabits = mergeIdMap(c.habits, cur.habits);
+    const backupOnlyHabitLogs = {};
+    Object.keys(c.habitLogs || {}).forEach(function (key) {
+      if (cur.habitLogs && Object.prototype.hasOwnProperty.call(cur.habitLogs, key)) return; // live wins
+      const log = c.habitLogs[key];
+      if (mergedHabits[log.habitId]) backupOnlyHabitLogs[key] = log;
+    });
+    const mergedHabitLogs = Object.assign({}, backupOnlyHabitLogs, cur.habitLogs || {});
+    // An older (un-migrated) backup that brings legacy Water/Sleep records the live archive lacks
+    // reopens the migration flag. HabitData.init() then folds them in (idempotent: event-id dedup,
+    // existing habit logs win). Nothing is converted here, so nothing is duplicated.
+    const backupBringsLegacy = c.habitsMigrated !== true
+      && (countAdditions(c.waterEvents, cur.waterEvents) > 0 || countAdditions(c.sleepRecords, cur.sleepRecords) > 0);
+
     return {
       currentScreen: cur.currentScreen,
       dateHubs: mergeIdMap(c.dateHubs, cur.dateHubs),
@@ -560,6 +610,9 @@ const Backup = (function () {
       waterEvents: mergeIdMap(c.waterEvents, cur.waterEvents),
       waterReminder: cur.waterReminder,
       sleepRecords: mergeIdMap(c.sleepRecords, cur.sleepRecords),
+      habits: mergedHabits,
+      habitLogs: mergedHabitLogs,
+      habitsMigrated: cur.habitsMigrated === true && !backupBringsLegacy,
       generalAlarms: mergeIdMap(c.generalAlarms, cur.generalAlarms),
       assistantNotes: mergeIdMap(c.assistantNotes, cur.assistantNotes),
       gamification: cur.gamification,
@@ -744,6 +797,11 @@ const Backup = (function () {
   // idempotent per the project's existing "no duplicate listeners on re-render" rule, so calling
   // it again here does not itself introduce duplicate listeners or subscriptions.
   function runPostRestoreHooks() {
+    // Habits: re-run the existing idempotent init (ensureSystemHabits + migrateLegacy) so a restored
+    // legacy Water/Sleep archive is folded in when the flag was reopened, before screens re-render.
+    if (typeof HabitData !== 'undefined' && typeof HabitData.init === 'function') {
+      try { HabitData.init(); } catch (e) { /* idempotent; retries on next app load */ }
+    }
     if (typeof Nav !== 'undefined' && typeof Nav.switchTo === 'function') {
       const screen = State.get().currentScreen;
       if (screen) Nav.switchTo(screen);
