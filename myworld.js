@@ -182,7 +182,7 @@ const MyWorld = (function () {
 
   /** The capability object handed to the active pack's lifecycle/event calls — the only channel it has back into the core. */
   function packEngineContext() {
-    return { growActiveTree: growActiveTree, getTreeStages: getTreeStages, openJournal: function () { closeFullscreen(); if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('journal'); } };
+    return { growActiveTree: growActiveTree, getTreeStages: getTreeStages, openJournal: function () { if (host && typeof Journal !== 'undefined' && Journal.openBook) { Journal.openBook(host); return; } closeFullscreen(); if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('journal'); } };
   }
 
   /**
@@ -3064,7 +3064,10 @@ for (let y = 0; y < 19; y++) {
   }
 
   function onKey(e) {
-    if (e.key === 'Escape') closeFullscreen();
+    if (e.key === 'Escape') {
+      if (typeof Journal !== 'undefined' && Journal.isBookOpen && Journal.isBookOpen()) return;
+      closeFullscreen();
+    }
   }
 
   function onFsChange() {
@@ -3152,6 +3155,7 @@ for (let y = 0; y < 19; y++) {
 
   function closeFullscreen() {
     if (!host) return;
+    if (typeof Journal !== 'undefined' && Journal.closeBook) Journal.closeBook();
 
     nativeFs = false;
     stopLoop();
