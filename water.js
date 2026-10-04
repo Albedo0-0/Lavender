@@ -17,12 +17,13 @@ const Water = (function () {
     return '<h3 class="section-heading">' + title + '</h3><div id="water-cat-list" class="chip-row">' + buttons + '</div>';
   }
 
-  function openPicker(title) {
+  function openPicker(title, dateStr, onDone) {
     Modal.open(pickerHtml(title || 'Log water'), title ? { popup: true } : undefined);
     document.querySelectorAll('.water-cat-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        WaterData.logEvent(WaterData.todayStr(), btn.dataset.cat);
+        WaterData.logEvent(dateStr || WaterData.todayStr(), btn.dataset.cat);
         Modal.close();
+        if (onDone) onDone();
       });
     });
   }
