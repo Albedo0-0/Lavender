@@ -3428,8 +3428,8 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header { z-index: 61;
 body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opacity: 1; }
 
 #utility-drawer {
-  --step: clamp(36px, 6vh, 52px);
-  position: fixed; top: 54px; right: 18px; width: 38px; height: 0;
+  --step: clamp(44px, calc((100vh - 130px) / 8.5), 64px);
+  position: fixed; top: 78px; right: 18px; width: 38px; height: 0;
   display: block; padding: 0; gap: 0;
   background: none; border: 0; box-shadow: none;
   z-index: 60; visibility: visible;
@@ -3448,8 +3448,8 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 
 /* the string */
 #utility-drawer::after {
-  content: ''; position: absolute; z-index: -1; left: 50%; top: -8px; margin-left: -1px;
-  height: calc(var(--step) * 8 + 26px);
+  content: ''; position: absolute; z-index: -1; left: 50%; top: -32px; margin-left: -1px;
+  height: calc(var(--step) * 8 + 52px);
   border-left: 2px dashed var(--color-kraft-500);
   transform-origin: top; transform: scaleY(1); transition: transform .5s ease;
 }
@@ -3459,10 +3459,10 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 #utility-drawer .utility-drawer-divider { display: none; }
 
 #utility-drawer button {
-  position: absolute; top: 0; right: -8px; width: 168px; height: 34px; box-sizing: border-box; margin: 0;
+  position: absolute; top: 0; right: -8px; width: 190px; height: 40px; box-sizing: border-box; margin: 0;
   display: flex; align-items: center; justify-content: flex-start; gap: 8px;
   padding: 0 12px; text-align: left; white-space: nowrap; line-height: 1;
-  font-family: var(--font-hand); font-size: 15px; font-weight: 700;
+  font-family: var(--font-hand); font-size: 17px; font-weight: 700;
   color: var(--color-brown-700);
   background: repeating-linear-gradient(0deg, rgba(169,134,90,.07) 0 1px, transparent 1px 8px), var(--color-cream-050);
   border: 1px solid var(--color-kraft-400);
@@ -3498,7 +3498,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 #utility-drawer button:nth-of-type(even)::before { background: rgba(217,196,163,.75); transform: rotate(3deg); }
 
 /* labels for icon-only utilities (Break already has text) */
-#utility-drawer button::after { font-family: var(--font-hand); font-size: 14px; font-weight: 700; }
+#utility-drawer button::after { font-family: var(--font-hand); font-size: 17px; font-weight: 700; }
 #unrecorded-study-icon::after { content: 'Unrecorded Study'; }
 #water-icon::after            { content: 'Water'; }
 #notepad-icon::after          { content: 'Notepad'; }
