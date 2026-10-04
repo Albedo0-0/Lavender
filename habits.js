@@ -61,7 +61,7 @@ const Habits = (function () {
       '<div class="hab-nav"><button type="button" data-act="prev" aria-label="Previous week">&lsaquo;</button>' +
         '<span>' + fmtDay(dates[0]) + ' &ndash; ' + fmtDay(dates[6]) + '</span>' +
         '<button type="button" data-act="next" aria-label="Next week"' + (atCurrentWeek ? ' disabled' : '') + '>&rsaquo;</button></div>' +
-      '<div class="hab-days"><span></span>' + dates.map(function (d, i) {
+      '<div class="hab-days"><span class="hab-col-label">Habit</span>' + dates.map(function (d, i) {
         return '<span' + (d === today ? ' class="hab-today-label"' : '') + '>' + DAY_LABELS[i] + '<small>' + parseInt(d.slice(8), 10) + '</small></span>';
       }).join('') + '</div>' +
       '<div id="habits-list">' + (habits.length ? habits.map(function (h) { return rowHtml(h, dates, today); }).join('')
