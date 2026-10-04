@@ -16,12 +16,12 @@ const SleepData = (function () {
   }
 
   function getAllRecords() {
-    return State.get().sleepRecords || {};
+    return HabitData.getSleepRecordsMap();
   }
 
   function getRecord(dateStr) {
-    const all = getAllRecords();
-    return all[dateStr] || { date: dateStr, sleepTime: null, wakeTime: null, durationMin: null, completed: false, dismissed: false };
+    const rec = HabitData.getSleepRecord(dateStr);
+    return rec || { date: dateStr, sleepTime: null, wakeTime: null, durationMin: null, completed: false, dismissed: false };
   }
 
   // §5.1 — duration handles the midnight crossing (e.g. 23:30 -> 07:00 = 7h30m) and the
@@ -36,24 +36,20 @@ const SleepData = (function () {
   }
 
   function saveRecord(dateStr, fields) {
-    const all = Object.assign({}, getAllRecords());
     const existing = getRecord(dateStr);
     const next = Object.assign({}, existing, fields, { date: dateStr });
     next.durationMin = computeDurationMin(next.sleepTime, next.wakeTime);
     next.completed = !!(next.sleepTime && next.wakeTime);
     if (next.completed) next.dismissed = false;
-    all[dateStr] = next;
-    State.set({ sleepRecords: all });
+    HabitData.saveSleepRecord(dateStr, next);
     return next;
   }
 
   // §5.2 — safe way to leave the prompt incomplete: dismiss persists so the auto-prompt
   // doesn't re-nag every reopen, without marking the record complete.
   function dismiss(dateStr) {
-    const all = Object.assign({}, getAllRecords());
     const existing = getRecord(dateStr);
-    all[dateStr] = Object.assign({}, existing, { date: dateStr, dismissed: true });
-    State.set({ sleepRecords: all });
+    HabitData.saveSleepRecord(dateStr, Object.assign({}, existing, { date: dateStr, dismissed: true }));
   }
 
   // §5.2 — prompted once per date until completed.
