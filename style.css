@@ -5247,7 +5247,6 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   background: var(--color-sage-100);
 }
 .itinerary-item-row {
-.itinerary-item-row {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
