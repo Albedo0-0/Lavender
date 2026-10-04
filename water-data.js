@@ -26,11 +26,11 @@ const WaterData = (function () {
   }
 
   function getAllEvents() {
-    return State.get().waterEvents || {};
+    return HabitData.getWaterEventsMap();
   }
 
   function getEventsForDate(dateStr) {
-    return getAllEvents()[dateStr] || [];
+    return HabitData.getWaterEvents(dateStr);
   }
 
   // §4.3 — normalized 0-10 daily hydration score, feeds Progress the same way other daily metrics do.
@@ -61,12 +61,8 @@ const WaterData = (function () {
   function logEvent(dateStr, categoryKey) {
     const cat = CATEGORIES[categoryKey];
     if (!cat) return null;
-    const all = Object.assign({}, getAllEvents());
-    const list = (all[dateStr] || []).slice();
     const event = { id: 'w' + Date.now() + Math.floor(Math.random() * 1000), category: categoryKey, value: cat.value, at: Date.now() };
-    list.push(event);
-    all[dateStr] = list;
-    State.set({ waterEvents: all });
+    HabitData.addWaterEvent(dateStr, event);
     // Logging also counts as "responding" to the reminder cycle — advance the schedule.
     setReminderState({ lastFiredAt: Date.now(), lastCategory: categoryKey, snoozedUntil: null });
     return event;
