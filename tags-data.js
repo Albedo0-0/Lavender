@@ -62,11 +62,18 @@ const TagsData = (function () {
         topics[id] = Object.assign({}, t, { tags: t.tags.filter(function (id2) { return id2 !== tagId; }) });
       }
     });
-    State.set({ topics: topics });
+        State.set({ topics: topics });
+    // Habits carry a single tagId — clear it too so a deleted tag never dangles in Habits / PTPE.
+    const habits = Object.assign({}, State.get().habits || {});
+    let habitsChanged = false;
+    Object.keys(habits).forEach(function (id) {
+      if (habits[id].tagId === tagId) { habits[id] = Object.assign({}, habits[id], { tagId: null }); habitsChanged = true; }
+    });
+    if (habitsChanged) State.set({ habits: habits });
     return true;
   }
 
-  function attachTagToTopic(topicId, tagId) {
+  function attachTagToTopic
     const topics = Object.assign({}, PlannerData.getAllTopics());
     const t = topics[topicId];
     if (!t) return;
@@ -91,7 +98,22 @@ const TagsData = (function () {
       .filter(function (t) { return (t.tags || []).indexOf(tagId) !== -1; });
   }
 
-  // Idempotent: converts legacy topics.tags (raw string arrays) into real Tag records +
+    // Global tag lookups — every taggable entity resolves through here (no second tag index anywhere).
+  // Tasks inherit tags from their topic; habits carry one tagId. PTPE derives progress from these.
+  function getTagIdsForTask(task) {
+    const topic = task && task.topicId ? PlannerData.getAllTopics()[task.topicId] : null;
+    return (topic && topic.tags) || [];
+  }
+
+  function getTasksByTag(tagId) {
+    return PlannerData.getTasksList().filter(function (t) { return getTagIdsForTask(t).indexOf(tagId) !== -1; });
+  }
+
+  function getHabitsByTag(tagId) {
+    return (typeof HabitData !== 'undefined' ? HabitData.getHabits({ includeArchived: true }) : []).filter(function (h) { return h.tagId === tagId; });
+  }
+
+  // Idempotent: converts legacy topics.tags(raw string arrays) into real Tag records +
   // tagId arrays, exactly once, guarded by State.get().tagsMigrated.
   function migrateLegacyStringTags() {
     if (State.get().tagsMigrated) return;
@@ -122,7 +144,10 @@ const TagsData = (function () {
     deleteTag: deleteTag,
     attachTagToTopic: attachTagToTopic,
     detachTagFromTopic: detachTagFromTopic,
-    getTopicsByTag: getTopicsByTag,
+        getTopicsByTag: getTopicsByTag,
+    getTagIdsForTask: getTagIdsForTask,
+    getTasksByTag: getTasksByTag,
+    getHabitsByTag: getHabitsByTag,
     migrateLegacyStringTags: migrateLegacyStringTags
   };
 })();
