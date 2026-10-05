@@ -222,12 +222,10 @@ const Progress = (function () {
     }
   }
 
-  function init() {
-    renderShell();
-    render();
-    if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) TimeEngine.subscribe(render, 'progress');
-  }
+    // PTPE: the Progress screen is now drawn by PTPEView (ptpe-ui.js) from PTPE's single calculation layer.
+  // The legacy sidebar renderers above are no longer called; Nav and index.html keep using Progress.init/render.
+  function init() { PTPEView.init(); }
 
-  return { init: init, render: function () { renderShell(); render(); } };
+  return { init: init, render: function () { PTPEView.render(); } };
 })();
 
