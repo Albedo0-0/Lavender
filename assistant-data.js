@@ -208,16 +208,49 @@ const AssistantData = (function () {
     if (!q) return [];
     const results = [];
 
+        // Tags (TagsData is the one registry): "#name" searches ONLY by tag; a plain word also surfaces matching
+    // tags. A tag match returns one summary row (opens that tag in Progress Explorer) plus a short, grouped
+    // list of its topics, habits and tasks — not every raw record.
+    const tagOnly = q.charAt(0) === '#';
+    const term = tagOnly ? q.slice(1).trim() : q;
+    if (!term) return [];
+    const seenTopic = {}, seenTask = {};
+    const matchedTags = (typeof TagsData !== 'undefined' ? TagsData.getAllTagsList() : []).filter(function (tg) {
+      const n = tg.name.toLowerCase();
+      return tagOnly ? n.indexOf(term) !== -1 : (n === term || (term.length >= 3 && n.indexOf(term) !== -1));
+    }).slice(0, 3);
+    matchedTags.forEach(function (tg) {
+      const summary = (typeof PTPE !== 'undefined') ? PTPE.tagSummaryText(tg.tagId) : '';
+      results.push({ type: 'Tag', text: '#' + tg.name + (summary ? ' \u2014 ' + summary : ''), date: '', ref: { kind: 'tag', tagId: tg.tagId } });
+      TagsData.getTopicsByTag(tg.tagId).slice(0, 6).forEach(function (topic) {
+        seenTopic[topic.topicId] = true;
+        results.push({ type: 'Library topic', text: topic.topicName, date: '', ref: { kind: 'topic', subject: topic.subject, topicId: topic.topicId } });
+      });
+      TagsData.getHabitsByTag(tg.tagId).filter(function (h) { return !h.archived; }).slice(0, 4).forEach(function (h) {
+        results.push({ type: 'Habit', text: h.title, date: '', ref: { kind: 'habit', habitId: h.habitId } });
+      });
+      TagsData.getTasksByTag(tg.tagId).filter(function (t) { return !t.completed && !t.archived; })
+        .sort(function (a, b) { return a.date < b.date ? -1 : 1; }).slice(0, 4).forEach(function (t) {
+          seenTask[t.taskId] = true;
+          results.push({ type: 'Planner task', text: t.topicName || t.title || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
+        });
+    });
+    if (tagOnly) return results;
+    const q2 = term;
+
     PlannerData.getTasksList().forEach(function (t) {
+      if (seenTask[t.taskId]) return;
       const hay = [t.topicName, t.title, t.note].filter(Boolean).join(' ').toLowerCase();
-      if (hay.indexOf(q) !== -1) results.push({ type: t.completed ? 'Study history' : 'Planner task', text: t.topicName || t.title || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
+      if (hay.indexOf(q2) !== -1) results.push({ type: t.completed ? 'Study history' : 'Planner task', text: t.topicName || t.title || 'Task', date: t.date, ref: { kind: 'task', taskId: t.taskId } });
     });
 
     PlannerData.getAllTopics && Object.keys(PlannerData.getAllTopics()).forEach(function (id) {
       const topic = PlannerData.getAllTopics()[id];
-      const tags = Array.isArray(topic.tags) ? topic.tags.join(' ') : '';
-      const hay = [topic.topicName, tags, topic.notes].filter(Boolean).join(' ').toLowerCase();
-      if (hay.indexOf(q) !== -1) results.push({ type: 'Library topic', text: topic.topicName, date: '', ref: { kind: 'topic', subject: topic.subject, topicId: topic.topicId } });
+      if (seenTopic[topic.topicId]) return;
+      // Topic tags are tagIds — resolve to names (the old code searched the raw ids, so tag names never matched).
+      const tagNames = (topic.tags || []).map(function (tid) { const tg = (typeof TagsData !== 'undefined') ? TagsData.getTag(tid) : null; return tg ? tg.name : ''; }).join(' ');
+      const hay = [topic.topicName, tagNames, topic.notes].filter(Boolean).join(' ').toLowerCase();
+      if (hay.indexOf(q2) !== -1) results.push({ type: 'Library topic', text: topic.topicName, date: '', ref: { kind: 'topic', subject: topic.subject, topicId: topic.topicId } });
     });
 
     // Journal text — respects the lock; locked entries are never surfaced by search.
@@ -225,7 +258,7 @@ const AssistantData = (function () {
       const entries = JournalData.getAllEntries();
       Object.keys(entries).forEach(function (dateStr) {
         const e = entries[dateStr];
-        if (e.diaryText && e.diaryText.toLowerCase().indexOf(q) !== -1) {
+                if (e.diaryText && e.diaryText.toLowerCase().indexOf(q2) !== -1) {
           results.push({ type: 'Journal', text: e.diaryText.slice(0, 80), date: dateStr, ref: { kind: 'journal', date: dateStr } });
         }
       });
@@ -234,7 +267,7 @@ const AssistantData = (function () {
     
 
     getNotes().forEach(function (n) {
-      if (n.text.toLowerCase().indexOf(q) !== -1) {
+            if (n.text.toLowerCase().indexOf(q2) !== -1) {
         results.push({ type: 'Notepad', text: n.text.slice(0, 80), date: new Date(n.createdAt).toISOString().slice(0, 10), ref: { kind: 'note', id: n.id } });
       }
     });
