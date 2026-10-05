@@ -252,7 +252,7 @@ const Assistant = (function () {
 
   function resultRowHtml(r) {
     const ref = r.ref || {};
-    return '<div class="assistant-search-row assistant-search-result assistant-index-row list-row list-row-compact" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
+    return '<div class="assistant-search-row assistant-search-result assistant-index-row list-row list-row-compact" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-tag-id="' + esc(ref.tagId || '') + '" data-habit-id="' + esc(ref.habitId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
       '<span class="list-row-title"><strong>' + esc(r.type) + '</strong> \u2014 ' + esc(r.text) + '</span>' +
       '<span class="list-row-meta">' + esc(r.date) + '</span>' +
     '</div>';
@@ -270,6 +270,13 @@ const Assistant = (function () {
       Modal.close();
       if (Planner.openForTopic) Planner.openForTopic(ds.subject, ds.topicId);
       Nav.switchTo('library');
+        } else if (ds.kind === 'tag') {
+      Modal.close();
+      if (typeof PTPEView !== 'undefined') PTPEView.openExplorer({ dim: 'tag', id: ds.tagId, metric: 'studyHours' });
+      Nav.switchTo('progress');
+    } else if (ds.kind === 'habit') {
+      Modal.close();
+      if (typeof Habits !== 'undefined' && Habits.open) Habits.open();
     } else if (ds.kind === 'journal') {
       Modal.close();
       if (typeof Journal !== 'undefined' && Journal.openDate) Journal.openDate(ds.date);
