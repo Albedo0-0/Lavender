@@ -73,7 +73,7 @@ const TagsData = (function () {
     return true;
   }
 
-  function attachTagToTopic
+    function attachTagToTopic(topicId, tagId) {
     const topics = Object.assign({}, PlannerData.getAllTopics());
     const t = topics[topicId];
     if (!t) return;
