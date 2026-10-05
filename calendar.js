@@ -3,8 +3,37 @@
 // writeItinerarySummary) to show a per-day itinerary outcome.
 
 const Calendar = (function () {
-  let viewYear, viewMonth; // viewMonth is 0-indexed
+    let viewYear, viewMonth; // viewMonth is 0-indexed
   let initialized = false;
+
+  // PTPE lens: Calendar only ASKS PTPE.lens() for each date's value — it never calculates one itself.
+  // The chosen lens is a small setting (State.settings.calendarLens / calendarLensTagId); 'normal' = unchanged look.
+  function getLens() {
+    const s = State.get().settings || {};
+    const known = typeof PTPE !== 'undefined' && PTPE.LENSES.some(function (l) { return l.key === s.calendarLens; });
+    return { mode: known ? s.calendarLens : 'normal', tagId: s.calendarLensTagId || null };
+  }
+  function activeLensTag(lens) {
+    if (lens.mode !== 'tag' || typeof TagsData === 'undefined') return null;
+    if (lens.tagId && TagsData.getTag(lens.tagId)) return lens.tagId;
+    const all = TagsData.getAllTagsList();
+    return all.length ? all[0].tagId : null;
+  }
+  function renderLensControl() {
+    const host = document.getElementById('calendar-lens');
+    if (!host || typeof PTPE === 'undefined') return;
+    const lens = getLens(), tagId = activeLensTag(lens);
+    host.innerHTML = '<select id="calendar-lens-select" class="cal-lens-select" title="Calendar view" aria-label="Calendar view">' +
+      PTPE.LENSES.map(function (l) { return '<option value="' + l.key + '"' + (l.key === lens.mode ? ' selected' : '') + '>' + l.label + '</option>'; }).join('') + '</select>' +
+      (lens.mode === 'tag' && typeof TagsData !== 'undefined' && TagsData.getAllTagsList().length
+        ? '<select id="calendar-lens-tag" class="cal-lens-select" aria-label="Tag">' + TagsData.getAllTagsList().map(function (t) { return '<option value="' + t.tagId + '"' + (t.tagId === tagId ? ' selected' : '') + '>' + String(t.name).replace(/[<>&]/g, '') + '</option>'; }).join('') + '</select>' : '');
+    host.querySelector('#calendar-lens-select').addEventListener('change', function (e) {
+      State.patch('settings', { calendarLens: e.target.value });
+      render();
+    });
+    const tagSel = host.querySelector('#calendar-lens-tag');
+    if (tagSel) tagSel.addEventListener('change', function (e) { State.patch('settings', { calendarLensTagId: e.target.value }); render(); });
+  }
   
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
@@ -37,7 +66,10 @@ const Calendar = (function () {
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     label.textContent = monthNames[viewMonth] + ' ' + viewYear;
 
-    grid.innerHTML = '';
+        grid.innerHTML = '';
+    renderLensControl();
+    const lens = getLens(), lensTag = activeLensTag(lens);
+    const lensOpts = lensTag ? { tagId: lensTag } : null;
 
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -68,10 +100,20 @@ const Calendar = (function () {
         cell.style.setProperty('--cal-user-color', hub.color);
       }
 
-      const dayNum = document.createElement('div');
+            const dayNum = document.createElement('div');
       dayNum.className = 'cal-day-num';
       dayNum.textContent = day;
       cell.appendChild(dayNum);
+
+      if (lens.mode !== 'normal' && typeof PTPE !== 'undefined' && dateStr <= today && (lens.mode !== 'tag' || lensTag)) {
+        const lv = PTPE.lens(lens.mode, dateStr, lensOpts);
+        if (lv.norm !== null) {
+          cell.classList.add('cal-lens');
+          cell.style.setProperty('--cal-lens-color', PTPE.lensColor(lens.mode, lensOpts));
+          cell.style.setProperty('--cal-lens-a', String(Math.round((0.1 + lv.norm * 0.4) * 100)) + '%');
+          cell.title = lv.text;
+        }
+      }
 
          let cellHasTask = false;
       let cellHasRevision = false;
