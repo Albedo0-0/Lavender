@@ -26,7 +26,7 @@ const Gamification = (function () {
     const prodFill = document.getElementById('productivity-bar-fill');
     const prodLabel = document.getElementById('productivity-bar-label');
     if (prodFill) prodFill.style.width = prodPct + '%';
-    if (prodLabel) prodLabel.textContent = 'Productivity \u2014 ' + (score === null ? '\u2013' : score.toFixed(1)) + ' / 10';
+        if (prodLabel) prodLabel.textContent = 'Productivity  ' + (score === null ? '\u2013' : score.toFixed(1));
 
     const gam = GamificationData.getGamState();
     const info = GamificationData.getLevelInfo(gam.totalExp);
@@ -34,7 +34,7 @@ const Gamification = (function () {
     const expFill = document.getElementById('exp-bar-fill');
     const expLabel = document.getElementById('exp-bar-label');
     if (expFill) expFill.style.width = expPct + '%';
-    if (expLabel) expLabel.textContent = 'Lv ' + info.level + ' \u00b7 ' + info.expIntoLevel + ' / ' + info.expForNextLevel + ' EXP';
+        if (expLabel) expLabel.textContent = 'Lv ' + info.level + '  \u00b7  ' + info.expIntoLevel + ' / ' + info.expForNextLevel;
   }
 
   // ---------- §8.5 Gamification hub modal ----------
