@@ -17,9 +17,20 @@ const GamificationData = (function () {
   const POST_10_INCREMENT_STEP = 100; // §8.4 "+100 to that increment every 5 levels"
   const MAX_PRECOMPUTED_LEVEL = 60;   // plenty of headroom; extend if ever needed
 
-  const STREAK_BONUS_THRESHOLD = 3;   // §8.3 "3-day streak reached"
-  const STREAK_BONUS_EXP = 200;
-  const DOUBLE_HOURS_THRESHOLD = 5;   // §8.3 both doubling conditions require >5h studied
+    const STREAK_BONUS_THRESHOLD = 3;   // §8.3 "3-day streak reached"
+  const STREAK_BONUS_EXP = 150;
+  const DOUBLE_HOURS_THRESHOLD = 5;   // long-study bonus needs >5h of Time-Engine-recorded study
+  // PTPE EXP rules — meaningful progress, not button presses. Everything below is idempotent per task/target/day.
+  const LONG_STUDY_BONUS_RATE = 0.5;  // +50% of the day's earned EXP (never of penalties), replacing the old 2x
+  const LONG_STUDY_BONUS_CAP = 300;
+  const STUDY_EXP_PER_HOUR = 75;
+  const MIN_STUDY_SEGMENT_MS = 60000; // sub-minute start/stop segments earn nothing (no tap-farming)
+  const STUDY_FULL_MS = 6 * 3600000;  // study EXP is full-rate to 6h, half-rate to 9h, nothing beyond
+  const STUDY_HARD_MS = 9 * 3600000;
+  const LATE_TASK_MULT = 0.5;         // tasks finished after their due date
+  const DAILY_FULL_TASKS = 6;         // tasks beyond this per day earn half; beyond DAILY_MAX_TASKS earn nothing
+  const DAILY_MAX_TASKS = 12;
+  const PENDING_PENALTY_CAP = 200;    // one bad day cannot cost more than this in pending-task penalties
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toDateStr(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
@@ -93,42 +104,81 @@ const GamificationData = (function () {
     State.set({ expLedger: ledger, gamification: Object.assign({}, gam, { totalExp: newTotal }) });
   }
 
+    // Base value only (Itinerary reads this for expected-EXP counters). Standalone custom tasks are worth less
+  // than topic work; R6 is the cycle's capstone.
   function taskExpValue(task) {
-    return (task.taskType === 'revision' && task.revisionNumber === 6) ? 400 : 100;
+    if (task.taskType === 'revision' && task.revisionNumber === 'R6') return 250;
+    if (task.taskType === 'revision' && task.revisionNumber === 6) return 250;
+    return task.taskType === 'custom' ? 40 : 100;
+  }
+
+  // Net EXP currently held for one task/target: the ledger is the single record, so awards are
+  // idempotent (already rewarded = no second reward) and a retract reverses exactly what was granted.
+  function netAwarded(idField, id, kinds) {
+    return getLedger().reduce(function (sum, e) {
+      return (e[idField] === id && kinds.indexOf(e.kind) !== -1) ? sum + e.exp : sum;
+    }, 0);
+  }
+
+  function tasksRewardedOn(dateStr) {
+    const net = {};
+    getLedger().forEach(function (e) {
+      if (e.kind !== 'task' && e.kind !== 'task-retract') return;
+      net[e.taskId] = (net[e.taskId] || 0) + e.exp;
+    });
+    const dated = {};
+    getLedger().forEach(function (e) { if (e.kind === 'task' && e.date === dateStr && e.exp > 0) dated[e.taskId] = true; });
+    return Object.keys(dated).filter(function (id) { return net[id] > 0; }).length;
+  }
+
+  // R6 only pays the capstone value once R1-R5 of the same cycle are actually done.
+  function earlierRevisionsDone(task) {
+    if (!task.cycleId) return true;
+    return PlannerData.getTasksList().filter(function (t) {
+      return t.cycleId === task.cycleId && t.taskType === 'revision' && t.revisionNumber !== task.revisionNumber && t.revisionNumber !== 'R6' && t.revisionNumber !== 6;
+    }).every(function (t) { return t.completed; });
   }
 
   // Called from PlannerData.toggleComplete the instant a task is checked off.
   function awardTaskCompleted(task) {
+    if (netAwarded('taskId', task.taskId, ['task', 'task-retract']) > 0) return; // duplicate completion event
     const dateStr = task.completedDate || todayStr();
-    const isR6 = task.taskType === 'revision' && task.revisionNumber === 6;
+    const isR6 = task.taskType === 'revision' && (task.revisionNumber === 'R6' || task.revisionNumber === 6);
+    let exp = (isR6 && !earlierRevisionsDone(task)) ? 100 : taskExpValue(task);
+    if (task.date && task.date < dateStr) exp *= LATE_TASK_MULT;
+    const already = tasksRewardedOn(dateStr);
+    if (already >= DAILY_MAX_TASKS) return;
+    if (already >= DAILY_FULL_TASKS) exp *= 0.5;
     const label = isR6
       ? 'Revision cycle completed (R6): ' + (task.topicName || '')
       : 'Task completed: ' + (task.topicName || task.title || PlannerData.taskLabel(task));
-    awardLive(dateStr, label, taskExpValue(task), { taskId: task.taskId, kind: 'task' });
+    awardLive(dateStr, label, Math.round(exp), { taskId: task.taskId, kind: 'task' });
   }
 
-  // Called from PlannerData.toggleComplete if a task is un-checked again — reverses the exact
-  // amount awardTaskCompleted granted, so toggling on/off can't be farmed for free EXP.
+  // Called from PlannerData.toggleComplete if a task is un-checked again — reverses exactly the
+  // net amount held for that task, so toggling on/off can never be farmed.
   function retractTaskCompleted(task) {
-    const dateStr = task.completedDate || todayStr();
+    const net = netAwarded('taskId', task.taskId, ['task', 'task-retract']);
+    if (net <= 0) return;
     const label = 'Task un-completed: ' + (task.topicName || task.title || PlannerData.taskLabel(task));
-    awardLive(dateStr, label, -taskExpValue(task), { taskId: task.taskId, kind: 'task-retract' });
+    awardLive(task.completedDate || todayStr(), label, -net, { taskId: task.taskId, kind: 'task-retract' });
   }
 
   function targetExpValue(target) {
-    if (target.timeframe === 'monthly') return 500;
-    if (target.timeframe === 'weekly') return 250;
-    return 150; // daily
+    if (target.timeframe === 'monthly') return 400;
+    if (target.timeframe === 'weekly') return 200;
+    return 100; // daily
   }
 
   function awardTargetCompleted(target) {
-    const dateStr = todayStr();
-    awardLive(dateStr, 'Target completed: ' + target.title, targetExpValue(target), { targetId: target.targetId, kind: 'target' });
+    if (netAwarded('targetId', target.targetId, ['target', 'target-retract']) > 0) return;
+    awardLive(todayStr(), 'Target completed: ' + target.title, targetExpValue(target), { targetId: target.targetId, kind: 'target' });
   }
 
   function retractTargetCompleted(target) {
-    const dateStr = todayStr();
-    awardLive(dateStr, 'Target uncompleted: ' + target.title, -targetExpValue(target), { targetId: target.targetId, kind: 'target-retract' });
+    const net = netAwarded('targetId', target.targetId, ['target', 'target-retract']);
+    if (net <= 0) return;
+    awardLive(todayStr(), 'Target uncompleted: ' + target.title, -net, { targetId: target.targetId, kind: 'target-retract' });
   }
 
   function spendExp(amount, label) {
@@ -140,14 +190,17 @@ const GamificationData = (function () {
     return true;
   }
   
-  // Called from Study.commitSegment for every committed Stopwatch/Timer segment — 100 EXP/hour,
-  // proportional, logged even for very short segments (min 1 EXP so a 1-minute segment ~= 1-2 EXP
-  // never rounds away to nothing).
+    // Called from Study.commitSegment for every committed Stopwatch/Timer segment — proportional EXP per
+  // hour, full-rate to 6h/day and half-rate to 9h/day (nothing beyond). Sub-minute segments earn nothing.
   function awardStudyTime(ms, mode) {
-    if (!ms || ms <= 0) return;
-    const exp = Math.max(1, Math.round((ms / 3600000) * 100));
+    if (!ms || ms < MIN_STUDY_SEGMENT_MS) return;
+    const dateStr = todayStr();
+    const doneMs = getLedger().reduce(function (sum, e) { return (e.kind === 'study' && e.date === dateStr) ? sum + (e.ms || 0) : sum; }, 0);
+    const credit = function (x) { return Math.min(x, STUDY_FULL_MS) + 0.5 * Math.max(0, Math.min(x, STUDY_HARD_MS) - STUDY_FULL_MS); };
+    const exp = Math.round(((credit(doneMs + ms) - credit(doneMs)) / 3600000) * STUDY_EXP_PER_HOUR);
+    if (exp <= 0) return;
     const label = (mode === 'timer' ? 'Timer' : 'Stopwatch') + ' session (' + Math.round(ms / 60000) + ' min)';
-    awardLive(todayStr(), label, exp, { kind: 'study' });
+    awardLive(dateStr, label, exp, { kind: 'study', ms: ms });
   }
 
   // ---------- §8.3 Daily settlement (cutoff-only events) ----------
@@ -158,19 +211,27 @@ const GamificationData = (function () {
 
     const events = [];
 
-    // Task left pending (-50 per task) / Revision cycle incomplete at R6 (-400, replaces the -50).
-    PlannerData.getTasksForDate(dateStr).filter(function (t) { return !t.completed; }).forEach(function (t) {
-      if (t.taskType === 'revision' && t.revisionNumber === 6) {
-        events.push({ label: 'Revision cycle incomplete: ' + (t.topicName || ''), exp: -400 });
-      } else {
-        events.push({ label: 'Task left pending: ' + (t.topicName || t.title || PlannerData.taskLabel(t)), exp: -50 });
-      }
+        // Task left pending (-50 each) / Revision cycle incomplete at R6 (-150, replaces the -50) — capped per day.
+    let pendingTotal = 0;
+    PlannerData.getTasksForDate(dateStr).filter(function (t) { return !t.completed && !t.archived; }).forEach(function (t) {
+      const isR6 = t.taskType === 'revision' && (t.revisionNumber === 'R6' || t.revisionNumber === 6);
+      const e = isR6
+        ? { label: 'Revision cycle incomplete: ' + (t.topicName || ''), exp: -150 }
+        : { label: 'Task left pending: ' + (t.topicName || t.title || PlannerData.taskLabel(t)), exp: -50 };
+      if (pendingTotal + e.exp < -PENDING_PENALTY_CAP) return;
+      pendingTotal += e.exp;
+      events.push(e);
     });
 
-    // Breaks exceeding study time (-200).
+    // Breaks exceeding study time (-100).
     const stats = TimeEngine.getDayStats(dateStr);
     if (stats.studyMs > 0 && stats.breakMs > stats.studyMs) {
-      events.push({ label: 'Breaks exceeded study time', exp: -200 });
+      events.push({ label: 'Breaks exceeded study time', exp: -100 });
+    }
+
+    // PTPE interprets Habit Tracker / consistency data into EXP events (settled once per day, here only).
+    if (typeof PTPE !== 'undefined' && PTPE.dayExpEvents) {
+      PTPE.dayExpEvents(dateStr).forEach(function (e) { events.push(e); });
     }
 
     // 3-day streak reached (+200, one-time per run — resets once the streak breaks below 3).
@@ -184,29 +245,26 @@ const GamificationData = (function () {
       nextStreakFlag = true;
     }
 
-    // Doubling — see the flagged open question at the top of this file. Now covers today's
-    // LIVE-awarded EXP (tasks + study time, already applied to totalExp as they happened) as well
-    // as this cutoff's own events, so >5h studied still doubles the whole day, not just the part
-    // that happened to be computed at cutoff.
-    const liveTotalToday = getLedger()
+        // Long-study bonus (replaces the old 2x doubling): >5h of Time-Engine-recorded study adds 50% of what
+    // the day EARNED (net live EXP + positive cutoff events — penalties are never amplified), capped.
+    const liveNetToday = getLedger()
       .filter(function (e) { return e.date === dateStr && e.live; })
       .reduce(function (sum, e) { return sum + e.exp; }, 0);
     const cutoffRawTotal = events.reduce(function (sum, e) { return sum + e.exp; }, 0);
-    const rawTotal = liveTotalToday + cutoffRawTotal;
+    const cutoffGain = events.reduce(function (sum, e) { return e.exp > 0 ? sum + e.exp : sum; }, 0);
 
     const studiedHours = stats.studyMs / 3600000;
-    const doubled = studiedHours > DOUBLE_HOURS_THRESHOLD;
-    // cutoffRawTotal hasn't been applied to totalExp yet (unlike liveTotalToday, applied already
-    // when each event happened) — so the delta to ADD here is just cutoffRawTotal at 1x, plus a
-    // full extra rawTotal if doubled (which doubles both the live part and the cutoff part).
-    const finalDelta = cutoffRawTotal + (doubled ? rawTotal : 0);
+    const bonus = studiedHours > DOUBLE_HOURS_THRESHOLD
+      ? Math.min(LONG_STUDY_BONUS_CAP, Math.round(LONG_STUDY_BONUS_RATE * Math.max(0, liveNetToday + cutoffGain)))
+      : 0;
+    const finalDelta = cutoffRawTotal + bonus;
 
     const ledger = getLedger().slice();
     events.forEach(function (e) {
-      ledger.push({ id: generateId('exp'), date: dateStr, label: e.label, exp: e.exp, doubled: doubled, at: Date.now() });
+      ledger.push({ id: generateId('exp'), date: dateStr, label: e.label, exp: e.exp, doubled: false, at: Date.now() });
     });
-    if (doubled && rawTotal !== 0) {
-      ledger.push({ id: generateId('exp'), date: dateStr, label: 'Doubled EXP day (>5h studied)', exp: rawTotal, doubled: true, at: Date.now() });
+    if (bonus > 0) {
+      ledger.push({ id: generateId('exp'), date: dateStr, label: 'Long-study bonus (>5h studied)', exp: bonus, doubled: false, at: Date.now() });
     }
 
     const newTotal = Math.max(0, gam.totalExp + finalDelta);
