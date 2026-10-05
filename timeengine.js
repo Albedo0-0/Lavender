@@ -156,16 +156,25 @@ const TimeEngine = (function () {
 
   function summarizeDate(dateStr) {
     const recs = getRecordsForDate(dateStr);
-    let studyMs = 0, breakMs = 0, questionsSolved = 0;
-    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); questionsSolved += Number(rec.questionsSolved) || 0; });
+        let studyMs = 0, breakMs = 0, questionsSolved = 0;
+    // PTPE: keep per-topic study/questions in the rollup so Tag/Subject progress survives the 14-day window.
+    const topicMs = {}, topicQ = {}, taskMap = State.get().tasks || {};
+    recs.forEach(function (rec) {
+      const ms = liveStudyMs(rec), q = Number(rec.questionsSolved) || 0;
+      studyMs += ms; breakMs += liveBreakMs(rec); questionsSolved += q;
+      const t = rec.taskId ? taskMap[rec.taskId] : null;
+      if (t && t.topicId) { topicMs[t.topicId] = (topicMs[t.topicId] || 0) + ms; topicQ[t.topicId] = (topicQ[t.topicId] || 0) + q; }
+    });
     (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === dateStr; }).forEach(function (b) { breakMs += b.durationMs; });
     return {
       date: dateStr,
       studyMs: studyMs,
       breakMs: breakMs,
       questionsSolved: questionsSolved,
-      tasksTotal: recs.length,
-      tasksCompleted: recs.filter(function (r) { return r.state === 'completed'; }).length
+            tasksTotal: recs.length,
+      tasksCompleted: recs.filter(function (r) { return r.state === 'completed'; }).length,
+      topicMs: topicMs,
+      topicQ: topicQ
     };
   }
 
