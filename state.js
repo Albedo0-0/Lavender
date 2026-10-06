@@ -45,6 +45,7 @@ const State = (function () {
     miscCandle: null, // Miscellaneous Candle Lamp: { lit, startedAt, durationMs } while a hidden-duration burn is active, else null
     miscWeather: null, // Miscellaneous weather ambience cycle: { state: 'clear'|'rain'|'sunlight', since }
     miscWishButterfly: null, // Miscellaneous Wish Butterfly: { date, appeared } — the calendar date the butterfly last appeared, mirroring WaterData.getReminderState()'s per-date reset pattern, so a same-day app reopen doesn't respawn it
+      calendarPhotos: {}, // Calendar photos: dateStr -> media id (image data lives in IndexedDB 'media'; see calendar-photos.js)
   };
   let data = Object.assign({}, defaultState);
 
