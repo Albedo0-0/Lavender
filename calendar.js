@@ -76,8 +76,247 @@ const Calendar = (function () {
     return toDateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
   }
 
-  function selectWeek(weekStartStr) {
+    function selectWeek(weekStartStr) {
     selectedWeekStart = weekStartStr;
+  }
+
+  // ---------- Week Calendar (Phase 2) ----------
+  // Pure view over canonical data: PlannerData tasks (startTime/stopTime, with the
+  // savedStartTime/savedStopTime a completed task keeps) + DateHub events. Nothing is stored here.
+  const WEEK_HOUR_PX = 56;       // vertical scale: 1 hour = 56px, so height = duration
+  const WEEK_MIN_BLOCK_PX = 18;  // readability floor for very short items only
+  let weekNowMin = -1;
+
+  function openWeek(weekStartStr) {
+    selectedWeekStart = weekStartStr;
+    viewMode = 'week';
+    render();
+  }
+
+  // Navigation hook for the future Day Calendar. When a CalendarDay module exists it only needs
+  // to expose open(dateStr). Until then the existing Date Hub opens, so nothing is a dead click.
+  function openDay(dateStr) {
+    if (typeof CalendarDay !== 'undefined' && CalendarDay && typeof CalendarDay.open === 'function') {
+      CalendarDay.open(dateStr);
+      return;
+    }
+    openDateHub(dateStr);
+  }
+
+  function addDaysStr(dateStr, n) {
+    const p = dateStr.split('-');
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
+    return toDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function shiftWeek(delta) {
+    if (!selectedWeekStart) selectedWeekStart = weekStartOf(viewYear, viewMonth, 1);
+    selectedWeekStart = addDaysStr(selectedWeekStart, delta * 7);
+    const thu = new Date(addDaysStr(selectedWeekStart, 3) + 'T00:00:00');
+    viewYear = thu.getFullYear();
+    viewMonth = thu.getMonth();
+    render();
+  }
+
+  function hmToMin(s) {
+    if (typeof s !== 'string') return null;
+    const p = s.split(':');
+    if (p.length < 2) return null;
+    const h = Number(p[0]), m = Number(p[1]);
+    if (!isFinite(h) || !isFinite(m)) return null;
+    return h * 60 + m;
+  }
+
+  function weekBlocksFor(dateStr) {
+    if (typeof PlannerData === 'undefined') return [];
+    const topics = PlannerData.getAllTopics();
+    const items = [];
+    PlannerData.getTasksForDate(dateStr).forEach(function (t) {
+      if (t.archived) return;
+      const startStr = t.startTime || t.savedStartTime;
+      const stopStr = t.stopTime || t.savedStopTime;
+      const s = hmToMin(startStr);
+      let e = hmToMin(stopStr);
+      if (s === null || e === null || s < 0 || s >= 1440 || e <= s) return;
+      e = Math.min(e, 1440);
+      const label = t.taskType === 'custom' ? t.title
+        : (t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName);
+      const meta = t.topicId ? topics[t.topicId] : null;
+      items.push({
+        s: s,
+        e: e,
+        label: label || 'Task',
+        color: meta && meta.color ? meta.color : null,
+        done: !!t.completed,
+        slot: startStr + '\u2013' + stopStr
+      });
+    });
+    return items;
+  }
+
+  // Simultaneous items: overlapping items form a cluster and share the column width in lanes.
+  function layoutLanes(items) {
+    items.sort(function (a, b) { return a.s - b.s || b.e - a.e; });
+    let cluster = [], clusterEnd = -1;
+    function flush() {
+      const laneEnds = [];
+      cluster.forEach(function (it) {
+        let lane = laneEnds.findIndex(function (end) { return end <= it.s; });
+        if (lane === -1) { lane = laneEnds.length; laneEnds.push(it.e); } else { laneEnds[lane] = it.e; }
+        it.lane = lane;
+      });
+      cluster.forEach(function (it) { it.lanes = laneEnds.length; });
+      cluster = [];
+    }
+    items.forEach(function (it) {
+      if (cluster.length && it.s >= clusterEnd) { flush(); clusterEnd = -1; }
+      cluster.push(it);
+      clusterEnd = Math.max(clusterEnd, it.e);
+    });
+    if (cluster.length) flush();
+    return items;
+  }
+
+  // Runs from the existing TimeEngine heartbeat (subscribed by id in renderWeek). It only moves one
+  // line, and only when the minute changes, so there is no timer of its own.
+  function updateWeekNow() {
+    const line = document.querySelector('#calendar-grid .cal-wk-now');
+    if (!line) return;
+    if (line.dataset.date !== todayStr()) { render(); return; }
+    const n = new Date();
+    const min = n.getHours() * 60 + n.getMinutes();
+    if (min === weekNowMin) return;
+    weekNowMin = min;
+    line.style.top = (min * WEEK_HOUR_PX / 60) + 'px';
+  }
+
+  function renderWeek(grid, label) {
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dowNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    function el(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined && text !== null) n.textContent = text;
+      return n;
+    }
+
+    if (!selectedWeekStart) selectedWeekStart = weekStartOf(viewYear, viewMonth, 1);
+    const prevScroller = grid.querySelector('.cal-wk');
+    const keepScroll = prevScroller ? prevScroller.scrollTop : null;
+    const today = todayStr();
+    const days = [];
+    for (let i = 0; i < 7; i++) days.push(addDaysStr(selectedWeekStart, i));
+
+    const first = new Date(days[0] + 'T00:00:00'), last = new Date(days[6] + 'T00:00:00');
+    label.textContent = 'Week ' + isoWeekOf(days[0]) + ' \u00b7 ' +
+      monthShort[first.getMonth()] + ' ' + first.getDate() +
+      (first.getFullYear() !== last.getFullYear() ? ', ' + first.getFullYear() : '') + ' \u2013 ' +
+      (last.getMonth() !== first.getMonth() || first.getFullYear() !== last.getFullYear() ? monthShort[last.getMonth()] + ' ' : '') +
+      last.getDate() + ', ' + last.getFullYear();
+
+    const lensHost = document.getElementById('calendar-lens');
+    if (lensHost) lensHost.innerHTML = '';
+    grid.innerHTML = '';
+
+    const wrap = el('div', 'cal-wk');
+    const inner = el('div', 'cal-wk-inner');
+    inner.style.setProperty('--wk-hour', WEEK_HOUR_PX + 'px');
+
+    // sticky top: day headers + optional all-day row
+    const top = el('div', 'cal-wk-top');
+    const head = el('div', 'cal-wk-row cal-wk-headrow');
+    head.appendChild(el('div', 'cal-wk-axis'));
+    days.forEach(function (ds, i) {
+      const d = new Date(ds + 'T00:00:00');
+      const b = el('button', 'cal-wk-dayhead');
+      b.type = 'button';
+      if (ds === today) b.classList.add('cal-wk-today');
+      if (i >= 5) b.classList.add('cal-wk-weekend');
+      const showMon = i === 0 || d.getDate() === 1;
+      b.appendChild(el('span', 'cal-wk-dow', dowNames[i] + (showMon ? ' \u00b7 ' + monthShort[d.getMonth()] : '')));
+      b.appendChild(el('span', 'cal-wk-dnum', String(d.getDate())));
+      b.title = formatLong(ds);
+      b.setAttribute('aria-label', formatLong(ds));
+      b.addEventListener('click', function () { openDay(ds); });
+      head.appendChild(b);
+    });
+    top.appendChild(head);
+
+    const hubs = days.map(function (ds) { return DateHub.get(ds); });
+    if (hubs.some(function (h) { return h.events && h.events.length; })) {
+      const ad = el('div', 'cal-wk-row cal-wk-allday');
+      ad.appendChild(el('div', 'cal-wk-axis cal-wk-axis-label', 'all day'));
+      hubs.forEach(function (h, i) {
+        const c = el('div', 'cal-wk-adcell');
+        (h.events || []).forEach(function (ev) {
+          const chip = el('div', 'cal-wk-chip', ev);
+          chip.title = ev;
+          c.appendChild(chip);
+        });
+        c.addEventListener('click', function () { openDateHub(days[i]); });
+        ad.appendChild(c);
+      });
+      top.appendChild(ad);
+    }
+    inner.appendChild(top);
+
+    // time grid
+    const body = el('div', 'cal-wk-row cal-wk-body');
+    const axis = el('div', 'cal-wk-axis cal-wk-axis-hours');
+    axis.style.height = (24 * WEEK_HOUR_PX) + 'px';
+    for (let h = 1; h < 24; h++) {
+      const tl = el('span', 'cal-wk-hour', pad(h) + ':00');
+      tl.style.top = (h * WEEK_HOUR_PX) + 'px';
+      axis.appendChild(tl);
+    }
+    body.appendChild(axis);
+
+    let earliest = null;
+    days.forEach(function (ds, i) {
+      const col = el('div', 'cal-wk-col');
+      col.style.height = (24 * WEEK_HOUR_PX) + 'px';
+      if (i >= 5) col.classList.add('cal-wk-weekend');
+      if (ds === today) col.classList.add('cal-wk-today');
+
+      layoutLanes(weekBlocksFor(ds)).forEach(function (it) {
+        if (earliest === null || it.s < earliest) earliest = it.s;
+        const hPx = Math.max((it.e - it.s) * WEEK_HOUR_PX / 60 - 2, WEEK_MIN_BLOCK_PX);
+        const b = el('div', 'cal-wk-block');
+        b.style.top = (it.s * WEEK_HOUR_PX / 60 + 1) + 'px';
+        b.style.height = hPx + 'px';
+        b.style.left = (it.lane * 100 / it.lanes) + '%';
+        b.style.width = 'calc(' + (100 / it.lanes) + '% - 2px)';
+        if (it.color) b.style.setProperty('--wk-color', it.color);
+        if (it.done) b.classList.add('cal-wk-done');
+        if (hPx < 34) b.classList.add('cal-wk-block-short');
+        b.title = it.label + ' \u00b7 ' + it.slot;
+        b.appendChild(el('div', 'cal-wk-block-title', it.label));
+        if (hPx >= 44) b.appendChild(el('div', 'cal-wk-block-time', it.slot));
+        b.addEventListener('click', function () { openDay(ds); });
+        col.appendChild(b);
+      });
+
+      if (ds === today) {
+        const nowLine = el('div', 'cal-wk-now');
+        nowLine.dataset.date = ds;
+        col.appendChild(nowLine);
+      }
+      body.appendChild(col);
+    });
+    inner.appendChild(body);
+    wrap.appendChild(inner);
+    grid.appendChild(wrap);
+
+    wrap.scrollTop = keepScroll !== null
+      ? keepScroll
+      : (earliest !== null ? Math.max(0, earliest - 60) : 7 * 60) * WEEK_HOUR_PX / 60;
+
+    weekNowMin = -1;
+    updateWeekNow();
+    if (typeof TimeEngine !== 'undefined') TimeEngine.subscribe(updateWeekNow, 'calendar-week');
+
+    renderCountdown();
+    renderStreak();
   }
 
   function renderYear(grid, label) {
@@ -143,8 +382,11 @@ const Calendar = (function () {
     if (!grid || !label) return;
 
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-        label.textContent = monthNames[viewMonth] + ' ' + viewYear;
+            label.textContent = monthNames[viewMonth] + ' ' + viewYear;
+    label.title = viewMode === 'week' ? 'Back to month' : 'Year overview';
     grid.classList.toggle('cal-grid-year', viewMode === 'year');
+    grid.classList.toggle('cal-grid-week', viewMode === 'week');
+    if (viewMode !== 'week' && typeof TimeEngine !== 'undefined') TimeEngine.unsubscribe('calendar-week');
     if (lastRenderedMode !== viewMode) {
       lastRenderedMode = viewMode;
       grid.classList.remove('cal-enter');
@@ -152,6 +394,7 @@ const Calendar = (function () {
       grid.classList.add('cal-enter');
     }
     if (viewMode === 'year') { renderYear(grid, label); return; }
+    if (viewMode === 'week') { renderWeek(grid, label); return; }
 
         grid.innerHTML = '';
     renderLensControl();
@@ -174,7 +417,8 @@ const Calendar = (function () {
       wk.setAttribute('aria-label', 'Week ' + wkNum);
       wk.addEventListener('click', function (e) {
         e.stopPropagation();
-        selectWeek(ws);
+                selectWeek(ws);
+        openWeek(ws);
       });
       grid.appendChild(wk);
     }
@@ -664,6 +908,7 @@ const Calendar = (function () {
   }
 
     function next() {
+        if (viewMode === 'week') { shiftWeek(1); return; }
     if (viewMode === 'year') { viewYear++; render(); return; }
     viewMonth++;
     if (viewMonth > 11) { viewMonth = 0; viewYear++; }
@@ -671,6 +916,7 @@ const Calendar = (function () {
   }
 
   function prev() {
+        if (viewMode === 'week') { shiftWeek(-1); return; }
     if (viewMode === 'year') { viewYear--; render(); return; }
     viewMonth--;
     if (viewMonth < 0) { viewMonth = 11; viewYear--; }
@@ -691,7 +937,7 @@ const prevBtn = document.getElementById('calendar-prev');
     const monthLabel = document.getElementById('calendar-month-label');
     if (monthLabel) {
       const toggleYear = function () {
-        viewMode = viewMode === 'year' ? 'month' : 'year';
+                viewMode = viewMode === 'month' ? 'year' : 'month';
         render();
       };
       monthLabel.setAttribute('role', 'button');
@@ -715,7 +961,9 @@ const prevBtn = document.getElementById('calendar-prev');
     init: init,
     render: render,
     isReady: isReady,
-    selectWeek: selectWeek,
+        selectWeek: selectWeek,
+    openWeek: openWeek,
+    openDay: openDay,
     getSelectedWeek: function () { return selectedWeekStart; }
   };
 })();
