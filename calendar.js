@@ -85,7 +85,9 @@ const Calendar = (function () {
   // savedStartTime/savedStopTime a completed task keeps) + DateHub events. Nothing is stored here.
   const WEEK_HOUR_PX = 56;       // vertical scale: 1 hour = 56px, so height = duration
   const WEEK_MIN_BLOCK_PX = 18;  // readability floor for very short items only
+    const WEEK_POINT_MIN = 20;     // layout footprint only for no-duration items (alarms, itinerary items without an end)
   let weekNowMin = -1;
+  let weekSig = '';
 
   function openWeek(weekStartStr) {
     selectedWeekStart = weekStartStr;
@@ -127,33 +129,90 @@ const Calendar = (function () {
     return h * 60 + m;
   }
 
-  function weekBlocksFor(dateStr) {
-    if (typeof PlannerData === 'undefined') return [];
-    const topics = PlannerData.getAllTopics();
+    function weekBlocksFor(dateStr) {
     const items = [];
-    PlannerData.getTasksForDate(dateStr).forEach(function (t) {
-      if (t.archived) return;
-      const startStr = t.startTime || t.savedStartTime;
-      const stopStr = t.stopTime || t.savedStopTime;
-      const s = hmToMin(startStr);
-      let e = hmToMin(stopStr);
-      if (s === null || e === null || s < 0 || s >= 1440 || e <= s) return;
-      e = Math.min(e, 1440);
-      const label = t.taskType === 'custom' ? t.title
-        : (t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName);
-      const meta = t.topicId ? topics[t.topicId] : null;
-      items.push({
-        s: s,
-        e: e,
-        label: label || 'Task',
-        color: meta && meta.color ? meta.color : null,
-        done: !!t.completed,
-        slot: startStr + '\u2013' + stopStr
+    const shownTaskIds = {};
+    if (typeof PlannerData !== 'undefined') {
+      const topics = PlannerData.getAllTopics();
+      PlannerData.getTasksForDate(dateStr).forEach(function (t) {
+        if (t.archived) return;
+        const startStr = t.startTime || t.savedStartTime;
+        const stopStr = t.stopTime || t.savedStopTime;
+        const s = hmToMin(startStr);
+        let e = hmToMin(stopStr);
+        if (s === null || e === null || s < 0 || s >= 1440 || e <= s) return;
+        e = Math.min(e, 1440);
+        const label = t.taskType === 'custom' ? t.title
+          : (t.taskType === 'revision' ? (t.topicName + ' ' + t.revisionNumber) : t.topicName);
+        const meta = t.topicId ? topics[t.topicId] : null;
+        shownTaskIds[t.taskId] = true;
+        items.push({
+          kind: 'task',
+          s: s,
+          e: e,
+          label: label || 'Task',
+          color: meta && meta.color ? meta.color : null,
+          done: !!t.completed,
+          slot: startStr + '\u2013' + stopStr
+        });
       });
-    });
+    }
+    if (typeof AlarmData !== 'undefined') {
+      AlarmData.getList().forEach(function (a) {
+        if (!a || !a.enabled || !a.recurrence || !AlarmData.dateMatchesRecurrence(a.recurrence, dateStr)) return;
+        const s = hmToMin(a.time);
+        if (s === null || s < 0 || s >= 1440) return;
+        items.push({
+          kind: 'alarm',
+          icon: '\u23F0',
+          point: true,
+          s: s,
+          e: Math.min(s + WEEK_POINT_MIN, 1440),
+          label: a.text || 'Alarm',
+          color: null,
+          done: a.lastFiredDate === dateStr,
+          slot: a.time
+        });
+      });
+    }
+    if (typeof ItineraryData !== 'undefined') {
+      const day = ItineraryData.getToday();
+      if (day && day.date === dateStr) {
+        (day.items || []).forEach(function (it) {
+          if (it.state === 'skipped') return;
+          if (it.refId && shownTaskIds[it.refId]) return;
+          const s = hmToMin(it.plannedStart);
+          if (s === null || s < 0 || s >= 1440) return;
+          let e = hmToMin(it.plannedEnd);
+          const point = e === null || e === s;
+          if (!point && e < s) e = 1440;
+          items.push({
+            kind: 'itinerary',
+            icon: '\u25C7',
+            point: point,
+            s: s,
+            e: point ? Math.min(s + WEEK_POINT_MIN, 1440) : Math.min(e, 1440),
+            label: it.label || 'Itinerary',
+            color: null,
+            done: it.state === 'completed',
+            slot: point ? it.plannedStart : it.plannedStart + '\u2013' + it.plannedEnd
+          });
+        });
+      }
+    }
     return items;
   }
 
+  function weekSignature() {
+    if (!selectedWeekStart) return '';
+    const parts = [];
+    for (let i = 0; i < 7; i++) {
+      weekBlocksFor(addDaysStr(selectedWeekStart, i)).forEach(function (it) {
+        parts.push(i + '|' + it.kind + '|' + it.s + '|' + it.e + '|' + it.label + '|' + (it.done ? 1 : 0) + '|' + (it.color || ''));
+      });
+    }
+    return parts.join(';');
+  }
   // Simultaneous items: overlapping items form a cluster and share the column width in lanes.
   function layoutLanes(items) {
     items.sort(function (a, b) { return a.s - b.s || b.e - a.e; });
@@ -179,7 +238,8 @@ const Calendar = (function () {
 
   // Runs from the existing TimeEngine heartbeat (subscribed by id in renderWeek). It only moves one
   // line, and only when the minute changes, so there is no timer of its own.
-  function updateWeekNow() {
+    function updateWeekNow() {
+    if (viewMode === 'week' && selectedWeekStart && weekSignature() !== weekSig) { render(); return; }
     const line = document.querySelector('#calendar-grid .cal-wk-now');
     if (!line) return;
     if (line.dataset.date !== todayStr()) { render(); return; }
@@ -280,17 +340,20 @@ const Calendar = (function () {
 
       layoutLanes(weekBlocksFor(ds)).forEach(function (it) {
         if (earliest === null || it.s < earliest) earliest = it.s;
-        const hPx = Math.max((it.e - it.s) * WEEK_HOUR_PX / 60 - 2, WEEK_MIN_BLOCK_PX);
+                const hPx = it.point ? WEEK_MIN_BLOCK_PX : Math.max((it.e - it.s) * WEEK_HOUR_PX / 60 - 2, WEEK_MIN_BLOCK_PX);
         const b = el('div', 'cal-wk-block');
-        b.style.top = (it.s * WEEK_HOUR_PX / 60 + 1) + 'px';
+        b.style.top = Math.min(it.s * WEEK_HOUR_PX / 60 + 1, 24 * WEEK_HOUR_PX - hPx - 1) + 'px';
         b.style.height = hPx + 'px';
         b.style.left = (it.lane * 100 / it.lanes) + '%';
         b.style.width = 'calc(' + (100 / it.lanes) + '% - 2px)';
         if (it.color) b.style.setProperty('--wk-color', it.color);
         if (it.done) b.classList.add('cal-wk-done');
+        if (it.kind === 'alarm') b.classList.add('cal-wk-alarm');
+        if (it.kind === 'itinerary') b.classList.add('cal-wk-itin');
+        if (it.point) b.classList.add('cal-wk-point');
         if (hPx < 34) b.classList.add('cal-wk-block-short');
-        b.title = it.label + ' \u00b7 ' + it.slot;
-        b.appendChild(el('div', 'cal-wk-block-title', it.label));
+        b.title = (it.icon ? it.icon + ' ' : '') + it.label + ' \u00b7 ' + it.slot;
+        b.appendChild(el('div', 'cal-wk-block-title', (it.icon ? it.icon + ' ' : '') + it.label));
         if (hPx >= 44) b.appendChild(el('div', 'cal-wk-block-time', it.slot));
         b.addEventListener('click', function () { openDay(ds); });
         col.appendChild(b);
@@ -311,7 +374,8 @@ const Calendar = (function () {
       ? keepScroll
       : (earliest !== null ? Math.max(0, earliest - 60) : 7 * 60) * WEEK_HOUR_PX / 60;
 
-    weekNowMin = -1;
+        weekNowMin = -1;
+    weekSig = weekSignature();
     updateWeekNow();
     if (typeof TimeEngine !== 'undefined') TimeEngine.subscribe(updateWeekNow, 'calendar-week');
 
