@@ -351,6 +351,8 @@ const Calendar = (function () {
         cell.appendChild(itPreview);
       }
 
+            if (typeof CalendarPhotos !== 'undefined') CalendarPhotos.apply(cell, dateStr);
+
       cell.addEventListener('click', function () {
         openDateHub(dateStr);
       });
@@ -474,7 +476,14 @@ const Calendar = (function () {
           '<input type="text" id="datehub-important-label" class="input" placeholder="label (e.g. NEET, Birthday)" value="' + (hub.label || '') + '"' + (hub.important ? '' : ' disabled') + '>' +
         '</div>' +
         '<label class="datehub-label section-heading">background</label>' +
-        '<input type="color" id="datehub-color" class="input" value="' + (hub.color || '#ffffff') + '">' +
+                '<input type="color" id="datehub-color" class="input" value="' + (hub.color || '#ffffff') + '">' +
+        (typeof CalendarPhotos !== 'undefined'
+          ? '<label class="datehub-label section-heading">photo</label>' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+              '<input type="file" id="datehub-photo-input" accept="image/*">' +
+              '<button type="button" id="datehub-photo-remove" class="btn btn-secondary"' + (CalendarPhotos.has(dateStr) ? '' : ' disabled') + '>Remove</button>' +
+            '</div>'
+          : '') +
         '<button id="datehub-save" class="btn btn-primary">Save</button>' +
         '<div class="datehub-quicknav">' +
           '<button id="datehub-goto-journal" class="btn btn-secondary">\uD83D\uDCD4 Journal</button>' +
@@ -544,10 +553,33 @@ const Calendar = (function () {
       Modal.close();
     });
 
-    document.getElementById('datehub-color').addEventListener('change', function (e) {
+        document.getElementById('datehub-color').addEventListener('change', function (e) {
       DateHub.update(dateStr, { color: e.target.value });
       render();
     });
+
+    const photoInput = document.getElementById('datehub-photo-input');
+    const photoRemove = document.getElementById('datehub-photo-remove');
+    if (photoInput && typeof CalendarPhotos !== 'undefined') {
+      photoInput.addEventListener('change', function () {
+        const file = photoInput.files && photoInput.files[0];
+        if (!file) return;
+        CalendarPhotos.attach(dateStr, file).then(function (ok) {
+          if (!ok) { alert('Please choose an image file.'); return; }
+          render();
+          if (photoRemove) photoRemove.disabled = false;
+        }).catch(function () { alert("Couldn't save that photo."); });
+      });
+    }
+    if (photoRemove && typeof CalendarPhotos !== 'undefined') {
+      photoRemove.addEventListener('click', function () {
+        CalendarPhotos.remove(dateStr).then(function () {
+          render();
+          photoRemove.disabled = true;
+          if (photoInput) photoInput.value = '';
+        });
+      });
+    }
 
     document.getElementById('datehub-important').addEventListener('change', function (e) {
       document.getElementById('datehub-important-label').disabled = !e.target.checked;
