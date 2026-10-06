@@ -4,7 +4,10 @@
 
 const Calendar = (function () {
     let viewYear, viewMonth; // viewMonth is 0-indexed
-  let initialized = false;
+    let initialized = false;
+  let viewMode = 'month';
+  let lastRenderedMode = null;
+  let selectedWeekStart = null;
 
   // PTPE lens: Calendar only ASKS PTPE.lens() for each date's value — it never calculates one itself.
   // The chosen lens is a small setting (State.settings.calendarLens / calendarLensTagId); 'normal' = unchanged look.
@@ -58,30 +61,136 @@ const Calendar = (function () {
     return 'Itinerary: ' + (c.completed || 0) + '/' + (c.total || 0) + ' done';
   }
 
+    function isoWeekOf(dateStr) {
+    const p = dateStr.split('-');
+    const t = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])));
+    const dow = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - dow);
+    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+  }
+
+  function weekStartOf(y, m, d) {
+    const dt = new Date(y, m, d);
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return toDateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+
+  function selectWeek(weekStartStr) {
+    selectedWeekStart = weekStartStr;
+  }
+
+  function renderYear(grid, label) {
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const now = new Date();
+    const today = todayStr();
+    label.textContent = String(viewYear);
+    grid.innerHTML = '';
+    const lensHost = document.getElementById('calendar-lens');
+    if (lensHost) lensHost.innerHTML = '';
+
+    monthNames.forEach(function (name, m) {
+      const box = document.createElement('div');
+      box.className = 'cal-year-month';
+      if (viewYear === now.getFullYear() && m === now.getMonth()) box.classList.add('cal-year-current');
+      box.tabIndex = 0;
+      box.setAttribute('role', 'button');
+      box.setAttribute('aria-label', name + ' ' + viewYear);
+
+      const title = document.createElement('div');
+      title.className = 'cal-year-month-name';
+      title.textContent = name;
+      box.appendChild(title);
+
+      const mini = document.createElement('div');
+      mini.className = 'cal-year-mini';
+      ['M', 'T', 'W', 'T', 'F', 'S', 'S'].forEach(function (w) {
+        const s = document.createElement('span');
+        s.className = 'cal-year-wd';
+        s.textContent = w;
+        mini.appendChild(s);
+      });
+      const offset = (new Date(viewYear, m, 1).getDay() + 6) % 7;
+      for (let i = 0; i < offset; i++) mini.appendChild(document.createElement('span'));
+      const dim = new Date(viewYear, m + 1, 0).getDate();
+      for (let d = 1; d <= dim; d++) {
+        const s = document.createElement('span');
+        s.textContent = d;
+        if (toDateStr(viewYear, m, d) === today) s.className = 'cal-year-today';
+        mini.appendChild(s);
+      }
+      box.appendChild(mini);
+
+      const openMonth = function () {
+        viewMonth = m;
+        viewMode = 'month';
+        render();
+      };
+      box.addEventListener('click', openMonth);
+      box.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMonth(); }
+      });
+      grid.appendChild(box);
+    });
+
+    renderCountdown();
+    renderStreak();
+  }
+
   function render() {
     const grid = document.getElementById('calendar-grid');
     const label = document.getElementById('calendar-month-label');
     if (!grid || !label) return;
 
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    label.textContent = monthNames[viewMonth] + ' ' + viewYear;
+        label.textContent = monthNames[viewMonth] + ' ' + viewYear;
+    grid.classList.toggle('cal-grid-year', viewMode === 'year');
+    if (lastRenderedMode !== viewMode) {
+      lastRenderedMode = viewMode;
+      grid.classList.remove('cal-enter');
+      void grid.offsetWidth;
+      grid.classList.add('cal-enter');
+    }
+    if (viewMode === 'year') { renderYear(grid, label); return; }
 
         grid.innerHTML = '';
     renderLensControl();
     const lens = getLens(), lensTag = activeLensTag(lens);
     const lensOpts = lensTag ? { tagId: lensTag } : null;
 
-    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+        const firstDay = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const today = todayStr();
 
-    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function (d) {
+    function addWeekCell(dayOfMonth) {
+      const ws = weekStartOf(viewYear, viewMonth, dayOfMonth);
+      const wkNum = isoWeekOf(ws);
+      const wk = document.createElement('button');
+      wk.type = 'button';
+      wk.className = 'cal-week';
+      wk.textContent = wkNum;
+      wk.dataset.weekStart = ws;
+      wk.title = 'Week ' + wkNum;
+      wk.setAttribute('aria-label', 'Week ' + wkNum);
+      wk.addEventListener('click', function (e) {
+        e.stopPropagation();
+        selectWeek(ws);
+      });
+      grid.appendChild(wk);
+    }
+
+    const weekHead = document.createElement('div');
+    weekHead.className = 'cal-head cal-head-wk';
+    grid.appendChild(weekHead);
+
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(function (d) {
       const head = document.createElement('div');
       head.className = 'cal-head';
       head.textContent = d;
       grid.appendChild(head);
     });
 
+    addWeekCell(1);
     for (let i = 0; i < firstDay; i++) {
       const blank = document.createElement('div');
       blank.className = 'cal-cell cal-blank';
@@ -89,11 +198,13 @@ const Calendar = (function () {
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
+      if (day > 1 && (firstDay + day - 1) % 7 === 0) addWeekCell(day);
       const dateStr = toDateStr(viewYear, viewMonth, day);
       const hub = DateHub.get(dateStr);
 
       const cell = document.createElement('div');
-      cell.className = 'cal-cell';
+            cell.className = 'cal-cell';
+      if ((firstDay + day - 1) % 7 >= 5) cell.classList.add('cal-weekend');
       if (dateStr === today) cell.classList.add('cal-today');
       if (hub.color) {
         cell.classList.add('cal-colored');
@@ -520,13 +631,15 @@ const Calendar = (function () {
     Modal.open('<h3 class="section-heading">Upcoming Events</h3>' + (rows || '<p class="empty-state">No events added yet.</p>'));
   }
 
-  function next() {
+    function next() {
+    if (viewMode === 'year') { viewYear++; render(); return; }
     viewMonth++;
     if (viewMonth > 11) { viewMonth = 0; viewYear++; }
     render();
   }
 
   function prev() {
+    if (viewMode === 'year') { viewYear--; render(); return; }
     viewMonth--;
     if (viewMonth < 0) { viewMonth = 11; viewYear--; }
     render();
@@ -541,8 +654,22 @@ const prevBtn = document.getElementById('calendar-prev');
     const nextBtn = document.getElementById('calendar-next');
     if (prevBtn) prevBtn.addEventListener('click', prev);
     if (nextBtn) nextBtn.addEventListener('click', next);
-    const evtBtn = document.getElementById('calendar-events-btn');
+        const evtBtn = document.getElementById('calendar-events-btn');
     if (evtBtn) evtBtn.addEventListener('click', openAllEventsModal);
+    const monthLabel = document.getElementById('calendar-month-label');
+    if (monthLabel) {
+      const toggleYear = function () {
+        viewMode = viewMode === 'year' ? 'month' : 'year';
+        render();
+      };
+      monthLabel.setAttribute('role', 'button');
+      monthLabel.tabIndex = 0;
+      monthLabel.title = 'Year overview';
+      monthLabel.addEventListener('click', toggleYear);
+      monthLabel.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleYear(); }
+      });
+    }
 
     initialized = true;
     render();
@@ -552,5 +679,11 @@ const prevBtn = document.getElementById('calendar-prev');
     return initialized;
   }
 
-  return { init: init, render: render, isReady: isReady };
+    return {
+    init: init,
+    render: render,
+    isReady: isReady,
+    selectWeek: selectWeek,
+    getSelectedWeek: function () { return selectedWeekStart; }
+  };
 })();
