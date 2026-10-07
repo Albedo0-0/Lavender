@@ -143,7 +143,7 @@ const WishButterfly = (function () {
   }
 
   const CSS_FLY = `
-  .wish-butterfly.wb-fly { top: 0; left: 0; animation: none; will-change: transform; }
+    .wish-butterfly.wb-fly { top: 0; left: 0; animation: none; will-change: transform; touch-action: manipulation; }
   .wish-butterfly.wb-fly.is-excited .wb-wing { animation-duration: 0.28s; }
   .wish-butterfly.wb-fly.is-glowing { filter: drop-shadow(0 0 10px rgba(200,210,160,0.95)) drop-shadow(0 0 24px rgba(168,176,135,0.7)); }
   .wb-dim { position: absolute; inset: 0; background: rgba(8,8,20,0.5); opacity: 0; transition: opacity 2.5s ease; pointer-events: none; }
@@ -240,7 +240,9 @@ const WishButterfly = (function () {
         target: { x: MiscCore.rand(vw * 0.25, vw * 0.75), y: MiscCore.rand(vh * 0.25, vh * 0.7) },
         exitPt: null
       };
-      const me = { s: s };
+            const me = { s: s };
+      let closing = false;
+      let ended = false;
       live = me;
 
       function place() {
@@ -264,7 +266,9 @@ const WishButterfly = (function () {
         return { x: s.x + j, y: h + 140 };
       }
 
-      function end() {
+            function end() {
+        if (ended) return;
+        ended = true;
         if (rafId) cancelAnimationFrame(rafId);
         rafId = null;
         if (reducedTimer) clearTimeout(reducedTimer);
@@ -284,16 +288,21 @@ const WishButterfly = (function () {
         // 15-25 minute timer re-arming within the same session/day.
       }
 
-      function fadeEnd() {
+            function fadeEnd() {
+        if (closing || ended) return;
+        closing = true;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
         butterfly.style.transition = 'opacity 0.7s ease';
         butterfly.style.opacity = '0';
         halo.classList.remove('is-on');
         setTimeout(end, 750);
       }
+      me.close = fadeEnd;
 
       function frame(now) {
-                  if (live !== me) return;
-          if (s.open) { reducedTimer = setTimeout(tryEnd, 5000); return; }
+                          if (live !== me || closing || ended) return;
+        const dt = Math.min(0.05, (now - s.last) / 1000);
         s.last = now;
         const vw = window.innerWidth, vh = window.innerHeight;
         let speed = 60, trailEvery = 0.2, long = false;
@@ -364,7 +373,12 @@ const WishButterfly = (function () {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openBubble(); }
       });
       butterfly.addEventListener('mouseenter', function () { s.hover = true; });
-      butterfly.addEventListener('mouseleave', function () { s.hover = false; });
+            butterfly.addEventListener('mouseleave', function () { s.hover = false; });
+      butterfly.addEventListener('dblclick', function (e) {
+        e.preventDefault();
+        if (closing || ended || s.phase === 'excited' || s.phase === 'leave' || s.phase === 'exit') return;
+        cancelBtn.click();
+      });
       textarea.addEventListener('input', function () { sendBtn.disabled = textarea.value.trim().length === 0; });
       cancelBtn.addEventListener('click', function () {
         textarea.value = '';
@@ -399,7 +413,11 @@ const WishButterfly = (function () {
           fadeEnd();
         }, LIFETIME_MS);
       } else {
-        requestAnimationFrame(function () { dim.classList.add('is-on'); halo.classList.add('is-on'); });
+                requestAnimationFrame(function () {
+          if (live !== me || closing || ended) return;
+          dim.classList.add('is-on');
+          halo.classList.add('is-on');
+        });
         rafId = requestAnimationFrame(frame);
       }
     }
@@ -419,8 +437,13 @@ const WishButterfly = (function () {
       }, 'misc-wish-butterfly');
     }
 
-    function onSettingChange() {
-      if (isEnabled() && !live && !hasAppearedToday()) scheduleSpawn(options.firstDelayMs || 6000);
+        function onSettingChange() {
+      if (!isEnabled()) {
+        if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+        if (live && typeof live.close === 'function') live.close();
+        return;
+      }
+      if (!live && !hasAppearedToday()) scheduleSpawn(options.firstDelayMs || 6000);
     }
     window.addEventListener('lavender-wish-butterfly-setting', onSettingChange);
 
