@@ -190,15 +190,32 @@ const ProductivityData = (function () {
       weightedSum += WEIGHTS[key] * v;
       totalWeight += WEIGHTS[key];
     });
-    if (totalWeight <= 0) return { score: null, factors: factors, penalties: [] };
-    let base = weightedSum / Math.max(totalWeight, COVERAGE_FLOOR);
+        if (totalWeight <= 0) return { score: null, factors: factors, penalties: [], contributions: [], capAdjust: null };
+    const divisor = Math.max(totalWeight, COVERAGE_FLOOR);
+    let base = weightedSum / divisor;
+    // Display-only: the exact points each factor put into `base` (same weights and divisor as above), so the UI never re-derives the score.
+    const FACTOR_LABELS = { study: 'Study time', delivery: 'Planned work done', questions: 'Questions', punctuality: 'Punctuality', habits: 'Habits', sleep: 'Sleep', water: 'Water', breakBalance: 'Break balance', mood: 'Mood' };
+    const contributions = Object.keys(WEIGHTS).filter(function (k) {
+      const v = factors[k];
+      return !(v === null || v === undefined || isNaN(v));
+    }).map(function (k) {
+      return { key: k, label: FACTOR_LABELS[k], value: WEIGHTS[k] * factors[k] / divisor };
+    });
+    const uncapped = base;
+    let capLabel = null;
     const hasCore = ['study', 'delivery', 'questions'].some(function (k) { return factors[k] !== null && factors[k] > 0; });
-    if (!hasCore) base = Math.min(base, SOFT_ONLY_CAP);
+    if (!hasCore) {
+      base = Math.min(base, SOFT_ONLY_CAP);
+      capLabel = 'Capped: no study, work or questions';
     // Tasks ticked off with no study time or questions behind them can't read as a strongly productive day.
-    else if (!(factors.study > 0) && !(factors.questions > 0)) base = Math.min(base, NO_EFFORT_CAP);
+    } else if (!(factors.study > 0) && !(factors.questions > 0)) {
+      base = Math.min(base, NO_EFFORT_CAP);
+      capLabel = 'Capped: work done without study';
+    }
+    const capAdjust = base < uncapped ? { label: capLabel, value: base - uncapped } : null;
     const penalties = dim ? [] : penaltiesFor(dateStr);
     const penalty = penalties.reduce(function (a, p) { return a + p.value; }, 0);
-    return { score: Math.round(clamp10(base - penalty) * 10) / 10, factors: factors, penalties: penalties };
+    return { score: Math.round(clamp10(base - penalty) * 10) / 10, factors: factors, penalties: penalties, contributions: contributions, capAdjust: capAdjust };
   }
 
   function getScore(dateStr, dim) {
