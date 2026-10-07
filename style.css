@@ -5121,6 +5121,46 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 
 .radio-back-btn { margin-top: var(--space-1); }
 
+/* Radio pixel assemble / disassemble — scoped to the Radio modal only. Reuses the shared
+   #modal-content open/close classes; no JS, no second modal system. 8px dither blocks. */
+#modal-content:has(.radio-modal) {
+  --px-25: conic-gradient(transparent 270deg, #000 0);
+  --px-50: conic-gradient(transparent 90deg, #000 0 180deg, transparent 0 270deg, #000 0);
+  --px-75: conic-gradient(#000 180deg, transparent 0 270deg, #000 0);
+  --px-0: linear-gradient(transparent, transparent);
+  -webkit-mask-size: 16px 16px;
+  mask-size: 16px 16px;
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
+  mask-clip: no-clip;
+  animation: radioPixelIn 170ms step-end;
+}
+#modal-content:has(.radio-modal).modal-closing {
+  animation: radioPixelOut 140ms step-end forwards;
+  pointer-events: none;
+}
+#modal-content:has(.radio-modal) .radio-body {
+  animation: none;
+}
+@keyframes radioPixelIn {
+  0%   { -webkit-mask-image: var(--px-25); mask-image: var(--px-25); }
+  30%  { -webkit-mask-image: var(--px-50); mask-image: var(--px-50); }
+  60%  { -webkit-mask-image: var(--px-75); mask-image: var(--px-75); }
+  85%  { -webkit-mask-image: none; mask-image: none; }
+  100% { -webkit-mask-image: none; mask-image: none; }
+}
+@keyframes radioPixelOut {
+  0%   { -webkit-mask-image: var(--px-75); mask-image: var(--px-75); }
+  30%  { -webkit-mask-image: var(--px-50); mask-image: var(--px-50); }
+  60%  { -webkit-mask-image: var(--px-25); mask-image: var(--px-25); }
+  90%  { -webkit-mask-image: var(--px-0); mask-image: var(--px-0); }
+  100% { -webkit-mask-image: var(--px-0); mask-image: var(--px-0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #modal-content:has(.radio-modal) { animation: none; }
+  #modal-content:has(.radio-modal).modal-closing { animation: none; opacity: 0; }
+}
+
 @media (max-width: 420px) {
   .radio-knob { width: 20px; height: 20px; }
   .radio-display-text { font-size: var(--text-xs); }
