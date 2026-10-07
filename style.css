@@ -5178,7 +5178,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   gap: calc(var(--rpx) * 4);
   margin-top: calc(var(--rpx) * 4);
 }
-.radio-btn {
+button.radio-btn {
   flex: 1;
   min-height: calc(var(--rpx) * 10);
   padding: var(--rpx) calc(var(--rpx) * 3);
@@ -5192,27 +5192,27 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   border-radius: 0;
   cursor: pointer;
 }
-.radio-btn-play {
+button.radio-btn-play {
   background: var(--color-sage-600);
   box-shadow: var(--r-outline), inset 0 calc(var(--rpx) * -1) 0 0 var(--color-sage-800), inset 0 var(--rpx) 0 0 var(--color-sage-400);
 }
-.radio-btn-pause {
+button.radio-btn-pause {
   background: var(--color-brown-600);
   box-shadow: var(--r-outline), inset 0 calc(var(--rpx) * -1) 0 0 var(--color-brown-800), inset 0 var(--rpx) 0 0 var(--color-kraft-500);
 }
-.radio-btn:hover { filter: brightness(1.12); }
-.radio-btn:active,
-.radio-playing .radio-btn-play {
+.radio-btn:hover { filter: brightness(1.12); transform: none; }
+button.radio-btn:active,
+.radio-playing button.radio-btn-play {
   transform: translateY(var(--rpx));
 }
-.radio-btn-play:active,
-.radio-playing .radio-btn-play {
+button.radio-btn-play:active,
+.radio-playing button.radio-btn-play {
   box-shadow: var(--r-outline), inset 0 var(--rpx) 0 0 var(--color-sage-800);
 }
 .radio-btn-pause:active { box-shadow: var(--r-outline), inset 0 var(--rpx) 0 0 var(--color-brown-800); }
 .radio-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; transform: none; }
-.radio-btn:focus-visible,
-.radio-back-btn:focus-visible {
+button.radio-btn:focus-visible,
+button.radio-back-btn:focus-visible {
   outline: calc(var(--rpx) / 2) dashed var(--color-cream-050);
   outline-offset: calc(var(--rpx) * 1.5);
 }
@@ -5232,7 +5232,7 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   height: calc(var(--rpx) / 2);
   background: repeating-linear-gradient(90deg, rgba(63, 47, 33, 0.55) 0 calc(var(--rpx) * 2), transparent calc(var(--rpx) * 2) calc(var(--rpx) * 4));
 }
-.radio-back-btn {
+button.radio-back-btn {
   padding: var(--rpx) calc(var(--rpx) * 3);
   font-family: 'Pixelify Sans', 'VT323', var(--font-body), monospace;
   font-size: 14px;
@@ -5245,8 +5245,8 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   box-shadow: var(--r-outline), inset 0 calc(var(--rpx) * -1) 0 0 var(--color-kraft-500);
   cursor: pointer;
 }
-.radio-back-btn:hover { background: var(--color-sage-100); }
-.radio-back-btn:active {
+.radio-back-btn:hover { background: var(--color-sage-100); transform: none; }
+button.radio-back-btn:active {
   transform: translateY(var(--rpx));
   box-shadow: var(--r-outline), inset 0 var(--rpx) 0 0 var(--color-kraft-500);
 }
