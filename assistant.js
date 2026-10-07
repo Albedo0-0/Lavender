@@ -53,6 +53,7 @@ const Assistant = (function () {
           '<button class="assistant-tab assistant-tab-4" data-go="search">Search</button>' +
         '</div>' +
         '<div class="assistant-ribbons-row">' +
+          '<button class="assistant-ribbon assistant-ribbon-plan" data-go="plan">Plan</button>' +
           '<button class="assistant-ribbon assistant-ribbon-today' + (todayNeedsChoice ? ' assistant-ribbon-highlight' : '') + '" data-go="today">Today</button>' +
           '<button class="assistant-ribbon assistant-ribbon-1" data-go="tomorrow">Tomorrow</button>' +
           '<button class="assistant-ribbon assistant-ribbon-2" data-go="store">Store</button>' +
@@ -63,10 +64,14 @@ const Assistant = (function () {
   }
 
     // ---------- Quarter-circle fan menu (replaces the old modal-style main menu) ----------
-  // Four options sit on a true 90-degree arc around the Assistant. Screen-space angles:
+  // Five options sit on a true 90-degree arc around the Assistant. Screen-space angles:
   // 90 = straight down, 180 = straight left (the lower-left quadrant from the header position).
   const FAN_PALETTE = { o: '#3f2f21', k: '#d9c4a3', c: '#fffdf8', g: '#566e3a', r: '#c8776a', y: '#e3c27a' };
   const FAN_OPTIONS = [
+    { go: 'plan', label: 'Plan', rows: [
+      '....oooo....', '..ooccccoo..', '.occcccccco.', '.ocgyyyycco.',
+      '.ocyycyyyco.', '.ocyyyyyyco.', '.occcccccco.', '..ooccccoo..',
+      '....oooo....', '....oyyo....', '....oooo....', '............'] },
     { go: 'today', label: 'Today', rows: [
       '............', '..o......o..', '..o......o..', 'oooooooooooo', 'orrrrrrrrrro', 'oooooooooooo',
       'occcccccccco', 'occcccggccco', 'occcccggccco', 'occcccccccco', 'oooooooooooo', '............'] },
@@ -309,6 +314,10 @@ const Assistant = (function () {
 
   function routeTo(key) {
     try {
+      if (key === 'plan') {
+        if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open();
+        return;
+      }
       if (key === 'store') return openStore();
       if (key === 'timeline') return openTimeline();
       if (key === 'tomorrow') return openTomorrow();
@@ -739,5 +748,12 @@ const Assistant = (function () {
     mountPixelEntity();
   }
 
-    return { init: init, openMain: openMain, openSearch: openSearch, openStore: openStoreFrom, refreshPixelEntitySkin: refreshPixelEntitySkin };
+    return {
+      init: init,
+      openMain: openMain,
+      openPlan: function (opts) { if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts); },
+      openSearch: openSearch,
+      openStore: openStoreFrom,
+      refreshPixelEntitySkin: refreshPixelEntitySkin
+    };
 })();

@@ -808,6 +808,7 @@ const Calendar = (function () {
         '<textarea id="datehub-note" class="input" rows="3">' + (hub.note || '') + '</textarea>' +
         '<div class="datehub-footer">' +
           '<div class="datehub-quicknav">' +
+            '<button id="datehub-goto-plan" class="btn btn-secondary">\u2728 Plan</button>' +
             '<button id="datehub-goto-journal" class="btn btn-secondary">\uD83D\uDCD4 Journal</button>' +
                         '<button id="datehub-goto-planner" class="btn btn-secondary">\uD83D\uDCDA Planner</button>' +
             '<button id="datehub-goto-day" class="btn btn-secondary">\uD83D\uDDD3 Day</button>' +
@@ -916,6 +917,15 @@ const Calendar = (function () {
     document.getElementById('datehub-important').addEventListener('change', function (e) {
       document.getElementById('datehub-important-label').disabled = !e.target.checked;
     });
+
+    const planBtn = document.getElementById('datehub-goto-plan');
+    if (planBtn) {
+      planBtn.addEventListener('click', function () {
+        if (typeof PlanningAgentUI !== 'undefined') {
+          PlanningAgentUI.open({ date: dateStr, intent: 'day' });
+        }
+      });
+    }
 
     // Placeholder hooks — Journal/Planner tabs don't read the selected date yet.
     // Once those tabs exist, they should read this date from DateHub/State instead
@@ -1057,6 +1067,7 @@ const prevBtn = document.getElementById('calendar-prev');
     openWeek: openWeek,
         openDay: openDay,
     openDateHub: openDateHub,
+    openPlan: function (opts) { if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts); },
     blocksFor: weekBlocksFor,
     layoutLanes: layoutLanes,
     getSelectedWeek: function () { return selectedWeekStart; }

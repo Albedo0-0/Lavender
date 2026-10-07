@@ -30,6 +30,7 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     if (!container) return;
 
     container.innerHTML =
+      '<button id="planner-open-agent-btn" class="btn btn-secondary" style="width:100%;margin-bottom:var(--space-2);display:flex;align-items:center;justify-content:center;gap:6px;">✨ Plan with Agent</button>' +
       '<div class="planner-compact-row">' +
         '<input type="date" id="planner-date" class="input" title="Date">' +
         '<input type="time" id="planner-start-time" class="input" title="Start" placeholder="Start">' +
@@ -41,6 +42,17 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
         '<button id="planner-mode-next" class="btn btn-secondary">&#8594;</button>' +
       '</div>' +
       '<div id="planner-addmode-body"></div>';
+
+    const agentBtn = document.getElementById('planner-open-agent-btn');
+    if (agentBtn) {
+      agentBtn.addEventListener('click', function () {
+        const dEl = document.getElementById('planner-date');
+        const curDate = (dEl && dEl.value) || todayStr();
+        if (typeof PlanningAgentUI !== 'undefined') {
+          PlanningAgentUI.open({ date: curDate });
+        }
+      });
+    }
 
     const dateInput = document.getElementById('planner-date');
     if (dateInput) {
@@ -710,5 +722,13 @@ function openForTopic(subject, topicId) {
     historyTopicId = topicId || null;
     renderSidePanel();
   }  
-  return { init: init, render: function () { renderForm(); renderSidePanel(); }, openHistory: openHistory, openDate: openDate, openForTopic: openForTopic, refreshSubjectOptions: refreshSubjectOptions };
+  return {
+    init: init,
+    render: function () { renderForm(); renderSidePanel(); },
+    openHistory: openHistory,
+    openDate: openDate,
+    openForTopic: openForTopic,
+    openPlan: function (opts) { if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts); },
+    refreshSubjectOptions: refreshSubjectOptions
+  };
 })();

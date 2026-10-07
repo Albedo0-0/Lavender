@@ -515,7 +515,13 @@ const Library = (function () {
       btn.addEventListener('click', function () { studyTopic(activeSubject, btn.dataset.topicId); });
     });
     container.querySelectorAll('.library-topic-planner').forEach(function (btn) {
-      btn.addEventListener('click', function () { openPlanner(activeSubject, btn.dataset.topicId); });
+      btn.addEventListener('click', function () {
+        if (typeof PlanningAgentUI !== 'undefined') {
+          PlanningAgentUI.open({ subject: activeSubject, topicId: btn.dataset.topicId, intent: 'topic' });
+        } else {
+          openPlanner(activeSubject, btn.dataset.topicId);
+        }
+      });
     });
     container.querySelectorAll('.library-topic-more').forEach(function (btn) {
       btn.addEventListener('click', function () { openTopicMenu(btn.dataset.topicId, false); });
@@ -677,7 +683,7 @@ const Library = (function () {
       tagsHtml +
       '<div class="library-primary-actions">' +
         '<button id="library-action-study" class="btn btn-primary"' + (sessionActive ? ' disabled' : '') + '>&#9654; Study</button>' +
-        '<button id="library-action-planner" class="btn btn-secondary">&#128197; Planner</button>' +
+        '<button id="library-action-planner" class="btn btn-secondary">&#128197; Plan</button>' +
       '</div>' +
       '<div class="library-info-row">' +
         '<button id="library-action-upcoming" class="library-info-chip">Upcoming</button>' +
@@ -693,7 +699,13 @@ const Library = (function () {
     });
     document.getElementById('library-action-more').addEventListener('click', function () { openTopicMenu(topicId, true); });
     document.getElementById('library-action-study').addEventListener('click', function () { studyTopic(subject, topicId); });
-    document.getElementById('library-action-planner').addEventListener('click', function () { openPlanner(subject, topicId); });
+    document.getElementById('library-action-planner').addEventListener('click', function () {
+      if (typeof PlanningAgentUI !== 'undefined') {
+        PlanningAgentUI.open({ subject: subject, topicId: topicId, intent: 'topic' });
+      } else {
+        openPlanner(subject, topicId);
+      }
+    });
     document.getElementById('library-action-history').addEventListener('click', function () { showTopicHistory(topicId); });
     document.getElementById('library-action-upcoming').addEventListener('click', function () { openUpcomingModal(topicId); });
     document.getElementById('library-action-links').addEventListener('click', function () { openLinksModal(topicId); });

@@ -338,7 +338,10 @@ const PlanningAgent = (function () {
     toggleComplete: toggleComplete,
     applyProposal: applyProposal,
     requestCatchUp: requestCatchUp,
-    proposeDayPlan: proposeDayPlan
+    proposeDayPlan: proposeDayPlan,
+    openUI: function (opts) {
+      if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts);
+    }
   };
 })();
 
