@@ -701,7 +701,7 @@ const Calendar = (function () {
       const subjectTasks = group.tasks;
       if (subjectTasks.length === 0) return '';
       return '<div class="datehub-todo-subject">' +
-        '<div class="datehub-todo-subject-name section-heading">' + escTg(group.name) + '</div>' +
+                '<div class="datehub-todo-subject-name section-heading">' + String(group.name).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }) + '</div>' +
         '<ul class="datehub-todo-list">' +
           subjectTasks.map(function (t) {
             const label = t.taskType === 'custom' ? t.title
