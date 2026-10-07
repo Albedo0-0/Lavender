@@ -108,7 +108,7 @@ const Assistant = (function () {
   function fanTotalMs() { return FAN_DUR_MS + FAN_STAGGER_MS * (FAN_OPTIONS.length - 1); }
   function fanReducedMotion() { return (typeof MiscCore !== 'undefined') && MiscCore.prefersReducedMotion(); }
 
-  function fanIconSvg(rows) {
+    function fanIconSvg(rows, size) {
     var rects = '';
     rows.forEach(function (row, y) {
       var x = 0;
@@ -121,7 +121,7 @@ const Assistant = (function () {
         x = x2;
       }
     });
-    return '<svg viewBox="0 0 12 12" width="' + FAN_ICON + '" height="' + FAN_ICON + '" shape-rendering="crispEdges" aria-hidden="true">' + rects + '</svg>';
+        return '<svg viewBox="0 0 12 12" width="' + (size || FAN_ICON) + '" height="' + (size || FAN_ICON) + '" shape-rendering="crispEdges" aria-hidden="true">' + rects + '</svg>';
   }
 
   // Origin = centre of the Assistant. All four options share one radius; angles are evenly spaced
@@ -326,8 +326,21 @@ const Assistant = (function () {
   }
 
   function backBtnHtml() { return '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>'; }
-    function wireBack(fn) {
+      function wireBack(fn) {
     document.getElementById('assistant-back-btn').addEventListener('click', fn || function () { Modal.close(); openMain(); });
+  }
+
+  function pageTitleHtml(go, text) {
+    var opt = FAN_OPTIONS.filter(function (o) { return o.go === go; })[0];
+    return '<h3 class="section-title assistant-page-title">' +
+      (opt ? '<span class="assistant-page-pixel">' + fanIconSvg(opt.rows, 24) + '</span>' : '') + esc(text) + '</h3>';
+  }
+
+  function segHtml(active) {
+    return '<div class="assistant-seg" role="tablist">' +
+      '<button type="button" id="assistant-summary-link" class="assistant-seg-btn' + (active === 'summary' ? ' is-active' : '') + '">Summary</button>' +
+      '<button type="button" id="assistant-history-link" class="assistant-seg-btn' + (active === 'history' ? ' is-active' : '') + '">History</button>' +
+    '</div>';
   }
 
   // ---------- Store (§7.3) ----------
@@ -439,8 +452,9 @@ const Assistant = (function () {
       '</div>';
     }).join('') : '<div class="empty-state">Nothing recorded yet today.</div>';
     const body = items.length ? '<div class="assistant-timeline-wrap"><div class="assistant-timeline-track">' + rows + '</div></div>' : rows;
-        Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-timeline"><h3 class="section-title">History</h3>' + body + '</div>');
-    wireBack(function () { openSummary(AssistantData.todayStr()); });
+            Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-timeline">' + pageTitleHtml('history', 'History') + segHtml('history') + body + '</div>');
+    wireBack();
+    document.getElementById('assistant-summary-link').addEventListener('click', function () { openSummary(AssistantData.todayStr()); });
   }
 
   // ---------- Tomorrow (§7.3) ----------
@@ -457,7 +471,7 @@ const Assistant = (function () {
     const rows = list.length ? list.map(taskRowHtml).join('') : '<div class="empty-state">Nothing scheduled for tomorrow yet.</div>';
     Modal.open(backBtnHtml() +
       '<div class="assistant-page assistant-page-envelope">' +
-        '<h3 class="section-title">Tomorrow</h3>' +
+                pageTitleHtml('tomorrow', 'Tomorrow') +
         '<div class="assistant-envelope">' +
           '<div class="assistant-envelope-flap" aria-hidden="true"></div>' +
           '<div class="assistant-envelope-contents">' + rows + '</div>' +
@@ -549,7 +563,7 @@ const Assistant = (function () {
 
   function summaryHtml(dateStr) {
     const s = AssistantData.getDailySummary(dateStr);
-    return backBtnHtml() + '<div class="assistant-page assistant-page-receipt"><h3 class="section-title">Daily Summary</h3>' +
+        return backBtnHtml() + '<div class="assistant-page assistant-page-receipt">' + pageTitleHtml('history', 'Daily Summary') + segHtml('summary') +
       '<div class="assistant-receipt">' +
         '<span class="assistant-receipt-stamp" aria-hidden="true">' + dateStr + '</span>' +
         '<div class="form-row"><input type="date" id="assistant-summary-date" value="' + dateStr + '"></div>' +
@@ -557,8 +571,7 @@ const Assistant = (function () {
         '<p>Hydration: ' + (s.hydrationScore === null ? '\u2013' : s.hydrationScore + '/10') + ' \u00b7 Sleep: ' + (s.sleepHours === null ? '\u2013' : s.sleepHours + 'h') + '</p>' +
         '<p>Tasks: ' + s.tasksCompleted + ' / ' + s.tasksTotal + ' completed</p>' +
                 itinerarySummaryLine(s.itinerary) +
-      '</div>' +
-      '<button id="assistant-history-link" class="btn-secondary">History</button>' +
+            '</div>' +
     '</div>';
   }
 
