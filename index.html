@@ -24,15 +24,17 @@
     <span id="app-title">Lavender</span>
   </div>
   <div id="app-header-right">
-    <div id="top-meter-bar">
-      <div id="productivity-bar-wrap" title="Productivity">
+      <div id="top-meter-bar">
+      <div id="productivity-bar-wrap" aria-label="Productivity">
         <div id="productivity-bar-fill"></div>
         <span id="productivity-bar-label"></span>
       </div>
-      <div id="exp-bar-wrap" title="EXP">
+      <div id="exp-bar-wrap" aria-label="EXP">
         <div id="exp-bar-fill"></div>
         <span id="exp-bar-label"></span>
       </div>
+      <button type="button" id="meter-store-btn" class="meter-cart" title="Store" aria-label="Store"><svg viewBox="0 0 12 10" width="18" height="15" shape-rendering="crispEdges" aria-hidden="true"><path fill="#3f2f21" d="M0 1h2v1H0zM2 2h1v5H2zM3 3h9v1H3zM3 4h1v1H3zM4 5h1v1H4zM10 4h1v1h-1zM9 5h1v1H9zM4 6h6v1H4zM2 7h8v1H2zM4 8h2v2H4zM8 8h2v2H8z"/><path fill="#d9c4a3" d="M4 4h6v1H4zM5 5h4v1H5z"/><path fill="#fff6e0" d="M5 4h1v1H5z"/></svg></button>
+      <div id="meter-note"></div>
     </div>
     <span id="header-assistant-slot" aria-hidden="true"></span>
     <button id="header-search-btn" title="Search">&#128269;</button>
