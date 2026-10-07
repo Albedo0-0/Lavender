@@ -6320,6 +6320,21 @@ button.cassette-media-remove {
     var(--color-kraft-500);
 }
 #productivity-bar-fill.no-anim, #exp-bar-fill.no-anim { transition: none !important; }
+
+/* Soft, pill-shaped corners */
+#top-meter-bar { border-radius: 20px; padding: 9px 18px 10px; }
+#productivity-bar-wrap, #exp-bar-wrap { height: 7px; }
+#exp-bar-wrap { height: 6px; }
+#productivity-bar-wrap::before, #exp-bar-wrap::before,
+#productivity-bar-fill, #exp-bar-fill { clip-path: none; border-radius: 999px; }
+#productivity-bar-fill, #exp-bar-fill { overflow: hidden; }
+#top-meter-bar #meter-note { border-radius: 12px; }
+#meter-store-btn.meter-cart, #modal-content .meter-cart { width: 26px; height: 24px; border-radius: 999px; }
+#modal-content .meter-sheet { border-radius: 18px; }
+#modal-content .meter-sheet::before { border-radius: 999px; }
+#modal-content .meter-track { clip-path: none; border-radius: 999px; overflow: hidden; }
+#modal-content .meter-track i { border-radius: 999px; }
+#modal-content:has(.meter-page) { border-radius: 22px; }
 #productivity-bar-label, #exp-bar-label { z-index: 2; white-space: nowrap; pointer-events: none; }
 #productivity-bar-label b, #exp-bar-label b { display: inline-block; font-weight: 700; color: var(--color-brown-700); }
 #exp-bar-label b.is-new { animation: meterTick .32s steps(3); }
