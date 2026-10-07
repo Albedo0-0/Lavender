@@ -150,8 +150,12 @@ const Study = (function () {
     const clockPanel = document.getElementById('study-clock-panel');
     if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
     if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
-    const layout = document.getElementById('study-layout');
-    if (layout) layout.classList.toggle('study-wallpaper-fullscreen', !!active || !!TimeEngine.getActiveSession());
+        const layout = document.getElementById('study-layout');
+    if (layout) {
+      const _ss = TimeEngine.getActiveSession();
+      layout.classList.toggle('study-wallpaper-fullscreen', !!active || !!_ss);
+      layout.dataset.studyState = _ss ? (_ss.state === 'paused' ? 'paused' : 'running') : (active ? (getClock().running ? 'running' : 'paused') : 'idle');
+    }
     applyChromeVisibility();
   }
   function isClockActive(c) {
@@ -429,7 +433,11 @@ function renderClock() {
     if (!container) return;
     const active = TimeEngine.getActiveSession();
     const layout = document.getElementById('study-layout');
-    if (layout) layout.classList.toggle('study-wallpaper-fullscreen', !!active || isClockActive(getClock()));
+        if (layout) {
+      const _cc = getClock();
+      layout.classList.toggle('study-wallpaper-fullscreen', !!active || isClockActive(_cc));
+      layout.dataset.studyState = active ? (active.state === 'paused' ? 'paused' : 'running') : (isClockActive(_cc) ? (_cc.running ? 'running' : 'paused') : 'idle');
+    }
 
     if (active) { renderFocusMode(active); return; }
     exitFocusMode();
@@ -496,9 +504,9 @@ function renderFocusMode(active) {
     const itineraryTitle = itineraryTitleForTask(active.taskId);
     container.innerHTML =
       '<div class="study-focus-mode">' +
-        '<p class="study-active-label">' + (itineraryTitle || taskLabelFull(task)) + '</p>' +
-           '<div id="study-focus-clock" class="study-focus-clock"></div>' +
-        '<div id="study-focus-remaining" class="study-focus-remaining"></div>' +
+                '<p class="study-active-label study-note-top">' + (itineraryTitle || taskLabelFull(task)) + '</p>' +
+        '<div id="study-focus-clock" class="study-focus-clock"></div>' +
+        '<div id="study-focus-remaining" class="study-focus-remaining study-note"></div>' +
         (active.state === 'paused' ? '<p class="study-paused-note">Paused</p>' : '') +
         '<div class="study-focus-actions">' +
           '<button id="study-focus-complete" class="btn btn-primary">Completed</button>' +
