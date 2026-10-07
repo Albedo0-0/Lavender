@@ -62,21 +62,190 @@ const Assistant = (function () {
     );
   }
 
-  function openMain() {
-    Modal.open(mainHtml(), { size: 'lg' });
-    document.querySelectorAll('#assistant-menu button').forEach(function (btn) {
-      btn.addEventListener('click', function () { routeTo(btn.dataset.go); });
+    // ---------- Quarter-circle fan menu (replaces the old modal-style main menu) ----------
+  // Four options sit on a true 90-degree arc around the Assistant. Screen-space angles:
+  // 90 = straight down, 180 = straight left (the lower-left quadrant from the header position).
+  const FAN_PALETTE = { o: '#3f2f21', k: '#d9c4a3', c: '#fffdf8', g: '#566e3a', r: '#c8776a', y: '#e3c27a' };
+  const FAN_OPTIONS = [
+    { go: 'today', label: 'Today', rows: [
+      '............', '..o......o..', '..o......o..', 'oooooooooooo', 'orrrrrrrrrro', 'oooooooooooo',
+      'occcccccccco', 'occcccggccco', 'occcccggccco', 'occcccccccco', 'oooooooooooo', '............'] },
+    { go: 'tomorrow', label: 'Tomorrow', rows: [
+      '............', 'oooooooooooo', 'okkkkkkkkkko', 'ookkkkkkkkoo', 'okokkkkkkoko', 'okkokkkkokko',
+      'okkkoooookko', 'okkkkrrkkkko', 'okkkkkkkkkko', 'oooooooooooo', '............', '............'] },
+    { go: 'alarms', label: 'Alarms', rows: [
+      '....oooo....', '...oyyyyo...', '..oycyyyyo..', '..oycyyyyo..', '..oyyyyyyo..', '.oyyyyyyyyo.',
+      '.oyyyyyyyyo.', 'oooooooooooo', '............', '....oyyo....', '....oooo....', '............'] },
+    { go: 'history', label: 'History / Daily Summary', rows: [
+      '............', '..oooooooo..', '..occcccco..', '..ocggggco..', '..occcccco..', '..ocgggcco..',
+      '..occcccco..', '..ocggggco..', '..occcccco..', '..occcrrco..', '..oooooooo..', '............'] }
+  ];
+  const FAN_ARC_START_DEG = 90;
+  const FAN_ARC_SPAN_DEG = 90;
+  const FAN_RADIUS_MAX = 150;
+  const FAN_RADIUS_MIN = 72;
+  const FAN_EDGE_PAD = 8;
+  const FAN_OPT_W = 72;
+  const FAN_ICON = 36;
+  const FAN_OPT_BELOW = 50;
+  const FAN_DUR_MS = 250;
+  const FAN_STAGGER_MS = 30;
+  const FAN_CLOSE_SPEED = 1.3;
+
+  let fanEl = null;
+  let fanItems = [];
+  let fanGeo = null;
+  let fanOpen = false;
+  let fanT = 0;
+  let fanLast = 0;
+  let fanRaf = 0;
+  let fanPollHandle = null;
+
+  function fanTotalMs() { return FAN_DUR_MS + FAN_STAGGER_MS * (FAN_OPTIONS.length - 1); }
+  function fanReducedMotion() { return (typeof MiscCore !== 'undefined') && MiscCore.prefersReducedMotion(); }
+
+  function fanIconSvg(rows) {
+    var rects = '';
+    rows.forEach(function (row, y) {
+      var x = 0;
+      while (x < row.length) {
+        var ch = row.charAt(x);
+        if (ch === '.' || !FAN_PALETTE[ch]) { x++; continue; }
+        var x2 = x;
+        while (x2 < row.length && row.charAt(x2) === ch) x2++;
+        rects += '<rect x="' + x + '" y="' + y + '" width="' + (x2 - x) + '" height="1" fill="' + FAN_PALETTE[ch] + '"/>';
+        x = x2;
+      }
     });
-    // B12: todayNeedsChoice is evaluated once at render time and goes stale while the menu stays
-    // open (e.g. the user opens Assistant before choosing a template, and the gate fires while the
-    // menu is up). Poll at the same cadence as the main heartbeat and patch the class live so the
-    // ribbon reflects real state for as long as the menu is visible.
-    var ribbonPollHandle = window.setInterval(function () {
-      var ribbon = document.querySelector('.assistant-ribbon-today');
-      if (!ribbon) { window.clearInterval(ribbonPollHandle); return; }
-      var needs = (typeof ItineraryToday !== 'undefined') && ItineraryToday.isAwaitingChoice();
-      ribbon.classList.toggle('assistant-ribbon-highlight', !!needs);
-    }, 1000);
+    return '<svg viewBox="0 0 12 12" width="' + FAN_ICON + '" height="' + FAN_ICON + '" shape-rendering="crispEdges" aria-hidden="true">' + rects + '</svg>';
+  }
+
+  // Origin = centre of the Assistant. All four options share one radius; angles are evenly spaced
+  // along the 90-degree arc. The radius shrinks (never the geometry) when the viewport is tight.
+  function fanGeometry() {
+    var anchor = document.getElementById('assistant-pixel-entity') || document.getElementById('header-assistant-slot');
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var rect = anchor ? anchor.getBoundingClientRect() : null;
+    var cx = rect ? rect.left + rect.width / 2 : vw - 40;
+    var cy = rect ? rect.top + rect.height / 2 : 30;
+    var step = FAN_ARC_SPAN_DEG / FAN_OPTIONS.length;
+    var angles = FAN_OPTIONS.map(function (o, i) { return (FAN_ARC_START_DEG + step * (i + 0.5)) * Math.PI / 180; });
+    var r = FAN_RADIUS_MAX;
+    angles.forEach(function (a) {
+      var c = Math.cos(a), s = Math.sin(a);
+      if (c < -1e-6) r = Math.min(r, (cx - FAN_OPT_W / 2 - FAN_EDGE_PAD) / -c);
+      if (c > 1e-6) r = Math.min(r, (vw - cx - FAN_OPT_W / 2 - FAN_EDGE_PAD) / c);
+      if (s > 1e-6) r = Math.min(r, (vh - cy - FAN_OPT_BELOW - FAN_EDGE_PAD) / s);
+    });
+    return { cx: cx, cy: cy, r: Math.max(FAN_RADIUS_MIN, r), angles: angles };
+  }
+
+  function fanPlace() {
+    if (!fanGeo) return;
+    fanItems.forEach(function (el) {
+      el.style.left = (fanGeo.cx - FAN_OPT_W / 2) + 'px';
+      el.style.top = (fanGeo.cy - FAN_ICON / 2) + 'px';
+    });
+  }
+
+  // Polar motion: radius eases out fast while the angle sweeps from the arc start to the option's
+  // own angle, so each option visibly rides the circle's circumference. Running the same clock
+  // backwards gives the exact reverse path on close.
+  function fanRender() {
+    if (!fanEl || !fanGeo) return;
+    var startRad = FAN_ARC_START_DEG * Math.PI / 180;
+    fanItems.forEach(function (el, i) {
+      var p = Math.max(0, Math.min(1, (fanT - i * FAN_STAGGER_MS) / FAN_DUR_MS));
+      var rad = fanGeo.r * (1 - Math.pow(1 - p, 4));
+      var ang = startRad + (fanGeo.angles[i] - startRad) * (1 - Math.pow(1 - p, 3));
+      el.style.transform = 'translate(' + (rad * Math.cos(ang)).toFixed(2) + 'px,' + (rad * Math.sin(ang)).toFixed(2) + 'px)';
+      el.style.opacity = String(Math.min(1, p * 2.5));
+      el.style.setProperty('--fan-p', p.toFixed(3));
+      el.style.pointerEvents = (fanOpen && p > 0.6) ? 'auto' : 'none';
+    });
+  }
+
+  function fanTick(now) {
+    fanRaf = 0;
+    var dt = Math.max(0, now - fanLast);
+    fanLast = now;
+    var total = fanTotalMs();
+    fanT = Math.max(0, Math.min(total, fanT + (fanOpen ? dt : -dt * FAN_CLOSE_SPEED)));
+    fanRender();
+    if (fanOpen ? fanT < total : fanT > 0) fanRaf = window.requestAnimationFrame(fanTick);
+    else if (!fanOpen) destroyFan();
+  }
+
+  function fanKick() {
+    if (fanRaf) return;
+    fanLast = performance.now();
+    fanRaf = window.requestAnimationFrame(fanTick);
+  }
+
+  function fanSyncHighlight() {
+    var el = fanEl && fanEl.querySelector('[data-go="today"]');
+    if (!el) return;
+    el.classList.toggle('assistant-fan-opt-highlight', (typeof ItineraryToday !== 'undefined') && !!ItineraryToday.isAwaitingChoice());
+  }
+
+  function fanOnKey(e) { if (e.key === 'Escape') { e.preventDefault(); closeFan(); } }
+  function fanOnResize() { if (!fanEl) return; fanGeo = fanGeometry(); fanPlace(); fanRender(); }
+
+  function destroyFan() {
+    if (fanRaf) { window.cancelAnimationFrame(fanRaf); fanRaf = 0; }
+    if (fanPollHandle) { window.clearInterval(fanPollHandle); fanPollHandle = null; }
+    document.removeEventListener('keydown', fanOnKey);
+    window.removeEventListener('resize', fanOnResize);
+    if (fanEl && fanEl.parentNode) fanEl.parentNode.removeChild(fanEl);
+    fanEl = null; fanItems = []; fanGeo = null; fanOpen = false; fanT = 0;
+  }
+
+  function closeFan() {
+    if (!fanEl || !fanOpen) return;
+    fanOpen = false;
+    if (pixelEntityEl) pixelEntityEl.focus({ preventScroll: true });
+    if (fanReducedMotion()) { destroyFan(); return; }
+    fanKick();
+  }
+
+  function openFan() {
+    if (fanEl) { fanOpen = true; fanKick(); return; }
+    fanGeo = fanGeometry();
+    fanEl = document.createElement('div');
+    fanEl.id = 'assistant-fan';
+    fanEl.setAttribute('role', 'menu');
+    fanEl.setAttribute('aria-label', Settings.assistantLabel() || 'Assistant');
+    fanEl.addEventListener('click', function (e) { if (e.target === fanEl) closeFan(); });
+    fanItems = FAN_OPTIONS.map(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'assistant-fan-opt';
+      b.dataset.go = o.go;
+      b.setAttribute('role', 'menuitem');
+      b.setAttribute('aria-label', o.label);
+      b.innerHTML = '<span class="assistant-fan-icon">' + fanIconSvg(o.rows) + '</span>' +
+        '<span class="assistant-fan-label">' + esc(o.label) + '</span>';
+      b.addEventListener('click', function () { closeFan(); routeTo(o.go); });
+      fanEl.appendChild(b);
+      return b;
+    });
+    fanPlace();
+    document.body.appendChild(fanEl);
+    fanOpen = true;
+    fanT = fanReducedMotion() ? fanTotalMs() : 0;
+    fanRender();
+    document.addEventListener('keydown', fanOnKey);
+    window.addEventListener('resize', fanOnResize);
+    fanSyncHighlight();
+    fanPollHandle = window.setInterval(fanSyncHighlight, 1000);
+    if (!fanReducedMotion()) fanKick();
+    fanItems[0].focus({ preventScroll: true });
+  }
+
+  function openMain() {
+    if (fanEl && fanOpen) closeFan();
+    else openFan();
   }
 
   function routeTo(key) {
@@ -86,7 +255,8 @@ const Assistant = (function () {
       if (key === 'tomorrow') return openTomorrow();
       if (key === 'leftoff') return openWhereLeftOff();
       if (key === 'search') return openSearch();
-      if (key === 'summary') return openSummary(AssistantData.todayStr());
+            if (key === 'summary') return openSummary(AssistantData.todayStr());
+      if (key === 'history') return openSummary(AssistantData.todayStr());
       if (key === 'alarms') return openAlarms();
       if (key === 'today') { if (typeof ItineraryToday !== 'undefined') ItineraryToday.open(); return; }
     } catch (err) {
@@ -97,7 +267,9 @@ const Assistant = (function () {
   }
 
   function backBtnHtml() { return '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>'; }
-  function wireBack() { document.getElementById('assistant-back-btn').addEventListener('click', openMain); }
+    function wireBack(fn) {
+    document.getElementById('assistant-back-btn').addEventListener('click', fn || function () { Modal.close(); openMain(); });
+  }
 
   // ---------- Store (§7.3) ----------
 
@@ -208,8 +380,8 @@ const Assistant = (function () {
       '</div>';
     }).join('') : '<div class="empty-state">Nothing recorded yet today.</div>';
     const body = items.length ? '<div class="assistant-timeline-wrap"><div class="assistant-timeline-track">' + rows + '</div></div>' : rows;
-    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-timeline"><h3 class="section-title">History</h3>' + body + '</div>');
-    wireBack();
+        Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-timeline"><h3 class="section-title">History</h3>' + body + '</div>');
+    wireBack(function () { openSummary(AssistantData.todayStr()); });
   }
 
   // ---------- Tomorrow (§7.3) ----------
@@ -325,15 +497,17 @@ const Assistant = (function () {
         '<p>Study: ' + fmtMs(s.studyMs) + ' \u00b7 Break: ' + fmtMs(s.breakMs) + ' \u00b7 Questions: ' + s.questionsSolved + '</p>' +
         '<p>Hydration: ' + (s.hydrationScore === null ? '\u2013' : s.hydrationScore + '/10') + ' \u00b7 Sleep: ' + (s.sleepHours === null ? '\u2013' : s.sleepHours + 'h') + '</p>' +
         '<p>Tasks: ' + s.tasksCompleted + ' / ' + s.tasksTotal + ' completed</p>' +
-        itinerarySummaryLine(s.itinerary) +
+                itinerarySummaryLine(s.itinerary) +
       '</div>' +
+      '<button id="assistant-history-link" class="btn-secondary">History</button>' +
     '</div>';
   }
 
   function openSummary(dateStr) {
     Modal.open(summaryHtml(dateStr));
     wireBack();
-    document.getElementById('assistant-summary-date').addEventListener('change', function (e) { openSummary(e.target.value); });
+        document.getElementById('assistant-summary-date').addEventListener('change', function (e) { openSummary(e.target.value); });
+    document.getElementById('assistant-history-link').addEventListener('click', function () { openTimeline(); });
   }
 
   // ---------- Alarms (§6.1 — General Alarm lives here, near Notepad, now that Assistant exists) ----------
