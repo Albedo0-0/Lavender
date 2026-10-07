@@ -82,12 +82,14 @@ const Assistant = (function () {
   ];
   const FAN_ARC_START_DEG = 90;
   const FAN_ARC_SPAN_DEG = 90;
-  const FAN_RADIUS_MAX = 150;
-  const FAN_RADIUS_MIN = 72;
+    const FAN_RADIUS_MAX = 210;
+  const FAN_RADIUS_MIN = 96;
   const FAN_EDGE_PAD = 8;
-  const FAN_OPT_W = 72;
-  const FAN_ICON = 36;
-  const FAN_OPT_BELOW = 50;
+  const FAN_OPT_W = 96;
+  const FAN_ICON = 48;
+  const FAN_OPT_BELOW = 68;
+  const FAN_LINE_GAP_ORIGIN = 26;
+  const FAN_LINE_GAP_ICON = FAN_ICON / 2 + 6;
   const FAN_DUR_MS = 250;
   const FAN_STAGGER_MS = 30;
   const FAN_CLOSE_SPEED = 1.3;
@@ -99,7 +101,9 @@ const Assistant = (function () {
   let fanT = 0;
   let fanLast = 0;
   let fanRaf = 0;
-  let fanPollHandle = null;
+    let fanPollHandle = null;
+  let fanLines = [];
+  let fanOriginEl = null;
 
   function fanTotalMs() { return FAN_DUR_MS + FAN_STAGGER_MS * (FAN_OPTIONS.length - 1); }
   function fanReducedMotion() { return (typeof MiscCore !== 'undefined') && MiscCore.prefersReducedMotion(); }
@@ -141,28 +145,49 @@ const Assistant = (function () {
     return { cx: cx, cy: cy, r: Math.max(FAN_RADIUS_MIN, r), angles: angles };
   }
 
-  function fanPlace() {
+    function fanPlace() {
     if (!fanGeo) return;
     fanItems.forEach(function (el) {
       el.style.left = (fanGeo.cx - FAN_OPT_W / 2) + 'px';
       el.style.top = (fanGeo.cy - FAN_ICON / 2) + 'px';
     });
+    if (fanOriginEl) {
+      fanOriginEl.style.left = (fanGeo.cx - PIXEL_CANVAS_SIZE / 2) + 'px';
+      fanOriginEl.style.top = (fanGeo.cy - PIXEL_CANVAS_SIZE / 2) + 'px';
+    }
   }
 
   // Polar motion: radius eases out fast while the angle sweeps from the arc start to the option's
   // own angle, so each option visibly rides the circle's circumference. Running the same clock
   // backwards gives the exact reverse path on close.
-  function fanRender() {
+    function fanRender() {
     if (!fanEl || !fanGeo) return;
     var startRad = FAN_ARC_START_DEG * Math.PI / 180;
+    fanEl.style.setProperty('--fan-bg', Math.max(0, Math.min(1, fanT / fanTotalMs())).toFixed(3));
     fanItems.forEach(function (el, i) {
       var p = Math.max(0, Math.min(1, (fanT - i * FAN_STAGGER_MS) / FAN_DUR_MS));
       var rad = fanGeo.r * (1 - Math.pow(1 - p, 4));
       var ang = startRad + (fanGeo.angles[i] - startRad) * (1 - Math.pow(1 - p, 3));
-      el.style.transform = 'translate(' + (rad * Math.cos(ang)).toFixed(2) + 'px,' + (rad * Math.sin(ang)).toFixed(2) + 'px)';
-      el.style.opacity = String(Math.min(1, p * 2.5));
+      var cos = Math.cos(ang), sin = Math.sin(ang);
+      var fade = Math.min(1, p * 2.5);
+      el.style.transform = 'translate(' + (rad * cos).toFixed(2) + 'px,' + (rad * sin).toFixed(2) + 'px)';
+      el.style.opacity = String(fade);
       el.style.setProperty('--fan-p', p.toFixed(3));
       el.style.pointerEvents = (fanOpen && p > 0.6) ? 'auto' : 'none';
+      var ln = fanLines[i];
+      if (ln) {
+        var from = FAN_LINE_GAP_ORIGIN;
+        var to = rad - FAN_LINE_GAP_ICON;
+        if (to > from) {
+          ln.setAttribute('x1', (fanGeo.cx + from * cos).toFixed(2));
+          ln.setAttribute('y1', (fanGeo.cy + from * sin).toFixed(2));
+          ln.setAttribute('x2', (fanGeo.cx + to * cos).toFixed(2));
+          ln.setAttribute('y2', (fanGeo.cy + to * sin).toFixed(2));
+          ln.style.opacity = String((0.7 * fade).toFixed(3));
+        } else {
+          ln.style.opacity = '0';
+        }
+      }
     });
   }
 
@@ -183,7 +208,15 @@ const Assistant = (function () {
     fanRaf = window.requestAnimationFrame(fanTick);
   }
 
-  function fanSyncHighlight() {
+    function fanSyncHighlight() {
+    if (fanOriginEl && pixelCanvasEl) {
+      var octx = fanOriginEl.getContext('2d');
+      if (octx) {
+        octx.imageSmoothingEnabled = false;
+        octx.clearRect(0, 0, PIXEL_CANVAS_SIZE, PIXEL_CANVAS_SIZE);
+        octx.drawImage(pixelCanvasEl, 0, 0);
+      }
+    }
     var el = fanEl && fanEl.querySelector('[data-go="today"]');
     if (!el) return;
     el.classList.toggle('assistant-fan-opt-highlight', (typeof ItineraryToday !== 'undefined') && !!ItineraryToday.isAwaitingChoice());
@@ -198,13 +231,18 @@ const Assistant = (function () {
     document.removeEventListener('keydown', fanOnKey);
     window.removeEventListener('resize', fanOnResize);
     if (fanEl && fanEl.parentNode) fanEl.parentNode.removeChild(fanEl);
-    fanEl = null; fanItems = []; fanGeo = null; fanOpen = false; fanT = 0;
+        fanEl = null; fanItems = []; fanGeo = null; fanOpen = false; fanT = 0;
+    fanLines = []; fanOriginEl = null;
+    if (pixelEntityEl) pixelEntityEl.style.visibility = '';
   }
 
   function closeFan() {
     if (!fanEl || !fanOpen) return;
     fanOpen = false;
-    if (pixelEntityEl) pixelEntityEl.focus({ preventScroll: true });
+        if (pixelEntityEl) {
+      pixelEntityEl.style.visibility = '';
+      pixelEntityEl.focus({ preventScroll: true });
+    }
     if (fanReducedMotion()) { destroyFan(); return; }
     fanKick();
   }
@@ -230,6 +268,22 @@ const Assistant = (function () {
       fanEl.appendChild(b);
       return b;
     });
+        var svgNS = 'http://www.w3.org/2000/svg';
+    var linesSvg = document.createElementNS(svgNS, 'svg');
+    linesSvg.setAttribute('class', 'assistant-fan-lines');
+    linesSvg.setAttribute('aria-hidden', 'true');
+    fanLines = fanItems.map(function () {
+      var ln = document.createElementNS(svgNS, 'line');
+      linesSvg.appendChild(ln);
+      return ln;
+    });
+    fanEl.insertBefore(linesSvg, fanEl.firstChild);
+    fanOriginEl = document.createElement('canvas');
+    fanOriginEl.width = PIXEL_CANVAS_SIZE;
+    fanOriginEl.height = PIXEL_CANVAS_SIZE;
+    fanOriginEl.className = 'assistant-fan-origin';
+    fanEl.appendChild(fanOriginEl);
+    if (pixelEntityEl) pixelEntityEl.style.visibility = 'hidden';
     fanPlace();
     document.body.appendChild(fanEl);
     fanOpen = true;
