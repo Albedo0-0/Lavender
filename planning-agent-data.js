@@ -182,10 +182,13 @@ const PlanningAgentData = (function () {
       return t.date === today && t.taskType === 'revision' && !t.completed && !t.archived;
     });
 
-    const targets = (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargets === 'function')
+    const rawTargets = (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargets === 'function')
       ? TargetsData.getAllTargets()
-      : (State.get().targets || {});
-    const activeTargets = Object.keys(targets).map(function (k) { return targets[k]; }).filter(function (t) {
+      : (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargetsList === 'function'
+          ? TargetsData.getAllTargetsList()
+          : (State.get().targets || {}));
+    const targetsList = Array.isArray(rawTargets) ? rawTargets : Object.keys(rawTargets).map(function (k) { return rawTargets[k]; });
+    const activeTargets = targetsList.filter(function (t) {
       return !t.completed && !t.archived;
     });
 

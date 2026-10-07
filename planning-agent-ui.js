@@ -153,10 +153,12 @@ const PlanningAgentUI = (function () {
 
     // 5. Match active targets
     if (typeof TargetsData !== 'undefined' && (!result.intent || result.intent === 'target')) {
-      const targets = TargetsData.getAllTargets();
-      const targetKeys = Object.keys(targets);
-      for (let i = 0; i < targetKeys.length; i++) {
-        const tgt = targets[targetKeys[i]];
+      const targets = (typeof TargetsData.getAllTargets === 'function')
+        ? TargetsData.getAllTargets()
+        : (typeof TargetsData.getAllTargetsList === 'function' ? TargetsData.getAllTargetsList() : (State.get().targets || {}));
+      const targetList = Array.isArray(targets) ? targets : Object.keys(targets).map(function (k) { return targets[k]; });
+      for (let i = 0; i < targetList.length; i++) {
+        const tgt = targetList[i];
         if (!tgt.completed && !tgt.archived && text.includes((tgt.title || '').toLowerCase())) {
           result.targetId = tgt.targetId;
           result.intent = 'target';
@@ -517,8 +519,11 @@ const PlanningAgentUI = (function () {
     const topicsForSubject = topicsMap[activeSubject] || [];
 
     // Active targets
-    const allTargets = (typeof TargetsData !== 'undefined' ? TargetsData.getAllTargets() : {});
-    const activeTargets = Object.keys(allTargets).map(function (k) { return allTargets[k]; }).filter(function (t) {
+    const rawTargets = (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargets === 'function')
+      ? TargetsData.getAllTargets()
+      : (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargetsList === 'function' ? TargetsData.getAllTargetsList() : ((typeof State !== 'undefined' && State.get().targets) || {}));
+    const allTargetsList = Array.isArray(rawTargets) ? rawTargets : Object.keys(rawTargets).map(function (k) { return rawTargets[k]; });
+    const activeTargets = allTargetsList.filter(function (t) {
       return !t.completed && !t.archived;
     });
 
