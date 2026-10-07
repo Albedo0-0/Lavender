@@ -36,8 +36,12 @@ const WishButterfly = (function () {
     const rs = State.get().miscWishButterfly;
     return !!(rs && rs.date === todayStr() && rs.appeared);
   }
-  function markAppearedToday() {
+    function markAppearedToday() {
     State.set({ miscWishButterfly: { date: todayStr(), appeared: true } });
+  }
+  function isEnabled() {
+    const s = State.get().settings;
+    return !(s && s.wishButterflyEnabled === false);
   }
   
 
@@ -192,7 +196,8 @@ const WishButterfly = (function () {
     }
 
     function spawn() {
-      if (live) return;
+            if (live) return;
+      if (!isEnabled()) return;
       if (hasAppearedToday()) return; // already had its one appearance today — waits for rollover
       markAppearedToday();
       const vw = window.innerWidth, vh = window.innerHeight;
@@ -287,8 +292,8 @@ const WishButterfly = (function () {
       }
 
       function frame(now) {
-        if (live !== me) return;
-        const dt = Math.min(0.05, (now - s.last) / 1000);
+                  if (live !== me) return;
+          if (s.open) { reducedTimer = setTimeout(tryEnd, 5000); return; }
         s.last = now;
         const vw = window.innerWidth, vh = window.innerHeight;
         let speed = 60, trailEvery = 0.2, long = false;
@@ -388,7 +393,8 @@ const WishButterfly = (function () {
         dim.classList.add('is-on');
         halo.classList.add('is-on');
         reducedTimer = setTimeout(function tryEnd() {
-          if (live !== me) return;
+                    if (live !== me) return;
+          if (!isEnabled()) { fadeEnd(); return; }
           if (s.open) { reducedTimer = setTimeout(tryEnd, 5000); return; }
           fadeEnd();
         }, LIFETIME_MS);
@@ -408,10 +414,15 @@ const WishButterfly = (function () {
     // second clock. A stable subscriber id means this never stacks a duplicate hook.
     let unsubscribeRollover = null;
     if (typeof TimeEngine !== 'undefined' && typeof TimeEngine.onRollover === 'function') {
-      unsubscribeRollover = TimeEngine.onRollover(function () {
+            unsubscribeRollover = TimeEngine.onRollover(function () {
         if (!hasAppearedToday()) scheduleSpawn(options.firstDelayMs || 6000);
       }, 'misc-wish-butterfly');
     }
+
+    function onSettingChange() {
+      if (isEnabled() && !live && !hasAppearedToday()) scheduleSpawn(options.firstDelayMs || 6000);
+    }
+    window.addEventListener('lavender-wish-butterfly-setting', onSettingChange);
 
     return {
       element: wrap,
@@ -419,7 +430,8 @@ const WishButterfly = (function () {
         if (spawnTimer) clearTimeout(spawnTimer);
         if (reducedTimer) clearTimeout(reducedTimer);
         if (rafId) cancelAnimationFrame(rafId);
-        if (typeof unsubscribeRollover === 'function') unsubscribeRollover();
+                if (typeof unsubscribeRollover === 'function') unsubscribeRollover();
+        window.removeEventListener('lavender-wish-butterfly-setting', onSettingChange);
         live = null;
         wrap.remove();
       }
