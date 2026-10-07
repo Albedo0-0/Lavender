@@ -424,6 +424,14 @@ const Assistant = (function () {
     });
   }
 
+    // Where Back returns to. Set only by an external opener (e.g. the Productivity/EXP page); the
+  // Store's own refreshes after a purchase call openStore() directly and keep it.
+  let storeBack = null;
+  function openStoreFrom(fn) {
+    storeBack = typeof fn === 'function' ? fn : null;
+    openStore();
+  }
+
   function openStore() {
     Modal.open(backBtnHtml() +
       '<div class="assistant-page assistant-page-plain">' +
@@ -433,7 +441,7 @@ const Assistant = (function () {
         '<h4 class="section-title">Companion Packs</h4>' +
         '<div class="assistant-store-card">' + assistantPacksBodyHtml() + '</div>' +
       '</div>');
-    wireBack();
+    wireBack(storeBack ? function () { Modal.close(); storeBack(); } : undefined);
     wireStore();
   }
 
@@ -704,5 +712,5 @@ const Assistant = (function () {
     mountPixelEntity();
   }
 
-  return { init: init, openMain: openMain, openSearch: openSearch, openStore: openStore, refreshPixelEntitySkin: refreshPixelEntitySkin };
+    return { init: init, openMain: openMain, openSearch: openSearch, openStore: openStoreFrom, refreshPixelEntitySkin: refreshPixelEntitySkin };
 })();
