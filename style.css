@@ -6846,3 +6846,83 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   .settings-panel .settings-switch::before,
   .settings-saved-chip { transition: none; }
 }
+
+/* ---- Assistant quarter-circle fan ---- */
+#assistant-fan {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  overflow: hidden;
+  background: transparent;
+}
+.assistant-fan-opt {
+  position: absolute;
+  width: 72px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  font: inherit;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  opacity: 0;
+  will-change: transform, opacity;
+  -webkit-tap-highlight-color: transparent;
+}
+.assistant-fan-opt:focus { outline: none; }
+.assistant-fan-icon {
+  position: relative;
+  display: block;
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 1px 0 rgba(63, 47, 33, 0.22));
+  transition: transform var(--transition-fast);
+}
+.assistant-fan-icon svg {
+  display: block;
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.assistant-fan-opt:hover .assistant-fan-icon,
+.assistant-fan-opt:focus-visible .assistant-fan-icon { transform: translateY(-2px); }
+.assistant-fan-opt:focus-visible .assistant-fan-icon {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+.assistant-fan-label {
+  max-width: 72px;
+  font-family: var(--font-hand);
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--color-ink-soft);
+  opacity: calc(var(--fan-p, 0) * 0.5);
+  transition: color var(--transition-fast);
+}
+.assistant-fan-opt:hover .assistant-fan-label,
+.assistant-fan-opt:focus-visible .assistant-fan-label { opacity: calc(var(--fan-p, 0) * 0.85); }
+.assistant-fan-opt-highlight .assistant-fan-icon::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-accent-rust-soft);
+  box-shadow: 0 0 0 1px #3f2f21;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-fan-icon,
+  .assistant-fan-label { transition: none; }
+}
