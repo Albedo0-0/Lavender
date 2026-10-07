@@ -97,9 +97,9 @@ const Calendar = (function () {
 
   // Navigation hook for the future Day Calendar. When a CalendarDay module exists it only needs
   // to expose open(dateStr). Until then the existing Date Hub opens, so nothing is a dead click.
-  function openDay(dateStr) {
+    function openDay(dateStr, from) {
     if (typeof CalendarDay !== 'undefined' && CalendarDay && typeof CalendarDay.open === 'function') {
-      CalendarDay.open(dateStr);
+      CalendarDay.open(dateStr, from || 'week');
       return;
     }
     openDateHub(dateStr);
@@ -176,7 +176,7 @@ const Calendar = (function () {
       });
     }
     if (typeof ItineraryData !== 'undefined') {
-      const day = ItineraryData.getToday();
+      const day = dateStr === todayStr() ? ItineraryData.getToday() : ItineraryData.getSummaryForDate(dateStr);
       if (day && day.date === dateStr) {
         (day.items || []).forEach(function (it) {
           if (it.state === 'skipped') return;
@@ -809,7 +809,8 @@ const Calendar = (function () {
         '<div class="datehub-footer">' +
           '<div class="datehub-quicknav">' +
             '<button id="datehub-goto-journal" class="btn btn-secondary">\uD83D\uDCD4 Journal</button>' +
-            '<button id="datehub-goto-planner" class="btn btn-secondary">\uD83D\uDCDA Planner</button>' +
+                        '<button id="datehub-goto-planner" class="btn btn-secondary">\uD83D\uDCDA Planner</button>' +
+            '<button id="datehub-goto-day" class="btn btn-secondary">\uD83D\uDDD3 Day</button>' +
           '</div>' +
           '<button id="datehub-save" class="btn btn-primary">Save</button>' +
         '</div>' +
@@ -928,7 +929,11 @@ const Calendar = (function () {
     document.getElementById('datehub-goto-planner').addEventListener('click', function () {
       Modal.close();
       if (typeof Planner !== 'undefined' && Planner.openDate) Planner.openDate(dateStr);
-      Nav.switchTo('library');
+            Nav.switchTo('library');
+    });
+
+    document.getElementById('datehub-goto-day').addEventListener('click', function () {
+      openDay(dateStr, 'datehub');
     });
   }
 
@@ -1050,7 +1055,10 @@ const prevBtn = document.getElementById('calendar-prev');
     isReady: isReady,
         selectWeek: selectWeek,
     openWeek: openWeek,
-    openDay: openDay,
+        openDay: openDay,
+    openDateHub: openDateHub,
+    blocksFor: weekBlocksFor,
+    layoutLanes: layoutLanes,
     getSelectedWeek: function () { return selectedWeekStart; }
   };
 })();
