@@ -139,15 +139,27 @@ const GamificationData = (function () {
     }).every(function (t) { return t.completed; });
   }
 
+    // In-memory only (never persisted): the latest legitimate zero-EXP outcome and the canonical rule behind it,
+  // so the UI can explain it. Written only from the existing rule branches below.
+  let lastZeroExp = null;
+  function noteZero(label, reason) { lastZeroExp = { label: label, reason: reason, at: Date.now() }; }
+  function getLastZeroExp() { return lastZeroExp; }
+
   // Called from PlannerData.toggleComplete the instant a task is checked off.
   function awardTaskCompleted(task) {
-    if (netAwarded('taskId', task.taskId, ['task', 'task-retract']) > 0) return; // duplicate completion event
+    if (netAwarded('taskId', task.taskId, ['task', 'task-retract']) > 0) { // duplicate completion event
+      noteZero('Task completed: ' + (task.topicName || task.title || PlannerData.taskLabel(task)), 'EXP already granted for this task');
+      return;
+    }
     const dateStr = task.completedDate || todayStr();
     const isR6 = task.taskType === 'revision' && (task.revisionNumber === 'R6' || task.revisionNumber === 6);
     let exp = (isR6 && !earlierRevisionsDone(task)) ? 100 : taskExpValue(task);
     if (task.date && task.date < dateStr) exp *= LATE_TASK_MULT;
     const already = tasksRewardedOn(dateStr);
-    if (already >= DAILY_MAX_TASKS) return;
+        if (already >= DAILY_MAX_TASKS) {
+      noteZero('Task completed: ' + (task.topicName || task.title || PlannerData.taskLabel(task)), 'daily task EXP limit reached (' + DAILY_MAX_TASKS + ')');
+      return;
+    }
     if (already >= DAILY_FULL_TASKS) exp *= 0.5;
     const label = isR6
       ? 'Revision cycle completed (R6): ' + (task.topicName || '')
@@ -193,12 +205,16 @@ const GamificationData = (function () {
     // Called from Study.commitSegment for every committed Stopwatch/Timer segment — proportional EXP per
   // hour, full-rate to 6h/day and half-rate to 9h/day (nothing beyond). Sub-minute segments earn nothing.
   function awardStudyTime(ms, mode) {
-    if (!ms || ms < MIN_STUDY_SEGMENT_MS) return;
+        if (!ms) return;
+    if (ms < MIN_STUDY_SEGMENT_MS) { noteZero('Study session', 'segments under 1 minute earn no EXP'); return; }
     const dateStr = todayStr();
     const doneMs = getLedger().reduce(function (sum, e) { return (e.kind === 'study' && e.date === dateStr) ? sum + (e.ms || 0) : sum; }, 0);
     const credit = function (x) { return Math.min(x, STUDY_FULL_MS) + 0.5 * Math.max(0, Math.min(x, STUDY_HARD_MS) - STUDY_FULL_MS); };
     const exp = Math.round(((credit(doneMs + ms) - credit(doneMs)) / 3600000) * STUDY_EXP_PER_HOUR);
-    if (exp <= 0) return;
+        if (exp <= 0) {
+      noteZero('Study session', doneMs >= STUDY_HARD_MS ? 'daily study EXP cap reached (' + (STUDY_HARD_MS / 3600000) + 'h)' : 'too short to round up to 1 EXP');
+      return;
+    }
     const label = (mode === 'timer' ? 'Timer' : 'Stopwatch') + ' session (' + Math.round(ms / 60000) + ' min)';
     awardLive(dateStr, label, exp, { kind: 'study', ms: ms });
   }
@@ -328,7 +344,8 @@ const GamificationData = (function () {
     awardStudyTime: awardStudyTime,
     awardTargetCompleted: awardTargetCompleted,
     retractTargetCompleted: retractTargetCompleted,
-    spendExp: spendExp,
+        spendExp: spendExp,
+    getLastZeroExp: getLastZeroExp,
     // Exposed read-only for Itinerary's expected-EXP counters (Phase 5 §16, Phase 6 §14) — pure
     // functions, never write to expLedger themselves. Not previously exported; itinerary.js's
     // builder already called these, so this was a latent bug fixed while wiring Phase 5 in.
