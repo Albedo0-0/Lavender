@@ -331,10 +331,9 @@ const Player = (function () {
         '</div>';
     }).join('');
     return (
-      '<div class="radio-modal">' +
-        '<div class="modal-header"><h3 class="modal-title">Radio</h3></div>' +
-        '<div class="radio-body' + (radioPlaying ? ' radio-playing' : '') + '">' +
-          '<div class="radio-grille" aria-hidden="true"></div>' +
+            '<div class="radio-modal">' +
+        '<div class="radio-antenna" aria-hidden="true"></div>' +
+        '<div class="radio-body' + (radioPlaying ? ' radio-playing' : '') + '" role="group" aria-label="Radio">' +
           '<div class="radio-top-row">' +
             '<span class="radio-knob radio-knob-left" aria-hidden="true"></span>' +
             '<div class="radio-display">' +
@@ -343,14 +342,14 @@ const Player = (function () {
             '</div>' +
             '<span class="radio-knob radio-knob-right" aria-hidden="true"></span>' +
           '</div>' +
-          '<div class="radio-on-air-tag" aria-hidden="true">On Air</div>' +
+          '<div class="radio-grille" aria-hidden="true"><span class="radio-on-air-tag">On Air</span></div>' +
           '<div class="radio-stations">' + rows + '</div>' +
           '<div id="radio-controls" class="radio-controls">' +
             '<button id="radio-play-btn" class="radio-btn radio-btn-play">Play</button>' +
             '<button id="radio-pause-btn" class="radio-btn radio-btn-pause">Pause</button>' +
           '</div>' +
+          '<div class="radio-foot"><button id="player-back-btn" class="radio-back-btn">Back</button></div>' +
         '</div>' +
-        '<button id="player-back-btn" class="btn-secondary radio-back-btn">Back</button>' +
       '</div>'
     );
   }
