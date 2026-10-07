@@ -21,7 +21,7 @@ const Gamification = (function () {
 
     // Presentation layer only: every value shown is read from ProductivityData / GamificationData / PTPE.
   const FILL_MS = 700;
-  const STAR_SVG = '<svg viewBox="0 0 7 7" width="10" height="10" shape-rendering="crispEdges" aria-hidden="true"><path fill="#c97b62" d="M3 0h1v2H3zM0 3h2v1H0zM5 3h2v1H5zM3 5h1v2H3zM2 2h3v3H2z"/><path fill="#fff6e0" d="M3 3h1v1H3z"/></svg>';
+  const STAR_SVG = '<svg viewBox="0 0 7 7" width="10" height="10" shape-rendering="crispEdges" aria-hidden="true"><path fill="#7f9a5c" d="M3 0h1v2H3zM0 3h2v1H0zM5 3h2v1H5zM3 5h1v2H3zM2 2h3v3H2z"/><path fill="#fff6e0" d="M3 3h1v1H3z"/></svg>';
   const mState = {
     ready: false, bound: false, score: undefined, total: 0, level: 0, expPct: 0,
     timers: [], typeTimer: null, noteTimer: null, hovering: null, seenZero: 0, pbSeen: {}
