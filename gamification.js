@@ -239,7 +239,7 @@ const Gamification = (function () {
   // ---------- Expanded Productivity / EXP page ----------
 
   function openStore() {
-    if (typeof Assistant !== 'undefined' && typeof Assistant.openStore === 'function') { Assistant.openStore(); return; }
+        if (typeof Assistant !== 'undefined' && typeof Assistant.openStore === 'function') { Assistant.openStore(openHub); return; }
     Modal.open('<p>Coming soon.</p>');
   }
 
