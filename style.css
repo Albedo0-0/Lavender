@@ -6853,11 +6853,38 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   inset: 0;
   z-index: 9000;
   overflow: hidden;
-  background: transparent;
+  background: rgba(32, 24, 17, calc(var(--fan-bg, 0) * 0.5));
+  -webkit-backdrop-filter: blur(calc(var(--fan-bg, 0) * 6px));
+  backdrop-filter: blur(calc(var(--fan-bg, 0) * 6px));
+}
+.assistant-fan-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.assistant-fan-lines line {
+  stroke: var(--color-cream-050);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  stroke-linecap: butt;
+  shape-rendering: crispEdges;
+  opacity: 0;
+}
+.assistant-fan-origin {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+  filter: drop-shadow(var(--shadow-sm));
 }
 .assistant-fan-opt {
-  position: absolute;
-  width: 72px;
+    position: absolute;
+  width: 96px;
   min-width: 0;
   min-height: 0;
   margin: 0;
@@ -6881,15 +6908,15 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 .assistant-fan-icon {
   position: relative;
   display: block;
-  width: 36px;
-  height: 36px;
-  filter: drop-shadow(0 1px 0 rgba(63, 47, 33, 0.22));
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
   transition: transform var(--transition-fast);
 }
 .assistant-fan-icon svg {
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
@@ -6901,17 +6928,17 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   border-radius: var(--radius-sm);
 }
 .assistant-fan-label {
-  max-width: 72px;
+  max-width: 96px;
   font-family: var(--font-hand);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.15;
   text-align: center;
-  color: var(--color-ink-soft);
-  opacity: calc(var(--fan-p, 0) * 0.5);
+  color: var(--color-cream-100);
+  opacity: calc(var(--fan-p, 0) * 0.6);
   transition: color var(--transition-fast);
 }
 .assistant-fan-opt:hover .assistant-fan-label,
-.assistant-fan-opt:focus-visible .assistant-fan-label { opacity: calc(var(--fan-p, 0) * 0.85); }
+.assistant-fan-opt:focus-visible .assistant-fan-label { opacity: calc(var(--fan-p, 0) * 0.95); }
 .assistant-fan-opt-highlight .assistant-fan-icon::after {
   content: '';
   position: absolute;
