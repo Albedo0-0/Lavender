@@ -1,0 +1,598 @@
+/* ==========================================================================
+   ui-components.css — Lavender shared UI component layer (visual only)
+
+   Loaded AFTER style.css. Styles the shared vocabulary that already exists
+   in the app (.btn / .btn-primary / .btn-secondary / .btn-danger / .btn-icon,
+   .input, .form-row, checkbox / radio, .switch-input, .toggle-switch, .chip
+   radios). Behaviour stays with the owning modules.
+
+   Rules for this file:
+   - No !important. Selectors stay at (0,1,1)–(0,2,1) so screen-specific rules
+     (Alarm skin, Library menus, Settings, Study, Journal, Radio, ...) still win.
+   - Dimensions (padding, font-size, width) are left to the host screen wherever
+     possible; this file owns colour, material, depth, focus and motion.
+   - Special UI keeps its identity: .settings-switch, .alarm-day-cb,
+     .library-icon-btn, cassette/radio controls and ID-scoped skins are excluded
+     or simply not targeted.
+
+   Sections
+   1.  Design tokens
+   2.  Buttons (primary / secondary / ghost / destructive / disabled)
+   3.  Icon buttons
+   4.  Form fields (text, number, date, time, textarea)
+   5.  Selects
+   6.  Search fields
+   7.  Checkboxes / radios / toggles
+   8.  Labels / helper text
+   9.  Validation states
+   10. Chip-style radio groups
+   11. Micro-interactions
+   12. Accessibility (focus, reduced motion, forced colors)
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Design tokens — derived from the existing palette in style.css
+   ========================================================================== */
+:root {
+  --ui-ease: var(--ease-soft);
+  --ui-dur-fast: 140ms;
+  --ui-dur: 200ms;
+  --ui-radius: var(--radius-sm);
+
+  /* Material edges: a 1px "pixel" highlight on top, a hairline shadow below */
+  --ui-edge-light: inset 0 1px 0 rgba(255, 253, 248, 0.22);
+  --ui-edge-paper: inset 0 1px 0 rgba(255, 253, 248, 0.85);
+  --ui-edge-under: 0 1px 0 rgba(63, 47, 33, 0.22);
+  --ui-press: inset 0 1px 2px rgba(63, 47, 33, 0.28);
+
+  /* Fields */
+  --ui-field-bg: var(--color-surface);
+  --ui-field-bg-focus: #fffefb;
+  --ui-field-bg-disabled: var(--color-cream-200);
+  --ui-field-border: var(--color-border);
+  --ui-field-border-hover: var(--color-kraft-300);
+  --ui-field-inset: inset 0 1px 2px rgba(63, 47, 33, 0.07);
+  --ui-placeholder: #857b69;
+
+  /* Focus + validation */
+  --ui-focus: var(--color-sage-600);
+  --ui-focus-ring: 0 0 0 3px rgba(107, 138, 74, 0.18);
+  --ui-invalid: var(--color-accent-rust);
+  --ui-invalid-ring: 0 0 0 3px rgba(181, 86, 107, 0.16);
+
+  /* Small pixel-style glyphs (crisp edges) */
+  --ui-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cg fill='%23fffdf8'%3E%3Crect x='1' y='5' width='2' height='2'/%3E%3Crect x='2' y='6' width='2' height='2'/%3E%3Crect x='3' y='7' width='2' height='2'/%3E%3Crect x='4' y='6' width='2' height='2'/%3E%3Crect x='5' y='5' width='2' height='2'/%3E%3Crect x='6' y='4' width='2' height='2'/%3E%3Crect x='7' y='3' width='2' height='2'/%3E%3C/g%3E%3C/svg%3E");
+  --ui-chevron-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cg fill='%236b6252'%3E%3Crect x='1' y='3' width='2' height='2'/%3E%3Crect x='3' y='5' width='2' height='2'/%3E%3Crect x='5' y='5' width='2' height='2'/%3E%3Crect x='7' y='3' width='2' height='2'/%3E%3C/g%3E%3C/svg%3E");
+  --ui-search-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='5' cy='5' r='3.4' fill='none' stroke='%236b6252' stroke-width='1.4'/%3E%3Cpath d='M7.8 7.8L10.8 10.8' stroke='%236b6252' stroke-width='1.6' stroke-linecap='square'/%3E%3C/svg%3E");
+}
+
+
+/* ==========================================================================
+   2. Buttons
+   Variants are chosen by the classes the app already emits:
+     .btn (alone) and .btn-primary → primary
+     .btn-secondary                → secondary
+     .btn-ghost                    → subtle (opt-in)
+     .btn-danger                   → destructive
+   Later rules intentionally override earlier ones at equal specificity, so
+   "btn btn-secondary" resolves to secondary.
+   ========================================================================== */
+
+/* 2a. Shared structure + motion */
+button.btn,
+button.btn-primary,
+button.btn-secondary,
+button.btn-danger,
+button.btn-ghost {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border-radius: var(--ui-radius);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease),
+    border-color var(--ui-dur-fast) var(--ui-ease),
+    color var(--ui-dur-fast) var(--ui-ease),
+    box-shadow var(--ui-dur) var(--ui-ease),
+    transform var(--ui-dur-fast) var(--ui-ease);
+}
+
+/* 2b. Primary — strongest hierarchy: dark sage, pixel highlight, thin under-edge */
+button.btn,
+button.btn-primary {
+  color: var(--color-btn-primary-text);
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
+  box-shadow: var(--ui-edge-light), var(--ui-edge-under), var(--shadow-sm);
+}
+button.btn:hover,
+button.btn-primary:hover {
+  background-color: var(--color-btn-primary-bg-hover);
+  border-color: var(--color-btn-primary-bg-hover);
+  box-shadow: var(--ui-edge-light), var(--ui-edge-under), var(--shadow-md);
+  transform: translateY(-1px);
+}
+button.btn:active,
+button.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--ui-press);
+}
+
+/* 2c. Secondary — quiet paper */
+button.btn-secondary {
+  color: var(--color-text);
+  background-color: var(--color-btn-secondary-bg);
+  border-color: var(--color-btn-secondary-border);
+  box-shadow: var(--ui-edge-paper), var(--shadow-sm);
+}
+button.btn-secondary:hover {
+  background-color: var(--color-sage-200);
+  border-color: var(--color-sage-500);
+  box-shadow: var(--ui-edge-paper), var(--shadow-md);
+  transform: translateY(-1px);
+}
+button.btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: var(--ui-press);
+}
+
+/* 2d. Subtle / ghost — very restrained, fills in only on interaction */
+button.btn-ghost {
+  color: var(--color-text-muted);
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+button.btn-ghost:hover {
+  color: var(--color-text);
+  background-color: var(--color-cream-200);
+  border-color: var(--color-border);
+  box-shadow: none;
+  transform: none;
+}
+button.btn-ghost:active {
+  background-color: var(--color-cream-300);
+  box-shadow: none;
+}
+
+/* 2e. Destructive — rust, same material as primary */
+button.btn-danger {
+  color: var(--color-cream-050);
+  background-color: var(--color-accent-rust);
+  border-color: var(--color-accent-rust);
+  box-shadow: var(--ui-edge-light), var(--ui-edge-under), var(--shadow-sm);
+}
+button.btn-danger:hover {
+  background-color: color-mix(in srgb, var(--color-accent-rust) 88%, black);
+  border-color: color-mix(in srgb, var(--color-accent-rust) 88%, black);
+  box-shadow: var(--ui-edge-light), var(--ui-edge-under), var(--shadow-md);
+  transform: translateY(-1px);
+}
+button.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: var(--ui-press);
+}
+
+/* 2f. Disabled — clearly inactive, not broken */
+button.btn:disabled,
+button.btn-primary:disabled,
+button.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: saturate(0.6);
+  box-shadow: none;
+  transform: none;
+}
+button.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+  background-color: var(--color-cream-200);
+  border-style: dashed;
+  box-shadow: none;
+  transform: none;
+}
+button.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: transparent;
+  transform: none;
+}
+
+
+/* ==========================================================================
+   3. Icon buttons — compact, quiet until hovered
+   ========================================================================== */
+button.btn-icon {
+  color: var(--color-text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+button.btn-icon:hover {
+  color: var(--color-text);
+  background-color: var(--color-cream-200);
+  border-color: var(--color-border);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+button.btn-icon:active {
+  background-color: var(--color-cream-300);
+  transform: translateY(0);
+}
+button.btn-icon.btn-danger {
+  color: var(--color-accent-rust);
+  background-color: transparent;
+  border-color: transparent;
+}
+button.btn-icon.btn-danger:hover {
+  color: var(--color-accent-rust);
+  background-color: var(--color-status-missed);
+  border-color: var(--color-status-missed-border);
+}
+button.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: transparent;
+  transform: none;
+}
+
+
+/* ==========================================================================
+   4. Form fields
+   Targets: .input, anything inside .form-row.
+   Colour, material, hover, focus, placeholder only — sizing stays with the screen.
+   ========================================================================== */
+:is(
+  .input,
+  .form-row :is(input, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  .form-row select
+) {
+  color: var(--color-text);
+  background-color: var(--ui-field-bg);
+  border: 1px solid var(--ui-field-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-field-inset);
+  transition:
+    border-color var(--ui-dur-fast) var(--ui-ease),
+    background-color var(--ui-dur-fast) var(--ui-ease),
+    box-shadow var(--ui-dur) var(--ui-ease);
+
+  &:hover {
+    border-color: var(--ui-field-border-hover);
+  }
+
+  /* Refined focus: border shift + soft ring + 2px "pencil underline" */
+  &:focus-visible {
+    background-color: var(--ui-field-bg-focus);
+    border-color: var(--ui-focus);
+    outline: 2px solid transparent;
+    outline-offset: 1px;
+    box-shadow:
+      inset 0 -2px 0 var(--color-sage-400),
+      var(--ui-focus-ring);
+  }
+
+  &:disabled {
+    color: var(--color-text-muted);
+    background-color: var(--ui-field-bg-disabled);
+    border-color: var(--ui-field-border);
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+
+  &:read-only:not(select):not(:disabled) {
+    background-color: var(--color-cream-100);
+  }
+
+  &::placeholder {
+    color: var(--ui-placeholder);
+    opacity: 1;
+  }
+}
+
+textarea.input,
+.form-row textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+/* Native date/time pickers: keep them, just tone the indicator */
+:is(.input, .form-row input)::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity var(--ui-dur-fast) var(--ui-ease);
+}
+:is(.input, .form-row input)::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+
+/* ==========================================================================
+   5. Selects — native select, restyled chevron only
+   ========================================================================== */
+select.input:not([multiple], [size]),
+.form-row select:not([multiple], [size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 28px;
+  cursor: pointer;
+  background-image: var(--ui-chevron-icon);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px 10px;
+}
+select.input:disabled,
+.form-row select:disabled {
+  cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   6. Search fields — same field, plus a small magnifier
+   Applies to Library's search row and any native type="search".
+   Assistant's search keeps its own drawn glass icon and is not targeted.
+   ========================================================================== */
+.library-search-row .input,
+input[type="search"] {
+  padding-left: 30px;
+  border-radius: var(--radius-md);
+  background-image: var(--ui-search-icon);
+  background-repeat: no-repeat;
+  background-position: 10px center;
+  background-size: 13px 13px;
+}
+
+
+/* ==========================================================================
+   7. Checkboxes / radios / toggles
+   Shared: size, border, active-state colour, focus, disabled, timing.
+   Excluded on purpose: .switch-input / .settings-switch (toggles, below),
+   .alarm-day-cb (weekday chip), ID-scoped custom controls.
+   ========================================================================== */
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb),
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  background-color: var(--ui-field-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 1.5px solid var(--color-kraft-500);
+  box-shadow: var(--ui-field-inset);
+  cursor: pointer;
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease),
+    border-color var(--ui-dur-fast) var(--ui-ease),
+    box-shadow var(--ui-dur-fast) var(--ui-ease);
+}
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb) {
+  border-radius: 4px;
+  background-size: 75% 75%;
+}
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb):hover,
+input[type="radio"]:hover {
+  border-color: var(--color-sage-600);
+}
+
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb):checked {
+  background-color: var(--color-sage-700);
+  background-image: var(--ui-check-icon);
+  border-color: var(--color-sage-800);
+}
+input[type="radio"]:checked {
+  border-color: var(--color-sage-700);
+  background-image: radial-gradient(circle closest-side, var(--color-sage-700) 55%, transparent 60%);
+  background-size: 100% 100%;
+}
+
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb):focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:not(.switch-input, .settings-switch, .alarm-day-cb):disabled,
+input[type="radio"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Toggles — .switch-input (Water, Backup, etc.) and .toggle-switch share one
+   language. Sizes are unchanged. Settings keeps its own .settings-switch. */
+input.switch-input {
+  background-color: var(--color-cream-300);
+  border-color: var(--color-kraft-400);
+  box-shadow: var(--ui-field-inset);
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease),
+    border-color var(--ui-dur-fast) var(--ui-ease);
+}
+input.switch-input::before {
+  border: 1px solid var(--color-kraft-500);
+  box-sizing: border-box;
+  transition: transform var(--ui-dur-fast) var(--ui-ease);
+}
+input.switch-input:checked {
+  background-color: var(--color-sage-700);
+  border-color: var(--color-sage-800);
+}
+input.switch-input:checked::before {
+  border-color: var(--color-sage-800);
+}
+input.switch-input:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+input.switch-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-switch .toggle-track {
+  background-color: var(--color-cream-300);
+  border-color: var(--color-kraft-400);
+  box-shadow: var(--ui-field-inset);
+}
+.toggle-switch .toggle-track::before {
+  border: 1px solid var(--color-kraft-500);
+  box-sizing: border-box;
+  transition: transform var(--ui-dur-fast) var(--ui-ease);
+}
+.toggle-switch input:checked + .toggle-track {
+  background-color: var(--color-sage-700);
+  border-color: var(--color-sage-800);
+}
+.toggle-switch input:checked + .toggle-track::before {
+  border-color: var(--color-sage-800);
+}
+.toggle-switch input:disabled + .toggle-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   8. Labels / helper text
+   Labels stay small and light; hierarchy comes from weight and spacing.
+   ========================================================================== */
+.form-row > label,
+.modal-body > label,
+.field-label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+
+/* ==========================================================================
+   9. Validation states
+   Opt-in via .is-invalid / aria-invalid, or native :user-invalid.
+   ========================================================================== */
+.input.is-invalid,
+.input[aria-invalid="true"],
+.form-row.has-error :is(input, textarea, select) {
+  border-color: var(--ui-invalid);
+}
+.input.is-invalid:focus-visible,
+.input[aria-invalid="true"]:focus-visible,
+.form-row.has-error :is(input, textarea, select):focus-visible {
+  border-color: var(--ui-invalid);
+  box-shadow:
+    inset 0 -2px 0 var(--color-accent-rust-soft),
+    var(--ui-invalid-ring);
+}
+
+/* Separate rule: older browsers drop :user-invalid and must not take the rule above with it */
+.input:user-invalid {
+  border-color: var(--ui-invalid);
+}
+
+.field-error {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--ui-invalid);
+}
+
+
+/* ==========================================================================
+   10. Chip-style radio groups (task type pickers in Planner / Library / Itinerary)
+   The radio inside shows the dot; the chip itself gets a quiet selected state.
+   ========================================================================== */
+label.chip:has(> input[type="radio"]) {
+  cursor: pointer;
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease),
+    border-color var(--ui-dur-fast) var(--ui-ease);
+}
+label.chip:has(> input[type="radio"]:checked) {
+  background-color: var(--color-sage-200);
+  border-color: var(--color-sage-600);
+}
+
+
+/* ==========================================================================
+   11. Micro-interactions
+   ========================================================================== */
+/* Tiny lift on field hover is intentionally NOT used — fields stay still;
+   only border, ring and underline respond. Buttons and icon buttons own the lift. */
+label:has(> input[type="checkbox"]:not(.switch-input, .settings-switch):disabled),
+label:has(> input[type="radio"]:disabled) {
+  cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   12. Accessibility
+   ========================================================================== */
+button.btn:focus-visible,
+button.btn-primary:focus-visible,
+button.btn-secondary:focus-visible,
+button.btn-ghost:focus-visible,
+button.btn-icon:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+button.btn-danger:focus-visible {
+  outline: 2px solid var(--ui-invalid);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.btn,
+  button.btn-primary,
+  button.btn-secondary,
+  button.btn-danger,
+  button.btn-ghost,
+  button.btn-icon,
+  .input,
+  .form-row input,
+  .form-row select,
+  .form-row textarea,
+  input[type="checkbox"],
+  input[type="radio"],
+  input.switch-input,
+  input.switch-input::before,
+  .toggle-switch .toggle-track::before,
+  label.chip {
+    transition: none;
+  }
+  button.btn:hover,
+  button.btn-primary:hover,
+  button.btn-secondary:hover,
+  button.btn-danger:hover,
+  button.btn-icon:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :is(.input, .form-row input, .form-row select, .form-row textarea):focus-visible {
+    outline: 2px solid Highlight;
+  }
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+}
