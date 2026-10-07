@@ -4173,6 +4173,184 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 .study-wallpaper-fullscreen button#study-wallpaper-next { z-index: 9501 !important; }
 .study-wallpaper-fullscreen #study-alarm-icon { z-index: 9501; }
 
+/* ---- Study makeover: IDLE scrapbook desk ---- */
+#study-layout:not(.study-wallpaper-fullscreen) {
+  background-color: #e9dcc3;
+  background-image: radial-gradient(rgba(138,107,69,0.12) 1px, transparent 1.6px), linear-gradient(135deg, #efe3cc, #e3d2b1);
+  background-size: 14px 14px, auto;
+}
+#study-layout:not(.study-wallpaper-fullscreen) #study-header h3 {
+  display: inline-block;
+  background: var(--color-cream-100);
+  color: #4a3b2a;
+  font-family: var(--font-hand);
+  font-size: 1.3rem;
+  padding: 4px 14px;
+  transform: rotate(-1deg);
+  box-shadow: 3px 3px 0 rgba(138,107,69,0.3);
+}
+#study-layout:not(.study-wallpaper-fullscreen) #study-clock-panel {
+  background: var(--color-cream-100);
+  color: #4a3b2a;
+  border: 1px solid var(--color-kraft-300);
+  border-radius: 3px;
+  backdrop-filter: none;
+  transform: rotate(-0.6deg);
+  box-shadow: 4px 4px 0 rgba(138,107,69,0.3), 0 14px 28px rgba(60,40,20,0.16);
+  margin-top: 28px;
+}
+#study-layout:not(.study-wallpaper-fullscreen) #study-clock-panel::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 88px;
+  height: 20px;
+  transform: translateX(-50%) rotate(2deg);
+  background: repeating-linear-gradient(90deg, rgba(195,169,126,0.6) 0 6px, rgba(217,196,163,0.6) 6px 12px);
+}
+#study-layout:not(.study-wallpaper-fullscreen) .study-clock-display { color: #3a2f22; text-shadow: none; }
+#study-layout:not(.study-wallpaper-fullscreen) .study-mode-btn { color: #5a4630; border-color: var(--color-kraft-400); background: transparent; font-family: var(--font-hand); }
+#study-layout:not(.study-wallpaper-fullscreen) .study-mode-btn.active { background: var(--color-kraft-300); color: #3a2f22; border-color: var(--color-kraft-500); }
+#study-layout:not(.study-wallpaper-fullscreen) .study-template-btn,
+#study-layout:not(.study-wallpaper-fullscreen) #study-template-add { color: #5a4630; border-color: var(--color-kraft-300); background: transparent; font-family: var(--font-hand); }
+#study-layout:not(.study-wallpaper-fullscreen) #study-timer-minutes { color: #3a2f22; background: #fff; border-color: var(--color-kraft-400); }
+#study-layout:not(.study-wallpaper-fullscreen) .study-clock-controls button { background: var(--color-kraft-500); color: var(--color-cream-100); border-color: var(--color-kraft-600); border-radius: 3px; box-shadow: 2px 2px 0 rgba(60,40,20,0.25); }
+#study-layout:not(.study-wallpaper-fullscreen) .study-active-label {
+  display: inline-block;
+  background: var(--color-cream-100);
+  color: #3a2f22;
+  font-family: var(--font-hand);
+  padding: 6px 14px;
+  transform: rotate(0.8deg);
+  box-shadow: 3px 3px 0 rgba(138,107,69,0.3);
+}
+#study-layout:not(.study-wallpaper-fullscreen) #study-log-panel {
+  background: var(--color-cream-100);
+  color: #4a3b2a;
+  border: 1px solid var(--color-kraft-300);
+  border-radius: 3px;
+  font-family: var(--font-hand);
+  transform: rotate(-0.5deg);
+}
+#study-layout:not(.study-wallpaper-fullscreen) #study-log-panel strong { color: #3a2f22; }
+
+/* ---- Study makeover: ACTIVE immersive stack ---- */
+.study-wallpaper-fullscreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: study-fs-in 450ms ease-out both;
+}
+.study-wallpaper-fullscreen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, rgba(10,12,28,0.08) 0, rgba(10,12,28,0.55) 100%);
+  transition: background 700ms ease;
+}
+.study-wallpaper-fullscreen[data-study-state="paused"]::after {
+  background: radial-gradient(ellipse at 50% 45%, rgba(10,12,28,0.30) 0, rgba(10,12,28,0.72) 100%);
+}
+.study-wallpaper-fullscreen #study-header { display: none; }
+.study-wallpaper-fullscreen #study-clock-panel.study-clock-focus {
+  background: none;
+  border: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+}
+.study-wallpaper-fullscreen #study-clock-panel,
+.study-wallpaper-fullscreen #study-session-panel {
+  animation: study-materialise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.study-wallpaper-fullscreen .study-focus-mode { padding: 0; animation: study-refocus 450ms ease-out both; }
+.study-wallpaper-fullscreen .study-focus-clock,
+.study-wallpaper-fullscreen .study-clock-focus .study-clock-display {
+  font-size: clamp(3.5rem, min(15vw, 26vh), 9.5rem);
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin: 6px 0 14px;
+  color: #f5f3ea;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 500ms ease;
+}
+.study-wallpaper-fullscreen[data-study-state="running"] .study-focus-clock,
+.study-wallpaper-fullscreen[data-study-state="running"] .study-clock-focus .study-clock-display {
+  animation: study-breathe 6s ease-in-out infinite;
+}
+.study-wallpaper-fullscreen[data-study-state="paused"] .study-focus-clock,
+.study-wallpaper-fullscreen[data-study-state="paused"] .study-clock-focus .study-clock-display {
+  opacity: 0.55;
+}
+.study-wallpaper-fullscreen .study-active-label,
+.study-wallpaper-fullscreen .study-note {
+  font-family: var(--font-hand);
+  color: rgba(245,243,234,0.85);
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+}
+.study-wallpaper-fullscreen .study-note { font-size: 1rem; opacity: 0.75; margin-top: 0; }
+.study-wallpaper-fullscreen .study-paused-note {
+  font-family: var(--font-hand);
+  color: #f2c9a0;
+  margin: 6px 0 0;
+}
+.study-wallpaper-fullscreen .study-focus-actions,
+.study-wallpaper-fullscreen .study-clock-controls {
+  gap: 10px;
+  margin-top: 14px;
+}
+.study-wallpaper-fullscreen .study-focus-actions button,
+.study-wallpaper-fullscreen .study-clock-controls button {
+  border-radius: 999px;
+  padding: 8px 22px;
+  background: rgba(255,255,255,0.12);
+  color: #f5f3ea;
+  border: 1px solid rgba(255,255,255,0.28);
+  backdrop-filter: blur(6px);
+}
+.study-wallpaper-fullscreen .study-focus-actions button:hover,
+.study-wallpaper-fullscreen .study-clock-controls button:hover { background: rgba(255,255,255,0.22); }
+.study-wallpaper-fullscreen #study-log-panel {
+  position: absolute;
+  bottom: 14px;
+  left: 16px;
+  max-width: 200px;
+  max-height: 90px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-hand);
+  color: rgba(245,243,234,0.6);
+}
+.study-wallpaper-fullscreen #study-log-panel strong { color: rgba(245,243,234,0.75); }
+
+@keyframes study-fs-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes study-materialise {
+  from { opacity: 0; transform: translateY(12px); filter: blur(5px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes study-refocus { from { opacity: 0.6; } to { opacity: 1; } }
+@keyframes study-breathe { 0%, 100% { opacity: 0.93; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .study-wallpaper-fullscreen,
+  .study-wallpaper-fullscreen #study-clock-panel,
+  .study-wallpaper-fullscreen #study-session-panel,
+  .study-wallpaper-fullscreen .study-focus-mode,
+  .study-wallpaper-fullscreen .study-focus-clock,
+  .study-wallpaper-fullscreen .study-clock-display { animation: none !important; }
+}
+
 .study-clock-on-dark .study-clock-display,
 .study-clock-on-dark .study-focus-clock {
   color: #f5f3ea;
