@@ -6853,9 +6853,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   inset: 0;
   z-index: 9000;
   overflow: hidden;
-  background: rgba(32, 24, 17, calc(var(--fan-bg, 0) * 0.5));
-  -webkit-backdrop-filter: blur(calc(var(--fan-bg, 0) * 6px));
-  backdrop-filter: blur(calc(var(--fan-bg, 0) * 6px));
+    background: transparent;
 }
 .assistant-fan-lines {
   position: absolute;
@@ -6883,8 +6881,8 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   filter: drop-shadow(var(--shadow-sm));
 }
 .assistant-fan-opt {
-    position: absolute;
-  width: 96px;
+      position: absolute;
+  width: 80px;
   min-width: 0;
   min-height: 0;
   margin: 0;
@@ -6928,17 +6926,18 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   border-radius: var(--radius-sm);
 }
 .assistant-fan-label {
-  max-width: 96px;
+  max-width: 80px;
   font-family: var(--font-hand);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.15;
   text-align: center;
-  color: var(--color-cream-100);
-  opacity: calc(var(--fan-p, 0) * 0.6);
+  white-space: nowrap;
+  color: #fffdf8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   transition: color var(--transition-fast);
 }
 .assistant-fan-opt:hover .assistant-fan-label,
-.assistant-fan-opt:focus-visible .assistant-fan-label { opacity: calc(var(--fan-p, 0) * 0.95); }
+.assistant-fan-opt:focus-visible .assistant-fan-label { opacity: 1 !important; }
 .assistant-fan-opt-highlight .assistant-fan-icon::after {
   content: '';
   position: absolute;
