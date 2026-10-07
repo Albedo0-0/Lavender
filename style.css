@@ -6335,6 +6335,33 @@ button.cassette-media-remove {
 #modal-content .meter-track { clip-path: none; border-radius: 999px; overflow: hidden; }
 #modal-content .meter-track i { border-radius: 999px; }
 #modal-content:has(.meter-page) { border-radius: 22px; }
+
+/* Green palette (replaces the pink accents) */
+#top-meter-bar {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(86, 110, 58, 0.07) 0 4px, transparent 4px 12px),
+    repeating-linear-gradient(90deg, rgba(86, 110, 58, 0.07) 0 4px, transparent 4px 12px);
+}
+#productivity-bar-fill {
+  background:
+    linear-gradient(to bottom, rgba(255, 246, 224, 0.42) 0 1px, transparent 1px),
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(63, 47, 33, 0.12) 5px 6px),
+    repeating-linear-gradient(0deg, rgba(255, 246, 224, 0.14) 0 1px, transparent 1px 3px),
+    #7f9a5c;
+}
+.meter-note-line.is-down, .meter-row.is-down { color: var(--color-brown-600); }
+#modal-content:has(.meter-page) {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(86, 110, 58, 0.09) 0 10px, transparent 10px 24px),
+    repeating-linear-gradient(90deg, rgba(86, 110, 58, 0.09) 0 10px, transparent 10px 24px),
+    repeating-linear-gradient(0deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px);
+}
+#modal-content .meter-sheet::before {
+  background: color-mix(in srgb, #7f9a5c 18%, var(--color-cream-100));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #7f9a5c 16%, transparent);
+}
+.meter-prod b { color: var(--color-sage-800); }
 #productivity-bar-label, #exp-bar-label { z-index: 2; white-space: nowrap; pointer-events: none; }
 #productivity-bar-label b, #exp-bar-label b { display: inline-block; font-weight: 700; color: var(--color-brown-700); }
 #exp-bar-label b.is-new { animation: meterTick .32s steps(3); }
