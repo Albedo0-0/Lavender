@@ -244,7 +244,7 @@ button.btn-icon:disabled {
    Colour, material, hover, focus, placeholder only — sizing stays with the screen.
    ========================================================================== */
 :is(
-  .input,
+  .input:not([type="color"], [type="file"]),
   .form-row :is(input, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
   .form-row select
 ) {
