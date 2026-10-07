@@ -41,10 +41,32 @@ const Settings = (function () {
     }
   }
 
+    function toggleRow(id, label, hint, checked) {
+    return '<div class="settings-toggle"><div class="settings-toggle-text">' +
+      '<label for="' + id + '">' + label + '</label>' +
+      (hint ? '<span class="settings-hint">' + hint + '</span>' : '') +
+      '</div><input type="checkbox" class="settings-switch" id="' + id + '"' + (checked ? ' checked' : '') + '></div>';
+  }
+
   function formHtml() {
     const cur = settings();
     return (
+            '<div class="settings-panel">' +
       '<div class="modal-header"><h3 class="modal-title">Settings</h3></div>' +
+      '<p class="settings-subtitle">Personalize how Lavender looks and feels on this device.</p>' +
+
+      '<section class="settings-section"><h4 class="section-title settings-section-title">Experience</h4>' +
+      toggleRow('settings-wish-butterfly', 'Wish Butterfly &#129419;', 'A little butterfly that visits once a day.', cur.wishButterflyEnabled !== false) +
+      toggleRow('settings-force-fullscreen', 'Force fullscreen', '', typeof ForcedFullscreen !== 'undefined' && ForcedFullscreen.isEnabled()) +
+      '</section>' +
+
+      '<section class="settings-section"><h4 class="section-title settings-section-title">Alerts</h4>' +
+      toggleRow('settings-notifications', 'Notifications', 'Popup reminders and prompts.', cur.notificationsEnabled !== false) +
+      toggleRow('settings-sound', 'Sound', 'Chimes and interface sounds.', cur.soundEnabled !== false) +
+      toggleRow('settings-vibration', 'Vibration', 'Haptic buzz on supported devices.', cur.vibrationEnabled !== false) +
+      '</section>' +
+
+      '<section class="settings-section"><h4 class="section-title settings-section-title">Wallpapers</h4>' +
 
       '<div class="form-row"><label for="settings-wallpaper-input">Break wallpaper</label>' +
       '<input type="file" id="settings-wallpaper-input" accept="image/*">' +
@@ -71,18 +93,13 @@ const Settings = (function () {
       }).join('') +
       '</div></div>' +
 
-      '<div class="form-row"><label><input type="checkbox" id="settings-study-slideshow-enabled"' +
-      (((cur.studyWallpaperSlideshow || {}).enabled) ? ' checked' : '') + '> Auto slideshow</label>' +
-      ' <input type="number" min="1" id="settings-study-slideshow-interval" value="' +
-      (((cur.studyWallpaperSlideshow || {}).intervalMin) || 5) + '" style="width:60px;"> min</div>' +
+            toggleRow('settings-study-slideshow-enabled', 'Auto slideshow', 'Cycle through your study wallpapers.', !!((cur.studyWallpaperSlideshow || {}).enabled)) +
+      '<div class="form-row settings-inline-row"><label for="settings-study-slideshow-interval">Change every</label>' +
+      '<input type="number" min="1" id="settings-study-slideshow-interval" class="settings-number" value="' +
+      (((cur.studyWallpaperSlideshow || {}).intervalMin) || 5) + '"> <span class="micro-label">min</span></div>' +
+            '</section>' +
 
-      '<hr class="divider">' +
-
-      '<div class="form-row"><label><input type="checkbox" id="settings-notifications"' + (cur.notificationsEnabled !== false ? ' checked' : '') + '> Notifications</label></div>' +
-      '<div class="form-row"><label><input type="checkbox" id="settings-sound"' + (cur.soundEnabled !== false ? ' checked' : '') + '> Sound</label></div>' +
-      '<div class="form-row"><label><input type="checkbox" id="settings-vibration"' + (cur.vibrationEnabled !== false ? ' checked' : '') + '> Vibration</label></div>' +
-      '<div class="form-row"><label><input type="checkbox" id="settings-force-fullscreen"' + (typeof ForcedFullscreen !== 'undefined' && ForcedFullscreen.isEnabled() ? ' checked' : '') + '> Force fullscreen</label></div>' +
-
+      '<section class="settings-section"><h4 class="section-title settings-section-title">Assistant</h4>' +
       '<div class="form-row"><label for="settings-assistant-name">Assistant name</label>' +
       '<input type="text" id="settings-assistant-name" value="' + esc(cur.assistantName || '') + '" placeholder="Assistant"></div>' +
 
@@ -90,34 +107,37 @@ const Settings = (function () {
 
       '<hr class="divider">' +
 
-             '<h4 class="section-title">My World LV Packs</h4>' +
+             '</section><section class="settings-section"><h4 class="section-title settings-section-title">My World LV Packs</h4>' +
       '<div class="form-row"><button id="settings-import-content-btn" class="btn-secondary">Import My World LV Pack</button>' +
       '<input type="file" id="settings-import-content-input" accept=".lvpack" style="display:none">' +
       '<span id="settings-import-content-status" class="micro-label"></span></div>' +
 
         '<hr class="divider">' +
 
-      '<h4 class="section-title">Assistant LV Packs</h4>' +
+      '</section><section class="settings-section"><h4 class="section-title settings-section-title">Assistant LV Packs</h4>' +
       '<div class="form-row"><button id="settings-import-assistant-btn" class="btn-secondary">Import Assistant LV Pack</button>' +
       '<input type="file" id="settings-import-assistant-input" accept=".lvpack" style="display:none">' +
       '<span id="settings-import-assistant-status" class="micro-label"></span></div>' +
 
       '<hr class="divider">' +
       
+      '</section><section class="settings-section"><h4 class="section-title settings-section-title">Backup</h4>' +
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
       '<div class="form-row"><label for="settings-import-input">Restore from backup</label>' +
       '<input type="file" id="settings-import-input" accept="application/json">' +
       '<div id="settings-import-status" class="micro-label"></div></div>' +
       '<button id="settings-clear-btn" class="btn-danger">Clear all data</button>' +
 
-            '<hr class="divider">' +
+            '</section><section class="settings-section"><h4 class="section-title settings-section-title">Updates</h4>' +
       '<div class="form-row settings-updates-row">' +
-      '<label>Updates</label>' +
       '<div id="settings-update-status" class="micro-label">You\'re up to date.</div>' +
       '<button id="settings-check-update-btn" class="btn-secondary">Check for updates</button>' +
       '<button id="settings-apply-update-btn" class="btn-secondary" style="display:none;">Update now</button>' +
       '</div>' +
-      '<p class="micro-label">Lavender v' + APP_VERSION + '</p>'
+      '</section>' +
+      '<p class="micro-label settings-version">Lavender v' + APP_VERSION + '</p>' +
+      '<div class="settings-saved-wrap"><div id="settings-saved-chip" class="settings-saved-chip" role="status">Saved to this device</div></div>' +
+      '</div>'
     );
   }
 
@@ -168,10 +188,17 @@ const Settings = (function () {
     open(); // re-render so the preview/remove button reflect the new state
   }
 
+    let savedChipTimer = null;
+  function flashSaved() {
+    const chip = document.getElementById('settings-saved-chip');
+    if (!chip) return;
+    chip.classList.add('is-on');
+    clearTimeout(savedChipTimer);
+    savedChipTimer = setTimeout(function () { chip.classList.remove('is-on'); }, 1600);
+  }
+
   function save() {
-    const durationRaw = parseInt(document.getElementById('settings-break-duration').value, 10);
     State.patch('settings', {
-      defaultBreakDuration: isNaN(durationRaw) ? null : durationRaw,
       notificationsEnabled: document.getElementById('settings-notifications').checked,
       soundEnabled: document.getElementById('settings-sound').checked,
       vibrationEnabled: document.getElementById('settings-vibration').checked,
@@ -184,7 +211,24 @@ const Settings = (function () {
   function open() {
     Modal.open(formHtml());
 
-    document.getElementById('settings-save-btn').addEventListener('click', save);
+        document.getElementById('settings-save-btn').addEventListener('click', save);
+
+    [
+      ['settings-notifications', 'notificationsEnabled'],
+      ['settings-sound', 'soundEnabled'],
+      ['settings-vibration', 'vibrationEnabled'],
+      ['settings-wish-butterfly', 'wishButterflyEnabled']
+    ].forEach(function (pair) {
+      const el = document.getElementById(pair[0]);
+      if (!el) return;
+      el.addEventListener('change', function () {
+        const next = {};
+        next[pair[1]] = el.checked;
+        if (!State.patch('settings', next)) return;
+        if (pair[1] === 'wishButterflyEnabled') window.dispatchEvent(new CustomEvent('lavender-wish-butterfly-setting'));
+        flashSaved();
+      });
+    });
 
     const forceFullscreenToggle = document.getElementById('settings-force-fullscreen');
     if (forceFullscreenToggle && typeof ForcedFullscreen !== 'undefined') {
@@ -380,6 +424,7 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       });
     }
 
+        window.removeEventListener('lavender-update-ready', renderUpdateStatus);
     window.addEventListener('lavender-update-ready', renderUpdateStatus);
   }
 
