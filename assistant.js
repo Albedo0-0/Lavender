@@ -80,14 +80,14 @@ const Assistant = (function () {
       '............', '..oooooooo..', '..occcccco..', '..ocggggco..', '..occcccco..', '..ocgggcco..',
       '..occcccco..', '..ocggggco..', '..occcccco..', '..occcrrco..', '..oooooooo..', '............'] }
   ];
-  const FAN_ARC_START_DEG = 90;
-  const FAN_ARC_SPAN_DEG = 90;
-    const FAN_RADIUS_MAX = 210;
+    const FAN_ARC_START_DEG = 60;
+  const FAN_ARC_SPAN_DEG = 120;
+  const FAN_RADIUS_MAX = 210;
   const FAN_RADIUS_MIN = 96;
   const FAN_EDGE_PAD = 8;
-  const FAN_OPT_W = 96;
+  const FAN_OPT_W = 80;
   const FAN_ICON = 48;
-  const FAN_OPT_BELOW = 68;
+  const FAN_OPT_BELOW = 60;
   const FAN_LINE_GAP_ORIGIN = 26;
   const FAN_LINE_GAP_ICON = FAN_ICON / 2 + 6;
   const FAN_DUR_MS = 250;
@@ -163,7 +163,10 @@ const Assistant = (function () {
     function fanRender() {
     if (!fanEl || !fanGeo) return;
     var startRad = FAN_ARC_START_DEG * Math.PI / 180;
-    fanEl.style.setProperty('--fan-bg', Math.max(0, Math.min(1, fanT / fanTotalMs())).toFixed(3));
+        var bgP = Math.max(0, Math.min(1, fanT / fanTotalMs()));
+    fanEl.style.background = 'rgba(32, 24, 17, ' + (bgP * 0.55).toFixed(3) + ')';
+    fanEl.style.backdropFilter = 'blur(' + (bgP * 8).toFixed(2) + 'px)';
+    fanEl.style.webkitBackdropFilter = 'blur(' + (bgP * 8).toFixed(2) + 'px)';
     fanItems.forEach(function (el, i) {
       var p = Math.max(0, Math.min(1, (fanT - i * FAN_STAGGER_MS) / FAN_DUR_MS));
       var rad = fanGeo.r * (1 - Math.pow(1 - p, 4));
@@ -172,7 +175,9 @@ const Assistant = (function () {
       var fade = Math.min(1, p * 2.5);
       el.style.transform = 'translate(' + (rad * cos).toFixed(2) + 'px,' + (rad * sin).toFixed(2) + 'px)';
       el.style.opacity = String(fade);
-      el.style.setProperty('--fan-p', p.toFixed(3));
+            el.style.setProperty('--fan-p', p.toFixed(3));
+      var lab = el.lastChild;
+      if (lab) lab.style.opacity = (p * 0.85).toFixed(3);
       el.style.pointerEvents = (fanOpen && p > 0.6) ? 'auto' : 'none';
       var ln = fanLines[i];
       if (ln) {
@@ -263,7 +268,7 @@ const Assistant = (function () {
       b.setAttribute('role', 'menuitem');
       b.setAttribute('aria-label', o.label);
       b.innerHTML = '<span class="assistant-fan-icon">' + fanIconSvg(o.rows) + '</span>' +
-        '<span class="assistant-fan-label">' + esc(o.label) + '</span>';
+                '<span class="assistant-fan-label">' + esc(o.label).replace(' / ', ' /<br>') + '</span>';
       b.addEventListener('click', function () { closeFan(); routeTo(o.go); });
       fanEl.appendChild(b);
       return b;
