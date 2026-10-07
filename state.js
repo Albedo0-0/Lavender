@@ -34,7 +34,7 @@ const State = (function () {
     notepadFolders: [], // Notepad: explicit folder name list (persists empty folders independent of notes)
     gamification: { totalExp: 0, lastSettledDate: null, streakBonusAwardedForRun: false }, // §B.8.3/8.4 — level is derived, never stored
     expLedger: [], // §B.8.3: append-only [{ id, date, label, exp, doubled, at }], settled once/day at cutoff
-    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, assistantName: '', assistantPosition: null, studyWallpapers: [], studyWallpaperIndex: 0, studyWallpaperSlideshow: { enabled: false, intervalMin: 5 }, hasSeenFullscreenPrompt: false, userExitedFullscreen: false },
+    settings: { breakWallpaper: null, defaultBreakDuration: null, notificationsEnabled: true, soundEnabled: true, vibrationEnabled: true, wishButterflyEnabled: true, assistantName: '', assistantPosition: null, studyWallpapers: [], studyWallpaperIndex: 0, studyWallpaperSlideshow: { enabled: false, intervalMin: 5 }, hasSeenFullscreenPrompt: false, userExitedFullscreen: false },
     subjects: null, // Subjects: ordered array of ACTIVE subject names (the one canonical list, read via PlannerData.getAllSubjects()). null = never customised -> defaults (+ any legacy custom subjects already in use); written only on the user's first add/delete.
     targets: {},
     subtargets: {},
