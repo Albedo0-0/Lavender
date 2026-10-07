@@ -4257,20 +4257,29 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 }
 .study-wallpaper-fullscreen #study-header { display: none; }
 .study-wallpaper-fullscreen #study-clock-panel.study-clock-focus {
-  background: none;
+  background: rgba(10,12,28,0.10);
   border: none;
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   box-shadow: none;
   max-width: none;
   margin: 0;
-  padding: 0;
+  padding: 18px 40px 22px;
+  border-radius: 28px;
   min-height: 0;
 }
 .study-wallpaper-fullscreen #study-clock-panel,
 .study-wallpaper-fullscreen #study-session-panel {
   animation: study-materialise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
-.study-wallpaper-fullscreen .study-focus-mode { padding: 0; animation: study-refocus 450ms ease-out both; }
+.study-wallpaper-fullscreen .study-focus-mode {
+  padding: 18px 40px 22px;
+  border-radius: 28px;
+  background: rgba(10,12,28,0.10);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: study-refocus 450ms ease-out both;
+}
 .study-wallpaper-fullscreen .study-focus-clock,
 .study-wallpaper-fullscreen .study-clock-focus .study-clock-display {
   font-size: clamp(3.5rem, min(15vw, 26vh), 9.5rem);
@@ -4320,18 +4329,23 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
 }
 .study-wallpaper-fullscreen .study-focus-actions button:hover,
 .study-wallpaper-fullscreen .study-clock-controls button:hover { background: rgba(255,255,255,0.22); }
-.study-wallpaper-fullscreen #study-log-panel {
+#study-layout.study-wallpaper-fullscreen #study-log-panel {
   position: absolute;
-  bottom: 14px;
+  top: auto;
+  bottom: 10px;
   left: 16px;
-  max-width: 200px;
-  max-height: 90px;
+  right: auto;
+  max-width: 220px;
+  max-height: 64px;
+  overflow: hidden;
   margin: 0;
   padding: 0;
   background: none;
   border: none;
+  font-size: 11px;
   font-family: var(--font-hand);
-  color: rgba(245,243,234,0.6);
+  color: rgba(245,243,234,0.55);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 .study-wallpaper-fullscreen #study-log-panel strong { color: rgba(245,243,234,0.75); }
 
