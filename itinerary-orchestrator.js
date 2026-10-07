@@ -221,19 +221,31 @@ function todayStr() { return ItineraryTime.todayStr(); }
     if (item.type !== 'study' || item.refId) return;
     const start = item.plannedStart;
     const end = item.plannedEnd;
-    const task = (item.topicName && item.subject)
-      ? PlannerData.createSingleTask(item.subject, item.topicName, item.taskType || 'theory', todayStr(), '', start, end)
-      : PlannerData.createCustomTask(item.label || 'Study session', todayStr(), '', start, end);
+    let task = null;
+    if (typeof PlanningAgent !== 'undefined' && typeof PlanningAgent.createTask === 'function') {
+      const res = PlanningAgent.createTask({
+        subject: item.subject,
+        topicName: item.topicName,
+        title: item.label || 'Study session',
+        taskType: item.taskType || 'theory',
+        date: todayStr(),
+        startTime: start,
+        stopTime: end,
+        planReason: 'itinerary-study'
+      }, 'agent');
+      if (res && res.ok) task = res.task;
+    }
+    if (!task) {
+      task = (item.topicName && item.subject)
+        ? PlannerData.createSingleTask(item.subject, item.topicName, item.taskType || 'theory', todayStr(), '', start, end)
+        : PlannerData.createCustomTask(item.label || 'Study session', todayStr(), '', start, end);
+    }
     if (!task) return;
     // Additive, non-breaking tag (Section 22) — lets a future view find "which itinerary item
     // does this session belong to" without PlannerData/TimeEngine needing to know Itinerary
     // exists at all.
     PlannerData.updateTask(task.taskId, { sourceItineraryItemId: item.itemId });
     ItineraryData.updateItemState(item.itemId, { refId: task.taskId });
-    // Phase D / P6: item.refId is no longer mutated directly here. The canonical store write
-    // above (updateItemState) is the one source of truth; the in-memory object is re-read from
-    // the store by checkStudyLike on the next tick, since tick() re-reads ItineraryData.getToday()
-    // every time rather than holding onto a stale reference.
   }
 
   // Opens the relevant existing screen/modal

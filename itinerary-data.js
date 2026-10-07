@@ -337,6 +337,10 @@ const ItineraryData = (function () {
       movable.push({ item: it, origStart: span.start, dur: span.dur });
     });
 
+    if (typeof PlanningAgentData !== 'undefined' && typeof PlanningAgentData.computeCatchUpPlan === 'function') {
+      return PlanningAgentData.computeCatchUpPlan(day);
+    }
+
     if (!movable.length) return { needed: false, reason: 'nothing-to-plan', changes: [] };
     movable.sort(function (a, b) { return a.origStart - b.origStart; });
 
@@ -403,7 +407,9 @@ const ItineraryData = (function () {
       const fields = { plannedStart: c.newStart };
       if (c.newEnd != null) fields.plannedEnd = c.newEnd;
       updateItemState(c.itemId, fields);
-      if (live.syncedFromPlanner && live.refId && typeof PlannerData !== 'undefined' && typeof PlannerData.updateTask === 'function') {
+      if (live.refId && typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.rescheduleTask(live.refId, day.date, c.newStart, c.newEnd, 'agent', 'catch-up');
+      } else if (live.syncedFromPlanner && live.refId && typeof PlannerData !== 'undefined' && typeof PlannerData.updateTask === 'function') {
         const plannerFields = { startTime: c.newStart };
         if (c.newEnd != null) plannerFields.stopTime = c.newEnd;
         PlannerData.updateTask(live.refId, plannerFields);
@@ -508,8 +514,12 @@ const ItineraryData = (function () {
       patch.completedAt = Date.now();
     }
     const nextDay = setToday(patch);
-    if (item.syncedFromPlanner && item.refId && typeof PlannerData !== 'undefined' && typeof PlannerData.updateTask === 'function') {
-      PlannerData.updateTask(item.refId, { date: null, startTime: null, stopTime: null });
+    if (item.syncedFromPlanner && item.refId) {
+      if (typeof PlanningAgent !== 'undefined' && typeof PlanningAgent.unscheduleTask === 'function') {
+        PlanningAgent.unscheduleTask(item.refId);
+      } else if (typeof PlannerData !== 'undefined' && typeof PlannerData.updateTask === 'function') {
+        PlannerData.updateTask(item.refId, { startTime: null, stopTime: null });
+      }
     }
     if (patch.status === 'completed') {
       writeChecklistTagRollup(nextDay);

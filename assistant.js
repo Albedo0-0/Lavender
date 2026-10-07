@@ -476,16 +476,43 @@ const Assistant = (function () {
 
   function openTomorrow() {
     const list = AssistantData.getTomorrow();
+    const tomStr = AssistantData.tomorrowStr();
+    const proposals = (typeof PlanningAgentData !== 'undefined')
+      ? PlanningAgentData.proposeScheduleForDate(tomStr)
+      : [];
+
+    let planActionHtml = '';
+    if (proposals.length > 0) {
+      planActionHtml = '<div style="margin-top:12px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;">' +
+        '<div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">Planning Agent Suggestions (' + proposals.length + ')</div>' +
+        proposals.map(function (p) {
+          return '<div style="font-size:0.8rem;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+            '<span>' + esc(p.title) + ' <span class="chip">' + p.proposedStart + '\u2013' + p.proposedEnd + '</span></span>' +
+            '<button type="button" class="btn btn-secondary assistant-apply-prop-btn" data-task-id="' + p.taskId + '" data-start="' + p.proposedStart + '" data-stop="' + p.proposedEnd + '" style="padding:2px 8px;font-size:0.75rem;">Plan</button>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+
     const rows = list.length ? list.map(taskRowHtml).join('') : '<div class="empty-state">Nothing scheduled for tomorrow yet.</div>';
     Modal.open(backBtnHtml() +
       '<div class="assistant-page assistant-page-envelope">' +
-                pageTitleHtml('tomorrow', 'Tomorrow') +
+        pageTitleHtml('tomorrow', 'Tomorrow') +
         '<div class="assistant-envelope">' +
           '<div class="assistant-envelope-flap" aria-hidden="true"></div>' +
-          '<div class="assistant-envelope-contents">' + rows + '</div>' +
+          '<div class="assistant-envelope-contents">' + rows + planActionHtml + '</div>' +
         '</div>' +
       '</div>');
     wireBack();
+
+    document.querySelectorAll('.assistant-apply-prop-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (typeof PlanningAgent !== 'undefined') {
+          PlanningAgent.rescheduleTask(btn.dataset.taskId, tomStr, btn.dataset.start, btn.dataset.stop, 'agent', 'assistant-plan');
+          openTomorrow();
+        }
+      });
+    });
   }
 
   // ---------- Resume / Where I Left Off (§7.3) ----------

@@ -31,6 +31,7 @@ const Targets = (function () {
           '<strong>' + esc(t.title) + '</strong>' +
         '</label>' +
         '<span class="targets-row-meta">' + t.timeframe + ' \u00B7 ' + t.currentValue + '/' + t.targetValue + ' (' + pct(t) + '%)</span>' +
+        (!t.completed ? '<button class="targets-plan-btn" data-target-id="' + t.targetId + '" style="margin-right:4px;">Plan Goal</button>' : '') +
         '<button class="targets-archive-btn" data-target-id="' + t.targetId + '">Archive</button>' +
         '<button class="targets-delete-btn" data-target-id="' + t.targetId + '">Delete</button>' +
       '</div>' +
@@ -111,6 +112,37 @@ const Targets = (function () {
       btn.addEventListener('click', function () {
         TargetsData.deleteTarget(btn.dataset.targetId);
         open();
+      });
+    });
+
+    document.querySelectorAll('.targets-plan-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const targetId = btn.dataset.targetId;
+        if (typeof PlanningAgentData === 'undefined' || typeof PlanningAgent === 'undefined') return;
+        const proposals = PlanningAgentData.proposeTargetAllocation(targetId);
+        if (!proposals.length) {
+          alert('Could not find a free slot for this target today. Try rescheduling existing tasks.');
+          return;
+        }
+        let created = 0;
+        proposals.forEach(function (p) {
+          const res = PlanningAgent.createTask({
+            title: p.title,
+            taskType: 'custom',
+            date: p.date,
+            startTime: p.proposedStart,
+            stopTime: p.proposedEnd,
+            targetId: p.targetId,
+            subtargetId: p.subtargetId || null,
+            planReason: 'target-allocation'
+          }, 'agent');
+          if (res.ok) created++;
+        });
+        if (created > 0) {
+          alert('Scheduled ' + created + ' session(s) in Planner for this goal.');
+          if (typeof Planner !== 'undefined' && Planner.renderSidePanel) Planner.renderSidePanel();
+          open();
+        }
       });
     });
 

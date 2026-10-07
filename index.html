@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> Planner</title>
+<title>Lavender</title>
+<meta name="description" content="Aesthetic planner, calendar, study tracker, and gamified productivity hub.">
+<meta property="og:title" content="Lavender">
+<meta property="og:description" content="Aesthetic planner, calendar, study tracker, and gamified productivity hub.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Kalam:wght@300;400;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Pixelify+Sans:wght@400..700&family=VT323&display=swap">
@@ -16,6 +19,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>
+  // Safe alert override for sandboxed iframe environments
+  window.alert = function (msg) {
+    if (typeof Modal !== 'undefined' && Modal.open) {
+      Modal.open('<div style="padding:1.25rem;text-align:center;"><p style="margin-bottom:1.25rem;font-size:1rem;color:#e2e8f0;">' + (msg || '') + '</p><button type="button" onclick="Modal.close()" style="padding:6px 18px;border-radius:6px;cursor:pointer;background:#6366f1;color:white;border:none;">OK</button></div>');
+    } else {
+      console.warn('[Alert]', msg);
+    }
+  };
+</script>
 </head>
 <body ontouchstart="">
 
@@ -166,6 +179,8 @@
   <script src="targets-data.js"></script>
   <script src="timeengine.js"></script>
   <script src="itinerary-time.js"></script>
+  <script src="planning-agent-data.js"></script>
+  <script src="planning-agent.js"></script>
   <script src="itinerary-data.js"></script>
   <script src="journal-data.js"></script>
   <script src="modal.js"></script>

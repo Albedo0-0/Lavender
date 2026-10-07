@@ -46,6 +46,7 @@ const State = (function () {
     miscWeather: null, // Miscellaneous weather ambience cycle: { state: 'clear'|'rain'|'sunlight', since }
     miscWishButterfly: null, // Miscellaneous Wish Butterfly: { date, appeared } — the calendar date the butterfly last appeared, mirroring WaterData.getReminderState()'s per-date reset pattern, so a same-day app reopen doesn't respawn it
       calendarPhotos: {}, // Calendar photos: dateStr -> media id (image data lives in IndexedDB 'media'; see calendar-photos.js)
+    planningHistory: {}, // Centralized Planning Agent (Phase 7): dateStr -> historical planning outcomes and stats
   };
   let data = Object.assign({}, defaultState);
 

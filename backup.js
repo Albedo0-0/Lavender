@@ -102,6 +102,7 @@ const Backup = (function () {
       },
       myWorld: buildMyWorld(),
       dailySummaries: s.dailySummaries,
+      planningHistory: s.planningHistory || {},
       settings: s.settings
     };
   }
@@ -408,7 +409,8 @@ const Backup = (function () {
       assistantNotes: a.assistantNotes,
       generalAlarms: al.generalAlarms,
       myWorld: parsed.myWorld,
-      dailySummaries: parsed.dailySummaries
+      dailySummaries: parsed.dailySummaries,
+      planningHistory: parsed.planningHistory
     };
   }
 
@@ -448,6 +450,7 @@ const Backup = (function () {
       habitLogs: cleanHabitLogs(flat.habitLogs),
       habitsMigrated: typeof flat.habitsMigrated === 'boolean' ? flat.habitsMigrated : undefined,
       dailySummaries: cleanDateKeyedMap(flat.dailySummaries, { dateField: 'date', recordValidator: validDailySummary }),
+      planningHistory: isPlainObject(flat.planningHistory) ? flat.planningHistory : {},
       generalAlarms: cleanIdMap(flat.generalAlarms, 'id', validAlarm),
       assistantNotes: cleanIdMap(flat.assistantNotes, 'id', validAssistantNote),
       expLedger: cleanIdArray(flat.expLedger, 'id', validExpEntry),
@@ -605,6 +608,7 @@ const Backup = (function () {
       sessionRecords: mergeIdMap(c.sessionRecords, cur.sessionRecords),
       timeEngineBreaks: mergeIdArrayById(c.timeEngineBreaks, cur.timeEngineBreaks, 'id'),
       dailySummaries: mergeIdMap(c.dailySummaries, cur.dailySummaries),
+      planningHistory: mergeIdMap(c.planningHistory, cur.planningHistory),
       studyLog: mergeIdMap(c.studyLog, cur.studyLog),
       favoriteTopics: mergedFavoriteTopics,
       waterEvents: mergeIdMap(c.waterEvents, cur.waterEvents),

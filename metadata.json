@@ -1,0 +1,8 @@
+{
+  "name": "Lavender",
+  "description": "Aesthetic planner, calendar, study tracker, and gamified productivity hub.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -472,7 +472,13 @@ const TimeEngine = (function () {
     if (questionsSolved !== undefined && questionsSolved !== null) patch.questionsSolved = questionsSolved;
     updateRecord(active.sessionId, patch);
     const task = PlannerData.getAllTasks()[active.taskId];
-    if (task && !task.completed) PlannerData.toggleComplete(active.taskId);
+    if (task && !task.completed) {
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.toggleComplete(active.taskId);
+      } else {
+        PlannerData.toggleComplete(active.taskId);
+      }
+    }
     const label = 'Study session (' + (task ? (task.taskType === 'custom' ? task.title : task.topicName) : 'Task') + ')';
     pushLog(active.date, label, studyMs, 'hr');
     setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });

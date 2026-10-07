@@ -119,8 +119,13 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
   function renderSuggestedModeBody(body) {
     const dateStr = document.getElementById('planner-date').value || todayStr();
     const suggestions = PlannerData.getSuggestedTasksForDate(dateStr);
+    const proposals = (typeof PlanningAgentData !== 'undefined' && typeof PlanningAgentData.proposeScheduleForDate === 'function')
+      ? PlanningAgentData.proposeScheduleForDate(dateStr)
+      : [];
+    const proposalsByTaskId = {};
+    proposals.forEach(function (p) { proposalsByTaskId[p.taskId] = p; });
 
-    if (suggestions.pending.length === 0 && suggestions.dueRevisions.length === 0) {
+    if (suggestions.pending.length === 0 && suggestions.dueRevisions.length === 0 && proposals.length === 0) {
       body.innerHTML = '<p class="planner-empty empty-state">No pending or due-revision tasks to suggest.</p>';
       return;
     }
@@ -130,18 +135,40 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return '<div class="planner-suggested-group">' +
         '<div class="planner-suggested-group-title section-heading">' + title + '</div>' +
         '<div class="planner-suggested-list list-row-group">' + list.map(function (t) {
+          const prop = proposalsByTaskId[t.taskId];
           const label = t.subject + ' \u00B7 ' + t.topicName + ' \u00B7 ' + PlannerData.taskLabel(t);
-          return '<button class="planner-suggested-btn list-row" data-task-id="' + t.taskId + '">' + label + '</button>';
+          const slotBadge = prop ? (' <span class="chip" style="font-size:0.75rem;">' + prop.proposedStart + '\u2013' + prop.proposedEnd + '</span>') : '';
+          const reasonMeta = prop ? ('<div style="font-size:0.75rem;color:var(--text-muted,#8b949e);margin-top:2px;">' + esc(prop.reason) + '</div>') : '';
+          return '<div class="planner-suggested-row list-row" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:6px;border-radius:6px;background:rgba(255,255,255,0.03);">' +
+            '<div style="flex:1;min-width:0;cursor:pointer;" class="planner-suggested-fill-btn" data-task-id="' + t.taskId + '" data-start="' + (prop ? prop.proposedStart : '') + '" data-stop="' + (prop ? prop.proposedEnd : '') + '">' +
+              '<div style="font-weight:500;">' + esc(label) + slotBadge + '</div>' +
+              reasonMeta +
+            '</div>' +
+            (prop ? ('<button type="button" class="btn btn-secondary planner-suggested-auto-btn" style="padding:4px 10px;font-size:0.8rem;margin-left:8px;" data-task-id="' + t.taskId + '" data-start="' + prop.proposedStart + '" data-stop="' + prop.proposedEnd + '">Plan</button>') : '') +
+          '</div>';
         }).join('') + '</div>' +
       '</div>';
     }
 
     body.innerHTML =
-      suggestionGroup('Pending', suggestions.pending) +
-      suggestionGroup('Due Revisions', suggestions.dueRevisions);
+      suggestionGroup('Due Revisions', suggestions.dueRevisions) +
+      suggestionGroup('Pending (Overdue)', suggestions.pending);
 
-    body.querySelectorAll('.planner-suggested-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () { handleUseSuggestion(btn.dataset.taskId); });
+    body.querySelectorAll('.planner-suggested-auto-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        handleUseSuggestion(btn.dataset.taskId, dateStr, btn.dataset.start, btn.dataset.stop);
+      });
+    });
+
+    body.querySelectorAll('.planner-suggested-fill-btn').forEach(function (el) {
+      el.addEventListener('click', function () {
+        const sInput = document.getElementById('planner-start-time');
+        const eInput = document.getElementById('planner-stop-time');
+        if (sInput && el.dataset.start) sInput.value = el.dataset.start;
+        if (eInput && el.dataset.stop) eInput.value = el.dataset.stop;
+        handleUseSuggestion(el.dataset.taskId, dateStr, el.dataset.start || null, el.dataset.stop || null);
+      });
     });
   }
 
@@ -310,9 +337,25 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
     }
 
     if (taskType === 'revision') {
-      PlannerData.createRevisionCycle(subject, topicName, dateStr, note, startTime, stopTime);
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.createRevisionCycle(subject, topicName, dateStr, note, startTime, stopTime, 'user');
+      } else {
+        PlannerData.createRevisionCycle(subject, topicName, dateStr, note, startTime, stopTime);
+      }
     } else {
-      PlannerData.createSingleTask(subject, topicName, taskType, dateStr, note, startTime, stopTime);
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.createTask({
+          subject: subject,
+          topicName: topicName,
+          taskType: taskType,
+          date: dateStr,
+          note: note,
+          startTime: startTime,
+          stopTime: stopTime
+        }, 'user');
+      } else {
+        PlannerData.createSingleTask(subject, topicName, taskType, dateStr, note, startTime, stopTime);
+      }
     }
 
     document.getElementById('planner-topic').value = '';
@@ -345,18 +388,29 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
 
-    PlannerData.createCustomTask(title, dateStr, note, startTime, stopTime);
+    if (typeof PlanningAgent !== 'undefined') {
+      PlanningAgent.createTask({
+        title: title,
+        taskType: 'custom',
+        date: dateStr,
+        note: note,
+        startTime: startTime,
+        stopTime: stopTime
+      }, 'user');
+    } else {
+      PlannerData.createCustomTask(title, dateStr, note, startTime, stopTime);
+    }
     document.getElementById('planner-custom-title').value = '';
     document.getElementById('planner-custom-note').value = '';
     renderSidePanel();
         if (typeof Library !== 'undefined' && Library.renderPanel) Library.renderPanel();
   }
 
-  function handleUseSuggestion(taskId) {
+  function handleUseSuggestion(taskId, overrideDate, overrideStart, overrideStop) {
     if (typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before scheduling a task.'); return; }
-    const dateStr = document.getElementById('planner-date').value;
-    const startTime = document.getElementById('planner-start-time').value;
-    const stopTime = document.getElementById('planner-stop-time').value;
+    const dateStr = overrideDate || document.getElementById('planner-date').value;
+    const startTime = overrideStart || document.getElementById('planner-start-time').value;
+    const stopTime = overrideStop || document.getElementById('planner-stop-time').value;
     if (!dateStr) {
       alert('Please pick a date first.');
       return;
@@ -372,7 +426,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       return;
     }
     
-    PlannerData.rescheduleTask(taskId, dateStr, startTime, stopTime);
+    if (typeof PlanningAgent !== 'undefined') {
+      PlanningAgent.rescheduleTask(taskId, dateStr, startTime, stopTime, 'user');
+    } else {
+      PlannerData.rescheduleTask(taskId, dateStr, startTime, stopTime);
+    }
     renderAddModeBody();
     renderSidePanel();
   }
@@ -440,7 +498,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       if (cb) {
         cb.addEventListener('change', function () {
           if (cb.checked && typeof MiscSound !== 'undefined') MiscSound.play('uiSuccess');
-          PlannerData.toggleComplete(t.taskId);
+          if (typeof PlanningAgent !== 'undefined') {
+            PlanningAgent.toggleComplete(t.taskId);
+          } else {
+            PlannerData.toggleComplete(t.taskId);
+          }
           renderSidePanel();
         });
       }
@@ -484,7 +546,13 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       const startVal = document.getElementById('planner-resched-start').value;
       const stopVal = document.getElementById('planner-resched-stop').value;
       if (!dateVal) { alert('Pick a date.'); return; }
-      const ok = TimeEngine.doItLater(taskId, dateVal, startVal, stopVal);
+      let ok = false;
+      if (typeof PlanningAgent !== 'undefined') {
+        const res = PlanningAgent.rescheduleTask(taskId, dateVal, startVal, stopVal, 'user');
+        ok = res.ok;
+      } else {
+        ok = TimeEngine.doItLater(taskId, dateVal, startVal, stopVal);
+      }
       if (!ok) { alert('That slot is invalid or overlaps another task on ' + dateVal + '.'); return; }
       Modal.close();
       renderSidePanel();
@@ -514,17 +582,29 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       if (!dateVal) { alert('Pick a date.'); return; }
       if (!PlannerData.isValidSlot(startVal, stopVal)) { alert('End time must be after start time. Leave both blank for no time slot.'); return; }
       if (PlannerData.hasSlotConflict(dateVal, startVal, stopVal, taskId)) { alert('That slot overlaps another task on ' + dateVal + '.'); return; }
-      PlannerData.rescheduleTask(taskId, dateVal, startVal, stopVal);
-      const tasks = State.get().tasks;
-      const existing = tasks[taskId];
-      if (existing) {
-        const updated = Object.assign({}, tasks);
-        updated[taskId] = Object.assign({}, existing, { note: noteVal });
-        if (isCustom) {
-          const titleVal = document.getElementById('planner-edit-title').value.trim();
-          if (titleVal) updated[taskId].title = titleVal;
+      
+      const patch = {
+        date: dateVal,
+        startTime: startVal || null,
+        stopTime: stopVal || null,
+        note: noteVal
+      };
+      if (isCustom) {
+        const titleVal = document.getElementById('planner-edit-title').value.trim();
+        if (titleVal) patch.title = titleVal;
+      }
+
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.updateTask(taskId, patch, 'user');
+      } else {
+        PlannerData.rescheduleTask(taskId, dateVal, startVal, stopVal);
+        const tasks = State.get().tasks;
+        const existing = tasks[taskId];
+        if (existing) {
+          const updated = Object.assign({}, tasks);
+          updated[taskId] = Object.assign({}, existing, patch);
+          State.set({ tasks: updated });
         }
-        State.set({ tasks: updated });
       }
       Modal.close();
       renderSidePanel();
@@ -541,7 +621,11 @@ let activeTab = 'today'; // 'today' | 'pending' | 'history'
       '</div>'
     );
     document.getElementById('planner-delete-confirm').addEventListener('click', function () {
-      PlannerData.deleteTask(taskId);
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.deleteTask(taskId);
+      } else {
+        PlannerData.deleteTask(taskId);
+      }
       Modal.close();
       renderSidePanel();
     });

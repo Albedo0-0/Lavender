@@ -852,7 +852,11 @@ const Library = (function () {
         const selected = document.querySelector('input[name="library-edit-tasktype"]:checked');
         if (selected) patch.taskType = selected.value;
       }
-      PlannerData.updateTask(taskId, patch);
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.updateTask(taskId, patch, 'user');
+      } else {
+        PlannerData.updateTask(taskId, patch);
+      }
       Modal.close();
       renderRightPanel();
     });
