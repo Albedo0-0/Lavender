@@ -308,11 +308,15 @@ const Player = (function () {
   }
 
   function chooserHtml() {
-    return '<div class="modal-header"><h3 class="modal-title">Radio &amp; Music</h3></div>' +
-      '<div class="player-chooser">' +
-      '<button id="player-open-radio-btn" class="btn-secondary player-chooser-btn">Radio</button>' +
-      '<button id="player-open-music-btn" class="btn-secondary player-chooser-btn">Music Player</button>' +
-      '</div>';
+        return '<div class="pixel-chooser">' +
+      '<div class="pixel-chooser-body">' +
+        '<div class="pixel-plate">Radio &amp; Music</div>' +
+        '<div class="pixel-chooser-keys">' +
+          '<button id="player-open-radio-btn" class="pixel-chooser-key"><span class="pixel-chooser-icon pixel-chooser-icon-radio" aria-hidden="true"></span>Radio</button>' +
+          '<button id="player-open-music-btn" class="pixel-chooser-key"><span class="pixel-chooser-icon pixel-chooser-icon-tape" aria-hidden="true"></span>Music Player</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
   function openChooser() {
     Modal.open(chooserHtml());
@@ -405,8 +409,7 @@ const Player = (function () {
   function musicHtml() {
     const track = MusicData.getById(currentTrackId);
     return (
-      '<div class="cassette-player">' +
-        '<div class="modal-header"><h3 class="modal-title">Music Player</h3></div>' +
+            '<div class="cassette-player">' +
         '<div class="cassette-body' + (musicPlaying ? ' music-playing' : '') + '">' +
           '<div class="cassette-window">' +
             '<span class="cassette-reel cassette-reel-left" aria-hidden="true"></span>' +
@@ -426,10 +429,10 @@ const Player = (function () {
             '<button id="music-shuffle-btn" class="cassette-toggle-btn' + (shuffleOn ? ' cassette-toggle-active' : '') + '">' + (shuffleOn ? 'Shuffle: On' : 'Shuffle: Off') + '</button>' +
             '<button id="music-autoplay-btn" class="cassette-toggle-btn' + (autoplayOn ? ' cassette-toggle-active' : '') + '">' + (autoplayOn ? 'Autoplay: On' : 'Autoplay: Off') + '</button>' +
           '</div>' +
-        '</div>' +
-        '<div class="cassette-footer">' +
-          '<button id="music-playlist-btn" class="btn-secondary">Playlist</button>' +
-          '<button id="player-back-btn" class="btn-secondary">Back</button>' +
+          '<div class="cassette-footer">' +
+            '<button id="music-playlist-btn" class="pixel-key">Playlist</button>' +
+            '<button id="player-back-btn" class="pixel-key">Back</button>' +
+          '</div>' +
         '</div>' +
       '</div>'
     );
@@ -463,12 +466,16 @@ const Player = (function () {
         '<button class="playlist-remove-btn cassette-media-remove" data-id="' + t.id + '">Remove</button>' +
         '</div>';
     }).join('') : '<div class="empty-state">No tracks yet.</div>';
-    return '<div class="modal-header"><h3 class="modal-title">Playlist</h3></div>' +
-      rows +
-      '<div class="form-row"><label for="playlist-file-input">Add local file</label><input type="file" id="playlist-file-input" accept="audio/mpeg,audio/wav,.mp3,.wav"></div>' +
-      '<div class="form-row"><label for="playlist-yt-input">Add YouTube URL</label><input type="text" id="playlist-yt-input" placeholder="https://youtube.com/watch?v=..."></div>' +
-      '<button id="playlist-add-yt-btn" class="btn-secondary">Add</button>' +
-      '<div class="modal-footer"><button id="player-back-to-music-btn" class="btn-secondary">Back</button></div>';
+        return '<div class="cassette-playlist">' +
+      '<div class="cassette-playlist-body">' +
+        '<div class="pixel-plate">Playlist</div>' +
+        '<div class="cassette-playlist-rows">' + rows + '</div>' +
+        '<div class="form-row"><label for="playlist-file-input">Add local file</label><input type="file" id="playlist-file-input" accept="audio/mpeg,audio/wav,.mp3,.wav"></div>' +
+        '<div class="form-row"><label for="playlist-yt-input">Add YouTube URL</label><input type="text" id="playlist-yt-input" placeholder="https://youtube.com/watch?v=..."></div>' +
+        '<button id="playlist-add-yt-btn" class="pixel-key">Add</button>' +
+        '<div class="cassette-footer"><button id="player-back-to-music-btn" class="pixel-key">Back</button></div>' +
+      '</div>' +
+    '</div>';
   }
   function openPlaylistModal() {
     Modal.open(playlistHtml());
