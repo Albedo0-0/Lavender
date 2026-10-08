@@ -3,6 +3,512 @@
 // Deterministic reasoning without AI/LLM network dependencies.
 // Depends on: State, Modal, PlannerData, TargetsData, PlanningAgentData, PlanningAgent, ItineraryData, MiscSound.
 
+// ============================================================================
+// SECTIONS 1-2 - CANONICAL TASK STORE (Planning Architecture, Phase 1)
+// Single storage key: 'lavender_canonical_tasks'. Owns schema validation, CRUD,
+// in-memory cache, change events and one-way legacy migration.
+// Legacy sources are READ ONLY in Phase 1 (never modified or deleted):
+//   - localStorage 'lavender_planner_tasks' (array or id->task map; backed up once)
+//   - State.get().tasks (the planner's live store: taskId -> task)
+// ============================================================================
+const CanonicalTaskStore = (function () {
+  const STORAGE_KEY = 'lavender_canonical_tasks';
+  const CORRUPT_BACKUP_KEY = 'lavender_canonical_tasks_corrupt_backup';
+  const LEGACY_PLANNER_KEY = 'lavender_planner_tasks';
+  const LEGACY_BACKUP_KEY = 'lavender_legacy_backup_planner_tasks';
+  const SCHEMA_VERSION = 1;
+
+  const STATUSES = ['pending', 'completed', 'cancelled'];
+  const TYPES = ['study', 'custom', 'revision', 'practice', 'break', 'exercise'];
+  const REVISION_LEVELS = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+  const ID_FIELDS = ['subjectId', 'topicId', 'targetId', 'subtaskId'];
+  const LEGACY_TYPE_MAP = {
+    theory: 'study', study: 'study', questions: 'practice', practice: 'practice',
+    revision: 'revision', custom: 'custom', 'break': 'break', exercise: 'exercise'
+  };
+
+  let cache = null; // { version, tasks: [], migratedLegacyIds: { legacyId: canonicalId } }
+  let migrationRan = false;
+  const listeners = [];
+
+  // ---------- helpers ----------
+
+  function fail(msg) { return { ok: false, error: msg }; }
+  function isBlank(v) { return v === undefined || v === null || v === ''; }
+  function isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function uuid() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function isValidDate(s) {
+    if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    const d = new Date(s + 'T00:00:00');
+    if (isNaN(d.getTime())) return false;
+    return d.getFullYear() === Number(s.slice(0, 4)) &&
+           d.getMonth() + 1 === Number(s.slice(5, 7)) &&
+           d.getDate() === Number(s.slice(8, 10));
+  }
+
+  function isValidTime(s) {
+    return typeof s === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+  }
+
+  function toMin(hhmm) {
+    return Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+  }
+
+  function emit(evt) {
+    listeners.slice().forEach(function (fn) {
+      try { fn(evt); } catch (e) { console.warn('CanonicalTaskStore listener error', e); }
+    });
+  }
+
+  function subscribe(fn) {
+    if (typeof fn !== 'function') return function () {};
+    listeners.push(fn);
+    return function () {
+      const i = listeners.indexOf(fn);
+      if (i !== -1) listeners.splice(i, 1);
+    };
+  }
+
+  // ---------- schema validation ----------
+  // Every field except the identifiers/status is optional; nothing is required to satisfy legacy shapes.
+
+  function normalize(raw) {
+    if (!raw || typeof raw !== 'object') return fail('Task must be an object.');
+    if (typeof raw.id !== 'string' || !raw.id) return fail('Task id is missing.');
+    if (!isFiniteNum(raw.createdAt) || !isFiniteNum(raw.updatedAt)) return fail('Task timestamps are invalid.');
+
+    const t = {
+      id: raw.id,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      status: isBlank(raw.status) ? 'pending' : raw.status
+    };
+    if (STATUSES.indexOf(t.status) === -1) return fail('Invalid status: ' + t.status);
+
+    if (!isBlank(raw.title)) {
+      if (typeof raw.title !== 'string') return fail('title must be a string.');
+      const title = raw.title.trim();
+      if (title) t.title = title;
+    }
+    if (!isBlank(raw.type)) {
+      if (TYPES.indexOf(raw.type) === -1) return fail('Invalid type: ' + raw.type);
+      t.type = raw.type;
+    }
+    if (!isBlank(raw.date)) {
+      if (!isValidDate(raw.date)) return fail('date must be a valid YYYY-MM-DD string.');
+      t.date = raw.date;
+    }
+    if (!isBlank(raw.time)) {
+      if (!isValidTime(raw.time)) return fail('time must be HH:mm (24-hour).');
+      t.time = raw.time;
+    }
+    if (!isBlank(raw.duration)) {
+      const d = Number(raw.duration);
+      if (!isFiniteNum(d) || d <= 0) return fail('duration must be a positive number of minutes.');
+      t.duration = d;
+    }
+    for (let i = 0; i < ID_FIELDS.length; i++) {
+      const k = ID_FIELDS[i];
+      if (!isBlank(raw[k])) {
+        if (typeof raw[k] !== 'string' && typeof raw[k] !== 'number') return fail(k + ' must be a string.');
+        t[k] = String(raw[k]);
+      }
+    }
+    if (!isBlank(raw.checklist)) {
+      if (!Array.isArray(raw.checklist)) return fail('checklist must be an array.');
+      const items = [];
+      raw.checklist.forEach(function (it) {
+        const isObj = it && typeof it === 'object';
+        const text = String(isObj ? (isBlank(it.text) ? '' : it.text) : (isBlank(it) ? '' : it)).trim();
+        if (!text) return;
+        items.push({
+          id: (isObj && !isBlank(it.id)) ? String(it.id) : 'c_' + uuid().slice(0, 8),
+          text: text,
+          completed: !!(isObj && it.completed)
+        });
+      });
+      if (items.length) t.checklist = items;
+    }
+    if (!isBlank(raw.alarm)) {
+      if (typeof raw.alarm !== 'object' || Array.isArray(raw.alarm)) return fail('alarm must be an object.');
+      const off = isBlank(raw.alarm.offsetMinutes) ? 0 : Number(raw.alarm.offsetMinutes);
+      if (!isFiniteNum(off) || off < 0) return fail('alarm.offsetMinutes must be zero or more.');
+      t.alarm = {
+        enabled: !!raw.alarm.enabled,
+        offsetMinutes: off,
+        sound: isBlank(raw.alarm.sound) ? 'chime' : String(raw.alarm.sound),
+        notified: !!raw.alarm.notified
+      };
+    }
+    if (!isBlank(raw.revisionMeta)) {
+      const rm = raw.revisionMeta;
+      if (typeof rm !== 'object' || Array.isArray(rm)) return fail('revisionMeta must be an object.');
+      const meta = {};
+      if (!isBlank(rm.level)) {
+        if (REVISION_LEVELS.indexOf(rm.level) === -1) return fail('revisionMeta.level must be R1 to R6.');
+        meta.level = rm.level;
+      }
+      if (!isBlank(rm.cycleId)) meta.cycleId = String(rm.cycleId);
+      const src = !isBlank(rm.sourceTaskId) ? rm.sourceTaskId : rm.originalTaskId;
+      if (!isBlank(src)) meta.sourceTaskId = String(src);
+      if (Object.keys(meta).length) t.revisionMeta = meta;
+    }
+    if (!isBlank(raw.completedAt)) {
+      if (!isFiniteNum(raw.completedAt)) return fail('completedAt must be an epoch timestamp.');
+      t.completedAt = raw.completedAt;
+    }
+    return { ok: true, task: t };
+  }
+
+  // completedAt always mirrors status: set when completed, removed otherwise.
+  function finalize(t, ts) {
+    if (t.status === 'completed') { if (!t.completedAt) t.completedAt = ts; }
+    else delete t.completedAt;
+    return t;
+  }
+
+  // ---------- persistence ----------
+
+  function load() {
+    if (cache) return cache;
+    let parsed = null;
+    let rawStr = null;
+    try {
+      rawStr = localStorage.getItem(STORAGE_KEY);
+      if (rawStr) parsed = JSON.parse(rawStr);
+    } catch (e) {
+      parsed = null;
+      try { if (rawStr) localStorage.setItem(CORRUPT_BACKUP_KEY, rawStr); } catch (e2) {}
+    }
+    const tasks = [];
+    if (parsed && Array.isArray(parsed.tasks)) {
+      parsed.tasks.forEach(function (t) {
+        const n = normalize(t);
+        if (n.ok) tasks.push(n.task);
+      });
+    }
+    const tomb = (parsed && parsed.migratedLegacyIds && typeof parsed.migratedLegacyIds === 'object') ? parsed.migratedLegacyIds : {};
+    cache = { version: SCHEMA_VERSION, tasks: tasks, migratedLegacyIds: tomb };
+    return cache;
+  }
+
+  function draft(s) {
+    return { version: SCHEMA_VERSION, tasks: s.tasks.slice(), migratedLegacyIds: Object.assign({}, s.migratedLegacyIds) };
+  }
+
+  function persist(next) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      cache = next;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function indexOfId(s, id) {
+    for (let i = 0; i < s.tasks.length; i++) if (s.tasks[i].id === id) return i;
+    return -1;
+  }
+
+  // Loads the store and runs the (idempotent) legacy migration once per page load.
+  function ready() {
+    load();
+    if (!migrationRan) {
+      migrationRan = true;
+      migrateLegacyPlannerData();
+    }
+    return load();
+  }
+
+  // ---------- legacy migration ----------
+
+  function extractLegacyList(parsed) {
+    if (!parsed || typeof parsed !== 'object') return [];
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed.tasks && typeof parsed.tasks === 'object') return extractLegacyList(parsed.tasks);
+    return Object.keys(parsed).map(function (k) {
+      const v = parsed[k];
+      return (v && typeof v === 'object') ? Object.assign({}, v, { taskId: v.taskId || v.id || k }) : null;
+    });
+  }
+
+  function mapLegacyTask(l, key, topics, ts) {
+    const topic = (!isBlank(l.topicId) && topics && topics[l.topicId]) || null;
+    const subject = l.subject || (topic && topic.subject) || '';
+    const topicName = l.topicName || (topic && topic.topicName) || '';
+    const type = LEGACY_TYPE_MAP[String(l.taskType || '').toLowerCase()] || 'study';
+
+    const time = isValidTime(l.startTime) ? l.startTime : (isValidTime(l.time) ? l.time : undefined);
+    let duration;
+    if (Number(l.durationMin) > 0) duration = Number(l.durationMin);
+    else if (isValidTime(l.startTime) && isValidTime(l.stopTime) && toMin(l.stopTime) > toMin(l.startTime)) {
+      duration = toMin(l.stopTime) - toMin(l.startTime);
+    }
+
+    let title = (typeof l.title === 'string' && l.title.trim()) ? l.title : '';
+    if (!title) title = (subject && topicName) ? subject + ' \u00b7 ' + topicName : (topicName || subject);
+
+    const rn = Math.floor(Number(l.revisionNumber));
+    const level = (rn >= 1 && rn <= 6) ? 'R' + rn : undefined;
+    const revisionMeta = (level || l.cycleId) ? { level: level, cycleId: l.cycleId } : undefined;
+
+    const completed = !!l.completed;
+    return {
+      id: 'legacy_' + key,
+      createdAt: isFiniteNum(l.createdAt) ? l.createdAt : ts,
+      updatedAt: ts,
+      status: completed ? 'completed' : 'pending',
+      title: title,
+      type: type,
+      date: isValidDate(l.date) ? l.date : undefined,
+      time: time,
+      duration: duration,
+      subjectId: subject,
+      topicId: l.topicId,
+      revisionMeta: revisionMeta,
+      completedAt: completed ? (isValidDate(l.completedDate) ? new Date(l.completedDate + 'T00:00:00').getTime() : ts) : undefined
+    };
+  }
+
+  // Idempotent: each legacy task id is migrated once (tracked in migratedLegacyIds), so deleting a
+  // migrated task never resurrects it. Safe to call repeatedly.
+  function migrateLegacyPlannerData() {
+    const s = load();
+    const summary = { migrated: 0, skipped: 0, failed: 0, sources: [] };
+    const found = [];
+    const seen = {};
+    let topics = {};
+
+    function collect(list, source) {
+      if (!list.length) return;
+      summary.sources.push(source);
+      list.forEach(function (l) {
+        const lid = l && (l.taskId || l.id);
+        if (isBlank(lid)) { summary.failed++; return; }
+        const key = String(lid);
+        if (seen[key]) return;
+        seen[key] = true;
+        found.push({ key: key, legacy: l });
+      });
+    }
+
+    try {
+      const rawStr = localStorage.getItem(LEGACY_PLANNER_KEY);
+      if (rawStr) {
+        if (!localStorage.getItem(LEGACY_BACKUP_KEY)) localStorage.setItem(LEGACY_BACKUP_KEY, rawStr);
+        collect(extractLegacyList(JSON.parse(rawStr)), LEGACY_PLANNER_KEY);
+      }
+    } catch (e) { summary.failed++; }
+
+    try {
+      if (typeof State !== 'undefined' && State && typeof State.get === 'function') {
+        const st = State.get() || {};
+        topics = st.topics || {};
+        collect(extractLegacyList(st.tasks), 'State.tasks');
+      }
+    } catch (e) { summary.failed++; }
+
+    const next = draft(s);
+    const ts = Date.now();
+    found.forEach(function (f) {
+      if (next.migratedLegacyIds[f.key]) { summary.skipped++; return; }
+      const raw = mapLegacyTask(f.legacy, f.key, topics, ts);
+      if (indexOfId(next, raw.id) !== -1) {
+        next.migratedLegacyIds[f.key] = raw.id;
+        summary.skipped++;
+        return;
+      }
+      const n = normalize(raw);
+      if (!n.ok) { summary.failed++; return; }
+      finalize(n.task, ts);
+      next.tasks.push(n.task);
+      next.migratedLegacyIds[f.key] = n.task.id;
+      summary.migrated++;
+    });
+
+    if (summary.migrated) {
+      if (!persist(next)) {
+        summary.migrated = 0;
+        summary.error = 'Could not save migrated tasks (storage unavailable or full).';
+        return summary;
+      }
+      emit({ type: 'migrated', count: summary.migrated });
+    }
+    return summary;
+  }
+
+  // ---------- CRUD ----------
+
+  function createTask(dto) {
+    if (dto !== undefined && (dto === null || typeof dto !== 'object' || Array.isArray(dto))) {
+      return fail('createTask expects an object.');
+    }
+    const s = ready();
+    const ts = Date.now();
+    const n = normalize(Object.assign({}, dto || {}, { id: uuid(), createdAt: ts, updatedAt: ts }));
+    if (!n.ok) return n;
+    finalize(n.task, ts);
+    const next = draft(s);
+    next.tasks.push(n.task);
+    if (!persist(next)) return fail('Could not save tasks (storage unavailable or full).');
+    emit({ type: 'created', id: n.task.id });
+    return { ok: true, task: clone(n.task) };
+  }
+
+  function updateTask(id, updates) {
+    const s = ready();
+    const idx = indexOfId(s, id);
+    if (idx === -1) return fail('Task not found: ' + id);
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return fail('updateTask expects an object of changes.');
+
+    const raw = Object.assign({}, s.tasks[idx]);
+    Object.keys(updates).forEach(function (k) {
+      if (k === 'id' || k === 'createdAt' || k === 'updatedAt') return;
+      if (updates[k] === undefined) return;
+      if (updates[k] === null) delete raw[k]; else raw[k] = updates[k];
+    });
+    const ts = Date.now();
+    raw.updatedAt = ts;
+
+    const n = normalize(raw);
+    if (!n.ok) return n;
+    finalize(n.task, ts);
+    if ((updates.date !== undefined || updates.time !== undefined) && n.task.alarm && updates.alarm === undefined) {
+      n.task.alarm.notified = false;
+    }
+    const next = draft(s);
+    next.tasks[idx] = n.task;
+    if (!persist(next)) return fail('Could not save tasks (storage unavailable or full).');
+    emit({ type: 'updated', id: id });
+    return { ok: true, task: clone(n.task) };
+  }
+
+  function deleteTask(id) {
+    const s = ready();
+    const idx = indexOfId(s, id);
+    if (idx === -1) return fail('Task not found: ' + id);
+    const next = draft(s);
+    next.tasks.splice(idx, 1);
+    if (!persist(next)) return fail('Could not save tasks (storage unavailable or full).');
+    emit({ type: 'deleted', id: id });
+    return { ok: true };
+  }
+
+  function toggleTaskComplete(id) {
+    const s = ready();
+    const idx = indexOfId(s, id);
+    if (idx === -1) return fail('Task not found: ' + id);
+    return updateTask(id, { status: s.tasks[idx].status === 'completed' ? 'pending' : 'completed' });
+  }
+
+  function getTask(id) {
+    const s = ready();
+    const idx = indexOfId(s, id);
+    return idx === -1 ? null : clone(s.tasks[idx]);
+  }
+
+  // ---------- queries ----------
+  // filter: { id, status, type, subjectId, topicId, targetId, subtaskId } (each a value or an array of values),
+  //         { date } exact, { dateFrom, dateTo } inclusive range (undated tasks excluded),
+  //         { scheduled: 'timed' | 'untimed' | 'undated' }, { search } (title, subjectId, topicId, checklist text).
+
+  function matches(actual, wanted) {
+    if (isBlank(wanted)) return true;
+    return Array.isArray(wanted) ? wanted.indexOf(actual) !== -1 : actual === wanted;
+  }
+
+  function getTasks(filter) {
+    const f = filter || {};
+    const s = ready();
+    const q = isBlank(f.search) ? '' : String(f.search).trim().toLowerCase();
+
+    const list = s.tasks.filter(function (t) {
+      if (!matches(t.id, f.id)) return false;
+      if (!matches(t.status, f.status)) return false;
+      if (!matches(t.type, f.type)) return false;
+      for (let i = 0; i < ID_FIELDS.length; i++) {
+        if (!matches(t[ID_FIELDS[i]], f[ID_FIELDS[i]])) return false;
+      }
+      if (!isBlank(f.date) && t.date !== f.date) return false;
+      if (!isBlank(f.dateFrom) && (!t.date || t.date < f.dateFrom)) return false;
+      if (!isBlank(f.dateTo) && (!t.date || t.date > f.dateTo)) return false;
+      if (f.scheduled === 'timed' && !(t.date && t.time)) return false;
+      if (f.scheduled === 'untimed' && !(t.date && !t.time)) return false;
+      if (f.scheduled === 'undated' && t.date) return false;
+      if (q) {
+        const hay = [t.title, t.subjectId, t.topicId].concat((t.checklist || []).map(function (c) { return c.text; }));
+        const hit = hay.some(function (h) { return h && String(h).toLowerCase().indexOf(q) !== -1; });
+        if (!hit) return false;
+      }
+      return true;
+    });
+
+    // Default order: date, then time (dated first, untimed after timed), then creation order.
+    list.sort(function (a, b) {
+      if (a.date !== b.date) {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date < b.date ? -1 : 1;
+      }
+      if (a.time !== b.time) {
+        if (!a.time) return 1;
+        if (!b.time) return -1;
+        return a.time < b.time ? -1 : 1;
+      }
+      return a.createdAt - b.createdAt;
+    });
+    return clone(list);
+  }
+
+  // ---------- lifecycle ----------
+
+  function init() {
+    load();
+    migrationRan = true;
+    const summary = migrateLegacyPlannerData();
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === null) persist(draft(load()));
+    } catch (e) {}
+    return summary;
+  }
+
+  // Console/testing only: wipes the canonical key and legacy backup, forgets in-memory state.
+  function _debugReset() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_BACKUP_KEY);
+    } catch (e) {}
+    cache = null;
+    migrationRan = false;
+  }
+
+  return {
+    STORAGE_KEY: STORAGE_KEY,
+    STATUSES: STATUSES.slice(),
+    TYPES: TYPES.slice(),
+    init: init,
+    createTask: createTask,
+    updateTask: updateTask,
+    deleteTask: deleteTask,
+    toggleTaskComplete: toggleTaskComplete,
+    getTask: getTask,
+    getTasks: getTasks,
+    migrateLegacyPlannerData: migrateLegacyPlannerData,
+    subscribe: subscribe,
+    _debugReset: _debugReset
+  };
+})();
+
 const PlanningAgentUI = (function () {
   function esc(s) {
     return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) {
@@ -884,13 +1390,18 @@ const PlanningAgentUI = (function () {
     render(true);
   }
 
-  return {
+    return {
     open: open,
-    parseNaturalInput: parseNaturalInput
+    parseNaturalInput: parseNaturalInput,
+    store: CanonicalTaskStore
   };
 })();
 
 if (typeof window !== 'undefined') {
+  window.CanonicalTaskStore = CanonicalTaskStore;
+  // Re-runs the idempotent legacy migration after boot, once State has loaded its saved data.
+  if (document.readyState === 'complete') CanonicalTaskStore.init();
+  else window.addEventListener('load', function () { CanonicalTaskStore.init(); });
   window.PlanningAgentUI = PlanningAgentUI;
   if (typeof PlanningAgent !== 'undefined') {
     PlanningAgent.openUI = function (opts) {
