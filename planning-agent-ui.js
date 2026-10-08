@@ -1,8 +1,7 @@
 // planning-agent-ui.js — Centralized Planning Agent: User-Facing Interface
-// Universal Planning Entry: ONE Planning Agent UI for all of Lavender.
-// "PLAN = TALK TO MY AGENT"
+// The ONE user-facing planning interface for all of Lavender: every "plan new work" action opens this.
 // Deterministic reasoning without AI/LLM network dependencies.
-// Depends on: State, Modal, PlannerData, TargetsData, PlanningAgentData, PlanningAgent, MiscSound, Nav.
+// Depends on: State, Modal, PlannerData, TargetsData, PlanningAgentData, PlanningAgent, ItineraryData, MiscSound.
 
 const PlanningAgentUI = (function () {
   function esc(s) {
@@ -39,50 +38,37 @@ const PlanningAgentUI = (function () {
   // Active state within the modal
   let state = {
     prompt: '',
-    intent: 'topic', // 'topic' | 'day' | 'pending' | 'catchup' | 'target'
+    intent: 'topic', // 'topic' | 'custom' | 'day' | 'pending' | 'catchup' | 'target'
     subject: '',
     topicId: '',
     taskMode: 'theory', // 'theory' | 'questions' | 'revision' | 'revision-cycle' (cycle only when explicitly chosen)
     date: '',
     targetId: '',
+    customTitle: '', // free-text title for the 'custom' intent
+    from: '', // 'assistant' when opened from the Assistant (enables the Back link)
+    message: '', // calm inline notice (replaces alert())
     proposals: null, // array of generated proposal objects
     lastResult: null // result message after committing
   };
 
-  // Pixel Brain Avatar for Planning Agent
-  const AGENT_PIXEL = {
-    o: '#3f2f21', k: '#d9c4a3', c: '#fffdf8', g: '#566e3a', r: '#c8776a', y: '#e3c27a'
-  };
-  const AGENT_ROWS = [
-    '....oooo....',
-    '..ooccccoo..',
-    '.occcccccco.',
-    '.ocgyyyycco.',
-    '.ocyycyyyco.',
-    '.ocyyyyyyco.',
-    '.occcccccco.',
-    '..ooccccoo..',
-    '....oooo....',
-    '....oyyo....',
-    '....oooo....',
-    '............'
-  ];
-
-  function agentIconSvg(size) {
-    let rects = '';
-    const sz = size || 24;
-    AGENT_ROWS.forEach(function (row, y) {
-      let x = 0;
-      while (x < row.length) {
-        const ch = row.charAt(x);
-        if (ch === '.' || !AGENT_PIXEL[ch]) { x++; continue; }
-        let x2 = x;
-        while (x2 < row.length && row.charAt(x2) === ch) x2++;
-        rects += '<rect x="' + x + '" y="' + y + '" width="' + (x2 - x) + '" height="1" fill="' + AGENT_PIXEL[ch] + '"/>';
-        x = x2;
+  // Canonical target list. TargetsData.getAllTargets() returns the id->target map; getAllTargetsList() the array.
+  function getTargetsList() {
+    if (typeof TargetsData !== 'undefined') {
+      if (typeof TargetsData.getAllTargetsList === 'function') return TargetsData.getAllTargetsList();
+      if (typeof TargetsData.getAllTargets === 'function') {
+        const m = TargetsData.getAllTargets() || {};
+        return Array.isArray(m) ? m : Object.keys(m).map(function (k) { return m[k]; });
       }
-    });
-    return '<svg viewBox="0 0 12 12" width="' + sz + '" height="' + sz + '" shape-rendering="crispEdges" aria-hidden="true">' + rects + '</svg>';
+    }
+    return [];
+  }
+
+  // Earliest sensible start for a date: now (rounded up to 15m, not before 08:00) for today, else 08:00.
+  function earliestStartFor(dateStr) {
+    if (dateStr !== todayStr()) return '08:00';
+    const now = new Date();
+    const mins = Math.min(1439, Math.max(480, Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15));
+    return PlanningAgentData.minutesToTimeStr(mins);
   }
 
   // ---------- Deterministic Intent & Text Parser ----------
@@ -153,10 +139,7 @@ const PlanningAgentUI = (function () {
 
     // 5. Match active targets
     if (typeof TargetsData !== 'undefined' && (!result.intent || result.intent === 'target')) {
-      const targets = (typeof TargetsData.getAllTargets === 'function')
-        ? TargetsData.getAllTargets()
-        : (typeof TargetsData.getAllTargetsList === 'function' ? TargetsData.getAllTargetsList() : (State.get().targets || {}));
-      const targetList = Array.isArray(targets) ? targets : Object.keys(targets).map(function (k) { return targets[k]; });
+      const targetList = getTargetsList();
       for (let i = 0; i < targetList.length; i++) {
         const tgt = targetList[i];
         if (!tgt.completed && !tgt.archived && text.includes((tgt.title || '').toLowerCase())) {
@@ -199,7 +182,7 @@ const PlanningAgentUI = (function () {
       }
       if (!topicName && topicId) topicName = topicId;
       if (!subject || !topicName) {
-        return { ok: false, error: 'Please choose a subject and topic to plan.' };
+        return { ok: false, error: 'Choose a subject and topic, or pick \u201cSomething else\u201d.' };
       }
 
       if (state.taskMode === 'revision-cycle') {
@@ -266,6 +249,28 @@ const PlanningAgentUI = (function () {
           confidence: 0.92
         });
       }
+
+    } else if (state.intent === 'custom') {
+      // Free-text task (no Library topic): becomes a normal canonical custom Task on accept.
+      const title = (state.customTitle || '').trim();
+      if (!title) return { ok: false, error: 'Type what you want to plan first.' };
+      const dur = 45;
+      const slot = PlanningAgentData.findNextFreeSlot(targetDate, dur, earliestStartFor(targetDate));
+      if (!slot) {
+        return { ok: false, error: 'No free time slot found on ' + targetDate + '.' };
+      }
+      proposals.push({
+        proposalId: 'prop_custom_' + Date.now(),
+        kind: 'custom-task',
+        title: title,
+        date: targetDate,
+        startTime: slot.start,
+        stopTime: slot.end,
+        durationMin: dur,
+        note: '',
+        reason: 'Placed in the next free slot',
+        confidence: 0.9
+      });
 
     } else if (state.intent === 'day') {
       // Plan entire day (due revisions + carried over overdue tasks + unslotted)
@@ -348,9 +353,12 @@ const PlanningAgentUI = (function () {
         return { ok: false, error: 'Itinerary is not loaded.' };
       }
       const day = ItineraryData.getToday();
+      if (!day || day.status !== 'in_progress') {
+        return { ok: false, error: 'Catch-up is available while today\u2019s itinerary is running.' };
+      }
       const plan = PlanningAgentData.computeCatchUpPlan(day);
       if (!plan.needed || !plan.changes.length) {
-        return { ok: false, error: 'No schedule delays detected today \u2014 everything is on track!' };
+        return { ok: false, error: 'No delays today \u2014 everything is on track.' };
       }
 
       plan.changes.forEach(function (c) {
@@ -374,7 +382,7 @@ const PlanningAgentUI = (function () {
       // Allocate sessions for a target
       const targetId = state.targetId;
       if (!targetId) {
-        return { ok: false, error: 'Please choose a goal to plan.' };
+        return { ok: false, error: 'Choose a goal to plan.' };
       }
       const targetProps = PlanningAgentData.proposeTargetAllocation(targetId, targetDate);
       if (!targetProps || !targetProps.length) {
@@ -412,6 +420,16 @@ const PlanningAgentUI = (function () {
 
     let committedCount = 0;
     const errors = [];
+    const catchUpChanges = [];
+
+    const createsTasks = state.proposals.some(function (p) {
+      return p.kind === 'revision-cycle' || p.kind === 'single-task' || p.kind === 'custom-task' || p.kind === 'target-allocation';
+    });
+    if (createsTasks && typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive && TimeEngine.isManualClockActive()) {
+      state.message = 'Finish or reset your Stopwatch/Timer before scheduling a task.';
+      render();
+      return;
+    }
 
     state.proposals.forEach(function (p) {
       if (p.kind === 'revision-cycle') {
@@ -458,16 +476,22 @@ const PlanningAgentUI = (function () {
         if (res.ok) committedCount++;
         else errors.push(res.error);
 
+      } else if (p.kind === 'custom-task') {
+        const res = PlanningAgent.createTask({
+          title: p.title,
+          taskType: 'custom',
+          date: p.date,
+          startTime: p.startTime,
+          stopTime: p.stopTime,
+          note: p.note || '',
+          planReason: p.reason
+        }, 'agent');
+        if (res.ok) committedCount++;
+        else errors.push(res.error);
+
       } else if (p.kind === 'catchup-change') {
-        if (p.taskId) {
-          PlanningAgent.rescheduleTask(p.taskId, p.date, p.startTime, p.stopTime, 'agent', 'catch-up');
-        }
-        if (typeof ItineraryData !== 'undefined' && typeof ItineraryData.updateItemState === 'function') {
-          const fields = { plannedStart: p.startTime };
-          if (p.stopTime) fields.plannedEnd = p.stopTime;
-          ItineraryData.updateItemState(p.itemId, fields);
-        }
-        committedCount++;
+        // Applied once below through the canonical path (ItineraryData.applyCatchUpPlan).
+        catchUpChanges.push(p.rawChange);
 
       } else if (p.kind === 'target-allocation') {
         const res = PlanningAgent.createTask({
@@ -485,13 +509,21 @@ const PlanningAgentUI = (function () {
       }
     });
 
+    if (catchUpChanges.length) {
+      if (typeof ItineraryData !== 'undefined' && typeof ItineraryData.applyCatchUpPlan === 'function') {
+        ItineraryData.applyCatchUpPlan(catchUpChanges);
+        committedCount += catchUpChanges.length;
+      } else {
+        errors.push('Itinerary is not available.');
+      }
+    }
+
     if (typeof MiscSound !== 'undefined') {
       MiscSound.play('uiSuccess');
     }
 
     // Refresh views across Lavender
     if (typeof Planner !== 'undefined' && Planner.render) Planner.render();
-    if (typeof Planner !== 'undefined' && Planner.renderSidePanel) Planner.renderSidePanel();
     if (typeof Library !== 'undefined' && Library.render) Library.render();
     if (typeof Library !== 'undefined' && Library.renderPanel) Library.renderPanel();
     if (typeof Calendar !== 'undefined' && Calendar.render) Calendar.render();
@@ -506,451 +538,330 @@ const PlanningAgentUI = (function () {
   }
 
   // ---------- HTML Rendering ----------
+  // Calm, scoped markup: everything lives under .plan-agent (see style.css). No decorative panels.
 
-  function renderHtml() {
-    const today = todayStr();
-    const tomorrow = shiftDateStr(today, 1);
-    const currentDate = state.date || today;
+  var INTENT_OPTIONS = [
+    { value: 'topic', label: 'A topic from my library' },
+    { value: 'custom', label: 'Something else' },
+    { value: 'day', label: 'My day' },
+    { value: 'pending', label: 'Overdue work' },
+    { value: 'target', label: 'A goal' },
+    { value: 'catchup', label: 'Catch up today' }
+  ];
 
-    // Subjects and topics
+  var MODE_OPTIONS = [
+    { value: 'theory', label: 'Study session' },
+    { value: 'questions', label: 'Practice questions' },
+    { value: 'revision', label: 'Revise once' },
+    { value: 'revision-cycle', label: 'Spaced revision cycle (R1\u2013R6)' }
+  ];
+
+  function optionsHtml(list, selected) {
+    return list.map(function (o) {
+      return '<option value="' + esc(o.value) + '"' + (o.value === selected ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+    }).join('');
+  }
+
+  function fieldsHtml(currentDate) {
     const subjects = (typeof PlannerData !== 'undefined' ? PlannerData.getAllSubjects() : []);
-    const activeSubject = state.subject || subjects[0] || '';
-    const topicsMap = (typeof PlannerData !== 'undefined' ? PlannerData.getTopicsBySubject() : {});
-    const topicsForSubject = topicsMap[activeSubject] || [];
-
-    // Active targets
-    const rawTargets = (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargets === 'function')
-      ? TargetsData.getAllTargets()
-      : (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargetsList === 'function' ? TargetsData.getAllTargetsList() : ((typeof State !== 'undefined' && State.get().targets) || {}));
-    const allTargetsList = Array.isArray(rawTargets) ? rawTargets : Object.keys(rawTargets).map(function (k) { return rawTargets[k]; });
-    const activeTargets = allTargetsList.filter(function (t) {
-      return !t.completed && !t.archived;
-    });
-
-    let contextControlsHtml = '';
+    const dateField =
+      '<div><label class="plan-agent-label" for="plan-ctrl-date">Date</label>' +
+      '<input type="date" id="plan-ctrl-date" value="' + esc(currentDate) + '"></div>';
 
     if (state.intent === 'topic') {
-      contextControlsHtml =
-        '<div class="planning-ctx-card">' +
-          '<div class="planning-ctx-row">' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Subject</label>' +
-              '<select id="plan-ctrl-subject" class="input">' +
-                subjects.map(function (s) {
-                  return '<option value="' + esc(s) + '"' + (s === activeSubject ? ' selected' : '') + '>' + esc(s) + '</option>';
-                }).join('') +
-              '</select>' +
-            '</div>' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Topic / Chapter</label>' +
-              '<select id="plan-ctrl-topic" class="input">' +
-                (topicsForSubject.length
-                  ? topicsForSubject.map(function (t) {
-                      return '<option value="' + esc(t.topicId) + '"' + (t.topicId === state.topicId ? ' selected' : '') + '>' + esc(t.topicName) + '</option>';
-                    }).join('')
-                  : '<option value="">(No chapters yet)</option>') +
-              '</select>' +
-            '</div>' +
-          '</div>' +
-          '<div class="planning-ctx-row">' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Planning Strategy</label>' +
-              '<select id="plan-ctrl-mode" class="input">' +
-                '<option value="revision-cycle"' + (state.taskMode === 'revision-cycle' ? ' selected' : '') + '>Full Revision Cycle (R1 \u2192 R6, only if you want it)</option>' +
-                '<option value="theory"' + (state.taskMode === 'theory' ? ' selected' : '') + '>Single Theory Session (50m)</option>' +
-                '<option value="questions"' + (state.taskMode === 'questions' ? ' selected' : '') + '>Questions Practice (60m)</option>' +
-                '<option value="revision"' + (state.taskMode === 'revision' ? ' selected' : '') + '>Single Revision Review (45m)</option>' +
-              '</select>' +
-            '</div>' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Start Date</label>' +
-              '<input type="date" id="plan-ctrl-date" class="input" value="' + esc(currentDate) + '">' +
-            '</div>' +
-          '</div>' +
-        '</div>';
+      const activeSubject = state.subject || subjects[0] || '';
+      const topicsMap = (typeof PlannerData !== 'undefined' ? PlannerData.getTopicsBySubject() : {});
+      const topicsForSubject = topicsMap[activeSubject] || [];
+      return (
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="plan-ctrl-subject">Subject</label>' +
+            '<select id="plan-ctrl-subject">' +
+              subjects.map(function (s) {
+                return '<option value="' + esc(s) + '"' + (s === activeSubject ? ' selected' : '') + '>' + esc(s) + '</option>';
+              }).join('') +
+            '</select></div>' +
+          '<div><label class="plan-agent-label" for="plan-ctrl-topic">Topic</label>' +
+            '<select id="plan-ctrl-topic">' +
+              (topicsForSubject.length
+                ? topicsForSubject.map(function (t) {
+                    return '<option value="' + esc(t.topicId) + '"' + (t.topicId === state.topicId ? ' selected' : '') + '>' + esc(t.topicName) + '</option>';
+                  }).join('')
+                : '<option value="">No topics yet</option>') +
+            '</select></div>' +
+        '</div>' +
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="plan-ctrl-mode">How</label>' +
+            '<select id="plan-ctrl-mode">' + optionsHtml(MODE_OPTIONS, state.taskMode) + '</select></div>' +
+          dateField +
+        '</div>'
+      );
+    }
 
-    } else if (state.intent === 'day') {
-      contextControlsHtml =
-        '<div class="planning-ctx-card">' +
-          '<div class="planning-ctx-row">' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Day to Plan</label>' +
-              '<input type="date" id="plan-ctrl-date" class="input" value="' + esc(currentDate) + '">' +
-            '</div>' +
-            '<div class="form-row" style="display:flex;align-items:flex-end;">' +
-              '<div class="planning-quick-dates">' +
-                '<button type="button" class="btn-secondary planning-quick-date' + (currentDate === today ? ' is-active' : '') + '" data-set-date="' + today + '">Today</button>' +
-                '<button type="button" class="btn-secondary planning-quick-date' + (currentDate === tomorrow ? ' is-active' : '') + '" data-set-date="' + tomorrow + '">Tomorrow</button>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<p class="planning-ctx-hint">The Agent will inspect due spaced revisions, carried-over tasks, and unslotted sessions to build an optimal day schedule.</p>' +
-        '</div>';
+    if (state.intent === 'custom') {
+      return (
+        '<div><label class="plan-agent-label" for="plan-ctrl-title">What do you want to plan?</label>' +
+        '<input type="text" id="plan-ctrl-title" maxlength="120" placeholder="e.g. Solve 20 questions" value="' + esc(state.customTitle) + '"></div>' +
+        dateField
+      );
+    }
 
-    } else if (state.intent === 'pending') {
+    if (state.intent === 'day') {
+      return dateField + '<p class="plan-agent-hint">Looks at due revisions, carried-over tasks and unscheduled work, then fits them into free time.</p>';
+    }
+
+    if (state.intent === 'pending') {
       const snap = (typeof PlanningAgentData !== 'undefined' ? PlanningAgentData.getSnapshot() : { pendingTasks: [] });
-      const pendingCount = (snap.pendingTasks || []).length;
-      contextControlsHtml =
-        '<div class="planning-ctx-card">' +
-          '<div class="planning-ctx-row">' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Target Date</label>' +
-              '<input type="date" id="plan-ctrl-date" class="input" value="' + esc(currentDate) + '">' +
-            '</div>' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Subject Filter</label>' +
-              '<select id="plan-ctrl-subject" class="input">' +
-                '<option value="">\u2014 All Subjects \u2014</option>' +
-                subjects.map(function (s) {
-                  return '<option value="' + esc(s) + '"' + (s === state.subject ? ' selected' : '') + '>' + esc(s) + '</option>';
-                }).join('') +
-              '</select>' +
-            '</div>' +
-          '</div>' +
-          '<p class="planning-ctx-hint"><strong>' + pendingCount + ' pending task' + (pendingCount === 1 ? '' : 's') + '</strong> overdue. Postponed tasks will automatically receive bite-sized focus windows to minimize friction.</p>' +
-        '</div>';
-
-    } else if (state.intent === 'catchup') {
-      contextControlsHtml =
-        '<div class="planning-ctx-card">' +
-          '<p class="planning-ctx-hint">Running late today? The Agent evaluates today\'s itinerary timeline and shifts delayed sessions forward into the next free gaps without altering completed work.</p>' +
-        '</div>';
-
-    } else if (state.intent === 'target') {
-      contextControlsHtml =
-        '<div class="planning-ctx-card">' +
-          '<div class="planning-ctx-row">' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Goal / Target</label>' +
-              '<select id="plan-ctrl-target" class="input">' +
-                (activeTargets.length
-                  ? activeTargets.map(function (t) {
-                      return '<option value="' + esc(t.targetId) + '"' + (t.targetId === state.targetId ? ' selected' : '') + '>' + esc(t.title) + ' (' + t.timeframe + ')' + '</option>';
-                    }).join('')
-                  : '<option value="">(No active goals)</option>') +
-              '</select>' +
-            '</div>' +
-            '<div class="form-row">' +
-              '<label class="planner-field-label">Scheduled Date</label>' +
-              '<input type="date" id="plan-ctrl-date" class="input" value="' + esc(currentDate) + '">' +
-            '</div>' +
-          '</div>' +
-        '</div>';
+      const n = (snap.pendingTasks || []).length;
+      return (
+        '<div class="plan-agent-row">' +
+          dateField +
+          '<div><label class="plan-agent-label" for="plan-ctrl-subject">Subject</label>' +
+            '<select id="plan-ctrl-subject"><option value="">All subjects</option>' +
+              subjects.map(function (s) {
+                return '<option value="' + esc(s) + '"' + (s === state.subject ? ' selected' : '') + '>' + esc(s) + '</option>';
+              }).join('') +
+            '</select></div>' +
+        '</div>' +
+        '<p class="plan-agent-hint">' + n + ' overdue task' + (n === 1 ? '' : 's') + '. Tasks that keep slipping get shorter sessions.</p>'
+      );
     }
 
-    // Proposals box
-    let proposalsHtml = '';
-    if (state.proposals && state.proposals.length) {
-      proposalsHtml =
-        '<div class="planning-proposals-box">' +
-          '<div class="planning-proposals-header">' +
-            '<h4 class="planning-proposals-title">Proposed Plan (' + state.proposals.length + ' session' + (state.proposals.length > 1 ? 's' : '') + ')</h4>' +
-            '<span class="planning-status-badge">Awaiting Confirmation</span>' +
-          '</div>' +
-          '<div class="planning-proposals-list">' +
-            state.proposals.map(function (p, idx) {
-              let futureListHtml = '';
-              if (p.futureSchedule && p.futureSchedule.length) {
-                futureListHtml =
-                  '<div class="planning-future-schedule">' +
-                    '<span class="planning-future-label">Follow-up intervals:</span> ' +
-                    p.futureSchedule.map(function (fs) {
-                      return '<span class="planning-future-pill">' + fs.label + ' \u00b7 ' + fs.date + '</span>';
-                    }).join(' ') +
-                  '</div>';
-              }
-
-              return (
-                '<div class="planning-proposal-card" data-idx="' + idx + '">' +
-                  '<div class="planning-proposal-top">' +
-                    '<div class="planning-proposal-info">' +
-                      '<strong class="planning-proposal-title">' + esc(p.title) + '</strong>' +
-                      '<div class="planning-proposal-timing">' +
-                        '<span class="planning-time-chip">\uD83D\uDCC5 ' + formatDateFriendly(p.date || p.baseDate) + '</span>' +
-                        (p.startTime ? '<span class="planning-time-chip">\u23F0 ' + p.startTime + ' \u2013 ' + (p.stopTime || '') + ' (' + (p.durationMin || 45) + 'm)</span>' : '') +
-                      '</div>' +
-                      '<div class="planning-proposal-reason">' + esc(p.reason) + '</div>' +
-                      futureListHtml +
-                    '</div>' +
-                    '<button type="button" class="planning-proposal-del" data-idx="' + idx + '" title="Remove from plan">&times;</button>' +
-                  '</div>' +
-                '</div>'
-              );
-            }).join('') +
-          '</div>' +
-          '<div class="planning-proposals-actions">' +
-            '<button type="button" id="planning-accept-btn" class="btn btn-primary">\u2713 Accept & Schedule in Lavender</button>' +
-            '<button type="button" id="planning-cancel-proposals-btn" class="btn btn-secondary">Cancel</button>' +
-          '</div>' +
-        '</div>';
+    if (state.intent === 'catchup') {
+      return '<p class="plan-agent-hint">Running behind? Shifts the rest of today\u2019s itinerary into the next free gaps. Finished work stays as it is.</p>';
     }
 
-    // Success / Result banner
-    let resultBannerHtml = '';
+    if (state.intent === 'target') {
+      const active = getTargetsList().filter(function (t) { return !t.completed && !t.archived; });
+      return (
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="plan-ctrl-target">Goal</label>' +
+            '<select id="plan-ctrl-target">' +
+              (active.length
+                ? active.map(function (t) {
+                    return '<option value="' + esc(t.targetId) + '"' + (t.targetId === state.targetId ? ' selected' : '') + '>' + esc(t.title) + (t.timeframe ? ' (' + esc(t.timeframe) + ')' : '') + '</option>';
+                  }).join('')
+                : '<option value="">No active goals</option>') +
+            '</select></div>' +
+          dateField +
+        '</div>'
+      );
+    }
+    return '';
+  }
+
+  function proposalsHtml() {
+    if (!state.proposals || !state.proposals.length) return '';
+    return (
+      '<div class="plan-agent-proposals">' +
+        '<p class="plan-agent-proposals-title">' + state.proposals.length + (state.proposals.length === 1 ? ' suggestion' : ' suggestions') + '</p>' +
+        '<ul class="plan-agent-list">' +
+          state.proposals.map(function (p, idx) {
+            const when = formatDateFriendly(p.date || p.baseDate) +
+              (p.startTime ? ' \u00b7 ' + esc(p.startTime) + '\u2013' + esc(p.stopTime || '') : '');
+            const followUp = (p.futureSchedule && p.futureSchedule.length)
+              ? '<div class="plan-agent-item-why">Then ' + p.futureSchedule.map(function (fs) { return esc(fs.label) + ' ' + esc(fs.date); }).join(', ') + '</div>'
+              : '';
+            return (
+              '<li class="plan-agent-item">' +
+                '<div class="plan-agent-item-main">' +
+                  '<div class="plan-agent-item-title">' + esc(p.title) + '</div>' +
+                  '<div class="plan-agent-item-when">' + when + '</div>' +
+                  (p.reason ? '<div class="plan-agent-item-why">' + esc(p.reason) + '</div>' : '') +
+                  followUp +
+                '</div>' +
+                '<button type="button" class="plan-agent-x" data-idx="' + idx + '" aria-label="Remove this suggestion">&times;</button>' +
+              '</li>'
+            );
+          }).join('') +
+        '</ul>' +
+        '<div class="plan-agent-actions">' +
+          '<button type="button" id="plan-agent-cancel" class="btn btn-secondary">Cancel</button>' +
+          '<button type="button" id="plan-agent-accept" class="btn btn-primary">Add to my plan</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderHtml() {
+    const currentDate = state.date || todayStr();
+    const head =
+      '<div class="plan-agent-head">' +
+        '<h3 class="plan-agent-title">Plan</h3>' +
+        (state.from === 'assistant'
+          ? '<button type="button" id="plan-agent-back" class="plan-agent-link">\u2190 Back</button>'
+          : '<button type="button" id="plan-agent-close" class="plan-agent-link">Close</button>') +
+      '</div>';
+
     if (state.lastResult) {
-      resultBannerHtml =
-        '<div class="planning-success-banner">' +
-          '<div class="planning-success-icon">\u2713</div>' +
-          '<div class="planning-success-content">' +
-            '<strong>Plan Confirmed & Scheduled!</strong>' +
-            '<p>Committed ' + state.lastResult.committedCount + ' canonical task(s) into your Planner, Itinerary, and Calendar.</p>' +
-            '<div class="planning-success-actions">' +
-              '<button type="button" id="planning-goto-planner-btn" class="btn-secondary">\uD83D\uDCDA View in Planner</button>' +
-              '<button type="button" id="planning-new-plan-btn" class="btn-secondary">Plan Something Else</button>' +
+      const r = state.lastResult;
+      return (
+        '<div class="plan-agent">' + head +
+          '<div class="plan-agent-done">' +
+            '<p class="plan-agent-done-title">' + (r.committedCount ? 'All set.' : 'Nothing was added.') + '</p>' +
+            (r.committedCount ? '<p class="plan-agent-muted">' + r.committedCount + (r.committedCount === 1 ? ' task' : ' tasks') + ' added to your plan.</p>' : '') +
+            (r.errors.length ? '<p class="plan-agent-muted">' + r.errors.map(esc).join('<br>') + '</p>' : '') +
+            '<div class="plan-agent-actions plan-agent-actions-center">' +
+              '<button type="button" id="plan-agent-again" class="btn btn-secondary">Plan something else</button>' +
+              '<button type="button" id="plan-agent-done" class="btn btn-primary">Done</button>' +
             '</div>' +
           '</div>' +
-        '</div>';
+        '</div>'
+      );
     }
 
     return (
-      '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>' +
-      '<div class="assistant-page assistant-page-plan">' +
-        '<h3 class="section-title assistant-page-title">' +
-          '<span class="assistant-page-pixel">' + agentIconSvg(24) + '</span>' +
-          'Planning Agent' +
-        '</h3>' +
-
-        '<div class="planning-agent-greeting">' +
-          '<span class="planning-quote">\u201cWhat do you want to plan?\u201d</span>' +
-        '</div>' +
-
-        // Natural Input form
-        '<div class="planning-input-box">' +
-          '<div class="form-row" style="margin-bottom:0;">' +
-            '<input type="text" id="planning-agent-prompt" class="input" placeholder="e.g. Plan Physics revision tomorrow, Schedule pending work..." value="' + esc(state.prompt) + '">' +
-          '</div>' +
-          '<button type="button" id="planning-agent-plan-btn" class="btn btn-primary">\u2728 Plan</button>' +
-        '</div>' +
-
-        // Intent Chips
-        '<div class="planning-intent-chips">' +
-          '<button type="button" class="planning-chip' + (state.intent === 'topic' ? ' is-active' : '') + '" data-intent="topic">\uD83D\uDCDA Plan Topic</button>' +
-          '<button type="button" class="planning-chip' + (state.intent === 'day' ? ' is-active' : '') + '" data-intent="day">\uD83D\uDCC5 Plan Day</button>' +
-          '<button type="button" class="planning-chip' + (state.intent === 'pending' ? ' is-active' : '') + '" data-intent="pending">\u23F3 Schedule Overdue</button>' +
-          '<button type="button" class="planning-chip' + (state.intent === 'catchup' ? ' is-active' : '') + '" data-intent="catchup">\uD83D\uDD04 Catch Up Today</button>' +
-          '<button type="button" class="planning-chip' + (state.intent === 'target' ? ' is-active' : '') + '" data-intent="target">\uD83C\uDFAF Plan Goal</button>' +
-        '</div>' +
-
-        // Dynamic context controls
-        contextControlsHtml +
-
-        // Result banner (if just committed)
-        resultBannerHtml +
-
-        // Proposals box (if proposals generated)
-        proposalsHtml +
-
+      '<div class="plan-agent">' + head +
+        '<label class="plan-agent-label" for="plan-ctrl-intent">What would you like to plan?</label>' +
+        '<select id="plan-ctrl-intent">' + optionsHtml(INTENT_OPTIONS, state.intent) + '</select>' +
+        '<div class="plan-agent-fields">' + fieldsHtml(currentDate) + '</div>' +
+        (state.message ? '<p class="plan-agent-message" role="status">' + esc(state.message) + '</p>' : '') +
+        (state.proposals && state.proposals.length
+          ? proposalsHtml()
+          : '<div class="plan-agent-actions"><button type="button" id="plan-agent-go" class="btn btn-primary">Plan</button></div>') +
       '</div>'
     );
   }
 
   // ---------- Event Wiring ----------
 
-  function bindEvents() {
-    // Back button
-    const backBtn = document.getElementById('assistant-back-btn');
-    if (backBtn) {
-      backBtn.addEventListener('click', function () {
-        Modal.close();
-        if (typeof Assistant !== 'undefined' && Assistant.openMain) {
-          Assistant.openMain();
-        }
-      });
-    }
+  function byId(id) { return document.getElementById(id); }
 
-    // Natural text input
-    const promptInput = document.getElementById('planning-agent-prompt');
-    const planBtn = document.getElementById('planning-agent-plan-btn');
+  function on(id, evt, fn) {
+    const el = byId(id);
+    if (el) el.addEventListener(evt, fn);
+  }
 
-    function executePlan() {
-      const val = promptInput ? promptInput.value.trim() : '';
-      if (val) {
-        state.prompt = val;
-        const parsed = parseNaturalInput(val);
-        if (parsed.intent) state.intent = parsed.intent;
-        if (parsed.date) state.date = parsed.date;
-        if (parsed.subject) state.subject = parsed.subject;
-        if (parsed.topicId) state.topicId = parsed.topicId;
-        if (parsed.taskMode) state.taskMode = parsed.taskMode;
-        if (parsed.targetId) state.targetId = parsed.targetId;
-      }
+  function resetResults() {
+    state.proposals = null;
+    state.message = '';
+  }
 
-      state.lastResult = null;
-      const res = generateProposals();
-      if (!res.ok) {
-        alert(res.error || 'Could not generate a plan.');
-        return;
-      }
+  function runPlan() {
+    state.lastResult = null;
+    state.message = '';
+    const res = generateProposals();
+    if (!res.ok) {
+      state.proposals = null;
+      state.message = res.error || 'Could not generate a plan.';
+    } else {
       state.proposals = res.proposals;
+    }
+    render();
+  }
+
+  function bindEvents() {
+    on('plan-agent-back', 'click', function () {
+      Modal.close();
+      if (typeof Assistant !== 'undefined' && Assistant.openMain) Assistant.openMain();
+    });
+    on('plan-agent-close', 'click', function () { Modal.close(); });
+    on('plan-agent-done', 'click', function () { Modal.close(); });
+    on('plan-agent-again', 'click', function () { state.lastResult = null; resetResults(); render(); });
+
+    on('plan-ctrl-intent', 'change', function (e) {
+      state.intent = e.target.value;
+      resetResults();
       render();
-    }
-
-    if (planBtn) planBtn.addEventListener('click', executePlan);
-    if (promptInput) {
-      promptInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          executePlan();
-        }
-      });
-    }
-
-    // Intent chips
-    document.querySelectorAll('.planning-chip').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.intent = btn.dataset.intent;
-        state.proposals = null;
-        state.lastResult = null;
-        render();
-      });
     });
 
-    // Subject dropdown
-    const subjSel = document.getElementById('plan-ctrl-subject');
-    if (subjSel) {
-      subjSel.addEventListener('change', function () {
-        state.subject = subjSel.value;
+    on('plan-ctrl-subject', 'change', function (e) {
+      state.subject = e.target.value;
+      if (state.intent === 'topic') {
         const topicsMap = (typeof PlannerData !== 'undefined' ? PlannerData.getTopicsBySubject() : {});
         const tList = topicsMap[state.subject] || [];
         state.topicId = tList.length ? tList[0].topicId : '';
-        state.proposals = null;
-        render();
-      });
-    }
-
-    // Topic dropdown
-    const topSel = document.getElementById('plan-ctrl-topic');
-    if (topSel) {
-      topSel.addEventListener('change', function () {
-        state.topicId = topSel.value;
-        state.proposals = null;
-      });
-    }
-
-    // Mode dropdown
-    const modeSel = document.getElementById('plan-ctrl-mode');
-    if (modeSel) {
-      modeSel.addEventListener('change', function () {
-        state.taskMode = modeSel.value;
-        state.proposals = null;
-      });
-    }
-
-    // Date picker
-    const dateInput = document.getElementById('plan-ctrl-date');
-    if (dateInput) {
-      dateInput.addEventListener('change', function () {
-        state.date = dateInput.value;
-        state.proposals = null;
-      });
-    }
-
-    // Quick date buttons
-    document.querySelectorAll('.planning-quick-date').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.date = btn.dataset.setDate;
-        state.proposals = null;
-        render();
-      });
+      }
+      resetResults();
+      render();
     });
+    on('plan-ctrl-topic', 'change', function (e) { state.topicId = e.target.value; resetResults(); render(); });
+    on('plan-ctrl-mode', 'change', function (e) { state.taskMode = e.target.value; resetResults(); render(); });
+    on('plan-ctrl-date', 'change', function (e) { state.date = e.target.value; resetResults(); render(); });
+    on('plan-ctrl-target', 'change', function (e) { state.targetId = e.target.value; resetResults(); render(); });
 
-    // Target dropdown
-    const tgtSel = document.getElementById('plan-ctrl-target');
-    if (tgtSel) {
-      tgtSel.addEventListener('change', function () {
-        state.targetId = tgtSel.value;
-        state.proposals = null;
+    const titleInput = byId('plan-ctrl-title');
+    if (titleInput) {
+      titleInput.addEventListener('input', function () { state.customTitle = titleInput.value; });
+      titleInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); state.customTitle = titleInput.value; runPlan(); }
       });
     }
 
-    // Proposal item removal
-    document.querySelectorAll('.planning-proposal-del').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
+    on('plan-agent-go', 'click', runPlan);
+
+    document.querySelectorAll('.plan-agent-x').forEach(function (btn) {
+      btn.addEventListener('click', function () {
         const idx = Number(btn.dataset.idx);
         if (state.proposals && state.proposals[idx]) {
           state.proposals.splice(idx, 1);
+          if (!state.proposals.length) state.proposals = null;
           render();
         }
       });
     });
 
-    // Accept proposals button
-    const acceptBtn = document.getElementById('planning-accept-btn');
-    if (acceptBtn) {
-      acceptBtn.addEventListener('click', function () {
-        acceptProposals();
-      });
-    }
-
-    // Cancel proposals
-    const cancelPropsBtn = document.getElementById('planning-cancel-proposals-btn');
-    if (cancelPropsBtn) {
-      cancelPropsBtn.addEventListener('click', function () {
-        state.proposals = null;
-        render();
-      });
-    }
-
-    // Go to Planner button
-    const gotoPlannerBtn = document.getElementById('planning-goto-planner-btn');
-    if (gotoPlannerBtn) {
-      gotoPlannerBtn.addEventListener('click', function () {
-        Modal.close();
-        if (typeof Nav !== 'undefined') {
-          Nav.switchTo('library');
-        }
-      });
-    }
-
-    // New Plan button
-    const newPlanBtn = document.getElementById('planning-new-plan-btn');
-    if (newPlanBtn) {
-      newPlanBtn.addEventListener('click', function () {
-        state.lastResult = null;
-        state.proposals = null;
-        state.prompt = '';
-        render();
-      });
-    }
+    on('plan-agent-accept', 'click', acceptProposals);
+    on('plan-agent-cancel', 'click', function () { resetResults(); render(); });
   }
 
-  function render() {
-    Modal.open(renderHtml(), { size: 'lg' });
+  function render(first) {
+    const html = renderHtml();
+    const content = document.getElementById('modal-content');
+    // After the first open, swap the contents in place so the modal doesn't re-animate on every change.
+    if (!first && content && content.querySelector('.plan-agent')) {
+      content.innerHTML = html;
+    } else {
+      Modal.open(html, { size: 'md' });
+    }
     bindEvents();
   }
 
   // ---------- Public Universal API ----------
+  // open(context): context may carry { date, intent, subject, topicId, chapterId, targetId, title, prompt, catchup, from }.
+  // chapterId is the same thing as topicId and is normalised here, at the entry boundary.
+
+  function normalizeContext(options) {
+    const o = Object.assign({}, options || {});
+    if (!o.topicId && o.chapterId) o.topicId = o.chapterId;
+    delete o.chapterId;
+    if (o.catchup) o.intent = 'catchup';
+    if (o.topicId && !o.subject && typeof PlannerData !== 'undefined') {
+      const t = PlannerData.getAllTopics()[o.topicId];
+      if (t) o.subject = t.subject;
+    }
+    return o;
+  }
 
   function open(options) {
-    const opts = options || {};
+    const opts = normalizeContext(options);
     state.proposals = null;
     state.lastResult = null;
+    state.message = '';
     state.prompt = opts.prompt || '';
-    state.intent = opts.intent || 'topic';
-    state.taskMode = 'theory';
+    state.customTitle = opts.title || '';
+    state.from = opts.from || '';
+    state.intent = opts.intent || (opts.title ? 'custom' : 'topic');
+    state.taskMode = 'theory'; // default: ONE Study Task. A full revision cycle only when explicitly chosen.
     state.date = opts.date || todayStr();
+    state.targetId = '';
 
-    if (opts.subject) {
-      state.subject = opts.subject;
-      state.intent = 'topic';
-    } else if (typeof PlannerData !== 'undefined') {
-      const allSub = PlannerData.getAllSubjects();
-      state.subject = allSub[0] || '';
-    }
-
+    const allSub = (typeof PlannerData !== 'undefined') ? PlannerData.getAllSubjects() : [];
+    state.subject = opts.subject || allSub[0] || '';
+    state.topicId = '';
     if (opts.topicId) {
       state.topicId = opts.topicId;
       state.intent = 'topic';
     } else if (state.subject && typeof PlannerData !== 'undefined') {
-      const tMap = PlannerData.getTopicsBySubject();
-      const tList = tMap[state.subject] || [];
+      const tList = PlannerData.getTopicsBySubject()[state.subject] || [];
       state.topicId = tList.length ? tList[0].topicId : '';
     }
 
     if (opts.targetId) {
       state.targetId = opts.targetId;
       state.intent = 'target';
+    } else {
+      const act = getTargetsList().filter(function (t) { return !t.completed && !t.archived; });
+      state.targetId = act.length ? act[0].targetId : '';
     }
 
     if (opts.prompt) {
@@ -963,13 +874,14 @@ const PlanningAgentUI = (function () {
       if (parsed.taskMode) state.taskMode = parsed.taskMode;
     }
 
-    // If preselected with an explicit topic or target, generate proposal right away
-    if (opts.topicId || opts.targetId) {
+    // An explicit context (topic, goal, day, catch-up) is already specific: show the proposal right away.
+    if (opts.topicId || opts.targetId || opts.intent === 'day' || state.intent === 'catchup') {
       const res = generateProposals();
       if (res.ok) state.proposals = res.proposals;
+      else state.message = res.error || '';
     }
 
-    render();
+    render(true);
   }
 
   return {
