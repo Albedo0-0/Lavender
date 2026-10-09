@@ -326,7 +326,7 @@ const Assistant = (function () {
             if (key === 'summary') return openSummary(AssistantData.todayStr());
       if (key === 'history') return openSummary(AssistantData.todayStr());
       if (key === 'alarms') return openAlarms();
-      if (key === 'today') { if (typeof ItineraryToday !== 'undefined') ItineraryToday.open(); return; }
+            if (key === 'today') { TaskManagerUI.open({ view: 'day' }); return; }
     } catch (err) {
       console.error('Assistant.routeTo failed for', key, err);
       Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-plain"><h3 class="section-title">' + key + '</h3><div class="empty-state">Couldn\'t load this right now.</div></div>');
