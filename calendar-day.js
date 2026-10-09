@@ -49,9 +49,8 @@ const CalendarDay = (function () {
 
   // ---------- canonical reads (no storage of its own) ----------
   function dayTasks(d) {
-    if (typeof PlannerData === 'undefined') return [];
-    if (typeof PTPE !== 'undefined' && typeof PTPE.dimTasks === 'function') return PTPE.dimTasks(d, null);
-    return PlannerData.getTasksForDate(d).filter(function (t) { return !t.archived || t.completed; });
+        if (typeof PlanningAgent === 'undefined' || !PlanningAgent.getTasksForDateRange) return [];
+    return PlanningAgent.getTasksForDateRange(d, d).filter(function (t) { return !t.archived || t.completed; });
   }
   function taskMin(t) {
     const a = hmToMin(t.startTime || t.savedStartTime), b = hmToMin(t.stopTime || t.savedStopTime);
@@ -74,10 +73,8 @@ const CalendarDay = (function () {
     return { done: items.filter(function (it) { return it.state === 'completed'; }).length, total: items.length };
   }
   function dayAlarms(d) {
-    if (typeof AlarmData === 'undefined') return [];
-    return AlarmData.getList().filter(function (a) {
-      return a && a.enabled && a.recurrence && AlarmData.dateMatchesRecurrence(a.recurrence, d) && hmToMin(a.time) !== null;
-    });
+        if (typeof PlanningAgent === 'undefined' || !PlanningAgent.getAlarmsForDate) return [];
+    return PlanningAgent.getAlarmsForDate(d).filter(function (a) { return hmToMin(a.time) !== null; });
   }
   function dayStats(d) {
     const out = { studyMs: 0, breakMs: 0, recs: [] };
@@ -99,7 +96,7 @@ const CalendarDay = (function () {
     return rows;
   }
   function sessionLabel(r) {
-    const t = r.taskId && typeof PlannerData !== 'undefined' ? PlannerData.getTask(r.taskId) : null;
+        const t = r.taskId && typeof PlanningAgent !== 'undefined' && PlanningAgent.getTask ? PlanningAgent.getTask(r.taskId) : null;
     return t ? taskName(t) : (SOURCE_NAMES[r.source] || 'Study session');
   }
 
