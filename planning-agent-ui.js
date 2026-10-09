@@ -1879,7 +1879,8 @@ const PlanningAgentUI = (function () {
 
   function normalizeContext(options) {
     const o = Object.assign({}, options || {});
-    if (!o.topicId && o.chapterId) o.topicId = o.chapterId;
+        if (!o.topicId && o.chapterId) o.topicId = o.chapterId;
+    if (!o.subject && o.subjectId) o.subject = o.subjectId;
     delete o.chapterId;
     if (o.catchup) o.intent = 'catchup';
     if (o.topicId && !o.subject) {
