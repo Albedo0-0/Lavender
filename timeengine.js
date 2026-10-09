@@ -800,7 +800,7 @@ const TimeEngine = (function () {
     if (typeof fn !== 'function') return function () {};
     const key = id || ('anon_' + (++anonCounter));
     if (!id) {
-      console.warn('TimeEngine.subscribe called without an id \u2014 subscription will not be de-duplicated on re-init. Pass a stable id (e.g. "study", "alarm", "gamification", "water").');
+      console.warn('TimeEngine.subscribe called without an id \u2014 subscription will not be de-duplicated on re-init. Pass a stable id (e.g. \"study\", \"planning-agent-alarms\", \"gamification\", \"water\").');
     }
     subscriberRegistry[key] = fn;
     return function unsubscribe() { delete subscriberRegistry[key]; };
