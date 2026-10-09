@@ -628,7 +628,7 @@ const Assistant = (function () {
   // ---------- Alarms (§6.1 — General Alarm lives here, near Notepad, now that Assistant exists) ----------
 
   function openAlarms() {
-    Alarm.openList();
+        TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } });
   }
 
   
