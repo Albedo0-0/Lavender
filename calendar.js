@@ -134,7 +134,7 @@ const Calendar = (function () {
     const shownTaskIds = {};
     if (typeof PlanData !== 'undefined') {
       const topics = PlanData.getAllTopics();
-      PlanData.getTasksForDate(dateStr).forEach(function (t) {
+            PlanningAgent.getTasksForDateRange(dateStr, dateStr).forEach(function (t) {
         if (t.archived) return;
         const startStr = t.startTime || t.savedStartTime;
         const stopStr = t.stopTime || t.savedStopTime;
@@ -159,7 +159,7 @@ const Calendar = (function () {
     }
         if (typeof CanonicalTaskStore !== 'undefined') {
       CanonicalTaskStore.getTasks({ date: dateStr, scheduled: 'timed' }).forEach(function (t) {
-        if (!t.alarm || !t.alarm.enabled || t.status === 'cancelled') return;
+                if (!t.alarm || !t.alarm.enabled || t.status === 'cancelled' || t.duration) return;
         const s = hmToMin(t.time);
         if (s === null || s < 0 || s >= 1440) return;
         items.push({
@@ -538,8 +538,8 @@ const Calendar = (function () {
       let cellHasRevision = false;
       let cellHasTarget = false;
       if (typeof PlanData !== 'undefined') {
-        cellHasTask = PlanData.getIncompleteTasksForDate(dateStr).length > 0;
-        cellHasRevision = PlanData.getTasksForDate(dateStr).some(function (t) { return t.taskType === 'revision'; });
+                cellHasTask = PlanningAgent.getIncompleteTasksForDate(dateStr).length > 0;
+        cellHasRevision = PlanningAgent.getTasksByDate(dateStr).some(function (t) { return t.taskType === 'revision'; });
       }
       if (typeof TargetsData !== 'undefined') {
         const dayTargets = TargetsData.getTargetsForDate(dateStr) || [];
@@ -606,7 +606,7 @@ const Calendar = (function () {
           cell.appendChild(snippet);
         }
 
-        const revisionCount = PlanData.getTasksForDate(dateStr).filter(function (t) { return t.taskType === 'revision'; }).length;
+                const revisionCount = PlanningAgent.getTasksByDate(dateStr).filter(function (t) { return t.taskType === 'revision'; }).length;
         if (revisionCount > 0) {
           const dots = document.createElement('div');
           dots.className = 'cal-revision-dots';
@@ -674,7 +674,7 @@ const Calendar = (function () {
 
   function renderTodoList(dateStr) {
     if (typeof PlanData === 'undefined') return '<p class="datehub-todo-empty empty-state">No planner tasks.</p>';
-    const tasks = PlanData.getTasksForDate(dateStr);
+        const tasks = PlanningAgent.getTasksByDate(dateStr);
     if (tasks.length === 0) return '<p class="datehub-todo-empty empty-state">Nothing due.</p>';
 
     // Groups come from the canonical subject list (active subjects first, in list order). A task
@@ -866,7 +866,7 @@ const Calendar = (function () {
     });
     document.querySelectorAll('.datehub-todo-check').forEach(function (cb) {
       cb.addEventListener('change', function () {
-        PlanData.toggleComplete(cb.dataset.taskId);
+                PlanningAgent.toggleTask(cb.dataset.taskId);
         render();
         openDateHub(dateStr);
       });
@@ -920,8 +920,8 @@ const Calendar = (function () {
     const planBtn = document.getElementById('datehub-goto-plan');
     if (planBtn) {
       planBtn.addEventListener('click', function () {
-        if (typeof PlanningAgentUI !== 'undefined') {
-          PlanningAgentUI.open({ date: dateStr, intent: 'day' });
+                if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) {
+          PlanningAgent.open({ date: dateStr, intent: 'day' });
         }
       });
     }
@@ -1060,7 +1060,7 @@ const prevBtn = document.getElementById('calendar-prev');
     openWeek: openWeek,
         openDay: openDay,
     openDateHub: openDateHub,
-    openPlan: function (opts) { if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts); },
+        openPlan: function (opts) { if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open(opts); },
     blocksFor: weekBlocksFor,
     layoutLanes: layoutLanes,
     getSelectedWeek: function () { return selectedWeekStart; }
