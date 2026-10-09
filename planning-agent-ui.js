@@ -3983,7 +3983,10 @@ if (typeof window !== 'undefined') {
     });
     PA.proposeRoutine = CatchUpUI.proposeRoutine;
   })();
-  window.TaskManagerUI = TaskManagerUI;
+    window.TaskManagerUI = TaskManagerUI;
+  // study.js and timeengine.js still call PlannerData, whose file was retired in Phase 3.
+  // PlanData has every method they use, so alias it rather than patch both files.
+  if (typeof window.PlannerData === 'undefined') window.PlannerData = PlanData;
   window.Planner = {
     init: function () {},
     render: function () {},
