@@ -1974,7 +1974,7 @@ const TaskManagerUI = (function () {
   const HOUR_PX = 48;
   const MONTH_CHIPS = 3;
 
-  function freshFilters() { return { search: '', type: '', subject: '', target: '', status: '', scheduled: '' }; }
+    function freshFilters() { return { search: '', type: '', subject: '', target: '', status: '', scheduled: '', alarm: '' }; }
 
   const st = {
     view: 'day',
@@ -2142,8 +2142,9 @@ const TaskManagerUI = (function () {
     if (f.target) q.targetId = f.target;
     if (f.status) q.status = f.status;
     if (f.scheduled) q.scheduled = f.scheduled;
-    let list = Store.getTasks(q);
-    const s = String(f.search || '').trim().toLowerCase();
+        let list = Store.getTasks(q);
+    if (f.alarm) list = list.filter(function (t) { return t.alarm && t.alarm.enabled; });
+    const s = String(f.search(f.search || '').trim().toLowerCase();
     if (s) list = list.filter(function (t) { return matchesSearch(t, s); });
     return sortTasks(list);
   }
@@ -2158,7 +2159,11 @@ const TaskManagerUI = (function () {
     if (t.revisionMeta && t.revisionMeta.level) bits.push(tag(t.revisionMeta.level, 'tm-tag-kraft'));
     if (t.subjectId) bits.push(tag(t.subjectId + (t.topicId ? ' · ' + topicName(t.topicId) : '')));
     else if (t.topicId) bits.push(tag(topicName(t.topicId)));
-    if (t.targetId) bits.push(tag('Goal: ' + targetTitle(t.targetId), 'tm-tag-neutral'));
+        if (t.targetId) {
+      bits.push(tag('Goal: ' + targetTitle(t.targetId), 'tm-tag-neutral'));
+      const gp = TargetsData.getProgress(t.targetId);
+      if (gp) bits.push(targetProgressBarHtml(gp.pct));
+    }
     if (t.checklist && t.checklist.length) {
       const done = t.checklist.filter(function (c) { return c.completed; }).length;
       bits.push(tag(done + '/' + t.checklist.length + ' items', 'tm-tag-neutral'));
@@ -2179,13 +2184,23 @@ const TaskManagerUI = (function () {
       (t.status === 'completed' ? ' checked' : '') + ' aria-label="Mark “' + esc(taskTitle(t)) + '” complete">';
   }
 
+    function inlineChecklistHtml(t) {
+    if (!t.checklist || !t.checklist.length) return '';
+    return '<ul class="tm-cl-inline" style="list-style:none;margin:4px 0 0;padding:0">' + t.checklist.map(function (c) {
+      return '<li><input type="checkbox" data-tm="cl-toggle" data-id="' + esc(t.id) + '" data-cid="' + esc(c.id) + '"' +
+        (c.completed ? ' checked' : '') + ' aria-label="Toggle ' + esc(c.text) + '"> ' +
+        '<span' + (c.completed ? ' style="text-decoration:line-through;opacity:.6"' : '') + '>' + esc(c.text) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+
   function rowHtml(t, showWhen) {
     return (
       '<li class="tm-row tm-st-' + esc(t.status) + '" data-tm="open" data-id="' + esc(t.id) + '" tabindex="0" role="button">' +
         checkHtml(t) +
         '<div class="tm-row-main">' +
           '<div class="tm-row-title">' + esc(taskTitle(t)) + (t.status === 'cancelled' ? ' <em>(cancelled)</em>' : '') + '</div>' +
-          '<div class="tm-row-tags">' + chipsHtml(t) + '</div>' +
+                    '<div class="tm-row-tags">' + chipsHtml(t) + '</div>' +
+          inlineChecklistHtml(t) +
         '</div>' +
         (showWhen ? '<div class="tm-row-when">' + esc(whenText(t)) + '</div>' : '') +
       '</li>'
@@ -2362,7 +2377,8 @@ const TaskManagerUI = (function () {
           selectHtml('data-tm-filter="subject" aria-label="Subject"', subjOpts, f.subject) +
           selectHtml('data-tm-filter="target" aria-label="Goal"', tgtOpts, f.target) +
           selectHtml('data-tm-filter="status" aria-label="Status"', statusOpts, f.status) +
-          selectHtml('data-tm-filter="scheduled" aria-label="Scheduling"', schedOpts, f.scheduled) +
+                    selectHtml('data-tm-filter="scheduled" aria-label="Scheduling"', schedOpts, f.scheduled) +
+          selectHtml('data-tm-filter="alarm" aria-label="Reminders"', [['', 'Any reminders'], ['1', 'With reminder']], f.alarm) +
         '</div>' +
         '<div class="tm-filter-row tm-sort-row">' +
           '<label class="tm-sort-label" for="tm-sort-by">Sort by</label>' +
@@ -2709,6 +2725,11 @@ const TaskManagerUI = (function () {
       }
       case 'toggle':
         res = Store.toggleTaskComplete(id);
+        if (!res.ok) st.message = res.error;
+        requestRender();
+        break;
+            case 'cl-toggle':
+        res = TaskChecklist.toggleItem(id, el.getAttribute('data-cid'));
         if (!res.ok) st.message = res.error;
         requestRender();
         break;
@@ -3181,6 +3202,598 @@ const CatchUpUI = (function () {
   };
 })();
 
+// ============================================================================
+// SECTION 9 - TARGETS, CHECKLISTS & ALARMS (Planning Architecture, Phase 5)
+// Replaces targets-data.js, targets.js, alarm-data.js and alarm.js.
+//   TargetsData    - goal/subgoal store (State.targets / State.subtargets) + progress maths.
+//                    Same public API as the retired file, so calendar/library/progress keep working.
+//   TaskChecklist  - inline checklist item toggling on canonical tasks.
+//   AlarmEngine    - handleClockTick(): fires task alarms from the TimeEngine heartbeat.
+//   TargetsPanel   - the goals manager modal (PlanningAgentUI.openTargets()).
+// ============================================================================
+
+const TargetsData = (function () {
+  function generateId(prefix) {
+    return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function todayStr() {
+    const t = new Date();
+    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  }
+  function clamp01(n) {
+    if (typeof n !== 'number' || isNaN(n)) return 0;
+    return Math.max(0, Math.min(1, n));
+  }
+
+  function getAllTargets() { return State.get().targets || {}; }
+  function getAllSubtargets() { return State.get().subtargets || {}; }
+  function getTarget(targetId) { return getAllTargets()[targetId] || null; }
+  function getAllTargetsList() {
+    const targets = getAllTargets();
+    return Object.keys(targets).map(function (id) { return targets[id]; });
+  }
+
+  function createTarget(input) {
+    const targets = Object.assign({}, getAllTargets());
+    const targetId = generateId('target');
+    const target = {
+      targetId: targetId,
+      timeframe: input.timeframe || 'daily',
+      dateKey: input.dateKey || todayStr(),
+      title: (input.title || '').trim(),
+      type: input.type || 'custom',
+      targetValue: typeof input.targetValue === 'number' && input.targetValue > 0 ? input.targetValue : 1,
+      currentValue: 0,
+      completed: false,
+      subtargets: [],
+      topicId: input.topicId || null,
+      note: input.note || '',
+      completedNote: '',
+      archived: false,
+      archivedAt: null
+    };
+    targets[targetId] = target;
+    State.set({ targets: targets });
+    return target;
+  }
+
+  function updateTarget(targetId, patch) {
+    const targets = Object.assign({}, getAllTargets());
+    const existing = targets[targetId];
+    if (!existing) return null;
+    const safePatch = Object.assign({}, patch);
+    if ('targetValue' in safePatch) {
+      const tv = parseFloat(safePatch.targetValue);
+      safePatch.targetValue = (!isNaN(tv) && tv >= 1) ? tv : existing.targetValue;
+    }
+    if ('currentValue' in safePatch) {
+      const cv = parseFloat(safePatch.currentValue);
+      const maxVal = ('targetValue' in safePatch) ? safePatch.targetValue : existing.targetValue;
+      safePatch.currentValue = isNaN(cv) ? existing.currentValue : Math.max(0, Math.min(maxVal, cv));
+    }
+    const updated = Object.assign({}, existing, safePatch);
+    targets[targetId] = updated;
+    State.set({ targets: targets });
+    return updated;
+  }
+
+  function deleteTarget(targetId) {
+    const targets = Object.assign({}, getAllTargets());
+    if (!targets[targetId]) return;
+    const subtargets = Object.assign({}, getAllSubtargets());
+    (targets[targetId].subtargets || []).forEach(function (sid) { delete subtargets[sid]; });
+    delete targets[targetId];
+    State.set({ targets: targets, subtargets: subtargets });
+  }
+
+  function archiveTarget(targetId) {
+    const target = getTarget(targetId);
+    if (!target || target.archived) return;
+    updateTarget(targetId, { archived: true, archivedAt: todayStr() });
+  }
+  function unarchiveTarget(targetId) {
+    const target = getTarget(targetId);
+    if (!target || !target.archived) return;
+    updateTarget(targetId, { archived: false, archivedAt: null });
+  }
+  function getArchivedTargetsList() {
+    return getAllTargetsList().filter(function (t) { return t.archived; });
+  }
+
+  function getSubtargetsForTarget(targetId) {
+    const target = getTarget(targetId);
+    if (!target) return [];
+    const subtargets = getAllSubtargets();
+    return (target.subtargets || []).map(function (id) { return subtargets[id]; }).filter(Boolean);
+  }
+
+  function createSubtarget(parentTargetId, input) {
+    const target = getTarget(parentTargetId);
+    if (!target) return null;
+    const subtargets = Object.assign({}, getAllSubtargets());
+    const subtargetId = generateId('subtarget');
+    const subtarget = {
+      subtargetId: subtargetId,
+      parentTargetId: parentTargetId,
+      title: (input.title || '').trim(),
+      dayAssigned: input.dayAssigned || todayStr(),
+      type: input.type || target.type,
+      targetValue: typeof input.targetValue === 'number' && input.targetValue > 0 ? input.targetValue : 1,
+      currentValue: 0,
+      completed: false
+    };
+    subtargets[subtargetId] = subtarget;
+    const targets = Object.assign({}, getAllTargets());
+    targets[parentTargetId] = Object.assign({}, target, { subtargets: (target.subtargets || []).concat([subtargetId]) });
+    State.set({ subtargets: subtargets, targets: targets });
+    recomputeParentCompletion(parentTargetId);
+    return subtarget;
+  }
+
+  function updateSubtarget(subtargetId, patch) {
+    const subtargets = Object.assign({}, getAllSubtargets());
+    const existing = subtargets[subtargetId];
+    if (!existing) return null;
+    const safePatch = Object.assign({}, patch);
+    if ('targetValue' in safePatch) {
+      const tv = parseFloat(safePatch.targetValue);
+      safePatch.targetValue = (!isNaN(tv) && tv >= 1) ? tv : existing.targetValue;
+    }
+    if ('currentValue' in safePatch) {
+      const cv = parseFloat(safePatch.currentValue);
+      const maxVal = ('targetValue' in safePatch) ? safePatch.targetValue : existing.targetValue;
+      safePatch.currentValue = isNaN(cv) ? existing.currentValue : Math.max(0, Math.min(maxVal, cv));
+    }
+    const updated = Object.assign({}, existing, safePatch);
+    subtargets[subtargetId] = updated;
+    State.set({ subtargets: subtargets });
+    recomputeParentCompletion(existing.parentTargetId);
+    return updated;
+  }
+
+  function deleteSubtarget(subtargetId) {
+    const subtargets = Object.assign({}, getAllSubtargets());
+    const existing = subtargets[subtargetId];
+    if (!existing) return;
+    delete subtargets[subtargetId];
+    const targets = Object.assign({}, getAllTargets());
+    const parent = targets[existing.parentTargetId];
+    if (parent) {
+      const remaining = (parent.subtargets || []).filter(function (id) { return id !== subtargetId; });
+      targets[existing.parentTargetId] = Object.assign({}, parent, {
+        subtargets: remaining,
+        currentValue: remaining.length === 0 ? 0 : parent.currentValue,
+        completed: remaining.length === 0 ? false : parent.completed
+      });
+    }
+    State.set({ subtargets: subtargets, targets: targets });
+    recomputeParentCompletion(existing.parentTargetId);
+  }
+
+  // Parent progress = average of its subtargets' completion (each clamped 0-1).
+  function recomputeParentCompletion(targetId) {
+    const target = getTarget(targetId);
+    if (!target || !target.subtargets || target.subtargets.length === 0) return;
+    const subs = getSubtargetsForTarget(targetId);
+    if (subs.length === 0) return;
+    const avgPct = subs.reduce(function (sum, s) {
+      return sum + clamp01(s.targetValue > 0 ? s.currentValue / s.targetValue : 0);
+    }, 0) / subs.length;
+    const allComplete = subs.every(function (s) { return s.completed; });
+    updateTarget(targetId, { currentValue: Math.round(avgPct * target.targetValue), completed: allComplete });
+    if (allComplete) archiveTarget(targetId);
+  }
+
+  function toggleTargetComplete(targetId, recordedValue) {
+    const target = getTarget(targetId);
+    if (!target) return null;
+    const nowCompleted = !target.completed;
+
+    if (target.subtargets && target.subtargets.length > 0) {
+      target.subtargets.forEach(function (sid) {
+        const sub = getAllSubtargets()[sid];
+        if (!sub) return;
+        updateSubtarget(sid, { completed: nowCompleted, currentValue: nowCompleted ? sub.targetValue : 0 });
+      });
+      recomputeParentCompletion(targetId);
+      if (nowCompleted) archiveTarget(targetId); else unarchiveTarget(targetId);
+      return getTarget(targetId);
+    }
+
+    const value = (target.type === 'hours' || target.type === 'questions')
+      ? (typeof recordedValue === 'number' && !isNaN(recordedValue) && recordedValue >= 0 ? recordedValue : target.targetValue)
+      : (nowCompleted ? target.targetValue : 0);
+    const updated = updateTarget(targetId, { completed: nowCompleted, currentValue: nowCompleted ? value : 0 });
+
+    if (typeof GamificationData !== 'undefined' && GamificationData.awardTargetCompleted) {
+      if (nowCompleted) GamificationData.awardTargetCompleted(updated);
+      else if (GamificationData.retractTargetCompleted) GamificationData.retractTargetCompleted(target);
+    }
+    if (nowCompleted) archiveTarget(targetId); else unarchiveTarget(targetId);
+    return getTarget(targetId);
+  }
+
+  function toggleSubtargetComplete(subtargetId) {
+    const sub = getAllSubtargets()[subtargetId];
+    if (!sub) return null;
+    const nowCompleted = !sub.completed;
+    return updateSubtarget(subtargetId, { completed: nowCompleted, currentValue: nowCompleted ? sub.targetValue : 0 });
+  }
+
+  function setProgressValue(targetId, value) {
+    const target = getTarget(targetId);
+    if (!target) return null;
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return null;
+    const clamped = Math.max(0, Math.min(target.targetValue, parsed));
+    return updateTarget(targetId, { currentValue: clamped, completed: clamped >= target.targetValue });
+  }
+
+  function getTargetsByTimeframe(timeframe) {
+    return getAllTargetsList().filter(function (t) { return t.timeframe === timeframe && !t.archived; });
+  }
+  function isSameMonth(a, b) { return a && b && a.slice(0, 7) === b.slice(0, 7); }
+  function isSameWeek(a, b) {
+    if (!a || !b) return false;
+    const startOfWeek = function (s) {
+      const d = new Date(s + 'T00:00:00');
+      d.setDate(d.getDate() - d.getDay());
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    };
+    return startOfWeek(a) === startOfWeek(b);
+  }
+  function getTargetsForDate(dateStr) {
+    return getAllTargetsList().filter(function (t) {
+      if (t.archived) return false;
+      if (t.timeframe === 'daily') return t.dateKey === dateStr;
+      if (t.timeframe === 'weekly') return isSameWeek(t.dateKey, dateStr);
+      if (t.timeframe === 'monthly') return isSameMonth(t.dateKey, dateStr);
+      return false;
+    });
+  }
+  function getTargetsForTopic(topicId) {
+    return getAllTargetsList().filter(function (t) { return t.topicId === topicId && !t.archived; });
+  }
+
+  // ---------- Phase 5: dynamic progress from canonical tasks ----------
+  // pct source, in order: subtargets (average) -> linked canonical tasks (custom targets: done/total)
+  // -> currentValue/targetValue. Cancelled tasks never count.
+  function getProgress(targetId) {
+    const t = getTarget(targetId);
+    if (!t) return null;
+    const linked = CanonicalTaskStore.getTasks({ targetId: targetId, status: ['pending', 'completed'] });
+    const taskDone = linked.filter(function (x) { return x.status === 'completed'; }).length;
+    const subs = getSubtargetsForTarget(targetId);
+    let ratio;
+    if (subs.length) {
+      ratio = subs.reduce(function (sum, s) {
+        return sum + clamp01(s.targetValue > 0 ? s.currentValue / s.targetValue : 0);
+      }, 0) / subs.length;
+    } else if (t.type === 'custom' && linked.length) {
+      ratio = taskDone / linked.length;
+    } else {
+      ratio = clamp01(t.targetValue > 0 ? t.currentValue / t.targetValue : 0);
+    }
+    return {
+      pct: Math.round(ratio * 100),
+      taskDone: taskDone,
+      taskTotal: linked.length,
+      currentValue: t.currentValue,
+      targetValue: t.targetValue,
+      completed: !!t.completed
+    };
+  }
+
+  // Keeps custom, subtarget-less targets in step with their linked tasks. Called on every task change.
+  function syncFromTasks() {
+    getAllTargetsList().forEach(function (t) {
+      if (t.archived || t.type !== 'custom' || (t.subtargets && t.subtargets.length)) return;
+      const linked = CanonicalTaskStore.getTasks({ targetId: t.targetId, status: ['pending', 'completed'] });
+      if (!linked.length) return;
+      const done = linked.filter(function (x) { return x.status === 'completed'; }).length;
+      const value = Math.round(t.targetValue * done / linked.length);
+      const completed = done === linked.length;
+      if (value !== t.currentValue || completed !== !!t.completed) {
+        updateTarget(t.targetId, { currentValue: value, completed: completed });
+      }
+    });
+  }
+
+  return {
+    createTarget: createTarget,
+    updateTarget: updateTarget,
+    deleteTarget: deleteTarget,
+    archiveTarget: archiveTarget,
+    unarchiveTarget: unarchiveTarget,
+    getArchivedTargetsList: getArchivedTargetsList,
+    getTarget: getTarget,
+    getAllTargets: getAllTargets,
+    getAllTargetsList: getAllTargetsList,
+    getAllSubtargets: getAllSubtargets,
+    getTargetsByTimeframe: getTargetsByTimeframe,
+    getTargetsForDate: getTargetsForDate,
+    getTargetsForTopic: getTargetsForTopic,
+    createSubtarget: createSubtarget,
+    updateSubtarget: updateSubtarget,
+    deleteSubtarget: deleteSubtarget,
+    getSubtargetsForTarget: getSubtargetsForTarget,
+    toggleTargetComplete: toggleTargetComplete,
+    toggleSubtargetComplete: toggleSubtargetComplete,
+    setProgressValue: setProgressValue,
+    getProgress: getProgress,
+    syncFromTasks: syncFromTasks
+  };
+})();
+
+function targetProgressBarHtml(pct) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  return '<span class="tm-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p + '" ' +
+    'style="display:inline-block;width:64px;height:6px;border-radius:3px;background:rgba(128,128,128,.25);vertical-align:middle;overflow:hidden">' +
+    '<span style="display:block;height:100%;width:' + p + '%;background:currentColor"></span></span> ' +
+    '<span class="tm-progress-pct">' + p + '%</span>';
+}
+
+const TaskChecklist = (function () {
+  function toggleItem(taskId, itemId) {
+    const t = CanonicalTaskStore.getTask(taskId);
+    if (!t || !t.checklist) return { ok: false, error: 'Checklist not found.' };
+    let hit = false;
+    const next = t.checklist.map(function (c) {
+      if (c.id !== itemId) return c;
+      hit = true;
+      return { id: c.id, text: c.text, completed: !c.completed };
+    });
+    if (!hit) return { ok: false, error: 'Checklist item not found.' };
+    return CanonicalTaskStore.updateTask(taskId, { checklist: next });
+  }
+  function progress(task) {
+    const list = (task && task.checklist) || [];
+    const done = list.filter(function (c) { return c.completed; }).length;
+    return { done: done, total: list.length, pct: list.length ? Math.round(done * 100 / list.length) : 0 };
+  }
+  return { toggleItem: toggleItem, progress: progress };
+})();
+
+const AlarmEngine = (function () {
+  const SUBSCRIBER_ID = 'planning-agent-alarms';
+  const GRACE_MIN = 10;                 // an alarm older than this when first seen is retired silently (no backlog)
+  const MIGRATION_FLAG = 'lavender_general_alarms_migrated_v1';
+  const MIGRATION_DAYS = 30;            // recurring legacy alarms are expanded into this many days of tasks
+  const DAY_KEYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  let lastMinute = null;
+  let migrated = false;
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function fmt(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function asMs(x) {
+    if (x instanceof Date) return x.getTime();
+    if (typeof x === 'number' && isFinite(x)) return x;
+    return Date.now();
+  }
+  function fireAtMs(t) {
+    return new Date(t.date + 'T' + t.time + ':00').getTime() - t.alarm.offsetMinutes * 60000;
+  }
+
+  function modalBusy() {
+    const ov = document.getElementById('modal-overlay'), c = document.getElementById('modal-content');
+    if (!ov || !c) return false;
+    const cs = getComputedStyle(ov);
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0' && c.innerHTML.trim() !== '';
+  }
+
+  function trigger(t) {
+    const title = t.title || 'Task reminder';
+    const body = t.alarm.offsetMinutes ? 'Starts in ' + t.alarm.offsetMinutes + ' min (' + t.time + ')' : 'Starting now (' + t.time + ')';
+    if (typeof Notify !== 'undefined' && Notify.deliver) Notify.deliver(title, body);
+    if (typeof Modal === 'undefined' || modalBusy()) return;   // sound/notification already delivered
+    Modal.open(
+      '<h3 class="section-heading">Reminder</h3><p><strong>' + esc(title) + '</strong><br>' + esc(body) + '</p>' +
+      '<button id="pa-alarm-open" class="btn btn-primary">Open task</button> ' +
+      '<button id="pa-alarm-done" class="btn btn-secondary">Mark complete</button> ' +
+      '<button id="pa-alarm-dismiss" class="btn btn-secondary">Dismiss</button>'
+    );
+    const on = function (id, fn) { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    on('pa-alarm-dismiss', function () { Modal.close(); });
+    on('pa-alarm-done', function () { CanonicalTaskStore.updateTask(t.id, { status: 'completed' }); Modal.close(); });
+    on('pa-alarm-open', function () { TaskManagerUI.open({ taskId: t.id }); });
+  }
+
+  // Called by the TimeEngine heartbeat (every second); does real work once per minute.
+  // currentTime: Date | epoch ms (defaults to now). Returns the ids of the tasks that fired.
+  function handleClockTick(currentTime) {
+    const now = asMs(currentTime);
+    const minute = Math.floor(now / 60000);
+    if (minute === lastMinute) return [];
+    lastMinute = minute;
+    migrateGeneralAlarms();
+
+    const fired = [];
+    CanonicalTaskStore.getTasks({ status: 'pending', scheduled: 'timed' }).forEach(function (t) {
+      if (!t.alarm || !t.alarm.enabled || t.alarm.notified) return;
+      const fireAt = fireAtMs(t);
+      if (isNaN(fireAt) || now < Math.floor(fireAt / 60000) * 60000) return;
+      const res = CanonicalTaskStore.updateTask(t.id, { alarm: Object.assign({}, t.alarm, { notified: true }) });
+      if (!res.ok) return;
+      if (now - fireAt > GRACE_MIN * 60000) return;            // stale: retired without firing
+      trigger(t);
+      fired.push(t.id);
+    });
+    return fired;
+  }
+
+  // One-time: legacy State.generalAlarms -> canonical tasks with an alarm (offset 0). The canonical
+  // schema has no recurrence, so daily/weekday alarms become one task per matching day for 30 days.
+  function migrateGeneralAlarms() {
+    if (migrated) return;
+    migrated = true;
+    try {
+      if (localStorage.getItem(MIGRATION_FLAG) === '1') return;
+      const all = (State.get() && State.get().generalAlarms) || {};
+      const now = new Date(), today = fmt(now), nowHm = pad(now.getHours()) + ':' + pad(now.getMinutes());
+      Object.keys(all).forEach(function (id) {
+        const a = all[id];
+        if (!a || !a.enabled || !a.time || !a.recurrence) return;
+        const r = a.recurrence, dates = [];
+        if (r.type === 'once') {
+          const d = new Date(now); if (a.time <= nowHm) d.setDate(d.getDate() + 1);
+          dates.push(fmt(d));
+        } else if (r.type === 'date' && r.date) {
+          dates.push(r.date);
+        } else if (r.type === 'daily' || r.type === 'weekdays') {
+          for (let i = 0; i < MIGRATION_DAYS; i++) {
+            const d = new Date(now); d.setDate(d.getDate() + i);
+            if (r.type === 'daily' || (r.days || []).indexOf(DAY_KEYS[d.getDay()]) !== -1) dates.push(fmt(d));
+          }
+        }
+        dates.forEach(function (date) {
+          CanonicalTaskStore.createTask({
+            title: a.text || 'Alarm', type: 'custom', date: date, time: a.time,
+            alarm: { enabled: true, offsetMinutes: 0, sound: 'chime', notified: date === today && a.lastFiredDate === today }
+          });
+        });
+      });
+      localStorage.setItem(MIGRATION_FLAG, '1');
+    } catch (e) { console.warn('General alarm migration failed', e); }
+  }
+
+  function init() {
+    if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) {
+      TimeEngine.subscribe(function () { handleClockTick(new Date()); }, SUBSCRIBER_ID);
+    }
+  }
+
+  return { init: init, handleClockTick: handleClockTick, migrateGeneralAlarms: migrateGeneralAlarms };
+})();
+
+const TargetsPanel = (function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'; }); }
+
+  function targetRowHtml(t) {
+    const subs = TargetsData.getSubtargetsForTarget(t.targetId);
+    const prog = TargetsData.getProgress(t.targetId) || { pct: 0, taskDone: 0, taskTotal: 0 };
+    const subsHtml = subs.length === 0 ? '' :
+      '<ul class="targets-subtarget-list">' +
+        subs.map(function (s) {
+          return '<li class="targets-subtarget-row">' +
+            '<label><input type="checkbox" class="targets-subtarget-check" data-subtarget-id="' + s.subtargetId + '" ' + (s.completed ? 'checked' : '') + '> ' +
+            esc(s.title) + ' (' + s.currentValue + '/' + s.targetValue + ')</label> ' +
+            '<button class="targets-subtarget-delete" data-subtarget-id="' + s.subtargetId + '" aria-label="Delete subtarget">&times;</button>' +
+          '</li>';
+        }).join('') +
+      '</ul>';
+    return '<div class="targets-row" data-target-id="' + t.targetId + '">' +
+      '<div class="targets-row-header">' +
+        '<label>' +
+          (subs.length === 0 ? '<input type="checkbox" class="targets-complete-check" data-target-id="' + t.targetId + '" ' + (t.completed ? 'checked' : '') + '> ' : '') +
+          '<strong>' + esc(t.title) + '</strong>' +
+        '</label>' +
+        '<span class="targets-row-meta">' + t.timeframe + ' \u00B7 ' + t.currentValue + '/' + t.targetValue +
+          (prog.taskTotal ? ' \u00B7 ' + prog.taskDone + '/' + prog.taskTotal + ' tasks' : '') + '</span> ' +
+        targetProgressBarHtml(prog.pct) + ' ' +
+        (prog.taskTotal ? '<button class="targets-tasks-btn" data-target-id="' + t.targetId + '">Tasks</button>' : '') +
+        (!t.completed ? '<button class="targets-plan-btn" data-target-id="' + t.targetId + '" style="margin-right:4px;">\u2728 Plan</button>' : '') +
+        '<button class="targets-archive-btn" data-target-id="' + t.targetId + '">Archive</button>' +
+        '<button class="targets-delete-btn" data-target-id="' + t.targetId + '">Delete</button>' +
+      '</div>' +
+      subsHtml +
+      '<div class="targets-subtarget-add-row">' +
+        '<input type="text" class="targets-subtarget-input" data-target-id="' + t.targetId + '" placeholder="Add subtarget...">' +
+        '<button class="targets-subtarget-add-btn" data-target-id="' + t.targetId + '">+</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function listHtml(timeframe) {
+    const list = TargetsData.getTargetsByTimeframe(timeframe);
+    if (list.length === 0) return '<p class="planner-empty">No ' + timeframe + ' targets yet.</p>';
+    return list.map(targetRowHtml).join('');
+  }
+
+  function formHtml() {
+    return '<div class="targets-add-form">' +
+      '<input type="text" id="targets-new-title" placeholder="Target title...">' +
+      '<select id="targets-new-timeframe"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>' +
+      '<select id="targets-new-type"><option value="custom">Custom</option><option value="hours">Hours</option><option value="questions">Questions</option></select>' +
+      '<input type="number" id="targets-new-value" placeholder="Target value" min="1" value="1">' +
+      '<button id="targets-new-add-btn">Add Target</button>' +
+    '</div>';
+  }
+
+  function archivedListHtml() {
+    const list = TargetsData.getArchivedTargetsList();
+    if (list.length === 0) return '<p class="planner-empty">No archived targets.</p>';
+    return list.map(function (t) {
+      return '<div class="targets-row" data-target-id="' + t.targetId + '">' +
+        '<div class="targets-row-header">' +
+          '<strong>' + esc(t.title) + '</strong>' +
+          '<span class="targets-row-meta">' + t.timeframe + ' \u00B7 Archived: ' + t.archivedAt + '</span>' +
+          '<button class="targets-unarchive-btn" data-target-id="' + t.targetId + '">Unarchive</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function html() {
+    return '<h3>Targets</h3>' + formHtml() +
+      '<div class="targets-section"><h4>Daily</h4>' + listHtml('daily') + '</div>' +
+      '<div class="targets-section"><h4>Weekly</h4>' + listHtml('weekly') + '</div>' +
+      '<div class="targets-section"><h4>Monthly</h4>' + listHtml('monthly') + '</div>' +
+      '<div class="targets-section"><h4>Archived</h4>' + archivedListHtml() + '</div>';
+  }
+
+  function each(sel, evt, fn) {
+    document.querySelectorAll(sel).forEach(function (el) { el.addEventListener(evt, function () { fn(el); }); });
+  }
+
+  function wire() {
+    document.getElementById('targets-new-add-btn').addEventListener('click', function () {
+      const title = document.getElementById('targets-new-title').value.trim();
+      if (!title) return;
+      TargetsData.createTarget({
+        title: title,
+        timeframe: document.getElementById('targets-new-timeframe').value,
+        type: document.getElementById('targets-new-type').value,
+        targetValue: Number(document.getElementById('targets-new-value').value) || 1
+      });
+      open();
+    });
+    each('.targets-complete-check', 'click', function (el) { TargetsData.toggleTargetComplete(el.dataset.targetId); open(); });
+    each('.targets-delete-btn', 'click', function (el) { TargetsData.deleteTarget(el.dataset.targetId); open(); });
+    each('.targets-plan-btn', 'click', function (el) { PlanningAgentUI.open({ targetId: el.dataset.targetId, intent: 'target' }); });
+    each('.targets-tasks-btn', 'click', function (el) { TaskManagerUI.open({ view: 'all', filters: { target: el.dataset.targetId } }); });
+    each('.targets-archive-btn', 'click', function (el) { TargetsData.archiveTarget(el.dataset.targetId); open(); });
+    each('.targets-unarchive-btn', 'click', function (el) { TargetsData.unarchiveTarget(el.dataset.targetId); open(); });
+    each('.targets-subtarget-check', 'click', function (el) { TargetsData.toggleSubtargetComplete(el.dataset.subtargetId); open(); });
+    each('.targets-subtarget-delete', 'click', function (el) { TargetsData.deleteSubtarget(el.dataset.subtargetId); open(); });
+    each('.targets-subtarget-add-btn', 'click', function (el) {
+      const input = document.querySelector('.targets-subtarget-input[data-target-id="' + el.dataset.targetId + '"]');
+      const title = input.value.trim();
+      if (!title) return;
+      TargetsData.createSubtarget(el.dataset.targetId, { title: title, targetValue: 1 });
+      open();
+    });
+  }
+
+  function open() {
+    CanonicalTaskStore.init();
+    TargetsData.syncFromTasks();
+    Modal.open(html());
+    wire();
+  }
+
+  // Goals follow their linked tasks: any task change re-syncs custom targets.
+  CanonicalTaskStore.subscribe(function () {
+    try { TargetsData.syncFromTasks(); } catch (e) { console.warn('Target sync failed', e); }
+  });
+
+  return { open: open };
+})();
+
 if (typeof window !== 'undefined') {
   window.CanonicalTaskStore = CanonicalTaskStore;
   // Re-runs the idempotent legacy migration after boot, once State has loaded its saved data.
@@ -3193,6 +3806,13 @@ if (typeof window !== 'undefined') {
   PlanningAgentUI.openRoutines = CatchUpUI.openRoutines;
   PlanningAgentUI.evaluateOverdueTasks = CatchUpUI.evaluateOverdueTasks;
   CatchUpUI.init();
+  AlarmEngine.init();
+  PlanningAgentUI.openTargets = TargetsPanel.open;
+  PlanningAgentUI.handleClockTick = AlarmEngine.handleClockTick;
+  PlanningAgentUI.toggleChecklistItem = TaskChecklist.toggleItem;
+  // Compatibility shims for callers outside this file (alarm.js / targets.js are retired).
+  window.Alarm = { init: function () {}, openList: function () { TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } }); } };
+  window.Targets = { init: function () {}, open: TargetsPanel.open };
   (function () {
     const PA = (typeof PlanningAgent !== 'undefined') ? PlanningAgent : (window.PlanningAgent = {});
     PA.evaluateOverdueTasks = CatchUpUI.evaluateOverdueTasks;
