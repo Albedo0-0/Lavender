@@ -97,8 +97,11 @@ const Backup = (function () {
         assistantNotes: s.assistantNotes,
         notepadFolders: s.notepadFolders
       },
-      alarms: {
+            alarms: {
         generalAlarms: s.generalAlarms
+      },
+      tests: {
+        testMarks: s.testMarks // older backups simply lack this group
       },
       myWorld: buildMyWorld(),
       dailySummaries: s.dailySummaries,
@@ -341,6 +344,28 @@ const Backup = (function () {
     return out;
   }
 
+    // testMarks are keyed by testId (never by date, so same-day tests stay separate). A record needs a valid
+  // date, total > 0 and 0 <= obtained <= total; bad subject rows are dropped individually.
+  function cleanTestMarks(rawMap) {
+    const out = {};
+    if (!isPlainObject(rawMap)) return out;
+    Object.keys(rawMap).forEach(function (key) {
+      const rec = rawMap[key];
+      if (!isPlainObject(rec) || !isValidDateStr(rec.date)) return;
+      if (rec.testId !== undefined && rec.testId !== key) return;
+      if (!isFiniteNum(rec.total) || rec.total <= 0 || !isFiniteNum(rec.obtained) || rec.obtained < 0 || rec.obtained > rec.total) return;
+      const seen = {};
+      const subjects = (Array.isArray(rec.subjects) ? rec.subjects : []).filter(function (s) {
+        if (!isPlainObject(s) || typeof s.subject !== 'string' || !s.subject || seen[s.subject]) return false;
+        if (!isFiniteNum(s.total) || s.total <= 0 || !isFiniteNum(s.obtained) || s.obtained < 0 || s.obtained > s.total) return false;
+        seen[s.subject] = true;
+        return true;
+      });
+      out[key] = Object.assign({}, rec, { testId: key, subjects: subjects });
+    });
+    return out;
+  }
+
   function validDailySummary(rec) {
     if (rec.studyMs !== undefined && !isNonNegNum(rec.studyMs)) return false;
     if (rec.breakMs !== undefined && !isNonNegNum(rec.breakMs)) return false;
@@ -379,7 +404,8 @@ const Backup = (function () {
     const sl = isPlainObject(parsed.sleep) ? parsed.sleep : {};
     const hb = isPlainObject(parsed.habits) ? parsed.habits : {};
     const a = isPlainObject(parsed.assistant) ? parsed.assistant : {};
-    const al = isPlainObject(parsed.alarms) ? parsed.alarms : {};
+        const al = isPlainObject(parsed.alarms) ? parsed.alarms : {};
+    const tm = isPlainObject(parsed.tests) ? parsed.tests : {};
 
     return {
       dateHubs: c.dateHubs,
@@ -407,7 +433,8 @@ const Backup = (function () {
       habitsMigrated: hb.habitsMigrated,
       expLedger: (isPlainObject(parsed.gamification) ? parsed.gamification.expLedger : undefined),
       assistantNotes: a.assistantNotes,
-      generalAlarms: al.generalAlarms,
+            generalAlarms: al.generalAlarms,
+      testMarks: tm.testMarks,
       myWorld: parsed.myWorld,
       dailySummaries: parsed.dailySummaries,
       planningHistory: parsed.planningHistory
@@ -447,7 +474,8 @@ const Backup = (function () {
       waterEvents: cleanDateKeyedArrayMap(flat.waterEvents, validWaterEvent),
       sleepRecords: cleanDateKeyedMap(flat.sleepRecords, { dateField: 'date', recordValidator: validSleepRecord }),
       habits: cleanIdMap(flat.habits, 'habitId', validHabit),
-      habitLogs: cleanHabitLogs(flat.habitLogs),
+            habitLogs: cleanHabitLogs(flat.habitLogs),
+      testMarks: cleanTestMarks(flat.testMarks),
       habitsMigrated: typeof flat.habitsMigrated === 'boolean' ? flat.habitsMigrated : undefined,
       dailySummaries: cleanDateKeyedMap(flat.dailySummaries, { dateField: 'date', recordValidator: validDailySummary }),
       planningHistory: isPlainObject(flat.planningHistory) ? flat.planningHistory : {},
@@ -615,7 +643,8 @@ const Backup = (function () {
       waterReminder: cur.waterReminder,
       sleepRecords: mergeIdMap(c.sleepRecords, cur.sleepRecords),
       habits: mergedHabits,
-      habitLogs: mergedHabitLogs,
+            habitLogs: mergedHabitLogs,
+      testMarks: mergeIdMap(c.testMarks, cur.testMarks), // live wins per testId; backup-only tests are added
       habitsMigrated: cur.habitsMigrated === true && !backupBringsLegacy,
       generalAlarms: mergeIdMap(c.generalAlarms, cur.generalAlarms),
       assistantNotes: mergeIdMap(c.assistantNotes, cur.assistantNotes),
@@ -665,7 +694,8 @@ const Backup = (function () {
       sleepRecordsAdded: countAdditions(c.sleepRecords, cur.sleepRecords),
       generalAlarmsAdded: countAdditions(c.generalAlarms, cur.generalAlarms),
       assistantNotesAdded: countAdditions(c.assistantNotes, cur.assistantNotes),
-      expLedgerAdded: countArrayAdditions(c.expLedger, cur.expLedger, 'id')
+            expLedgerAdded: countArrayAdditions(c.expLedger, cur.expLedger, 'id'),
+      testMarksAdded: countAdditions(c.testMarks, cur.testMarks)
     };
   }
 
@@ -760,7 +790,8 @@ const Backup = (function () {
       studyLog: compareMaps(c.studyLog, cur.studyLog),
       generalAlarms: compareMaps(c.generalAlarms, cur.generalAlarms),
       assistantNotes: compareMaps(c.assistantNotes, cur.assistantNotes),
-      expLedger: compareArraysById(c.expLedger, cur.expLedger, 'id'),
+            expLedger: compareArraysById(c.expLedger, cur.expLedger, 'id'),
+      testMarks: compareMaps(c.testMarks, cur.testMarks),
       liveWinsOnConflict: true
     };
   }
