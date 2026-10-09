@@ -178,13 +178,113 @@ const PTPE = (function () {
     return Math.max(0, sum(list.filter(function (e) { return e.taskId && tasks[e.taskId] && taskInDim(tasks[e.taskId], dim); }).map(function (e) { return e.exp; })));
   }
 
+    // ---------- tests (canonical records live in State.testMarks; PTPE only reads + interprets them) ----------
+  // One record per testId, never keyed or merged by date. Every test is normalised to a percentage so tests
+  // with different totals compare fairly. A day's value is the mean of that day's tests (so a day counts once
+  // in weekly / monthly averages); the per-test chart view keeps same-day tests as separate points.
+  function cleanTest(rec, key) {
+    if (!rec || typeof rec !== 'object' || !isDateStr(rec.date)) return null;
+    const total = Number(rec.total), got = Number(rec.obtained);
+    if (!isFinite(total) || total <= 0 || !isFinite(got) || got < 0 || got > total) return null;
+    const subs = [];
+    (Array.isArray(rec.subjects) ? rec.subjects : []).forEach(function (s) {
+      if (!s || typeof s.subject !== 'string' || !s.subject) return;
+      const st = Number(s.total), so = Number(s.obtained);
+      if (!isFinite(st) || st <= 0 || !isFinite(so) || so < 0 || so > st) return;
+      if (subs.some(function (x) { return x.subject === s.subject; })) return;
+      subs.push({ subject: s.subject, total: st, obtained: so, pct: so / st * 100 });
+    });
+    return { id: String(key), date: rec.date, total: total, obtained: got, pct: got / total * 100, subjects: subs, at: Number(rec.createdAt) || 0 };
+  }
+  function testList() {
+    return memo('tests', function () {
+      const raw = State.get().testMarks, m = raw && typeof raw === 'object' ? raw : {}, out = [];
+      Object.keys(m).forEach(function (k) { const t = cleanTest(m[k], k); if (t) out.push(t); });
+      return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.at - b.at) || (a.id < b.id ? -1 : 1); });
+    });
+  }
+  function testsByDate() {
+    return memo('tbd', function () {
+      const m = {};
+      testList().forEach(function (t) { (m[t.date] || (m[t.date] = [])).push(t); });
+      return m;
+    });
+  }
+  // Percentage a test contributes to a dimension (null = the test says nothing about it).
+  function testPct(t, dim) {
+    if (!dim || dim.type === 'overall') return t.pct;
+    if (dim.type !== 'subject') return null;
+    for (let i = 0; i < t.subjects.length; i++) if (t.subjects[i].subject === dim.id) return t.subjects[i].pct;
+    return null;
+  }
+  function testsOn(d, dim) {
+    return (testsByDate()[d] || []).filter(function (t) { return testPct(t, dim) !== null; });
+  }
+  function testEvents(from, to, dim) {
+    const t0 = today(), out = [];
+    testList().forEach(function (t) {
+      if (t.date < from || t.date > to || t.date > t0) return;
+      const p = testPct(t, dim);
+      if (p !== null) out.push({ id: t.id, date: t.date, pct: p, t: t });
+    });
+    return out;
+  }
+  function markFmt(v) { return String(Math.round(v * 100) / 100); }
+  function testDate(d) { const x = parse(d); return x.getDate() + ' ' + MON[x.getMonth()] + ' ' + x.getFullYear(); }
+  // Hover snippet: exactly what was stored; only subject rows that were really entered.
+  function testDetail(t, dim) {
+    const same = testsByDate()[t.date] || [t];
+    let idx = 0;
+    for (let i = 0; i < same.length; i++) if (same[i].id === t.id) idx = i;
+    return {
+      title: same.length > 1 ? 'Test ' + (idx + 1) + ' of ' + same.length : 'Test',
+      sub: testDate(t.date),
+      main: markFmt(t.obtained) + ' / ' + markFmt(t.total),
+      lines: t.subjects.map(function (s) { return { text: s.subject + ': ' + markFmt(s.obtained) + ' / ' + markFmt(s.total), on: !!dim && dim.type === 'subject' && dim.id === s.subject }; })
+    };
+  }
+  // One chart point per test (same-day tests sit side by side in saved order); used for daily-resolution ranges.
+  function testEventSeries(key, dim, r) {
+    const m = METRICS[key], ev = testEvents(r.from, r.to, dim), labels = [], values = [], dates = [], ids = [], details = [];
+    ev.forEach(function (e, i) {
+      labels.push(i === 0 || ev[i - 1].date !== e.date ? dayLabel(e.date, r.days, r.from) : '');
+      values.push(round1(e.pct)); dates.push(e.date); ids.push(e.id); details.push(testDetail(e.t, dim));
+    });
+    const avg = mean(ev.map(function (e) { return e.pct; }));
+    return {
+      metric: key, label: m.label, kind: 'mean', max: 100, labels: labels, values: values, dates: dates, ids: ids, details: details,
+      bucket: 1, from: r.from, to: r.to, total: null, average: avg === null ? null : round1(avg), hasData: values.length > 0, format: m.fmt, events: true
+    };
+  }
+  // Test trend: latest tests vs the tests before them (tests are sparse, so the daily rolling windows don't fit).
+  function testTrend(dim) {
+    const ev = testEvents('0000-01-01', today(), dim), n = ev.length;
+    if (n < 4 || between(ev[n - 1].date, today()) > 120) return null;
+    const p = ev.map(function (e) { return e.pct; }), k = Math.min(3, Math.floor(n / 2));
+    const r = mean(p.slice(n - k)), pv = mean(p.slice(n - 2 * k, n - k)), b = n >= 3 * k ? mean(p.slice(n - 3 * k, n - 2 * k)) : null;
+    const diff = r - pv; let state = 'stable';
+    if (b !== null && pv < b - 3 && diff >= 3) state = 'recovering';
+    else if (diff >= 3) state = 'improving';
+    else if (diff <= -3) state = 'declining';
+    return { state: state, pct: Math.round(diff), recent: r, previous: pv };
+  }
+  function testSummary() {
+    return memo('tsm|' + today(), function () {
+      const tl = testList().filter(function (t) { return t.date <= today(); });
+      if (!tl.length) return null;
+      return { count: tl.length, average: mean(tl.map(function (t) { return t.pct; })), latest: tl[tl.length - 1] };
+    });
+  }
+
   // ---------- metric catalogue ----------
   const ALL3 = ['overall', 'subject', 'tag'];
   const METRICS = {
     studyHours: { label: 'Study hours', kind: 'sum', dims: ALL3, floor: 0.3, fmt: function (v) { return fmtHours(v); } },
     questions: { label: 'Questions solved', kind: 'sum', dims: ALL3, floor: 3, fmt: function (v) { return Math.round(v) + ''; } },
     productivity: { label: 'Productivity', kind: 'mean', dims: ALL3, max: 10, floor: 0.3, fmt: function (v) { return round1(v) + ' / 10'; } },
-    exp: { label: 'EXP earned', kind: 'sum', dims: ALL3, floor: 20, fmt: function (v) { return Math.round(v) + ' EXP'; } },
+        exp: { label: 'EXP earned', kind: 'sum', dims: ALL3, floor: 20, fmt: function (v) { return Math.round(v) + ' EXP'; } },
+    testScore: { label: 'Test score', kind: 'mean', dims: ['overall', 'subject'], max: 100, floor: 3, events: true, fmt: pctFmt },
+    testCount: { label: 'Tests taken', kind: 'sum', dims: ['overall', 'subject'], floor: 1, fmt: function (v) { return Math.round(v) + ''; } },
     plannerCompletion: { label: 'Planner completion', kind: 'mean', dims: ALL3, max: 100, floor: 5, fmt: pctFmt },
     revisionCompletion: { label: 'Revision completion', kind: 'mean', dims: ALL3, max: 100, floor: 5, fmt: pctFmt },
     studyVsPlan: { label: 'Actual vs planned study', kind: 'mean', dims: ALL3, max: 100, floor: 5, fmt: pctFmt },
@@ -228,6 +328,8 @@ const PTPE = (function () {
         const planned = sum(dimTasks(d, dim).map(plannedMin)); if (planned <= 0) return null;
         return Math.min(200, Math.round(dimStudyMs(d, dim) / 60000 / planned * 100));
       }
+            case 'testScore': { const v = mean(testsOn(d, dim).map(function (t) { return testPct(t, dim); })); return v === null ? null : round1(v); }
+      case 'testCount': return testsOn(d, dim).length;
       case 'habitActivity': return habitActivity(d, dim);
       case 'habitCompletion': { const v = habitCompletion(d, dim); return v === null ? null : Math.round(v); }
       case 'mood': return ProgressData.moodValue(entry);
@@ -263,7 +365,8 @@ const PTPE = (function () {
   function dimensionItems(type) {
     if (type === 'subject') {
       const names = PlannerData.getAllSubjects().slice(), topics = topicsMap();
-      Object.keys(topics).forEach(function (id) { const s = topics[id].subject; if (s && names.indexOf(s) === -1) names.push(s); });
+            Object.keys(topics).forEach(function (id) { const s = topics[id].subject; if (s && names.indexOf(s) === -1) names.push(s); });
+      testList().forEach(function (t) { t.subjects.forEach(function (x) { if (names.indexOf(x.subject) === -1) names.push(x.subject); }); });
       return names.map(function (s) { return { id: s, label: s }; });
     }
     if (type === 'tag') return TagsData.getAllTagsList().map(function (t) { return { id: t.tagId, label: t.name, color: t.color }; });
@@ -292,9 +395,11 @@ const PTPE = (function () {
     if (x.getDate() === 1 || d === first) return MON[x.getMonth()] + ' ' + x.getDate();
     return '' + x.getDate();
   }
-  function series(metricKey, dim, rangeKey, custom) {
+    // opts.byDay forces one value per day (used when the UI regroups days into weeks / months).
+  function series(metricKey, dim, rangeKey, custom, opts) {
     dim = dim || { type: 'overall' };
     const m = METRICS[metricKey], r = resolveRange(rangeKey, custom), dates = span(r.from, r.to);
+    if (m.events && r.bucket === 1 && !(opts && opts.byDay)) return testEventSeries(metricKey, dim, r);
     const labels = [], values = [], starts = [];
     for (let i = 0; i < dates.length; i += r.bucket) {
       const chunk = dates.slice(i, i + r.bucket);
@@ -319,8 +424,9 @@ const PTPE = (function () {
   }
 
   // ---------- trend (rolling comparison, no AI) ----------
-  function trend(key, dim) {
+    function trend(key, dim) {
     dim = dim || { type: 'overall' };
+    if (key === 'testScore') return testTrend(dim);
     const m = METRICS[key], t = today();
     const rv = lastValues(key, dim, 7, t), pv = lastValues(key, dim, 7, shift(t, -7)), bv = lastValues(key, dim, 14, shift(t, -14));
     const dataDays = function (a) { return nums(a).filter(function (v) { return m.kind === 'mean' || v > 0; }).length; };
@@ -392,7 +498,8 @@ const PTPE = (function () {
       TimeEngine.getAllTrackedDates().forEach(add);
       Object.keys(State.get().habitLogs || {}).forEach(function (k) { add((State.get().habitLogs[k] || {}).date); });
       Object.keys(ledgerByDate()).forEach(add);
-      PlannerData.getTasksList().forEach(function (x) { add(x.date); });
+            PlannerData.getTasksList().forEach(function (x) { add(x.date); });
+      testList().forEach(function (x) { add(x.date); });
       return Object.keys(set).sort();
     });
   }
@@ -427,7 +534,12 @@ const PTPE = (function () {
       if (runBest >= 3) out.push({ key: 'longestRun', label: 'Longest consistent run', value: runBest + ' days', date: runEnd });
       if (bestQ && bestQ.v >= 10) out.push({ key: 'bestQuestions', label: 'Most questions in a day', value: bestQ.v + '', date: bestQ.date });
       if (bestProd && bestProd.v >= 5) out.push({ key: 'bestProductivity', label: 'Highest productivity', value: round1(bestProd.v) + ' / 10', date: bestProd.date });
-      if (bestExp && bestExp.v >= 100) out.push({ key: 'bestExp', label: 'Most EXP in a day', value: Math.round(bestExp.v) + '', date: bestExp.date });
+            if (bestExp && bestExp.v >= 100) out.push({ key: 'bestExp', label: 'Most EXP in a day', value: Math.round(bestExp.v) + '', date: bestExp.date });
+      const tl = testList().filter(function (x) { return x.date <= today(); });
+      if (tl.length >= 2) { // percentages, so different totals compare; ties keep the earliest test
+        let bt = tl[0]; tl.forEach(function (x) { if (x.pct > bt.pct) bt = x; });
+        out.push({ key: 'bestTest', label: 'Best test score', value: round1(bt.pct) + '% (' + markFmt(bt.obtained) + '/' + markFmt(bt.total) + ')', date: bt.date });
+      }
       let hw = null; Object.keys(habitWeeks).forEach(function (w) { if (habitWeeks[w].length >= 5) { const mv = mean(habitWeeks[w]); if (mv >= 70 && (!hw || mv > hw.v)) hw = { v: mv, date: w }; } });
       if (hw) out.push({ key: 'bestHabitWeek', label: 'Best habit week', value: Math.round(hw.v) + '%', date: hw.date });
       let st = null; Object.keys(tagHours).forEach(function (tg) { if (TagsData.getTag(tg) && tagHours[tg] >= 2 && (!st || tagHours[tg] > st.v)) st = { v: tagHours[tg], id: tg }; });
@@ -446,7 +558,11 @@ const PTPE = (function () {
       add('Study', wk('studyHours', null, 0), wk('studyHours', null, 7), 1);
       add('Questions', wk('questions', null, 0), wk('questions', null, 7), 10);
       const pr = mean(lastValues('productivity', null, 7, t)), pp = mean(lastValues('productivity', null, 7, shift(t, -7)));
-      if (pr !== null && pp !== null && pp > 0) items.push({ label: 'Productivity', pct: Math.round((pr - pp) / pp * 100) });
+            if (pr !== null && pp !== null && pp > 0) items.push({ label: 'Productivity', pct: Math.round((pr - pp) / pp * 100) });
+      { // test score: change in average percentage points, only when both weeks had a test
+        const tw = testEvents(shift(t, -6), t).map(function (e) { return e.pct; }), tp = testEvents(shift(t, -13), shift(t, -7)).map(function (e) { return e.pct; });
+        if (tw.length && tp.length) items.push({ label: 'Test score', pct: Math.round(mean(tw) - mean(tp)) });
+      }
       let top = null;
       TagsData.getAllTagsList().forEach(function (tg) {
         const dim = { type: 'tag', id: tg.tagId }, a = wk('studyHours', dim, 0), b = wk('studyHours', dim, 7);
@@ -497,6 +613,17 @@ const PTPE = (function () {
         if (all7 < 4 || all21 < 6) return;
         if (tw.m[tg.tagId] / all7 >= 0.6 && tp.m[tg.tagId] / all21 < 0.35) out.push({ key: 'tag' + tg.tagId, sev: 1.5, text: tg.name + ' took most of this week\u2019s study.' });
       });
+            { // newest test (within the last week) against the tests before it
+        const tl = testList().filter(function (x) { return x.date <= t; });
+        if (tl.length >= 6 && between(tl[tl.length - 1].date, t) <= 6) {
+          const last = tl[tl.length - 1], base = tl.slice(Math.max(0, tl.length - 13), tl.length - 1).map(function (x) { return x.pct; }), bs = sd(base);
+          if (bs !== null && bs >= 1.5) {
+            const diff = last.pct - mean(base), zz = diff / bs;
+            if (zz >= 2 && diff >= 8) out.push({ key: 'testHigh', sev: zz, text: 'A recent test score was unusually high.' });
+            else if (zz <= -2 && diff <= -8) out.push({ key: 'testLow', sev: -zz, text: 'A recent test score was unusually low.' });
+          }
+        }
+      }
       return out.sort(function (a, b) { return b.sev - a.sev; }).slice(0, 3);
     });
   }
@@ -522,6 +649,16 @@ const PTPE = (function () {
         if (n < 14 || r === null || Math.abs(r) < Math.max(0.35, 2 / Math.sqrt(n))) return;
         out.push({ a: p[0], b: p[1], r: Math.round(r * 100) / 100, n: n, strength: Math.abs(r), text: 'Days with more ' + p[2] + ' tend to have ' + (r > 0 ? 'more ' : 'less ') + p[3] + '.' });
       });
+            { // study in the 7 days before each test vs that test's score (tests are sparse, so pair per test, not per day)
+        const xs = [], ys = [];
+        testList().filter(function (x) { return x.date <= today() && x.date >= shift(today(), -365); }).forEach(function (x) {
+          xs.push(mean(span(shift(x.date, -7), shift(x.date, -1)).map(function (d) { return value('studyHours', d) || 0; }))); ys.push(x.pct);
+        });
+        const n = xs.length, r = pearson(xs, ys);
+        if (n >= 8 && r !== null && Math.abs(r) >= Math.max(0.4, 2 / Math.sqrt(n))) {
+          out.push({ a: 'studyHours', b: 'testScore', r: Math.round(r * 100) / 100, n: n, unit: 'tests', strength: Math.abs(r), text: 'Tests tend to go ' + (r > 0 ? 'better' : 'worse') + ' after weeks with more study time.' });
+        }
+      }
       return out.sort(function (a, b) { return b.strength - a.strength; }).slice(0, 3);
     });
   }
@@ -548,9 +685,11 @@ const PTPE = (function () {
     { key: 'tag', label: 'Tag activity' },
     { key: 'mood', label: 'Mood' },
     { key: 'study', label: 'Study time' },
-    { key: 'habits', label: 'Habits' }
+        { key: 'habits', label: 'Habits' },
+    { key: 'tests', label: 'Tests' }
   ];
-  const LENS_COLORS = { productivity: '#b5566b', mood: '#c3a97e', study: '#6b8a4a', habits: '#7fb8d9', tag: '#b39ddb' };
+
+    const LENS_COLORS = { productivity: '#b5566b', mood: '#c3a97e', study: '#6b8a4a', habits: '#7fb8d9', tag: '#b39ddb', tests: '#c98a4b' };
   function tagActivity(tagId, d) {
     const dim = { type: 'tag', id: tagId }, h = value('studyHours', d, dim), c = value('plannerCompletion', d, dim);
     let n = 0, w = 0;
@@ -563,7 +702,8 @@ const PTPE = (function () {
     if (mode === 'productivity') { v = value('productivity', d); if (v !== null) { norm = v / 10; text = round1(v) + ' / 10'; } }
     else if (mode === 'mood') { v = value('mood', d); if (v !== null) { norm = (v - 1) / 4; text = MOOD_WORDS[Math.round(v)]; } }
     else if (mode === 'study') { v = value('studyHours', d); if (v > 0) { norm = Math.min(1, v / 6); text = fmtHours(v); } }
-    else if (mode === 'habits') { v = value('habitCompletion', d); if (v !== null) { norm = v / 100; text = Math.round(v) + '%'; } }
+        else if (mode === 'habits') { v = value('habitCompletion', d); if (v !== null) { norm = v / 100; text = Math.round(v) + '%'; } }
+    else if (mode === 'tests') { v = value('testScore', d); if (v !== null) { norm = v / 100; const c = value('testCount', d); text = (c > 1 ? c + ' tests \u00b7 ' : 'Test \u00b7 ') + Math.round(v) + '%'; } }
     else if (mode === 'tag' && opts && opts.tagId && TagsData.getTag(opts.tagId)) {
       v = tagActivity(opts.tagId, d); if (v !== null) { norm = v; text = TagsData.getTag(opts.tagId).name + ' ' + Math.round(v * 100) + '%'; }
     }
@@ -619,7 +759,7 @@ const PTPE = (function () {
     value: value, series: series, metricsFor: metricsFor, dimensionItems: dimensionItems, resolveRange: resolveRange,
     trend: trend, consistency: consistency, plannedVsActual: plannedVsActual, personalBests: personalBests,
     whatChanged: whatChanged, anomalies: anomalies, correlations: correlations, whyProductivity: whyProductivity,
-    lens: lens, lensColor: lensColor, tagSummary: tagSummary, tagSummaryText: tagSummaryText, dayExpEvents: dayExpEvents,
+        lens: lens, lensColor: lensColor, tagSummary: tagSummary, tagSummaryText: tagSummaryText, dayExpEvents: dayExpEvents, testSummary: testSummary,
     // shared with ProductivityData / TagsData so nobody re-derives these
     taskInDim: taskInDim, dimTasks: dimTasks, dimStudyHours: dimStudyHours, dimQuestions: dimQuestions, habitFactor: habitFactor
   };
