@@ -44,7 +44,7 @@ const Modal = (function () {
     content.classList.remove('modal-closing');
     // Reset any size modifier on every open — the shared #modal-content element persists
     // across unrelated modals, so a size requested by one caller must never leak into the next.
-    content.classList.remove('modal-sm', 'modal-md', 'modal-lg');
+        content.classList.remove('modal-sm', 'modal-md', 'modal-lg', 'modal-xl');
     clearPopupTimer();
     isPopup = !!(opts && (opts.popup || opts.persistent));
     overlay.classList.toggle('modal-popup', isPopup);
