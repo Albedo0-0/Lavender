@@ -123,7 +123,8 @@ const Library = (function () {
     });
   }
 
-  function afterSubjectChange(renamed, removed) {
+    function afterSubjectChange(renamed, removed) {
+    if (renamed && typeof UnrecordedStudy !== 'undefined' && UnrecordedStudy.renameTestSubject) UnrecordedStudy.renameTestSubject(renamed.from, renamed.to); // keep stored test subject names in step
     if (typeof Planner !== 'undefined' && Planner.refreshSubjectOptions) Planner.refreshSubjectOptions(renamed);
     if (renamed && activeSubject === renamed.from) activeSubject = renamed.to;
     if (removed && activeSubject === removed && view !== 'subjects') { view = 'subjects'; activeTopicId = null; }
