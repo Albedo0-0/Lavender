@@ -3808,11 +3808,9 @@ if (typeof window !== 'undefined') {
   CatchUpUI.init();
   AlarmEngine.init();
   PlanningAgentUI.openTargets = TargetsPanel.open;
+  PlanningAgentUI.openAlarms = function () { TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } }); };
   PlanningAgentUI.handleClockTick = AlarmEngine.handleClockTick;
   PlanningAgentUI.toggleChecklistItem = TaskChecklist.toggleItem;
-  // Compatibility shims for callers outside this file (alarm.js / targets.js are retired).
-  window.Alarm = { init: function () {}, openList: function () { TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } }); } };
-  window.Targets = { init: function () {}, open: TargetsPanel.open };
   (function () {
     const PA = (typeof PlanningAgent !== 'undefined') ? PlanningAgent : (window.PlanningAgent = {});
     PA.evaluateOverdueTasks = CatchUpUI.evaluateOverdueTasks;
