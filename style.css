@@ -3529,7 +3529,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header { z-index: 61;
 body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opacity: 1; }
 
 #utility-drawer {
-  --step: clamp(44px, calc((100vh - 130px) / 8.5), 64px);
+    --step: clamp(44px, calc((100vh - 130px) / 9.5), 64px);
   position: fixed; top: 78px; right: 18px; width: 38px; height: 0;
   display: block; padding: 0; gap: 0;
   background: none; border: 0; box-shadow: none;
@@ -3550,7 +3550,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 /* the string */
 #utility-drawer::after {
   content: ''; position: absolute; z-index: -1; left: 50%; top: -32px; margin-left: -1px;
-  height: calc(var(--step) * 8 + 52px);
+    height: calc(var(--step) * 9 + 52px);
   border-left: 2px dashed var(--color-kraft-500);
   transform-origin: top; transform: scaleY(1); transition: transform .5s ease;
 }
@@ -3588,7 +3588,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 #utility-drawer.utility-drawer-hidden button {
   transform: translateY(-6px) scale(.3) rotate(-14deg); opacity: 0;
   transition: transform .25s ease-in, opacity .2s ease-in;
-  transition-delay: calc((8 - var(--i)) * 18ms);
+    transition-delay: calc((9 - var(--i)) * 18ms);
 }
 
 /* washi tape at the hang point */
@@ -3604,6 +3604,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 #habits-icon::after           { content: 'Habits'; }
 #notepad-icon::after          { content: 'Notepad'; }
 #paintbrush-icon::after       { content: 'Cosmetics'; }
+#gallery-icon::after          { content: 'Gallery'; }
 #backup-export-btn::after     { content: 'Export'; }
 #backup-restore-btn::after    { content: 'Restore'; }
 #settings-icon::after         { content: 'Settings'; }
@@ -3615,10 +3616,11 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 #habits-icon           { --i: 2; --rot: -2deg;   --sway: -3px; }
 #notepad-icon          { --i: 3; --rot: 2.5deg;  --sway: -14px; }
 #paintbrush-icon       { --i: 4; --rot: -2.5deg; --sway: 0px; }
-#backup-export-btn     { --i: 5; --rot: 2deg;    --sway: -14px; }
-#backup-restore-btn    { --i: 6; --rot: -2deg;   --sway: -3px; }
-#settings-icon         { --i: 7; --rot: 2.5deg;  --sway: -14px; }
-#fullscreen-btn        { --i: 8; --rot: -2deg;   --sway: 0px; }
+#gallery-icon          { --i: 5; --rot: 2deg;    --sway: -14px; }
+#backup-export-btn     { --i: 6; --rot: -2deg;   --sway: -3px; }
+#backup-restore-btn    { --i: 7; --rot: 2.5deg;  --sway: -14px; }
+#settings-icon         { --i: 8; --rot: -2deg;   --sway: 0px; }
+#fullscreen-btn        { --i: 9; --rot: 2deg;    --sway: -14px; }
 
 @media (prefers-reduced-motion: reduce) {
   #utility-drawer button, #utility-drawer::after { transition-duration: .01s !important; transition-delay: 0s !important; }
