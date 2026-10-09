@@ -315,7 +315,7 @@ const Assistant = (function () {
   function routeTo(key) {
     try {
       if (key === 'plan') {
-        if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open({ from: 'assistant' });
+                if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open({ from: 'assistant' });
         return;
       }
       if (key === 'store') return openStore();
@@ -516,8 +516,8 @@ const Assistant = (function () {
 
     document.querySelectorAll('.assistant-apply-prop-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        if (typeof PlanningAgentUI !== 'undefined') {
-          PlanningAgentUI.open({ date: tomStr, intent: 'day', from: 'assistant' });
+                if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) {
+          PlanningAgent.open({ date: tomStr, intent: 'day', from: 'assistant' });
         }
       });
     });
@@ -548,7 +548,7 @@ const Assistant = (function () {
 
   function navigateToResult(ds) {
     if (ds.kind === 'task') {
-      const task = PlanData.getAllTasks()[ds.taskId];
+            const task = PlanningAgent.getTask(ds.taskId);
       if (!task) return;
       Modal.close();
       if (task.completed && Planner.openHistory) Planner.openHistory(task.subject, task.topicId);
@@ -750,7 +750,7 @@ const Assistant = (function () {
     return {
       init: init,
       openMain: openMain,
-      openPlan: function (opts) { if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open(opts); },
+            openPlan: function (opts) { if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open(opts); },
       openSearch: openSearch,
       openStore: openStoreFrom,
       refreshPixelEntitySkin: refreshPixelEntitySkin
