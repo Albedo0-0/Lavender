@@ -3795,6 +3795,150 @@ const TargetsPanel = (function () {
   return { open: open };
 })();
 
+// ============================================================================
+// SECTION 10 - VIEW BRIDGE (Planning Architecture, Phase 6)
+// Today / Calendar / Library / Assistant are consumers only: they read tasks through these
+// PlanningAgent methods and open the Agent to plan. Reads come from CanonicalTaskStore.
+// Legacy-created tasks (State.tasks, written by PlanningAgent.createTask until Phase 7) are
+// reconciled into the canonical store before every read, so a new task shows up immediately.
+// Returned task views carry the canonical fields AND the legacy aliases the existing views render
+// (taskId, startTime, stopTime, taskType, subject, topicName, completed, archived, revisionNumber).
+// ============================================================================
+const PlanningAgentTasks = (function () {
+  const LEGACY_PREFIX = 'legacy_';
+  const TYPE_TO_LEGACY = { study: 'theory', revision: 'revision', practice: 'questions', custom: 'custom', 'break': 'custom', exercise: 'custom' };
+  let syncedRef = null;
+  let hasSynced = false;
+  let syncing = false;
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function todayStr() {
+    const t = new Date();
+    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  }
+  function toMin(hm) { return Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)); }
+  function addMin(hm, min) {
+    const m = toMin(hm) + min;
+    return m >= 1440 ? '' : pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  }
+  function legacyKey(id) { return String(id).indexOf(LEGACY_PREFIX) === 0 ? String(id).slice(LEGACY_PREFIX.length) : null; }
+  function legacyTasks() { return (typeof PlanData !== 'undefined') ? PlanData.getAllTasks() : {}; }
+
+  // Mirrors State.tasks changes (create / reschedule / complete / delete) into legacy-mapped canonical tasks.
+  function sync() {
+    if (syncing || typeof State === 'undefined' || !State.get) return;
+    const ref = State.get().tasks;
+    if (hasSynced && ref === syncedRef) return;
+    syncing = true;
+    try {
+      CanonicalTaskStore.getTasks();
+      CanonicalTaskStore.migrateLegacyPlannerData();
+      const legacy = legacyTasks();
+      CanonicalTaskStore.getTasks().forEach(function (t) {
+        const key = legacyKey(t.id);
+        if (!key) return;
+        const lt = legacy[key];
+        if (!lt) { CanonicalTaskStore.deleteTask(t.id); return; }
+        const start = lt.startTime || lt.savedStartTime || null;
+        const stop = lt.stopTime || lt.savedStopTime || null;
+        const duration = (start && stop && toMin(stop) > toMin(start)) ? toMin(stop) - toMin(start) : null;
+        const status = lt.completed ? 'completed' : 'pending';
+        const patch = {};
+        if ((lt.date || null) !== (t.date || null)) patch.date = lt.date || null;
+        if (start !== (t.time || null)) patch.time = start;
+        if (duration !== (t.duration || null)) patch.duration = duration;
+        if (status !== t.status && t.status !== 'cancelled') patch.status = status;
+        if (Object.keys(patch).length) CanonicalTaskStore.updateTask(t.id, patch);
+      });
+      syncedRef = State.get().tasks;
+      hasSynced = true;
+    } catch (e) {
+      console.warn('PlanningAgent task sync failed', e);
+    } finally {
+      syncing = false;
+    }
+  }
+
+  function toView(t) {
+    const key = legacyKey(t.id);
+    const lt = key ? legacyTasks()[key] : null;
+    const topic = (t.topicId && typeof PlanData !== 'undefined') ? PlanData.getAllTopics()[t.topicId] : null;
+    const level = t.revisionMeta && t.revisionMeta.level;
+    return Object.assign({}, t, {
+      taskId: key || t.id,
+      completed: t.status === 'completed',
+      archived: !!(lt && lt.archived),
+      startTime: t.time || '',
+      stopTime: (t.time && t.duration) ? addMin(t.time, t.duration) : '',
+      savedStartTime: '',
+      savedStopTime: '',
+      taskType: TYPE_TO_LEGACY[t.type] || 'theory',
+      subject: t.subjectId || (topic && topic.subject) || '',
+      topicName: (topic && topic.topicName) || t.title || '',
+      revisionNumber: level ? Number(level.slice(1)) : undefined
+    });
+  }
+
+  function getTasksForDateRange(from, to) {
+    sync();
+    return CanonicalTaskStore.getTasks({ dateFrom: from, dateTo: to })
+      .filter(function (t) { return t.status !== 'cancelled'; })
+      .map(toView);
+  }
+  function getTasksByDate(date) { return getTasksForDateRange(date, date); }
+  function getIncompleteTasksForDate(date) {
+    return getTasksByDate(date).filter(function (t) { return !t.completed && !t.archived; });
+  }
+  // Today dashboard: today's tasks that are still open.
+  function getTodayTasks() { return getIncompleteTasksForDate(todayStr()); }
+  // Overdue: open tasks dated before today.
+  function getPendingTasks() {
+    sync();
+    const today = todayStr();
+    return CanonicalTaskStore.getTasks({ status: 'pending' })
+      .filter(function (t) { return t.date && t.date < today; })
+      .map(toView)
+      .filter(function (t) { return !t.archived; });
+  }
+  function getTask(id) {
+    sync();
+    const t = CanonicalTaskStore.getTask(id) || CanonicalTaskStore.getTask(LEGACY_PREFIX + id);
+    return t ? toView(t) : null;
+  }
+  // Reminders for a date (timed tasks with an enabled alarm), shaped for the day calendar.
+  function getAlarmsForDate(date) {
+    sync();
+    return CanonicalTaskStore.getTasks({ date: date, scheduled: 'timed' })
+      .filter(function (t) { return t.alarm && t.alarm.enabled && t.status !== 'cancelled'; })
+      .map(function (t) {
+        return { id: t.id, time: t.time, text: t.title || 'Reminder', enabled: true, lastFiredDate: t.alarm.notified ? date : null };
+      });
+  }
+  // Single completion path for every view. Legacy-mapped tasks go through PlanData so EXP awards stay correct.
+  function toggleTask(id) {
+    if (typeof PlanData !== 'undefined' && PlanData.getTask(id)) {
+      PlanData.toggleComplete(id);
+      sync();
+      return { ok: true };
+    }
+    const t = CanonicalTaskStore.getTask(id);
+    if (!t) return { ok: false, error: 'Task not found.' };
+    return CanonicalTaskStore.toggleTaskComplete(id);
+  }
+
+  return {
+    sync: sync,
+    getTasksForDateRange: getTasksForDateRange,
+    getTasksByDate: getTasksByDate,
+    getIncompleteTasksForDate: getIncompleteTasksForDate,
+    getTodayTasks: getTodayTasks,
+    getPendingTasks: getPendingTasks,
+    getTask: getTask,
+    getAlarmsForDate: getAlarmsForDate,
+    toggleTask: toggleTask
+  };
+})();
+
 if (typeof window !== 'undefined') {
   window.CanonicalTaskStore = CanonicalTaskStore;
   // Re-runs the idempotent legacy migration after boot, once State has loaded its saved data.
@@ -3816,7 +3960,27 @@ if (typeof window !== 'undefined') {
     const PA = (typeof PlanningAgent !== 'undefined') ? PlanningAgent : (window.PlanningAgent = {});
     PA.evaluateOverdueTasks = CatchUpUI.evaluateOverdueTasks;
     PA.openCatchUp = CatchUpUI.open;
-    PA.generateRoutineTasks = CatchUpUI.generateRoutineTasks;
+        PA.generateRoutineTasks = CatchUpUI.generateRoutineTasks;
+    PA.open = PlanningAgentUI.open;
+    PA.getTasksForDateRange = PlanningAgentTasks.getTasksForDateRange;
+    PA.getTasksByDate = PlanningAgentTasks.getTasksByDate;
+    PA.getIncompleteTasksForDate = PlanningAgentTasks.getIncompleteTasksForDate;
+    PA.getTodayTasks = PlanningAgentTasks.getTodayTasks;
+    PA.getPendingTasks = PlanningAgentTasks.getPendingTasks;
+    PA.getTask = PlanningAgentTasks.getTask;
+    PA.getAlarmsForDate = PlanningAgentTasks.getAlarmsForDate;
+    PA.toggleTask = PlanningAgentTasks.toggleTask;
+
+    // Live refresh: any task change re-renders the open views (debounced), no page reload needed.
+    let viewRefreshTimer = null;
+    CanonicalTaskStore.subscribe(function () {
+      if (viewRefreshTimer) return;
+      viewRefreshTimer = setTimeout(function () {
+        viewRefreshTimer = null;
+        try { if (typeof Calendar !== 'undefined' && Calendar.render) Calendar.render(); } catch (e) {}
+        try { if (typeof Library !== 'undefined' && Library.renderPanel) Library.renderPanel(); } catch (e) {}
+      }, 50);
+    });
     PA.proposeRoutine = CatchUpUI.proposeRoutine;
   })();
   window.TaskManagerUI = TaskManagerUI;
