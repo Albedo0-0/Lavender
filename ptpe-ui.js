@@ -108,8 +108,14 @@ const PTPEChart = (function () {
         const c = focus.querySelector('circle'); c.setAttribute('cx', x); c.setAttribute('cy', y);
       }
       wrap.querySelectorAll('.ptpe-bar').forEach(function (b) { b.classList.toggle('on', Number(b.dataset.i) === i); });
-      const when = s.tips && s.tips[i] ? s.tips[i] : (s.bucket > 1 ? 'Week of ' + (s.labels[i] || '') : (PTPEView.longDay(s.dates[i])));
-      tip.innerHTML = '<span>' + esc(when) + '</span>' + esc(s.format ? s.format(v) : v);
+            const dt = s.details && s.details[i];
+      if (dt) { // per-event detail (e.g. one test): exactly the stored information
+        tip.innerHTML = '<span>' + esc(dt.title) + '</span><span>' + esc(dt.sub) + '</span>' + esc(dt.main) +
+          (dt.lines && dt.lines.length ? '<div class="ptpe-tip-lines">' + dt.lines.map(function (l) { return '<i' + (l.on ? ' class="on"' : '') + '>' + esc(l.text) + '</i>'; }).join('') + '</div>' : '');
+      } else {
+        const when = s.tips && s.tips[i] ? s.tips[i] : (s.bucket > 1 ? 'Week of ' + (s.labels[i] || '') : (PTPEView.longDay(s.dates[i])));
+        tip.innerHTML = '<span>' + esc(when) + '</span>' + esc(s.format ? s.format(v) : v);
+      }
       tip.hidden = false;
       const pct = x / W * 100;
       tip.style.left = Math.max(14, Math.min(86, pct)) + '%';
@@ -168,7 +174,7 @@ const PTPEView = (function () {
     const map = {}; let ref = null, a = from;
     while (a <= to) {
       const b = PTPE.shift(a, CHUNK - 1) < to ? PTPE.shift(a, CHUNK - 1) : to;
-      const s = PTPE.series(metric, dim, 'custom', { from: a, to: b });
+            const s = PTPE.series(metric, dim, 'custom', { from: a, to: b }, { byDay: true });
       if (!ref || (s.hasData && !ref.hasData)) ref = s;
       (s.dates || []).forEach(function (d, i) { const v = s.values[i]; if (v !== null && v !== undefined) map[d] = v; });
       a = PTPE.shift(b, 1);
@@ -258,7 +264,9 @@ const PTPEView = (function () {
     const compare = wk.length ? '<div class="ptpe-cmp">' + wk.map(function (c) { return '<span class="ptpe-chg ' + (c.pct > 0 ? 'up' : c.pct < 0 ? 'down' : '') + '"><em>' + esc(c.label) + '</em> ' + signed(c.pct) + '</span>'; }).join('') + '</div>' : '<p class="ptpe-hint">Not enough recent data to compare yet.</p>';
 
     const o = ProgressData.getOtherStats();
-    const rows = [['Best study streak', o.bestStudyStreak + (o.bestStudyStreak === 1 ? ' day' : ' days')], ['Total study', PTPE.fmtHours(o.totalStudyHours)], ['Questions solved', o.totalQuestionsSolved], ['Tasks completed', o.totalTasks], ['Revision cycles', o.totalCompletedRevisionCycles]];
+        const ts = PTPE.testSummary();
+    const rows = [['Best study streak', o.bestStudyStreak + (o.bestStudyStreak === 1 ? ' day' : ' days')], ['Total study', PTPE.fmtHours(o.totalStudyHours)], ['Questions solved', o.totalQuestionsSolved], ['Tasks completed', o.totalTasks], ['Revision cycles', o.totalCompletedRevisionCycles]]
+      .concat(ts ? [['Tests logged', ts.count], ['Average test score', Math.round(ts.average) + '%']] : []);
     const allTime = rows.map(function (r) { return '<div class="ptpe-line"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join('');
 
     const notes = [];
@@ -440,10 +448,11 @@ const PTPEView = (function () {
     } else if (key === 'records') {
       const o = ProgressData.getOtherStats(), pb = PTPE.personalBests();
       html = pb.map(function (b) { return line(esc(b.label) + (b.date ? ' <em>' + shortDate(b.date) + '</em>' : ''), esc(b.value)); }).join('') +
-        line('Total study', PTPE.fmtHours(o.totalStudyHours)) + line('Total questions', o.totalQuestionsSolved) + line('Tasks completed', o.totalTasks) + line('Revision cycles completed', o.totalCompletedRevisionCycles);
+                line('Total study', PTPE.fmtHours(o.totalStudyHours)) + line('Total questions', o.totalQuestionsSolved) + line('Tasks completed', o.totalTasks) + line('Revision cycles completed', o.totalCompletedRevisionCycles) +
+        (function () { const ts = PTPE.testSummary(); return ts ? line('Tests logged', ts.count) + line('Average test score', Math.round(ts.average) + '%') : ''; })();
     } else if (key === 'patterns') {
       const c = PTPE.correlations();
-      html = c.length ? c.map(function (x) { return '<div class="ptpe-note">' + esc(x.text) + ' <span>' + x.n + ' days</span></div>'; }).join('') + '<p class="ptpe-hint">Patterns, not causes.</p>' : '<p class="ptpe-hint">Not enough history yet for reliable patterns.</p>';
+      html = c.length ? c.map(function (x) { return '<div class="ptpe-note">' + esc(x.text) + ' <span>' + x.n + ' ' + (x.unit || 'days') + '</span></div>'; }).join('') + '<p class="ptpe-hint">Patterns, not causes.</p>' : '<p class="ptpe-hint">Not enough history yet for reliable patterns.</p>';
     } else if (key === 'notable') {
       const a = PTPE.anomalies();
       html = a.length ? a.map(function (x) { return '<div class="ptpe-note">' + esc(x.text) + '</div>'; }).join('') : '<p class="ptpe-hint">Nothing unusual lately.</p>';
@@ -495,5 +504,10 @@ const PTPEView = (function () {
     window.addEventListener('resize', onResize);
     if (typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) TimeEngine.subscribe(tick, SUBSCRIBER_ID); // stable id: replaces, never stacks
   }
-  return { init: init, render: enter, openExplorer: openExplorer, longDay: longDay };
+    // Redraw whatever is on screen right now (no view reset, no animation) after data changed elsewhere, e.g. a test was saved.
+  function refresh() {
+    const r = root(); if (!r || !r.firstChild || r.style.display === 'none') return;
+    if (view === 'explore') drawExplorer(false); else render({ animate: false });
+  }
+  return { init: init, render: enter, openExplorer: openExplorer, longDay: longDay, refresh: refresh };
 })();
