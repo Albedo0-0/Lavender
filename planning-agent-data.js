@@ -1,7 +1,7 @@
 // planning-agent-data.js — Centralized Planning Agent: Perception, Modeling, Decision Logic & Shared Utilities.
 // Pure functions only. No direct State mutations here.
-// Depends on: State, PlanData, TargetsData, TimeEngine, ItineraryTime.
-// Load order: after planner-data.js, targets-data.js, timeengine.js, itinerary-time.js; before planning-agent.js and views.
+// Depends on: State, PlanData, TargetsData (defined in planning-agent-ui.js; resolved at call time), TimeEngine, ItineraryTime.
+// Load order: after timeengine.js, itinerary-time.js; before planning-agent.js and views.
 
 const PlanningAgentData = (function () {
   // Default study availability window (08:00 - 22:00)
