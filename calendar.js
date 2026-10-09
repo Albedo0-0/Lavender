@@ -157,10 +157,10 @@ const Calendar = (function () {
         });
       });
     }
-    if (typeof AlarmData !== 'undefined') {
-      AlarmData.getList().forEach(function (a) {
-        if (!a || !a.enabled || !a.recurrence || !AlarmData.dateMatchesRecurrence(a.recurrence, dateStr)) return;
-        const s = hmToMin(a.time);
+        if (typeof CanonicalTaskStore !== 'undefined') {
+      CanonicalTaskStore.getTasks({ date: dateStr, scheduled: 'timed' }).forEach(function (t) {
+        if (!t.alarm || !t.alarm.enabled || t.status === 'cancelled') return;
+        const s = hmToMin(t.time);
         if (s === null || s < 0 || s >= 1440) return;
         items.push({
           kind: 'alarm',
@@ -168,10 +168,10 @@ const Calendar = (function () {
           point: true,
           s: s,
           e: Math.min(s + WEEK_POINT_MIN, 1440),
-          label: a.text || 'Alarm',
+          label: t.title || 'Reminder',
           color: null,
-          done: a.lastFiredDate === dateStr,
-          slot: a.time
+          done: t.status === 'completed' || !!t.alarm.notified,
+          slot: t.time
         });
       });
     }
