@@ -1,5 +1,5 @@
 // assistant.js — Assistant UI (§B.7) + Assistant Makeover (Itinerary Phase 10). Depends on:
-// State, Modal, Settings, AssistantData, PlanData, Alarm (folded in here per §6.1 "near
+// State, Modal, Settings, AssistantData, PlanData, PlanningAgentUI (alarms, per §6.1 "near
 // Notepad"), AssistantLVPackData, MiscCore. History (item 6) renders inline from PlanData
 // directly — no Nav/Planner dependency anymore, so opening Assistant never leaves the Assistant
 // modal or switches tabs underneath the user.
@@ -628,7 +628,7 @@ const Assistant = (function () {
   // ---------- Alarms (§6.1 — General Alarm lives here, near Notepad, now that Assistant exists) ----------
 
   function openAlarms() {
-        TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } });
+            PlanningAgentUI.openAlarms();
   }
 
   
