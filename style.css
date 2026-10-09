@@ -5065,6 +5065,31 @@ button#study-wallpaper-next { position: absolute !important; top: 10px !importan
   opacity: 0.85;
 }
 
+/* Unrecorded Study — Tests section (uses the shared Forms + Buttons vocabulary from ui-components.css) */
+.unrecorded-tests { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px dashed var(--color-border); }
+.unrecorded-tests [hidden] { display: none; }
+.unrecorded-tests-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); }
+.unrecorded-tests-title { margin: 0; font-family: var(--font-hand); font-size: var(--text-md); font-weight: 600; color: var(--color-text); }
+.unrecorded-tests-head .btn-secondary { width: auto; flex-shrink: 0; padding: 4px 12px; font-size: var(--text-sm); }
+.unrecorded-tests .micro-label { margin: 0 0 var(--space-3); }
+.unrecorded-test-form { margin-top: var(--space-3); }
+.unrecorded-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.unrecorded-pair .form-row { margin-bottom: var(--space-3); min-width: 0; }
+.field-hint-inline { font-weight: 400; opacity: 0.8; }
+.unrecorded-subject-chips { margin-top: 4px; }
+.unrecorded-tests .chip[aria-pressed="true"] { background-color: var(--color-sage-200); border-color: var(--color-sage-600); }
+.unrecorded-subject-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.unrecorded-subject-name { font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unrecorded-subject-row .input { width: 100%; min-width: 0; }
+.unrecorded-slash { color: var(--color-text-muted); }
+.unrecorded-test-form .btn-primary { margin-top: var(--space-3); }
+.unrecorded-test-ok { color: var(--color-sage-700); }
+.unrecorded-test-list { margin-top: var(--space-4); }
+.unrecorded-test-item { display: flex; align-items: center; gap: var(--space-3); padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+.unrecorded-test-when { flex: 1; color: var(--color-text-muted); }
+.unrecorded-test-score em { font-style: normal; margin-left: 4px; color: var(--color-text-muted); }
+.unrecorded-test-item .btn-icon { padding: 0 8px; line-height: 1.6; }
+
 /* ---- Break (shell-level ambience only; custom wallpaper untouched) ---- */
 #global-break-takeover::after {
   content: '';
@@ -6897,6 +6922,9 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 .ptpe-tip { position: absolute; transform: translate(-50%, -100%); pointer-events: none; background: var(--color-brown-800); color: var(--color-cream-050); border-radius: var(--radius-sm); padding: 6px 10px; font-size: var(--text-sm); font-weight: 700; white-space: nowrap; display: flex; flex-direction: column; align-items: center; line-height: 1.35; box-shadow: var(--shadow-md); z-index: 2; }
 .ptpe-tip[hidden] { display: none; }
 .ptpe-tip span { font-size: var(--text-xs); font-weight: 500; opacity: .75; }
+.ptpe-tip .ptpe-tip-lines { display: flex; flex-direction: column; align-items: flex-start; align-self: stretch; gap: 1px; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 253, 248, .18); font-size: var(--text-xs); font-weight: 500; }
+.ptpe-tip .ptpe-tip-lines i { font-style: normal; opacity: .85; }
+.ptpe-tip .ptpe-tip-lines i.on { opacity: 1; font-weight: 700; }
 .ptpe-chart-empty { padding: var(--space-6) 0; font-size: var(--text-sm); font-weight: 500; color: var(--ptpe-muted); text-align: center; }
 
 @media (max-width: 860px) {
