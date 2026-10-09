@@ -18,7 +18,8 @@ const ProductivityData = (function () {
     sleep: 0.05,
     water: 0.04,
     breakBalance: 0.05,
-    mood: 0.03
+        mood: 0.03,
+    tests: 0.08 // Test Marks (PTPE-normalised percentage). Only present on days with a test; absent factors are renormalised away, so other days score exactly as before.
   };
 
   const STUDY_HOURS_CAP = 6;            // 6 effective hours is a full day; more adds nothing (no marathon inflation)
@@ -159,6 +160,14 @@ const ProductivityData = (function () {
     return (raw === null || raw === undefined) ? null : clamp10(raw * 2);
   }
 
+    // ---------- Tests (8%) — the day's test percentage from PTPE (mean of that day's tests; for a subject scope, that subject's
+  // marks only), mapped 0-10. Days without a test return null, so nothing changes for them. Counts as a soft factor:
+  // a test alone can't lift a day past SOFT_ONLY_CAP, so it can't stand in for study, work or questions. ----------
+  function testsFactor(dateStr, dim) {
+    const v = PTPE.value('testScore', dateStr, dim || { type: 'overall' });
+    return (v === null || v === undefined || isNaN(v)) ? null : clamp10(v / 10);
+  }
+
   function getFactorScores(dateStr, dim) {
     const entry = JournalData.getEntry(dateStr);
     const f = {
@@ -170,7 +179,8 @@ const ProductivityData = (function () {
       sleep: dim ? null : sleepFactor(dateStr),
       water: dim ? null : waterFactor(dateStr),
       breakBalance: dim ? null : breakBalanceFactor(dateStr),
-      mood: dim ? null : moodFactor(entry)
+            mood: dim ? null : moodFactor(entry),
+      tests: testsFactor(dateStr, dim)
     };
     // Planned work with no study behind it is a real zero, not "no data".
     if (f.delivery !== null && f.study === null) f.study = 0;
@@ -194,7 +204,7 @@ const ProductivityData = (function () {
     const divisor = Math.max(totalWeight, COVERAGE_FLOOR);
     let base = weightedSum / divisor;
     // Display-only: the exact points each factor put into `base` (same weights and divisor as above), so the UI never re-derives the score.
-    const FACTOR_LABELS = { study: 'Study time', delivery: 'Planned work done', questions: 'Questions', punctuality: 'Punctuality', habits: 'Habits', sleep: 'Sleep', water: 'Water', breakBalance: 'Break balance', mood: 'Mood' };
+    const FACTOR_LABELS = { study: 'Study time', delivery: 'Planned work done', questions: 'Questions', punctuality: 'Punctuality', habits: 'Habits', sleep: 'Sleep', water: 'Water', breakBalance: 'Break balance', mood: 'Mood', tests: 'Test score' };
     const contributions = Object.keys(WEIGHTS).filter(function (k) {
       const v = factors[k];
       return !(v === null || v === undefined || isNaN(v));
