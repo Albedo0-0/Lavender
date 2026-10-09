@@ -103,7 +103,8 @@ const Backup = (function () {
       tests: {
         testMarks: s.testMarks // older backups simply lack this group
       },
-      myWorld: buildMyWorld(),
+            myWorld: buildMyWorld(),
+      gallery: buildGallery(),
       dailySummaries: s.dailySummaries,
       planningHistory: s.planningHistory || {},
       settings: s.settings
@@ -117,8 +118,14 @@ const Backup = (function () {
     return {
       world: MyWorldData.getWorld(),
       inventory: content.inventory,
-      definitions: content.definitions
+            definitions: content.definitions
     };
+  }
+
+  // Gallery owns its photos/folders/tags in its own IndexedDB store — read through its module. Null if not loaded.
+  function buildGallery() {
+    if (typeof Gallery === 'undefined' || typeof Gallery.exportBackup !== 'function') return null;
+    return Gallery.exportBackup();
   }
 
   function exportJson() {
@@ -386,7 +393,16 @@ const Backup = (function () {
     return {
       world: isPlainObject(raw.world) ? raw.world : null,
       inventory: isPlainObject(raw.inventory) ? raw.inventory : null,
-      definitions: Array.isArray(raw.definitions) ? raw.definitions.filter(isPlainObject) : []
+            definitions: Array.isArray(raw.definitions) ? raw.definitions.filter(isPlainObject) : []
+    };
+  }
+
+  // Structural check only — Gallery re-validates every folder/photo record when the merge is applied.
+  function cleanGallery(raw) {
+    if (!isPlainObject(raw)) return null;
+    return {
+      folders: isPlainObject(raw.folders) ? raw.folders : {},
+      photos: isPlainObject(raw.photos) ? raw.photos : {}
     };
   }
 
@@ -435,7 +451,8 @@ const Backup = (function () {
       assistantNotes: a.assistantNotes,
             generalAlarms: al.generalAlarms,
       testMarks: tm.testMarks,
-      myWorld: parsed.myWorld,
+            myWorld: parsed.myWorld,
+      gallery: parsed.gallery,
       dailySummaries: parsed.dailySummaries,
       planningHistory: parsed.planningHistory
     };
@@ -496,7 +513,8 @@ const Backup = (function () {
       notepadFolders: Array.isArray(flat.notepadFolders)
         ? flat.notepadFolders.filter(function (f) { return typeof f === 'string' && f.trim().length > 0; })
         : [],
-      myWorld: cleanMyWorld(flat.myWorld)
+            myWorld: cleanMyWorld(flat.myWorld),
+      gallery: cleanGallery(flat.gallery)
     };
 
     return { ok: true, schemaVersion: schemaVersion, exportedAt: parsed.exportedAt, cleaned: cleaned };
@@ -868,7 +886,17 @@ const Backup = (function () {
     try {
       settled = MyWorldContent.mergeBackup(mw).settled;
     } catch (e) { /* leave the live inventory untouched */ }
-    return settled;
+        return settled;
+  }
+
+  // Merges the backup's Gallery through its own module (it isn't part of State). Live wins on id
+  // conflict, backup-only records are added. Always resolves.
+  function restoreGallery(g) {
+    if (!g || typeof Gallery === 'undefined' || typeof Gallery.mergeBackup !== 'function') return Promise.resolve(true);
+    try {
+      return Gallery.mergeBackup(g).settled;
+    } catch (e) { /* leave the live gallery untouched */ }
+    return Promise.resolve(true);
   }
 
   // Returns { ok, error } or { ok:true, summary, settled }. Never throws. Rejects (with zero state changes)
@@ -892,7 +920,8 @@ const Backup = (function () {
       const summary = summarizeApplied(v, cur);
 
       State.replace(merged);
-      const settled = restoreMyWorld(v.cleaned.myWorld);
+            const settled = Promise.all([restoreMyWorld(v.cleaned.myWorld), restoreGallery(v.cleaned.gallery)])
+        .then(function () { return true; });
       runPostRestoreHooks();
 
       return { ok: true, summary: summary, settled: settled };
@@ -914,7 +943,11 @@ const Backup = (function () {
         if (k && k.indexOf('lavender.myWorld.') === 0) myWorldKeys.push(k);
       }
       myWorldKeys.forEach(function (k) { localStorage.removeItem(k); });
-    } catch (e) { /* localStorage unavailable — nothing to clear */ }
+        } catch (e) { /* localStorage unavailable — nothing to clear */ }
+    // Gallery persists in its own IndexedDB store.
+    if (typeof Gallery !== 'undefined' && typeof Gallery.clearAll === 'function') {
+      try { Gallery.clearAll(); } catch (e) { /* best-effort */ }
+    }
   }
 
   return {
