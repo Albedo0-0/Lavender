@@ -72,7 +72,7 @@ const Library = (function () {
     Object.keys(recs).forEach(function (id) {
       const r = recs[id];
       if (!r || !r.taskId || !r.studyMs) return;
-      const task = PlanData.getTask(r.taskId);
+            const task = PlanningAgent.getTask(r.taskId);
       if (!task || !task.subject) return;
       out[task.subject] = (out[task.subject] || 0) + r.studyMs;
     });
@@ -99,7 +99,7 @@ const Library = (function () {
 
   function getSubjectStats() {
     const due = {};
-    PlanData.getTodayTasks().concat(PlanData.getPendingTasks()).forEach(function (t) {
+        PlanningAgent.getTodayTasks().concat(PlanningAgent.getPendingTasks()).forEach(function (t) {
       if (t.subject) due[t.subject] = (due[t.subject] || 0) + 1;
     });
     return { grouped: PlanData.getTopicsBySubject(), due: due };
@@ -213,11 +213,11 @@ const Library = (function () {
   // chapterId === topicId, so the Library's topic is passed straight through as topicId.
   function openPlan(subject, topicId) {
     if (typeof Modal.isLocked === 'function' && Modal.isLocked()) return;
-    if (typeof PlanningAgentUI === 'undefined') return;
+        if (typeof PlanningAgent === 'undefined' || !PlanningAgent.open) return;
     const ctx = { intent: 'topic' };
-    if (subject) ctx.subject = subject;
+    if (subject) ctx.subjectId = subject;
     if (topicId) ctx.topicId = topicId;
-    PlanningAgentUI.open(ctx);
+    PlanningAgent.open(ctx);
   }
 
   function togglePanel() {
@@ -974,8 +974,8 @@ const Library = (function () {
     }
 
       let tasks;
-    if (tab === 'today') tasks = PlanData.getTodayTasks();
-    else if (tab === 'pending') tasks = PlanData.getPendingTasks();
+        if (tab === 'today') tasks = PlanningAgent.getTodayTasks();
+    else if (tab === 'pending') tasks = PlanningAgent.getPendingTasks();
     else if (tab === 'upcoming') tasks = PlanData.getUpcomingTasks();
     else tasks = historyFilterTopicId
       ? PlanData.getHistoryTasks().filter(function (t) { return t.topicId === historyFilterTopicId; })
@@ -1007,7 +1007,7 @@ const Library = (function () {
 
     content.querySelectorAll('.library-panel-task-check').forEach(function (cb) {
       cb.addEventListener('change', function () {
-        PlanData.toggleComplete(cb.dataset.taskId);
+                PlanningAgent.toggleTask(cb.dataset.taskId);
         renderRightPanel();
       });
     });
