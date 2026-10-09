@@ -622,7 +622,7 @@ const Library = (function () {
       items.push({ label: 'Upcoming', run: function () { openUpcomingModal(topicId); } });
       items.push({ label: 'History', run: function () { showTopicHistory(topicId); } });
       items.push({ label: 'Links', run: function () { openLinksModal(topicId); } });
-      items.push({ label: 'Target', run: function () { Targets.open(); } });
+            items.push({ label: 'Target', run: function () { PlanningAgentUI.openTargets(); } });
     }
     items.push({ label: 'Rename', run: function () { renameTopicFlow(topicId); } });
     items.push({ label: 'Color', run: function () { colorTopicFlow(topicId); } });
@@ -687,7 +687,7 @@ const Library = (function () {
     document.getElementById('library-action-history').addEventListener('click', function () { showTopicHistory(topicId); });
     document.getElementById('library-action-upcoming').addEventListener('click', function () { openUpcomingModal(topicId); });
     document.getElementById('library-action-links').addEventListener('click', function () { openLinksModal(topicId); });
-    document.getElementById('library-action-target').addEventListener('click', function () { Targets.open(); });
+        document.getElementById('library-action-target').addEventListener('click', function () { PlanningAgentUI.openTargets(); });
 
     renderTopicTargetsChecklist(container, topicId);
   }
