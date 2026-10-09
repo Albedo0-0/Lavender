@@ -528,7 +528,7 @@ const PTPE = (function () {
 
   // ---------- productivity: broad "why it moved" (compares weighted contributions to previous day) ----------
   function whyProductivity(d) {
-    const W = ProductivityData.WEIGHTS, labels = { study: 'Study time', questions: 'Questions', delivery: 'Planned work done', punctuality: 'Punctuality', habits: 'Habits', sleep: 'Sleep', water: 'Water', breakBalance: 'Break balance', mood: 'Mood' };
+    const W = ProductivityData.WEIGHTS, labels = { study: 'Study time', questions: 'Questions', delivery: 'Planned work done', punctuality: 'Punctuality', habits: 'Habits', sleep: 'Sleep', water: 'Water', breakBalance: 'Break balance', mood: 'Mood', tests: 'Test score' };
     const a = ProductivityData.getBreakdown(d), b = ProductivityData.getBreakdown(shift(d, -1));
     if (!a || !b || a.score === null || b.score === null) return [];
     const parts = [];
