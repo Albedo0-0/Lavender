@@ -8373,3 +8373,24 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 .ga-day input:checked + span { background: var(--pa-accent); border-color: var(--pa-accent); color: #fff; }
 .ga-day input:focus-visible + span { box-shadow: 0 0 0 3px var(--pa-accent-soft), 0 0 0 4px var(--pa-accent); }
 .ga-quick { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Target folder (Planning Agent) */
+.plan-agent-target-btn { color: var(--pa-accent); }
+.pa-target .pa-t-links { display: flex; gap: var(--space-4); }
+.pa-target .pa-t-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.pa-target .pa-t-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); width: 100%; padding: var(--space-3) 0; font: inherit; color: inherit; text-align: left; background: none; border: none; border-bottom: 1px solid var(--pa-line); cursor: pointer; transition: background var(--transition-fast); }
+.pa-target .pa-t-row:hover { background: var(--pa-accent-soft); }
+.pa-target .pa-t-row:active { transform: translateY(1px); }
+.pa-target .pa-t-row:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--pa-accent-soft), 0 0 0 4px var(--pa-accent); border-radius: var(--radius-sm); }
+.pa-target .pa-t-main, .pa-target .pa-t-sub-main { display: flex; flex-direction: column; min-width: 0; }
+.pa-target .pa-t-name, .pa-target .pa-t-sub-title { font-weight: 500; overflow-wrap: anywhere; }
+.pa-target .pa-t-when, .pa-target .pa-t-sub-when { margin-top: 2px; font-size: var(--text-sm); color: var(--color-ink-soft); }
+.pa-target .pa-t-prog { flex: none; font-size: var(--text-sm); color: var(--pa-accent); }
+.pa-target .pa-t-range { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--pa-accent); }
+.pa-target .pa-t-progress { margin-bottom: var(--space-4); color: var(--pa-accent); }
+.pa-target .pa-t-sub { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--pa-line); }
+.pa-target .pa-t-sub:last-child { border-bottom: none; }
+.pa-target .pa-t-sub.is-done .pa-t-sub-title { text-decoration: line-through; color: var(--color-ink-soft); }
+.pa-target .pa-t-check { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; flex: 1; cursor: pointer; }
+.pa-target .pa-t-check input { margin-top: 3px; accent-color: var(--pa-accent); }
+.pa-target .pa-t-sub-actions { display: flex; align-items: center; gap: var(--space-3); flex: none; font-size: var(--text-sm); color: var(--color-ink-soft); }
