@@ -1930,7 +1930,7 @@ const PlanningAgent = (function () {
     // If task was linked to a Target, update target progress cleanly (Phase 5)
     if (taskAfter && taskAfter.completed && taskAfter.targetId && typeof TargetsData !== 'undefined') {
       const target = TargetsData.getTarget(taskAfter.targetId);
-      if (target && !target.completed) {
+            if (target && !target.completed && !target.startDate) {
         if (taskAfter.subtargetId) {
           TargetsData.updateSubtarget(taskAfter.subtargetId, { completed: true });
         } else {
@@ -2962,13 +2962,9 @@ const PlanningAgentUI = (function () {
     );
   }
 
-  // Quiet secondary entry points. Each button only opens an existing flow; nothing here is a second implementation.
-  function moreHtml() {
-    return '<details class="plan-agent-more"><summary>Options</summary><div class="plan-agent-more-list">' +
-      '<button type="button" id="plan-opt-targets" class="plan-agent-link">Targets</button>' +
-      '<button type="button" id="plan-opt-day" class="plan-agent-link">My day</button>' +
-      '<button type="button" id="plan-opt-goal" class="plan-agent-link">A goal</button>' +
-    '</div></details>';
+    // Single entry point to the Target folders (replaces the former Options menu).
+  function targetBtnHtml() {
+    return '<div class="plan-agent-more"><button type="button" id="plan-agent-target" class="plan-agent-link plan-agent-target-btn">\uD83C\uDFAF Target</button></div>';
   }
 
   function renderHtml() {
@@ -3011,7 +3007,7 @@ const PlanningAgentUI = (function () {
               (state.proposals && state.proposals.length
                 ? proposalsHtml()
                 : '<div class="plan-agent-actions"><button type="button" id="plan-agent-go" class="btn btn-primary">Plan</button></div>'))) +
-        (state.tab ? moreHtml() : '') +
+                (state.tab ? targetBtnHtml() : '') +
       '</div>'
     );
   }
@@ -3053,9 +3049,7 @@ const PlanningAgentUI = (function () {
     });
     on('plan-agent-close', 'click', function () { Modal.close(); });
     on('plan-agent-tasks', 'click', function () { TaskManagerUI.open({}); });
-    on('plan-opt-targets', 'click', function () { if (typeof TargetsPanel !== 'undefined') TargetsPanel.open(); });   // existing Targets manager
-    on('plan-opt-day', 'click', function () { open({ intent: 'day', date: state.date || todayStr() }); });            // existing "My day" flow
-    on('plan-opt-goal', 'click', function () { open({ intent: 'target' }); });                                         // existing "A goal" flow
+        on('plan-agent-target', 'click', function () { TargetFolderUI.open({ from: 'agent' }); });                                         // existing "A goal" flow
     on('plan-agent-done', 'click', function () { Modal.close(); });
     on('plan-agent-again', 'click', function () { state.lastResult = null; resetResults(); render(); });
 
@@ -5171,6 +5165,422 @@ const TargetsPanel = (function () {
     try { TargetsData.syncFromTasks(); } catch (e) { console.warn('Target sync failed', e); }
   });
 
+    return { open: open };
+})();
+
+// ============================================================================
+// TARGET FOLDER UI
+// A target is a folder: a TargetsData record (+ startDate / endDate / startTime / endTime) whose
+// subtasks are ordinary canonical tasks carrying that targetId. No second task store, no second
+// completion/EXP path (toggle goes through PlanningAgentTasks.toggleTask). Progress comes from the
+// linked tasks' real states (TargetsData.getProgress / syncFromTasks).
+// ============================================================================
+const TargetFolderUI = (function () {
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) {
+      return c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : '&quot;';
+    });
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function toMin(hm) { return Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)); }
+  function addMin(hm, min) { const m = toMin(hm) + min; return m >= 1440 ? '' : pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+  function todayStr() { return PlanData.todayStr(); }
+  function timeText(a, b) {
+    if (a && b) return a + '\u2013' + b;
+    if (a) return 'from ' + a;
+    if (b) return 'until ' + b;
+    return '';
+  }
+  function rangeText(t) {
+    const d = t.startDate === t.endDate ? t.startDate : t.startDate + ' \u2192 ' + t.endDate;
+    const tm = timeText(t.startTime, t.endTime);
+    return tm ? d + ' \u00b7 ' + tm : d;
+  }
+  function val(id) { const el = document.getElementById(id); return el ? el.value : undefined; }
+
+  const view = { screen: 'list', targetId: '', from: '', msg: '', ok: false, confirm: '' };
+  let form = null;   // target create/edit draft
+  let sub = null;    // subtask create/edit draft
+
+  function refresh() {
+    PlanningAgentTasks.sync();
+    TargetsData.syncFromTasks();
+    if (typeof Library !== 'undefined' && Library.render) Library.render();
+    if (typeof Library !== 'undefined' && Library.renderPanel) Library.renderPanel();
+    if (typeof Calendar !== 'undefined' && Calendar.render) Calendar.render();
+  }
+
+  function folders() {
+    return TargetsData.getAllTargetsList().filter(function (t) { return t.startDate && !t.archived; })
+      .sort(function (a, b) { return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+  }
+
+  function subtasksOf(targetId) {
+    PlanningAgentTasks.sync();
+    return CanonicalTaskStore.getTasks({ targetId: targetId, status: ['pending', 'completed'] }).map(function (t) {
+      const key = t.id.indexOf('legacy_') === 0 ? t.id.slice(7) : '';
+      const lt = key ? PlanData.getTask(key) : null;
+      return {
+        id: t.id,
+        key: key,
+        title: t.title || (lt && (lt.title || lt.topicName)) || 'Task',
+        date: t.date || '',
+        done: t.status === 'completed',
+        start: lt ? (lt.startTime || lt.savedStartTime || '') : (t.time || ''),
+        stop: lt ? (lt.stopTime || lt.savedStopTime || '') : ((t.time && t.duration) ? addMin(t.time, t.duration) : ''),
+        note: lt ? (lt.note || '') : '',
+        topicId: (lt && lt.topicId) || t.topicId || '',
+        subject: (lt && lt.subject) || t.subjectId || ''
+      };
+    }).sort(function (a, b) {
+      if (!!a.date !== !!b.date) return a.date ? -1 : 1;
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.start || '99') < (b.start || '99') ? -1 : ((a.start || '99') > (b.start || '99') ? 1 : 0);
+    });
+  }
+
+  function formFrom(t) {
+    return t
+      ? { id: t.targetId, title: t.title || '', start: t.startDate || '', end: t.endDate || '', startTime: t.startTime || '', endTime: t.endTime || '', note: t.note || '', showNote: !!t.note }
+      : { id: '', title: '', start: '', end: '', startTime: '', endTime: '', note: '', showNote: false };
+  }
+  function subFrom(s) {
+    return s
+      ? { key: s.key, id: s.id, title: s.title, date: s.date, start: s.start, stop: s.stop, note: s.note, showNote: !!s.note, subject: s.subject, topicId: s.topicId }
+      : { key: '', id: '', title: '', date: '', start: '', stop: '', note: '', showNote: false, subject: '', topicId: '' };
+  }
+  function collect(draft, map) {
+    if (!draft) return;
+    Object.keys(map).forEach(function (k) { const v = val(map[k]); if (v !== undefined) draft[k] = v; });
+  }
+  function collectForm() {
+    collect(form, { title: 'pa-t-name', start: 'pa-t-start', end: 'pa-t-end', startTime: 'pa-t-stime', endTime: 'pa-t-etime', note: 'pa-t-note' });
+  }
+  function collectSub() {
+    collect(sub, { title: 'pa-s-title', date: 'pa-s-date', start: 'pa-s-start', stop: 'pa-s-stop', note: 'pa-s-note', subject: 'pa-s-subject', topicId: 'pa-s-topic' });
+  }
+
+  // ---------- HTML ----------
+
+  function btn(act, label, id, cls) {
+    return '<button type="button" class="' + (cls || 'plan-agent-link') + '" data-act="' + act + '"' + (id ? ' data-id="' + esc(id) + '"' : '') + '>' + label + '</button>';
+  }
+  function head(title, links) {
+    return '<div class="plan-agent-head"><h3 class="plan-agent-title">' + title + '</h3><span class="pa-t-links">' + links + '</span></div>';
+  }
+  function msgHtml() {
+    return view.msg ? '<p class="plan-agent-message' + (view.ok ? ' plan-agent-message-ok' : '') + '" role="status">' + esc(view.msg) + '</p>' : '';
+  }
+  function noteHtml(draft, fieldId, toggleAct) {
+    return draft.showNote
+      ? '<div><label class="plan-agent-label" for="' + fieldId + '">Note</label><textarea id="' + fieldId + '" rows="2" maxlength="300" placeholder="Anything to remember">' + esc(draft.note) + '</textarea></div>'
+      : '<button type="button" class="plan-agent-link plan-agent-addnote" data-act="' + toggleAct + '">+ Add note</button>';
+  }
+
+  function listHtml() {
+    const rows = folders().map(function (t) {
+      const p = TargetsData.getProgress(t.targetId) || { pct: 0, taskDone: 0, taskTotal: 0 };
+      return '<li><button type="button" class="pa-t-row" data-act="open" data-id="' + esc(t.targetId) + '">' +
+        '<span class="pa-t-main"><span class="pa-t-name">' + esc(t.title) + '</span><span class="pa-t-when">' + esc(rangeText(t)) + '</span></span>' +
+        '<span class="pa-t-prog">' + (p.taskTotal ? p.taskDone + '/' + p.taskTotal + ' \u00b7 ' : '') + p.pct + '%</span></button></li>';
+    }).join('');
+    return head('\uD83C\uDFAF Targets', view.from === 'agent' ? btn('agent', '\u2190 Back') : btn('close', 'Close')) +
+      msgHtml() +
+      (rows ? '<ul class="pa-t-list">' + rows + '</ul>' : '<p class="plan-agent-muted">No targets yet. A target is a folder for related tasks.</p>') +
+      '<div class="plan-agent-actions"><button type="button" class="btn btn-primary" data-act="new">New target</button></div>';
+  }
+
+  function targetFormHtml() {
+    const editing = !!form.id;
+    return head(editing ? 'Edit target' : 'New target', btn('cancel-form', editing ? '\u2190 Back' : 'Cancel')) +
+      '<div class="plan-agent-form">' +
+        '<div><label class="plan-agent-label" for="pa-t-name">Target name</label>' +
+          '<input type="text" id="pa-t-name" maxlength="120" placeholder="e.g. Finish Cardiology" value="' + esc(form.title) + '"></div>' +
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="pa-t-start">Start date</label><input type="date" id="pa-t-start" value="' + esc(form.start) + '"></div>' +
+          '<div><label class="plan-agent-label" for="pa-t-end">End date</label><input type="date" id="pa-t-end" value="' + esc(form.end) + '"></div>' +
+        '</div>' +
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="pa-t-stime">Start time (optional)</label><input type="time" id="pa-t-stime" value="' + esc(form.startTime) + '"></div>' +
+          '<div><label class="plan-agent-label" for="pa-t-etime">End time (optional)</label><input type="time" id="pa-t-etime" value="' + esc(form.endTime) + '"></div>' +
+        '</div>' +
+        noteHtml(form, 'pa-t-note', 'note-t') +
+        msgHtml() +
+        '<div class="plan-agent-actions"><button type="button" class="btn btn-primary" data-act="save-target">' + (editing ? 'Save target' : 'Create target') + '</button></div>' +
+      '</div>';
+  }
+
+  function detailHtml() {
+    const t = TargetsData.getTarget(view.targetId);
+    if (!t) { view.screen = 'list'; return listHtml(); }
+    const subs = subtasksOf(t.targetId);
+    const done = subs.filter(function (s) { return s.done; }).length;
+    const pct = subs.length ? Math.round(done / subs.length * 100) : 0;
+
+    const rows = subs.map(function (s) {
+      const rid = s.key || s.id;
+      const when = s.date ? s.date + (s.start ? ' \u00b7 ' + timeText(s.start, s.stop) : '') : 'No date \u00b7 anytime in range';
+      const actions = view.confirm === 'sub:' + rid
+        ? '<span class="pa-t-sub-actions">Delete? ' + btn('del-sub-yes', 'Yes', rid) + btn('cancel-confirm', 'No') + '</span>'
+        : '<span class="pa-t-sub-actions">' + (s.key && !s.done ? btn('edit-sub', 'Edit', rid) : '') +
+          '<button type="button" class="plan-agent-x" data-act="del-sub" data-id="' + esc(rid) + '" aria-label="Delete subtask">&times;</button></span>';
+      return '<li class="pa-t-sub' + (s.done ? ' is-done' : '') + '">' +
+        '<label class="pa-t-check"><input type="checkbox" data-act="toggle" data-id="' + esc(rid) + '"' + (s.done ? ' checked' : '') + '>' +
+          '<span class="pa-t-sub-main"><span class="pa-t-sub-title">' + esc(s.title) + '</span><span class="pa-t-sub-when">' + esc(when) + '</span></span></label>' +
+        actions + '</li>';
+    }).join('');
+
+    let confirm = '';
+    if (view.confirm === 'target') {
+      confirm = '<p class="plan-agent-message" role="alert">Delete \u201c' + esc(t.title) + '\u201d?' +
+        (subs.length ? ' It has ' + subs.length + (subs.length === 1 ? ' subtask.' : ' subtasks.') : '') + '</p>' +
+        '<div class="plan-agent-actions">' +
+          btn('cancel-confirm', 'Cancel', '', 'btn btn-secondary btn-sm') +
+          (subs.length ? btn('del-target-keep', 'Keep subtasks as tasks', '', 'btn btn-secondary btn-sm') + btn('del-target-all', 'Delete subtasks too', '', 'btn btn-primary btn-sm')
+                       : btn('del-target-keep', 'Delete target', '', 'btn btn-primary btn-sm')) +
+        '</div>';
+    }
+
+    return head(esc(t.title), btn('list', '\u2190 Targets') + btn('edit-target', 'Edit')) +
+      '<p class="pa-t-range">' + esc(rangeText(t)) + '</p>' +
+      (t.note ? '<p class="plan-agent-muted">' + esc(t.note) + '</p>' : '') +
+      '<div class="pa-t-progress">' + targetProgressBarHtml(pct) + ' <span class="plan-agent-muted">' + done + '/' + subs.length + ' done</span></div>' +
+      msgHtml() +
+      (rows ? '<ul class="pa-t-list">' + rows + '</ul>' : '<p class="plan-agent-muted">No subtasks yet.</p>') +
+      confirm +
+      '<div class="plan-agent-actions">' + btn('del-target', 'Delete target') + btn('add-sub', '+ Add subtask', '', 'btn btn-primary') + '</div>';
+  }
+
+  function subFormHtml() {
+    const t = TargetsData.getTarget(view.targetId);
+    const editing = !!sub.key;
+    const allTopics = PlanData.getAllTopics();
+    const topics = Object.keys(allTopics).map(function (id) { return allTopics[id]; })
+      .filter(function (x) { return !sub.subject || x.subject === sub.subject; })
+      .sort(function (a, b) { return (a.topicName || '').localeCompare(b.topicName || ''); });
+    return head(editing ? 'Edit subtask' : 'Add subtask', btn('cancel-sub', '\u2190 ' + esc(t.title))) +
+      '<div class="plan-agent-form">' +
+        '<div><label class="plan-agent-label" for="pa-s-title">Subtask name</label>' +
+          '<input type="text" id="pa-s-title" maxlength="120" placeholder="e.g. Solve 20 questions" value="' + esc(sub.title) + '"></div>' +
+        '<div class="plan-agent-row">' +
+          '<div><label class="plan-agent-label" for="pa-s-subject">Subject (optional)</label><select id="pa-s-subject"><option value="">Any subject</option>' +
+            PlanData.getAllSubjects().map(function (s) { return '<option value="' + esc(s) + '"' + (s === sub.subject ? ' selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div><label class="plan-agent-label" for="pa-s-topic">Topic (optional)</label><select id="pa-s-topic"><option value="">No topic</option>' +
+            topics.map(function (x) {
+              return '<option value="' + esc(x.topicId) + '"' + (x.topicId === sub.topicId ? ' selected' : '') + '>' + esc(sub.subject ? x.topicName : x.subject + ' \u00b7 ' + x.topicName) + '</option>';
+            }).join('') +
+          '</select></div>' +
+        '</div>' +
+        '<div class="plan-agent-row plan-agent-row-3">' +
+          '<div><label class="plan-agent-label" for="pa-s-date">Date (optional)</label><input type="date" id="pa-s-date" min="' + esc(t.startDate) + '" max="' + esc(t.endDate) + '" value="' + esc(sub.date) + '"></div>' +
+          '<div><label class="plan-agent-label" for="pa-s-start">Start</label><input type="time" id="pa-s-start" value="' + esc(sub.start) + '"></div>' +
+          '<div><label class="plan-agent-label" for="pa-s-stop">End</label><input type="time" id="pa-s-stop" value="' + esc(sub.stop) + '"></div>' +
+        '</div>' +
+        '<p class="plan-agent-muted">Target runs ' + esc(rangeText(t)) + '. Leave the date empty for an undated subtask.</p>' +
+        noteHtml(sub, 'pa-s-note', 'note-s') +
+        msgHtml() +
+        '<div class="plan-agent-actions"><button type="button" class="btn btn-primary" data-act="save-sub">' + (editing ? 'Save subtask' : 'Add subtask') + '</button></div>' +
+      '</div>';
+  }
+
+  // ---------- Actions ----------
+
+  function fail(m) { view.msg = m; view.ok = false; render(); }
+
+  function saveTarget() {
+    collectForm();
+    const f = form;
+    const name = f.title.trim();
+    if (!name) return fail('Give the target a name.');
+    if (!f.start) return fail('Choose a start date.');
+    if (!f.end) return fail('Choose an end date.');
+    if (f.end < f.start) return fail('The end date cannot be earlier than the start date.');
+    if (f.startTime && f.endTime && f.start === f.end && f.endTime < f.startTime) return fail('The end time cannot be earlier than the start time.');
+    const fields = { title: name, dateKey: f.start, note: f.note.trim(), startDate: f.start, endDate: f.end, startTime: f.startTime || '', endTime: f.endTime || '' };
+    if (f.id) {
+      const outside = subtasksOf(f.id).filter(function (s) { return s.date && (s.date < f.start || s.date > f.end); });
+      if (outside.length) return fail(outside.length + (outside.length === 1 ? ' subtask is' : ' subtasks are') + ' dated outside this range. Change ' + (outside.length === 1 ? 'it' : 'them') + ' first.');
+      TargetsData.updateTarget(f.id, fields);
+      view.targetId = f.id;
+    } else {
+      const t = TargetsData.createTarget({ title: name, timeframe: 'daily', dateKey: f.start, type: 'custom', note: f.note.trim() });
+      TargetsData.updateTarget(t.targetId, fields);
+      view.targetId = t.targetId;
+    }
+    form = null;
+    view.screen = 'detail';
+    view.msg = ''; view.confirm = '';
+    render();
+  }
+
+  function saveSub() {
+    collectSub();
+    const t = TargetsData.getTarget(view.targetId);
+    if (!t) return;
+    const s = sub;
+    const title = s.title.trim();
+    if (!title) return fail('Give the subtask a name.');
+    if (s.date && (s.date < t.startDate || s.date > t.endDate)) return fail('The date must fall within the target (' + t.startDate + ' to ' + t.endDate + ').');
+    if (!!s.start !== !!s.stop) return fail('Add both a start and an end time, or leave both empty.');
+    if (s.start && !s.date) return fail('Choose a date to set a time.');
+    if (s.start && s.stop <= s.start) return fail('End time must be after start time.');
+    if (s.start && typeof TimeEngine !== 'undefined' && TimeEngine.isManualClockActive && TimeEngine.isManualClockActive()) {
+      return fail('Finish or reset your Stopwatch/Timer before scheduling a task.');
+    }
+    const topic = s.topicId ? PlanData.getAllTopics()[s.topicId] : null;
+    const subject = topic ? topic.subject : (s.subject || '');
+    const link = { topicId: topic ? topic.topicId : null, subject: subject || null, topicName: topic ? topic.topicName : null };
+
+    if (!s.key) {
+      const res = PlanningAgent.createTask({
+        title: title, taskType: 'custom', date: s.date || todayStr(),
+        startTime: s.start || null, stopTime: s.stop || null, note: s.note.trim(), targetId: t.targetId
+      }, 'user');
+      if (!res.ok) return fail(res.error || 'Could not add the subtask.');
+      const patch = Object.assign({}, link);
+      if (!s.date) patch.date = null;   // createTask defaults to today; an undated subtask stays undated
+      PlanData.updateTask(res.task.taskId, patch);
+    } else {
+      const res = PlanningAgent.updateTask(s.key, Object.assign({
+        title: title, date: s.date || null, startTime: s.start || null, stopTime: s.stop || null, note: s.note.trim()
+      }, link), 'user');
+      if (!res.ok) return fail(res.error || 'Could not save the subtask.');
+      PlanningAgentTasks.sync();
+      CanonicalTaskStore.updateTask(s.id, { title: title, topicId: link.topicId, subjectId: link.subject });
+    }
+    if (typeof MiscSound !== 'undefined') MiscSound.play('uiSuccess');
+    refresh();
+    sub = null;
+    view.screen = 'detail';
+    view.confirm = '';
+    view.msg = 'Saved \u201c' + title + '\u201d.';
+    view.ok = true;
+    render();
+  }
+
+  function unlink(s) {
+    if (s.key) PlanData.updateTask(s.key, { targetId: null, subtargetId: null });
+    CanonicalTaskStore.updateTask(s.id, { targetId: null, subtaskId: null });
+  }
+
+  function deleteTarget(mode) {
+    const id = view.targetId;
+    CanonicalTaskStore.getTasks({ targetId: id }).forEach(function (t) {
+      const key = t.id.indexOf('legacy_') === 0 ? t.id.slice(7) : '';
+      const s = { id: t.id, key: key };
+      if (mode === 'all') {
+        if (key) PlanningAgent.deleteTask(key); else CanonicalTaskStore.deleteTask(t.id);
+      } else {
+        unlink(s);
+      }
+    });
+    PlanningAgentTasks.sync();
+    TargetsData.deleteTarget(id);
+    refresh();
+    view.targetId = ''; view.screen = 'list'; view.confirm = '';
+    view.msg = mode === 'all' ? 'Target and its subtasks deleted.' : 'Target deleted. Its tasks were kept.';
+    view.ok = true;
+    render();
+  }
+
+  function deleteSub(rid) {
+    const s = subtasksOf(view.targetId).filter(function (x) { return (x.key || x.id) === rid; })[0];
+    if (!s) return;
+    if (s.key) { PlanningAgent.deleteTask(s.key); PlanningAgentTasks.sync(); } else CanonicalTaskStore.deleteTask(s.id);
+    refresh();
+    view.confirm = ''; view.msg = '';
+    render();
+  }
+
+  function act(a, el) {
+    const id = el && el.dataset ? el.dataset.id : '';
+    switch (a) {
+      case 'close': Modal.close(); return;
+      case 'agent': Modal.close(); PlanningAgentUI.open(); return;
+      case 'list': view.screen = 'list'; view.msg = ''; view.confirm = ''; break;
+      case 'open': view.targetId = id; view.screen = 'detail'; view.msg = ''; view.confirm = ''; break;
+      case 'new': form = formFrom(null); view.screen = 'form'; view.msg = ''; break;
+      case 'edit-target': form = formFrom(TargetsData.getTarget(view.targetId)); view.screen = 'form'; view.msg = ''; break;
+      case 'cancel-form': form = null; view.screen = view.targetId && TargetsData.getTarget(view.targetId) && view.screen === 'form' && formWasEdit ? 'detail' : 'list'; view.msg = ''; break;
+      case 'note-t': collectForm(); form.showNote = true; break;
+      case 'save-target': saveTarget(); return;
+      case 'add-sub': sub = subFrom(null); view.screen = 'sub'; view.msg = ''; break;
+      case 'edit-sub': sub = subFrom(subtasksOf(view.targetId).filter(function (x) { return (x.key || x.id) === id; })[0]); view.screen = 'sub'; view.msg = ''; break;
+      case 'cancel-sub': sub = null; view.screen = 'detail'; view.msg = ''; break;
+      case 'note-s': collectSub(); sub.showNote = true; break;
+      case 'save-sub': saveSub(); return;
+      case 'del-sub': view.confirm = 'sub:' + id; break;
+      case 'del-sub-yes': deleteSub(id); return;
+      case 'del-target': view.confirm = 'target'; break;
+      case 'del-target-keep': deleteTarget('keep'); return;
+      case 'del-target-all': deleteTarget('all'); return;
+      case 'cancel-confirm': view.confirm = ''; break;
+      default: return;
+    }
+    render();
+  }
+  let formWasEdit = false;
+
+  // ---------- Render / wiring ----------
+
+  function render(first) {
+    formWasEdit = !!(form && form.id);
+    const body = view.screen === 'form' && form ? targetFormHtml()
+      : view.screen === 'sub' && sub ? subFormHtml()
+      : view.screen === 'detail' ? detailHtml()
+      : listHtml();
+    const html = '<div class="plan-agent pa-target">' + body + '</div>';
+    const content = document.getElementById('modal-content');
+    if (!first && content && content.querySelector('.pa-target')) content.innerHTML = html;
+    else Modal.open(html, { size: 'lg' });
+    view.msg = view.screen === 'list' || view.screen === 'detail' ? view.msg : view.msg;
+    bind();
+  }
+
+  function bind() {
+    const root = document.querySelector('.pa-target');
+    if (!root) return;
+    root.addEventListener('click', function (e) {
+      const el = e.target.closest('[data-act]');
+      if (!el || el.dataset.act === 'toggle') return;
+      act(el.dataset.act, el);
+    });
+    root.addEventListener('change', function (e) {
+      const el = e.target;
+      if (el.dataset && el.dataset.act === 'toggle') {
+        PlanningAgentTasks.toggleTask(el.dataset.id);   // single completion path (EXP included)
+        refresh();
+        render();
+      } else if (el.id === 'pa-s-subject') {
+        collectSub(); sub.topicId = ''; render();
+      } else if (el.id === 'pa-s-topic') {
+        collectSub();
+        const tp = sub.topicId ? PlanData.getAllTopics()[sub.topicId] : null;
+        if (tp) sub.subject = tp.subject;
+        render();
+      }
+    });
+    root.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || e.target.type !== 'text') return;
+      e.preventDefault();
+      if (e.target.id === 'pa-t-name') saveTarget();
+      else if (e.target.id === 'pa-s-title') saveSub();
+    });
+  }
+
+  function open(opts) {
+    const o = opts || {};
+    CanonicalTaskStore.init();
+    TargetsData.syncFromTasks();
+    view.from = o.from || '';
+    view.targetId = o.targetId || '';
+    view.screen = view.targetId ? 'detail' : 'list';
+    view.msg = ''; view.ok = false; view.confirm = '';
+    form = null; sub = null;
+    render(true);
+  }
+
   return { open: open };
 })();
 
@@ -5343,7 +5753,8 @@ if (typeof window !== 'undefined') {
   PlanningAgentUI.evaluateOverdueTasks = CatchUpUI.evaluateOverdueTasks;
   CatchUpUI.init();
   AlarmEngine.init();
-  PlanningAgentUI.openTargets = TargetsPanel.open;
+    PlanningAgentUI.openTargets = TargetsPanel.open;
+  window.TargetFolderUI = TargetFolderUI;
   PlanningAgentUI.openAlarms = function () { TaskManagerUI.open({ view: 'all', filters: { alarm: '1' } }); };
   PlanningAgentUI.handleClockTick = AlarmEngine.handleClockTick;
   PlanningAgentUI.toggleChecklistItem = TaskChecklist.toggleItem;
