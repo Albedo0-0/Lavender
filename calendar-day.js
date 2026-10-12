@@ -409,5 +409,97 @@ const CalendarDay = (function () {
     if (typeof TimeEngine !== 'undefined') TimeEngine.subscribe(tick, SUB_ID);
   }
 
-  return { open: open, close: function () { stop(); Modal.close(); } };
+    // ---------- Assistant -> Today: read-only dashboard of TODAY's tasks ----------
+  // Reads through PlanningAgent.getTasksForDateRange (canonical store). Writes nothing and has no add / edit /
+  // complete / delete / schedule / alarm / planning controls. Its only buttons are Back (to the Assistant) and Close.
+  const TODAY_SUB_ID = 'calendar-day-today';
+  let todayView = null;     // { sig }
+
+  function todayRows() {
+    const now = nowMin();
+    return dayTasks(todayStr()).map(function (t) {
+      const s = t.startTime || t.savedStartTime || '';
+      const e = t.stopTime || t.savedStopTime || '';
+      const end = hmToMin(e || s);
+      return { name: taskName(t), s: s, e: e, min: hmToMin(s), done: !!t.completed, overdue: !t.completed && end !== null && end < now };
+    });
+  }
+
+  function todaySig() {
+    return todayStr() + '|' + nowMin() + '|' + todayRows().map(function (r) {
+      return r.name + ':' + r.s + ':' + r.e + ':' + (r.done ? 1 : 0);
+    }).join(',');
+  }
+
+  function todayRowHtml(r) {
+    const state = r.done ? 'Done' : (r.overdue ? 'Overdue' : '');
+    return '<li class="cal-today-task' + (r.done ? ' is-done' : '') + (r.overdue ? ' is-overdue' : '') + '">' +
+      '<span class="cal-day-rt">' + esc(r.s ? r.s + (r.e ? '\u2013' + r.e : '') : '') + '</span>' +
+      '<span class="cal-today-name">' + esc(r.name) + '</span>' +
+      (state ? '<span class="cal-today-state">' + state + '</span>' : '') + '</li>';
+  }
+
+  function todayHtml() {
+    const d = todayStr();
+    const dt = new Date(d + 'T00:00:00');
+    const weekday = dt.toLocaleDateString('en-US', { weekday: 'long' });
+    const monthYear = dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const rows = todayRows();
+    const timed = rows.filter(function (r) { return r.s; }).sort(function (a, b) { return (a.min === null ? 1e9 : a.min) - (b.min === null ? 1e9 : b.min); });
+    const anytime = rows.filter(function (r) { return !r.s; });
+    const done = rows.filter(function (r) { return r.done; }).length;
+    const pct = rows.length ? Math.round(done / rows.length * 100) : 0;
+    return '<div class="cal-day-head">' +
+        '<div class="cal-day-headmain">' +
+          '<button type="button" id="cal-today-back" class="cal-day-back">\u2039 Back</button>' +
+          '<h3 class="datehub-date">' +
+            '<span class="datehub-day">' + dt.getDate() + '</span>' +
+            '<span class="datehub-dow"><span class="datehub-weekday">' + weekday + ' \u00b7 today</span><span class="datehub-monthyear">' + monthYear + '</span></span>' +
+          '</h3>' +
+        '</div>' +
+        '<div class="cal-day-corner"><button type="button" id="cal-today-close" class="cal-day-close" aria-label="Close">&times;</button></div>' +
+      '</div>' +
+      (rows.length
+        ? '<div class="cal-today-progress"><span>' + done + ' of ' + rows.length + ' done</span><span class="cal-today-bar"><i style="width:' + pct + '%"></i></span></div>' +
+          (timed.length ? '<section><h4 class="cal-day-h">Scheduled</h4><ul class="cal-day-list cal-today-list">' + timed.map(todayRowHtml).join('') + '</ul></section>' : '') +
+          (anytime.length ? '<section><h4 class="cal-day-h">Anytime today</h4><ul class="cal-day-list cal-today-list">' + anytime.map(todayRowHtml).join('') + '</ul></section>' : '')
+        : '<p class="cal-day-quiet">No tasks for today.</p>');
+  }
+
+  function stopToday() {
+    if (typeof TimeEngine !== 'undefined') TimeEngine.unsubscribe(TODAY_SUB_ID);
+    todayView = null;
+  }
+
+  function renderToday() {
+    const root = document.getElementById('cal-today-root');
+    if (!root || !todayView) { stopToday(); return; }
+    root.innerHTML = todayHtml();
+    const back = document.getElementById('cal-today-back');
+    if (back) back.addEventListener('click', function () {
+      stopToday();
+      Modal.close();
+      if (typeof Assistant !== 'undefined' && Assistant.openMain) Assistant.openMain();
+    });
+    const close = document.getElementById('cal-today-close');
+    if (close) close.addEventListener('click', function () { stopToday(); Modal.close(); });
+    todayView.sig = todaySig();
+  }
+
+  function tickToday() {
+    const root = document.getElementById('cal-today-root');
+    const ov = document.getElementById('modal-overlay');
+    if (!todayView || !root || !root.isConnected || !ov || ov.style.display === 'none' || ov.classList.contains('modal-closing')) { stopToday(); return; }
+    if (todaySig() !== todayView.sig) renderToday();
+  }
+
+  function openToday() {
+    Modal.open('<div class="cal-day cal-today" id="cal-today-root"></div>');
+    if (!document.getElementById('cal-today-root')) return;
+    todayView = { sig: '' };
+    renderToday();
+    if (typeof TimeEngine !== 'undefined') TimeEngine.subscribe(tickToday, TODAY_SUB_ID);
+  }
+
+  return { open: open, openToday: openToday, close: function () { stop(); stopToday(); Modal.close(); } };
 })();
