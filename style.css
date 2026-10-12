@@ -8374,6 +8374,20 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 .ga-day input:focus-visible + span { box-shadow: 0 0 0 3px var(--pa-accent-soft), 0 0 0 4px var(--pa-accent); }
 .ga-quick { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
+/* Assistant -> Today (read-only task dashboard) */
+.cal-today { height: auto; max-height: 86vh; overflow-y: auto; }
+.cal-today-progress { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-3) 0 var(--space-4); font-size: var(--text-sm); color: var(--color-ink-soft); }
+.cal-today-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(128, 128, 128, 0.2); overflow: hidden; }
+.cal-today-bar i { display: block; height: 100%; background: var(--color-sage-600); }
+.cal-today .cal-today-list { margin-bottom: var(--space-4); }
+.cal-today-task { align-items: center; }
+.cal-today-task .cal-today-name { min-width: 0; overflow-wrap: anywhere; }
+.cal-today-task.is-done { opacity: 0.55; }
+.cal-today-task.is-done .cal-today-name { text-decoration: line-through; }
+.cal-today-task.is-overdue { border-left-color: var(--color-accent-rust); }
+.cal-today-state { margin-left: auto; flex: none; font-size: var(--text-xs); color: var(--color-ink-soft); }
+.cal-today-task.is-overdue .cal-today-state { color: var(--color-accent-rust); }
+
 /* Target folder (Planning Agent) */
 .plan-agent-target-btn { color: var(--pa-accent); }
 .pa-target .pa-t-links { display: flex; gap: var(--space-4); }
