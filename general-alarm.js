@@ -402,10 +402,8 @@ const GeneralAlarm = (function () {
   function init() {
     if (!subscribed && typeof TimeEngine !== 'undefined' && TimeEngine.subscribe) {
       TimeEngine.subscribe(tick, SUBSCRIBER_ID);
-      subscribed = true;
+            subscribed = true;
     }
-    const btn = typeof document !== 'undefined' ? document.getElementById('alarm-clock-btn') : null;
-    if (btn && !btn.__gaBound) { btn.__gaBound = true; btn.addEventListener('click', open); }
   }
 
   return { init: init, open: open, _scan: scan, _tick: tick, _show: showPrompt, _next: nextOccurrenceMs };
