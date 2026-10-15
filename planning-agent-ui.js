@@ -150,12 +150,7 @@ const CanonicalTaskStore = (function () {
         notified: !!raw.alarm.notified
       };
     }
-    if (!isBlank(raw.tags)) {
-      if (!Array.isArray(raw.tags)) return fail('tags must be an array.');
-      const seenTags = {}, tags = [];
-      raw.tags.forEach(function (x) { const s = String(x); if (s && !seenTags[s]) { seenTags[s] = 1; tags.push(s); } });
-      if (tags.length) t.tags = tags;
-    }
+    
     if (!isBlank(raw.revisionMeta)) {
       const rm = raw.revisionMeta;
       if (typeof rm !== 'object' || Array.isArray(rm)) return fail('revisionMeta must be an object.');
