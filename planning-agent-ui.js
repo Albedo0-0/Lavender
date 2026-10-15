@@ -5233,7 +5233,7 @@ const TargetFolderUI = (function () {
         subject: (lt && lt.subject) || t.subjectId || '',
         taskType: lt ? lt.taskType : '',
         alarm: t.alarm || null,
-        tags: t.tags || []
+                tags: TagsData.getTagIdsForTask({ topicId: (lt && lt.topicId) || t.topicId || '' })
       };
     }).sort(function (a, b) {
       if (!!a.date !== !!b.date) return a.date ? -1 : 1;
@@ -5301,7 +5301,7 @@ const TargetFolderUI = (function () {
     return { start: r.time, stop: stop };
   }
   function validTags(r) {
-    return (r.tags || []).filter(function (id) { return typeof TagsData !== 'undefined' && TagsData.getTag && TagsData.getTag(id); });
+        return (r.tags || []).filter(function (id) { return !!TagsData.getTag(id); });
   }
   function checkRow(r, range) {
     if (isBlankRow(r)) return 'Pick a subject or topic, or write a note.';
@@ -5321,12 +5321,18 @@ const TargetFolderUI = (function () {
   }
   // Reminder + tags live on the canonical task; the Notify system (AlarmEngine) fires from task.alarm.
   function finishCanonical(taskKey, r, title, subject, topicId, prevAlarm) {
-    PlanningAgentTasks.sync();
-    const tags = validTags(r);
+        PlanningAgentTasks.sync();
     CanonicalTaskStore.updateTask('legacy_' + taskKey, {
       title: title, topicId: topicId || null, subjectId: subject || null,
-      tags: tags.length ? tags : null, alarm: alarmFor(r, prevAlarm)
+      alarm: alarmFor(r, prevAlarm)
     });
+    if (topicId) {
+      const want = validTags(r);
+      TagsData.getTagIdsForTask({ topicId: topicId }).forEach(function (id) {
+        if (want.indexOf(id) === -1) TagsData.detachTagFromTopic(topicId, id);
+      });
+      want.forEach(function (id) { TagsData.attachTagToTopic(topicId, id); });
+    }
   }
 
   function createOne(r, t) {
@@ -5404,13 +5410,15 @@ const TargetFolderUI = (function () {
     if (r.creating === 'subject') {
       const res = PlanData.addSubject(name);
       if (!res.ok && !res.subject) { r.err = res.error || 'Could not add the subject.'; return; }
-      r.subject = res.subject;   // already existing -> reuse it, never a duplicate
+            r.subject = res.subject;   // already existing -> reuse it, never a duplicate
       r.topicId = '';
+      r.tags = [];
     } else {
       const sj = r.subject;
       if (!sj) { r.err = 'Pick a subject first.'; return; }
       if (name.length > 120) { r.err = 'Chapter names can be up to 120 characters.'; return; }
-      r.topicId = PlanData.getOrCreateTopic(sj, name).topicId;   // existing chapter with the same name is reused
+            r.topicId = PlanData.getOrCreateTopic(sj, name).topicId;   // existing chapter with the same name is reused
+      r.tags = TagsData.getTagIdsForTask({ topicId: r.topicId }).slice();
     }
     r.creating = '';
     if (typeof Library !== 'undefined' && Library.render) Library.render();
@@ -5418,7 +5426,7 @@ const TargetFolderUI = (function () {
   }
 
   function rowsHtml(range) {
-    const tagList = (typeof TagsData !== 'undefined' && TagsData.getAllTagsList) ? TagsData.getAllTagsList() : [];
+        const tagList = TagsData.getAllTagsList();
     const subjects = PlanData.getAllSubjects();
     const topicsAll = PlanData.getAllTopics();
     const cards = rows.map(function (r, i) {
@@ -5427,7 +5435,7 @@ const TargetFolderUI = (function () {
         .filter(function (x) { return !r.subject || x.subject === r.subject; })
         .sort(function (a, b) { return (a.topicName || '').localeCompare(b.topicName || ''); });
       const offs = REMIND_OFFSETS.indexOf(Number(r.offset)) === -1 ? REMIND_OFFSETS.concat([Number(r.offset)]).sort(function (a, b) { return a - b; }) : REMIND_OFFSETS;
-      const chips = tagList.length ? tagList.map(function (tg) {
+            const chips = !r.topicId ? '<span class="plan-agent-muted pa-s-hint">Choose a topic to tag it.</span>' : tagList.length ? tagList.map(function (tg) {
         const on = r.tags.indexOf(tg.tagId) !== -1;
         return '<button type="button" class="chip pa-s-tag' + (on ? ' is-on' : '') + '" data-act="tag" data-row="' + i + '" data-id="' + esc(tg.tagId) + '" aria-pressed="' + on + '" style="border-color:' + esc(tg.color) + '">' + esc(tg.name) + '</button>';
       }).join('') : '<span class="plan-agent-muted pa-s-hint">No tags yet — create them in Library › Manage tags.</span>';
@@ -5525,7 +5533,7 @@ const TargetFolderUI = (function () {
       const rid = s.key || s.id;
       let when = s.date ? s.date + (s.start ? ' \u00b7 ' + timeText(s.start, s.stop) : '') : 'No date \u00b7 anytime in range';
       if (s.alarm && s.alarm.enabled) when += ' \u00b7 \uD83D\uDD14';
-      const tagNames = (s.tags || []).map(function (id) { const tg = (typeof TagsData !== 'undefined' && TagsData.getTag) ? TagsData.getTag(id) : null; return tg ? tg.name : ''; }).filter(Boolean);
+            const tagNames = (s.tags || []).map(function (id) { const tg = TagsData.getTag(id); return tg ? tg.name : ''; }).filter(Boolean);
       if (tagNames.length) when += ' \u00b7 \uD83C\uDFF7\uFE0F ' + tagNames.join(', ');
       const actions = view.confirm === 'sub:' + rid
         ? '<span class="pa-t-sub-actions">Delete? ' + btn('del-sub-yes', 'Yes', rid) + btn('cancel-confirm', 'No') + '</span>'
@@ -5749,13 +5757,15 @@ const TargetFolderUI = (function () {
         collectForm(); collectRows();
         const r = rows[i];
         if (wantsNew) { r.creating = kind === 'subject' ? 'subject' : 'topic'; r.err = ''; }
-        else if (kind === 'subject') { r.topicId = ''; r.creating = ''; }
+                else if (kind === 'subject') { r.topicId = ''; r.creating = ''; r.tags = []; }
         else {
           const tp = r.topicId ? PlanData.getAllTopics()[r.topicId] : null;
           if (tp) r.subject = tp.subject;
+          r.tags = r.topicId ? TagsData.getTagIdsForTask({ topicId: r.topicId }).slice() : [];
         }
         render();
-      } else if (el.dataset && el.dataset.act === 'remind') {
+            } else if (el.dataset && el.dataset.act === 'remind') {
+        if (el.checked) Notify.requestPermission();
         collectForm(); collectRows(); render();
       }
     });
