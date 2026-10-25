@@ -2151,8 +2151,11 @@ const PlanningAgentUI = (function () {
   // PlanningAgent.createTask and linked by targetId. Subjects come from PlanData, tags from TagsData (shared stores).
 
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  let subUid = 0;
+    let subUid = 0;
   let state = freshState({});
+  let screen = 'dash';
+  let dash = null;
+  let toTop = false;
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -2161,8 +2164,8 @@ const PlanningAgentUI = (function () {
       pop: '', popErr: '', cal: '', err: '', msg: '', done: null };
   }
 
-  function blankSub(date) {
-    return { uid: ++subUid, title: '', date: date || '', start: '', end: '', note: '', tags: [], subject: '', open: false, err: '' };
+    function blankSub(date) {
+    return { uid: ++subUid, title: '', date: date || '', start: '', end: '', note: '', tags: [], subject: '', open: false, err: '', isNew: true };
   }
 
   function holderOf(who) {
@@ -2461,9 +2464,11 @@ const PlanningAgentUI = (function () {
     '</div>';
   }
 
-  function subHtml(s, i) {
+    function subHtml(s, i) {
     const u = String(s.uid);
-    return '<div class="pl-sub' + (s.open ? ' is-open' : '') + '">' +
+    const fresh = s.isNew;
+    s.isNew = false;
+    return '<div class="pl-sub' + (s.open ? ' is-open' : '') + (fresh ? ' is-new' : '') + '">' +
       '<div class="pl-sub-row"><span class="pl-num" aria-hidden="true">' + (i + 1) + '</span>' +
         '<input type="text" class="pl-input" id="pl-st-' + u + '" data-f="s-title" data-u="' + u + '" maxlength="120" placeholder="Subtask title" aria-label="Subtask ' + (i + 1) + ' title" value="' + esc(s.title) + '">' +
         '<button type="button" class="pl-more" data-pl="toggle" data-u="' + u + '" aria-expanded="' + s.open + '" aria-label="' + (s.open ? 'Hide' : 'Show') + ' details for subtask ' + (i + 1) + '"><span class="pl-caret" aria-hidden="true"></span></button></div>' +
@@ -2472,14 +2477,369 @@ const PlanningAgentUI = (function () {
     '</div>';
   }
 
+    // ---------- Dashboard ----------
+  // Reads go through PlanningAgentTasks / CanonicalTaskStore / TargetsData. Writes reuse the Agent's existing paths:
+  // PlanningAgentTasks.toggleTask, PlanningAgent.deleteTask, TaskManagerUI (task edit) and TargetFolderUI (plan edit).
+
+  const DASH_VIEWS = [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'Week'], ['month', 'Month'], ['pick', 'Pick a date'], ['timeline', 'Timeline']];
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  function pix(rows) {
+    let r = '';
+    rows.forEach(function (row, y) {
+      for (let x = 0; x < row.length; x++) if (row.charAt(x) === '#') r += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    });
+    return '<svg class="pl-ico" viewBox="0 0 8 8" width="16" height="16" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true" focusable="false">' + r + '</svg>';
+  }
+
+  const ICONS = {
+    plus: pix(['...##...', '...##...', '...##...', '########', '########', '...##...', '...##...', '...##...']),
+    edit: pix(['......##', '.....###', '....###.', '...###..', '..###...', '.###....', '.##.....', '.#......']),
+    trash: pix(['..####..', '########', '.#....#.', '.#.##.#.', '.#.##.#.', '.#.##.#.', '.######.', '........'])
+  };
+
+  function isDateStr(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
+  function isDash(v) { return DASH_VIEWS.some(function (d) { return d[0] === v; }); }
+
+  function freshDash(o) {
+    const d = isDateStr(o.date) ? o.date : todayStr();
+    return { from: o.from || '', view: isDash(o.view) ? o.view : 'today', anchor: d, date: d, cal: d.slice(0, 7), tray: '', open: {}, confirm: '', limit: 14, subject: o.subject || '', pulse: '' };
+  }
+
+  function toMin(hm) { return Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)); }
+  function addMin(hm, min) { const m = toMin(hm) + min; return m >= 1440 ? '' : pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+
+  function info(t) {
+    const key = String(t.id).indexOf('legacy_') === 0 ? String(t.id).slice(7) : '';
+    const lt = key ? PlanData.getTask(key) : null;
+    return {
+      id: t.id, key: key, targetId: t.targetId || '', date: t.date || '', start: t.time || '', done: t.status === 'completed',
+      title: (lt && lt.title) || t.title || (lt && lt.topicName) || 'Task',
+      stop: (t.time && t.duration) ? addMin(t.time, t.duration) : '',
+      subject: (lt && lt.subject) || t.subjectId || '',
+      note: (lt && lt.note) || '',
+      tags: lt ? TagsData.getTagIdsForTask({ topicId: lt.topicId || '', tagIds: lt.tagIds }) : []
+    };
+  }
+
+  function toggleKey(id) {
+    const key = String(id).indexOf('legacy_') === 0 ? String(id).slice(7) : '';
+    return key && PlanData.getTask(key) ? key : id;
+  }
+
+  function isOverdue(t) { return !t.done && !!t.date && t.date < todayStr(); }
+
+  function keepTask(t) {
+    return !t.archived && t.type !== 'break' && (!dash.subject || info(t).subject === dash.subject);
+  }
+
+  function dashTasks(from, to) { return PlanningAgentTasks.getTasksForDateRange(from, to).filter(keepTask); }
+
+  function planOf(t) {
+    const tg = t.targetId ? TargetsData.getTarget(t.targetId) : null;
+    return tg && tg.isPlan ? tg : null;
+  }
+
+  function planSubs(targetId) {
+    PlanningAgentTasks.sync();
+    return CanonicalTaskStore.getTasks({ targetId: targetId, status: ['pending', 'completed'] }).map(info);
+  }
+
+  function itemsFor(tasks) {
+    const seen = {}, out = [];
+    tasks.forEach(function (t) {
+      const tg = planOf(t), sort = (t.date || '~') + (t.time || '~');
+      if (!tg) { out.push({ kind: 'task', task: info(t), sort: sort }); return; }
+      if (seen[tg.targetId]) { if (sort < seen[tg.targetId].sort) seen[tg.targetId].sort = sort; return; }
+      seen[tg.targetId] = { kind: 'plan', target: tg, sort: sort };
+      out.push(seen[tg.targetId]);
+    });
+    return out.sort(function (a, b) { return a.sort < b.sort ? -1 : (a.sort > b.sort ? 1 : 0); });
+  }
+
+  function emptyPlans() {
+    PlanningAgentTasks.sync();
+    return TargetsData.getAllTargetsList().filter(function (p) {
+      return p.isPlan && !p.archived && (!dash.subject || p.subject === dash.subject) &&
+        !CanonicalTaskStore.getTasks({ targetId: p.targetId, status: ['pending', 'completed'] }).length;
+    });
+  }
+
+  function overdueTasks() { return PlanningAgentTasks.getPendingTasks().filter(keepTask); }
+
+  function unscheduledItems() {
+    const items = itemsFor(PlanningAgentTasks.getOpenTasks().filter(function (t) { return !t.date && keepTask(t); }));
+    return items.concat(emptyPlans().map(function (p) { return { kind: 'plan', target: p, sort: '~~' }; }));
+  }
+
+  function mdLabel(s) {
+    const d = new Date(s + 'T00:00:00');
+    return MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+  }
+
+  function dayName(s) {
+    const t = todayStr(), d = new Date(s + 'T00:00:00');
+    const base = DOW[d.getDay()] + ', ' + mdLabel(s);
+    if (s === t) return 'Today \u00b7 ' + base;
+    if (s === shiftDateStr(t, 1)) return 'Tomorrow \u00b7 ' + base;
+    if (s === shiftDateStr(t, -1)) return 'Yesterday \u00b7 ' + base;
+    return base;
+  }
+
+  function whenText(t, hideDate) {
+    const bits = [];
+    if (!t.date) bits.push('Unscheduled');
+    else if (!hideDate) bits.push(dayLabel(t.date));
+    if (t.start) bits.push(fmt12(t.start) + (t.stop ? '\u2013' + fmt12(t.stop) : ''));
+    if (!bits.length) bits.push('Anytime');
+    return bits.join(' \u00b7 ');
+  }
+
+  function chipsHtml(subject, tagIds) {
+    const c = (subject ? '<span class="pl-chip pl-chip-subj">' + esc(subject) + '</span>' : '') +
+      (tagIds || []).map(function (id) {
+        const t = TagsData.getTag(id);
+        return t ? '<span class="pl-chip" style="--c:' + esc(t.color) + '">' + esc(t.name) + '</span>' : '';
+      }).join('');
+    return c ? '<div class="pl-chips">' + c + '</div>' : '';
+  }
+
+  function checkHtml(t) {
+    return '<button type="button" class="pl-check' + (t.done ? ' is-on' : '') + (dash.pulse === t.id ? ' is-pulse' : '') + '" role="checkbox" aria-checked="' + t.done +
+      '" data-pl="d-toggle" data-id="' + esc(t.id) + '" aria-label="' + esc(t.title) + '"><span aria-hidden="true"></span></button>';
+  }
+
+  function actsHtml(kind, id, title) {
+    return '<span class="pl-acts">' +
+      '<button type="button" class="pl-ib" data-pl="' + (kind === 'plan' ? 'd-edit-plan' : 'd-edit') + '" data-id="' + esc(id) + '" aria-label="Edit ' + esc(title) + '" title="Edit">' + ICONS.edit + '</button>' +
+      '<button type="button" class="pl-ib pl-ib-del" data-pl="d-del" data-kind="' + kind + '" data-id="' + esc(id) + '" aria-label="Delete ' + esc(title) + '" title="Delete">' + ICONS.trash + '</button>' +
+    '</span>';
+  }
+
+  function confirmHtml(kind, id) {
+    const yes = function (mode, label) {
+      return '<button type="button" class="pl-cbtn is-danger" data-pl="d-del-yes" data-kind="' + kind + '" data-id="' + esc(id) + '"' + (mode ? ' data-mode="' + mode + '"' : '') + '>' + label + '</button>';
+    };
+    return '<div class="pl-confirm" role="group" aria-label="Confirm delete"><span>' + (kind === 'plan' ? 'Delete this plan?' : 'Delete this task?') + '</span>' +
+      '<span class="pl-confirm-acts">' +
+        (kind === 'plan'
+          ? yes('all', 'Delete with subtasks') + '<button type="button" class="pl-cbtn" data-pl="d-del-yes" data-kind="plan" data-mode="keep" data-id="' + esc(id) + '">Keep subtasks</button>'
+          : yes('', 'Delete')) +
+        '<button type="button" class="pl-cbtn" data-pl="d-del-no">Cancel</button>' +
+      '</span></div>';
+  }
+
+  function taskDetailHtml(t) {
+    const when = t.date
+      ? dayName(t.date) + (t.start ? ' \u00b7 ' + fmt12(t.start) + (t.stop ? '\u2013' + fmt12(t.stop) : '') : '')
+      : 'Not scheduled';
+    return '<p class="pl-when">' + esc(when) + '</p>' + chipsHtml(t.subject, t.tags) + (t.note.trim() ? '<p class="pl-note">' + esc(t.note) + '</p>' : '');
+  }
+
+  function taskItemHtml(t, gk, hideDate) {
+    const k = 't:' + t.id + ':' + gk, open = !!dash.open[k];
+    return '<li class="pl-item pl-task ' + (t.done ? 'is-done' : 'is-todo') + (open ? ' is-expanded' : '') + '">' +
+      '<div class="pl-item-row">' + checkHtml(t) +
+        '<button type="button" class="pl-item-main" data-pl="d-open" data-k="' + esc(k) + '" aria-expanded="' + open + '">' +
+          '<span class="pl-item-title">' + esc(t.title) + '</span>' +
+          '<span class="pl-item-meta">' + esc(whenText(t, hideDate)) + (isOverdue(t) ? ' <span class="pl-badge is-over">Overdue</span>' : '') + '</span>' +
+        '</button>' + actsHtml('task', t.id, t.title) +
+      '</div>' +
+      (dash.confirm === 'task:' + t.id ? confirmHtml('task', t.id) : '') +
+      (open ? '<div class="pl-details' + (dash.pulse === k ? ' is-fresh' : '') + '">' + taskDetailHtml(t) + '</div>' : '') +
+    '</li>';
+  }
+
+  function subLineHtml(t) {
+    return '<li class="pl-subi ' + (t.done ? 'is-done' : 'is-todo') + '">' +
+      '<div class="pl-item-row">' + checkHtml(t) +
+        '<div class="pl-item-main pl-static"><span class="pl-item-title">' + esc(t.title) + '</span>' +
+          '<span class="pl-item-meta">' + esc(whenText(t, false)) + (isOverdue(t) ? ' <span class="pl-badge is-over">Overdue</span>' : '') + '</span>' +
+          (t.note.trim() ? '<span class="pl-note">' + esc(t.note) + '</span>' : '') + chipsHtml(t.subject, t.tags) + '</div>' +
+        actsHtml('task', t.id, t.title) +
+      '</div>' + (dash.confirm === 'task:' + t.id ? confirmHtml('task', t.id) : '') + '</li>';
+  }
+
+  function planItemHtml(tg, gk) {
+    const subs = planSubs(tg.targetId), total = subs.length, done = subs.filter(function (s) { return s.done; }).length;
+    const st = total && done === total ? 'done' : (done ? 'part' : 'open');
+    const k = 'p:' + tg.targetId + ':' + gk, open = !!dash.open[k];
+    const status = st === 'done' ? 'All done'
+      : (st === 'part' ? 'In progress \u00b7 ' + done + ' of ' + total
+        : (total ? 'Not started \u00b7 ' + total + (total === 1 ? ' subtask' : ' subtasks') : 'No subtasks yet'));
+    return '<li class="pl-item pl-plan is-' + st + (open ? ' is-expanded' : '') + '">' +
+      '<div class="pl-item-row"><span class="pl-state" aria-hidden="true"></span>' +
+        '<button type="button" class="pl-item-main" data-pl="d-open" data-k="' + esc(k) + '" aria-expanded="' + open + '">' +
+          '<span class="pl-item-title">' + esc(tg.title || 'Plan') + '</span>' +
+          '<span class="pl-item-meta">' + esc(status) + '</span>' +
+          (total ? '<span class="pl-prog" aria-hidden="true"><i style="width:' + Math.round(done / total * 100) + '%"></i></span>' : '') +
+        '</button>' + actsHtml('plan', tg.targetId, tg.title || 'plan') +
+      '</div>' +
+      (dash.confirm === 'plan:' + tg.targetId ? confirmHtml('plan', tg.targetId) : '') +
+      (open ? '<div class="pl-details' + (dash.pulse === k ? ' is-fresh' : '') + '">' + chipsHtml(tg.subject, tg.tagIds) +
+        (subs.length ? '<ul class="pl-subl">' + subs.map(subLineHtml).join('') + '</ul>' : '<p class="pl-empty">No subtasks yet.</p>') + '</div>' : '') +
+    '</li>';
+  }
+
+  function itemsHtml(items, gk, hideDate) {
+    return '<ul class="pl-list">' + items.map(function (it) {
+      return it.kind === 'plan' ? planItemHtml(it.target, gk) : taskItemHtml(it.task, gk, hideDate);
+    }).join('') + '</ul>';
+  }
+
+  function blankHtml(msg) {
+    return '<div class="pl-blank"><span class="pl-spark" aria-hidden="true">\u2726</span><p>' + esc(msg) + '</p></div>';
+  }
+
+  function dayHtml(d) {
+    const items = itemsFor(dashTasks(d, d));
+    return '<p class="pl-date">' + esc(dayName(d)) + '</p>' +
+      (items.length ? itemsHtml(items, d, true) : blankHtml(d === todayStr() ? 'Nothing planned for today. Tap + to start a plan.' : 'Nothing planned for this day. Tap + to start a plan.'));
+  }
+
+  function groupsHtml(tasks, dates, emptyMsg) {
+    if (!dates.length) return blankHtml(emptyMsg);
+    const map = {}, today = todayStr();
+    tasks.forEach(function (t) { (map[t.date] = map[t.date] || []).push(t); });
+    return dates.map(function (d) {
+      const items = itemsFor(map[d] || []);
+      return '<section class="pl-group"><h4 class="pl-group-h' + (d === today ? ' is-today' : '') + '">' + esc(dayName(d)) + '</h4>' +
+        (items.length ? itemsHtml(items, d, true) : '<p class="pl-empty">Nothing planned.</p>') + '</section>';
+    }).join('');
+  }
+
+  function navBar(label, resetLabel) {
+    return '<div class="pl-navbar"><button type="button" class="pl-nav" data-pl="d-nav" data-dir="-1" aria-label="Previous">\u2039</button>' +
+      '<span class="pl-nav-label" aria-live="polite">' + esc(label) + '</span>' +
+      '<button type="button" class="pl-nav" data-pl="d-nav" data-dir="1" aria-label="Next">\u203A</button>' +
+      '<button type="button" class="pl-link" data-pl="d-nav" data-dir="0">' + resetLabel + '</button></div>';
+  }
+
+  function dashCalHtml() {
+    const p = dash.cal.split('-'), y = Number(p[0]), m = Number(p[1]) - 1, today = todayStr();
+    const lead = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), has = {};
+    dashTasks(y + '-' + pad(m + 1) + '-01', y + '-' + pad(m + 1) + '-' + pad(days)).forEach(function (t) { has[t.date] = true; });
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<span></span>';
+    for (let d = 1; d <= days; d++) {
+      const v = y + '-' + pad(m + 1) + '-' + pad(d), on = v === dash.date;
+      cells += '<button type="button" class="pl-day' + (on ? ' is-on' : '') + (v === today ? ' is-today' : '') + (has[v] ? ' has-dot' : '') +
+        '" data-pl="d-day" data-val="' + v + '" aria-pressed="' + on + '" aria-label="' + MONTHS[m] + ' ' + d + (has[v] ? ', has plans' : '') + '">' + d + '</button>';
+    }
+    return '<div class="pl-minical">' + navBar(MONTHS[m] + ' ' + y, 'Today') +
+      '<div class="pl-cal-week" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>' +
+      '<div class="pl-cal-grid">' + cells + '</div></div>';
+  }
+
+  function dashBodyHtml(od, un) {
+    const v = dash.view, t = todayStr();
+    if (dash.tray === 'overdue') {
+      const items = itemsFor(od);
+      return '<p class="pl-date">Overdue</p>' + (items.length ? itemsHtml(items, 'tray', false) : blankHtml('Nothing overdue.'));
+    }
+    if (dash.tray === 'unscheduled') {
+      return '<p class="pl-date">Unscheduled</p>' + (un.length ? itemsHtml(un, 'tray', false) : blankHtml('Nothing is waiting for a date.'));
+    }
+    if (v === 'today') return dayHtml(t);
+    if (v === 'tomorrow') return dayHtml(shiftDateStr(t, 1));
+    if (v === 'pick') return dashCalHtml() + dayHtml(dash.date);
+    if (v === 'week') {
+      const from = shiftDateStr(dash.anchor, -new Date(dash.anchor + 'T00:00:00').getDay()), dates = [];
+      for (let i = 0; i < 7; i++) dates.push(shiftDateStr(from, i));
+      return navBar(mdLabel(dates[0]) + ' \u2013 ' + mdLabel(dates[6]), 'This week') + groupsHtml(dashTasks(dates[0], dates[6]), dates, '');
+    }
+    if (v === 'month') {
+      const p = dash.anchor.split('-'), y = Number(p[0]), m = Number(p[1]) - 1, seen = {};
+      const tasks = dashTasks(y + '-' + pad(m + 1) + '-01', y + '-' + pad(m + 1) + '-' + pad(new Date(y, m + 1, 0).getDate()));
+      tasks.forEach(function (x) { seen[x.date] = true; });
+      return navBar(MONTHS[m] + ' ' + y, 'This month') + groupsHtml(tasks, Object.keys(seen).sort(), 'Nothing planned this month.');
+    }
+    const all = dashTasks('1900-01-01', t), days = {};
+    all.forEach(function (x) { days[x.date] = true; });
+    const dates = Object.keys(days).sort().reverse();
+    return '<div class="pl-timeline">' + groupsHtml(all, dates.slice(0, dash.limit), 'Your timeline fills in as you plan.') +
+      (dates.length > dash.limit ? '<button type="button" class="pl-add" data-pl="d-more">Show earlier days</button>' : '') + '</div>';
+  }
+
+  function dashHtml() {
+    const od = overdueTasks(), un = unscheduledItems();
+    const tabs = DASH_VIEWS.map(function (d) {
+      const on = !dash.tray && dash.view === d[0];
+      return '<button type="button" role="tab" class="pl-tab' + (on ? ' is-on' : '') + '" data-pl="d-view" data-val="' + d[0] + '" aria-selected="' + on + '" tabindex="' + (dash.view === d[0] ? 0 : -1) + '">' + d[1] + '</button>';
+    }).join('');
+    const tray = function (id, label, n) {
+      const on = dash.tray === id;
+      return '<button type="button" class="pl-tray' + (on ? ' is-on' : '') + (n ? ' has-n' : '') + '" data-pl="d-tray" data-val="' + id + '" aria-pressed="' + on + '">' + label + ' <b>' + n + '</b></button>';
+    };
+    return '<div class="plan-agent pl pl-dash">' +
+      '<div class="pl-head"><h3 class="plan-agent-title">Plans</h3><span class="pl-head-acts">' +
+        (dash.from === 'assistant' ? '<button type="button" class="plan-agent-link" data-pl="back">\u2190 Back</button>' : '') +
+        '<button type="button" class="pl-plus" data-pl="d-new" aria-label="New plan" title="New plan">' + ICONS.plus + '</button>' +
+        '<button type="button" class="plan-agent-link" data-pl="close">Close</button></span></div>' +
+      '<div class="pl-tabs" role="tablist" aria-label="Plan views">' + tabs + '</div>' +
+      '<div class="pl-trays">' + tray('overdue', 'Overdue', od.length) + tray('unscheduled', 'Unscheduled', un.length) +
+        (dash.subject ? '<button type="button" class="pl-chip pl-chip-subj pl-filter" data-pl="d-clear-subject" aria-label="Clear subject filter">' + esc(dash.subject) + ' \u00d7</button>' : '') + '</div>' +
+      '<div class="pl-body" role="tabpanel">' + dashBodyHtml(od, un) + '</div>' +
+    '</div>';
+  }
+
+  function dashView(v, focus) {
+    dash.view = v; dash.tray = ''; dash.open = {}; dash.confirm = ''; dash.limit = 14;
+    if (v === 'week' || v === 'month') dash.anchor = todayStr();
+    if (v === 'pick') dash.cal = dash.date.slice(0, 7);
+    render(false, focus ? '[data-pl="d-view"][data-val="' + v + '"]' : '');
+  }
+
+  function dashNav(dir) {
+    const t = todayStr();
+    if (dash.view === 'week') dash.anchor = dir ? shiftDateStr(dash.anchor, 7 * dir) : t;
+    else {
+      const pickView = dash.view === 'pick', base = (pickView ? dash.cal + '-01' : dash.anchor).split('-');
+      const d = dir ? new Date(Number(base[0]), Number(base[1]) - 1 + dir, 1) : new Date(t + 'T00:00:00');
+      const ym = d.getFullYear() + '-' + pad(d.getMonth() + 1);
+      if (pickView) { dash.cal = ym; if (!dir) dash.date = t; } else dash.anchor = ym + '-01';
+    }
+    dash.open = {}; dash.confirm = '';
+    render(false, '[data-pl="d-nav"][data-dir="' + dir + '"]');
+  }
+
+  function removeTask(id) {
+    const key = String(id).indexOf('legacy_') === 0 ? String(id).slice(7) : '';
+    if (key && PlanData.getTask(key)) { PlanningAgent.deleteTask(key); PlanningAgentTasks.sync(); }
+    else CanonicalTaskStore.deleteTask(id);
+  }
+
+  function dashRemove(kind, id, mode) {
+    if (kind === 'task') removeTask(id);
+    else {
+      CanonicalTaskStore.getTasks({ targetId: id }).forEach(function (t) {
+        if (mode === 'all') { removeTask(t.id); return; }
+        const key = t.id.indexOf('legacy_') === 0 ? t.id.slice(7) : '';
+        if (key) PlanData.updateTask(key, { targetId: null, subtargetId: null });
+        CanonicalTaskStore.updateTask(t.id, { targetId: null, subtaskId: null });
+      });
+      PlanningAgentTasks.sync();
+      TargetsData.deleteTarget(id);
+    }
+    dash.confirm = '';
+    refreshViews();
+    render(false);
+  }
+
+  function showDashboard() {
+    if (!dash) dash = freshDash({});
+    screen = 'dash';
+    render(true);
+  }
+
   // ---------- Render ----------
 
   function renderHtml() {
-    const head =
-      '<div class="pl-head"><h3 class="plan-agent-title">Plan</h3>' +
-        (state.from === 'assistant'
-          ? '<button type="button" class="plan-agent-link" data-pl="back">\u2190 Back</button>'
-          : '<span><button type="button" class="plan-agent-link" data-pl="tasks">All tasks</button> <button type="button" class="plan-agent-link" data-pl="plans">Plans</button> <button type="button" class="plan-agent-link" data-pl="close">Close</button></span>') +
+    if (screen === 'dash') return dashHtml();
+        const head =
+      '<div class="pl-head"><h3 class="plan-agent-title">New plan</h3>' +
+        '<span class="pl-head-acts"><button type="button" class="plan-agent-link" data-pl="d-home">\u2190 Plans</button>' +
+        '<button type="button" class="plan-agent-link" data-pl="close">Close</button></span>' +
       '</div>';
 
     if (state.done) {
@@ -2489,7 +2849,7 @@ const PlanningAgentUI = (function () {
           '<p class="plan-agent-muted">\u201c' + esc(state.done.title) + '\u201d' + (n ? ' with ' + n + (n === 1 ? ' subtask.' : ' subtasks.') : '.') + '</p>' +
           '<div class="plan-agent-actions plan-agent-actions-center">' +
             '<button type="button" class="btn btn-secondary" data-pl="again">Plan something else</button>' +
-            '<button type="button" class="btn btn-primary" data-pl="close">Done</button>' +
+                        '<button type="button" class="btn btn-primary" data-pl="d-home">View plans</button>' +
           '</div></div></div>';
     }
 
@@ -2508,10 +2868,13 @@ const PlanningAgentUI = (function () {
     '</div>';
   }
 
-  function render(first, focusSel) {
+    function render(first, focusSel) {
     const html = renderHtml();
     const content = document.getElementById('modal-content');
-    if (!first && content && content.querySelector('.pl')) content.innerHTML = html;
+    const inPlace = !first && content && content.querySelector('.pl');
+    const keep = inPlace && !toTop ? content.scrollTop : 0;
+    toTop = false;
+    if (inPlace) { content.innerHTML = html; content.scrollTop = keep; }
     else Modal.open(html, { size: 'lg' });
     bindEvents();
     if (focusSel) {
@@ -2543,8 +2906,59 @@ const PlanningAgentUI = (function () {
     const popField = state.pop ? state.pop.slice(0, state.pop.indexOf(':')) : '';
     switch (a) {
       case 'close': Modal.close(); return;
-      case 'tasks': TaskManagerUI.open({}); return;
-      case 'plans': TargetFolderUI.open({ from: 'agent' }); return;
+            case 'd-view': dashView(val, true); return;
+      case 'd-nav': dashNav(Number(el.dataset.dir)); return;
+      case 'd-day':
+        dash.date = val; dash.open = {}; dash.confirm = '';
+        render(false, '.pl-day[data-val="' + val + '"]');
+        return;
+      case 'd-tray':
+        dash.tray = dash.tray === val ? '' : val; dash.open = {}; dash.confirm = '';
+        render(false, '[data-pl="d-tray"][data-val="' + val + '"]');
+        return;
+      case 'd-open': {
+        const k = el.dataset.k;
+        dash.open[k] = !dash.open[k];
+        dash.pulse = dash.open[k] ? k : '';
+        render(false, '[data-k="' + k + '"]');
+        dash.pulse = '';
+        return;
+      }
+      case 'd-toggle': {
+        const id = el.dataset.id;
+        PlanningAgentTasks.toggleTask(toggleKey(id));
+        refreshViews();
+        dash.pulse = id;
+        render(false, '[data-pl="d-toggle"][data-id="' + id + '"]');
+        dash.pulse = '';
+        return;
+      }
+      case 'd-edit': TaskManagerUI.open({ taskId: el.dataset.id, backToDash: true }); return;
+      case 'd-edit-plan': TargetFolderUI.open({ from: 'agent', targetId: el.dataset.id }); return;
+      case 'd-del':
+        dash.confirm = el.dataset.kind + ':' + el.dataset.id;
+        render(false, '.pl-confirm .is-danger');
+        return;
+      case 'd-del-no': {
+        const c = dash.confirm;
+        dash.confirm = '';
+        render(false, '[data-pl="d-del"][data-id="' + c.slice(c.indexOf(':') + 1) + '"]');
+        return;
+      }
+      case 'd-del-yes': dashRemove(el.dataset.kind, el.dataset.id, el.dataset.mode); return;
+      case 'd-more': dash.limit += 14; render(false); return;
+      case 'd-clear-subject': dash.subject = ''; render(false); return;
+      case 'd-new':
+        state = freshState({ from: dash ? dash.from : '' });
+        screen = 'compose'; toTop = true;
+        render(false, '#pl-title');
+        return;
+      case 'd-home':
+        state.pop = ''; clk = null;
+        if (!dash) dash = freshDash({ from: state.from });
+        screen = 'dash'; toTop = true;
+        render(false);
+        return;
       case 'back':
         Modal.close();
         if (typeof Assistant !== 'undefined' && Assistant.openMain) Assistant.openMain();
@@ -2627,8 +3041,21 @@ const PlanningAgentUI = (function () {
     s.err = '';
   }
 
-  function onKey(e) {
+    function onKey(e) {
     if (clkKey(e)) return;
+    if (screen === 'dash') {
+      const t = e.target;
+      if (t && t.dataset && t.dataset.pl === 'd-view' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        const at = DASH_VIEWS.map(function (d) { return d[0]; }).indexOf(dash.view);
+        e.preventDefault();
+        dashView(DASH_VIEWS[(at + (e.key === 'ArrowRight' ? 1 : DASH_VIEWS.length - 1)) % DASH_VIEWS.length][0], true);
+      } else if (e.key === 'Escape' && dash.confirm) {
+        e.stopPropagation();
+        dash.confirm = '';
+        render(false);
+      }
+      return;
+    }
     if (e.key === 'Escape' && state.pop) {
       clk = null;
       e.stopPropagation();
@@ -2734,9 +3161,17 @@ const PlanningAgentUI = (function () {
     return o;
   }
 
-  function open(options) {
+    function open(options) {
     const opts = normalizeContext(options);
     if (opts.intent === 'catchup') { CatchUpUI.open(); return; }
+    const compose = !!opts.create || (!opts.view && !!(opts.date || opts.intent || opts.subject || opts.title || opts.prompt || opts.targetId));
+    if (!compose) {
+      dash = freshDash({ from: opts.from, view: opts.view === 'day' ? 'pick' : opts.view, date: opts.date, subject: opts.filterSubject });
+      screen = 'dash';
+      render(true);
+      return;
+    }
+    screen = 'compose';
     state = freshState({ from: opts.from, date: opts.date, subject: opts.subject, title: opts.title });
     if (opts.prompt) {
       const parsed = parseNaturalInput(opts.prompt);
@@ -2746,8 +3181,9 @@ const PlanningAgentUI = (function () {
     render(true);
   }
 
-    return {
+  return {
     open: open,
+    showDashboard: showDashboard,
     parseNaturalInput: parseNaturalInput,
     store: CanonicalTaskStore
   };
@@ -3205,20 +3641,7 @@ const TaskManagerUI = (function () {
     };
   }
 
-  function newInspector(ctx) {
-    ctx = ctx || {};
-    const d = draftFromTask({ status: 'pending' });
-    d.date = isDateStr(ctx.date) ? ctx.date : (st.view === 'all' ? '' : st.date);
-    if (ctx.time) d.time = ctx.time;
-    if (ctx.title) d.title = ctx.title;
-    if (ctx.type) d.type = ctx.type;
-    if (ctx.subjectId) d.subjectId = ctx.subjectId;
-    if (ctx.topicId) d.topicId = ctx.topicId;
-    if (ctx.targetId) d.targetId = ctx.targetId;
-    return { id: null, draft: d, original: null, confirmDelete: false, error: '' };
-  }
-
-  function inspectorFor(id) {
+    function inspectorFor(id) {
     const t = Store.getTask(id);
     if (!t) return null;
     return { id: id, draft: draftFromTask(t), original: t, confirmDelete: false, error: '' };
@@ -3476,8 +3899,7 @@ const TaskManagerUI = (function () {
         '<h3 class="tm-title">Tasks</h3>' +
         '<div class="tm-head-actions">' +
           (inInspector ? '' :
-            '<button type="button" class="btn btn-primary tm-small" data-tm="add">+ Add task</button>' +
-            '<button type="button" class="btn btn-secondary tm-small" data-tm="plan">Plan with agent</button>') +
+                        '<button type="button" class="btn btn-primary tm-small" data-tm="plan">+ Plan</button>') +
           '<button type="button" class="tm-link" data-tm="' + (inInspector ? 'back' : 'close') + '">' + (inInspector ? '← Back to tasks' : 'Close') + '</button>' +
         '</div>' +
       '</div>';
@@ -3560,9 +3982,12 @@ const TaskManagerUI = (function () {
     const a = el.getAttribute('data-tm'), id = el.getAttribute('data-id');
     let res;
     switch (a) {
-      case 'close': Modal.close(); break;
+            case 'close':
+        Modal.close();
+        if (st.backToDash && typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.showDashboard();
+        break;
       case 'plan':
-        if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open({ date: st.view === 'all' ? '' : st.date });
+        if (typeof PlanningAgentUI !== 'undefined') PlanningAgentUI.open({ create: true, date: st.view === 'all' ? '' : st.date });
         break;
       case 'view': st.view = el.getAttribute('data-view'); render(); break;
       case 'nav': {
@@ -3596,8 +4021,7 @@ const TaskManagerUI = (function () {
         st.message = res.ok ? 'Added to ' + friendly(st.date).toLowerCase() + '.' : res.error;
         requestRender();
         break;
-      case 'add': st.inspector = newInspector(); render(); break;
-      case 'back': st.inspector = null; render(); break;
+            case 'back': st.inspector = null; render(); break;
       case 'save': saveInspector(); break;
       case 'delete': collectDraft(); st.inspector.confirmDelete = true; render(); break;
       case 'delete-cancel': collectDraft(); st.inspector.confirmDelete = false; render(); break;
@@ -3694,16 +4118,21 @@ const TaskManagerUI = (function () {
   // open({ view: 'day'|'week'|'month'|'all', date, filters: {type,subject,target,status,scheduled,search},
   //        sort: {by,dir}, taskId (opens the inspector), create (true or { date,time,title,... }) })
 
-  function open(opts) {
+    function open(opts) {
     opts = opts || {};
+    if (opts.create && !opts.taskId && typeof PlanningAgentUI !== 'undefined') {
+      const c = opts.create === true ? {} : opts.create;
+      PlanningAgentUI.open({ create: true, date: c.date || opts.date || '', title: c.title || '', subjectId: c.subjectId || '' });
+      return;
+    }
+    st.backToDash = !!opts.backToDash;
     st.view = VIEWS.some(function (v) { return v[0] === opts.view; }) ? opts.view : 'day';
     st.date = isDateStr(opts.date) ? opts.date : today();
     st.filters = Object.assign(freshFilters(), opts.filters || {});
     st.sort = Object.assign({ by: 'date', dir: 'asc' }, opts.sort || {});
     st.message = '';
     st.inspector = null;
-    if (opts.taskId) st.inspector = inspectorFor(opts.taskId);
-    else if (opts.create) st.inspector = newInspector(opts.create === true ? {} : opts.create);
+        if (opts.taskId) st.inspector = inspectorFor(opts.taskId);
     Store.init();
     render(true);
   }
@@ -4614,8 +5043,8 @@ const TargetsPanel = (function () {
 
   function wire() {
     document.getElementById('targets-new-add-btn').addEventListener('click', function () {
-      Modal.close();
-      PlanningAgentUI.open();
+            Modal.close();
+      PlanningAgentUI.open({ create: true });
     });
     each('.targets-complete-check', 'click', function (el) { TargetsData.toggleTargetComplete(el.dataset.targetId); open(); });
     each('.targets-delete-btn', 'click', function (el) { TargetsData.deleteTarget(el.dataset.targetId); open(); });
@@ -5128,7 +5557,7 @@ const TargetFolderUI = (function () {
       case 'agent': Modal.close(); PlanningAgentUI.open(); return;
       case 'list': view.screen = 'list'; view.msg = ''; view.confirm = ''; break;
       case 'open': view.targetId = id; view.screen = 'detail'; view.msg = ''; view.confirm = ''; break;
-      case 'new': Modal.close(); PlanningAgentUI.open(); return;
+            case 'new': Modal.close(); PlanningAgentUI.open({ create: true }); return;
       case 'edit-target': form = formFrom(TargetsData.getTarget(view.targetId)); view.screen = 'form'; view.msg = ''; break;
       case 'cancel-form': form = null; rows = []; view.screen = view.targetId && TargetsData.getTarget(view.targetId) && view.screen === 'form' && formWasEdit ? 'detail' : 'list'; view.msg = ''; break;
       case 'note-t': collectForm(); form.showNote = true; break;
@@ -5449,7 +5878,7 @@ if (typeof window !== 'undefined') {
     render: function () {},
     refreshSubjectOptions: function () {},
     openDate: function (d) { TaskManagerUI.open({ view: 'day', date: d }); },
-    openHistory: function (subject) { TaskManagerUI.open({ view: 'all', filters: { status: 'completed', subject: subject || '' } }); },
+        openHistory: function (subject) { PlanningAgentUI.open({ view: 'timeline', filterSubject: subject || '' }); },
     openPlan: function (o) { PlanningAgentUI.open(o); }
   };
   PlanningAgent.openUI = function (opts) { PlanningAgentUI.open(opts); };
