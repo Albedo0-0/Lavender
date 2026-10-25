@@ -6674,102 +6674,58 @@ button.cassette-media-remove {
 
 
 /* ===== PTPE — Progress, Explorer, charts, Calendar lens, quiet meter bar ===== */
-/* Quiet header meters: hairline tracks, one accent each, labels beside not inside */
-#top-meter-bar { gap: 5px; padding: 7px 12px; min-width: 176px; box-shadow: none; background: transparent; border-color: var(--color-border); }
-#productivity-bar-wrap, #exp-bar-wrap { height: 4px; background: color-mix(in srgb, var(--color-brown-700) 10%, transparent); border: 0; box-shadow: none; overflow: visible; margin-top: 15px; }
-#exp-bar-wrap { height: 3px; margin-top: 15px; }
-#productivity-bar-fill, #exp-bar-fill { border-radius: var(--radius-pill); transition: width .7s var(--ease-soft); }
-#productivity-bar-fill { background: var(--color-accent-rust); }
-#exp-bar-fill { background: var(--color-kraft-500); }
-#productivity-bar-label, #exp-bar-label { top: -15px; left: 0; line-height: 1; font-family: var(--font-body); font-size: 10px; font-weight: 500; letter-spacing: .02em; color: var(--color-text-muted); text-shadow: none; white-space: pre; }
-#exp-bar-label { font-size: 10px; line-height: 1; }
-
-/* ---- Productivity / EXP object: pixel precision + scrapbook paper + restrained plaid ---- */
+/* Header meters — cream card, soft sage track, rounded fills */
 #top-meter-bar {
-  --meter-notch: polygon(1px 0, calc(100% - 1px) 0, 100% 1px, 100% calc(100% - 1px), calc(100% - 1px) 100%, 1px 100%, 0 calc(100% - 1px), 0 1px);
   position: relative;
   box-sizing: border-box;
+  gap: 5px;
   min-width: 176px;
   max-width: 100%;
-  background-color: color-mix(in srgb, var(--color-cream-050) 92%, transparent);
-  background-image:
-    repeating-linear-gradient(0deg, rgba(181, 86, 107, 0.07) 0 4px, transparent 4px 12px),
-    repeating-linear-gradient(90deg, rgba(181, 86, 107, 0.07) 0 4px, transparent 4px 12px);
-  border: 1px solid var(--color-border);
-  border-radius: 3px;
-  box-shadow: 1px 1px 0 rgba(63, 47, 33, 0.16);
+  padding: 8px 16px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-sage-300);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
-#productivity-bar-wrap, #exp-bar-wrap { position: relative; height: 6px; margin-top: 15px; background: none; border: 0; box-shadow: none; overflow: visible; }
-#exp-bar-wrap { height: 5px; }
+#productivity-bar-wrap, #exp-bar-wrap {
+  position: relative;
+  height: 7px;
+  margin-top: 15px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+#exp-bar-wrap { height: 6px; }
 #productivity-bar-wrap::before, #exp-bar-wrap::before {
-  content: ''; position: absolute; inset: 0;
-  background: color-mix(in srgb, var(--color-brown-700) 12%, var(--color-cream-200));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brown-700) 28%, transparent);
-  clip-path: var(--meter-notch);
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-sage-100);
+  box-shadow: inset 0 0 0 1px var(--color-sage-300);
+  border-radius: var(--radius-pill);
 }
 #productivity-bar-wrap::after, #exp-bar-wrap::after { content: ''; position: absolute; left: 0; right: 0; top: -15px; bottom: -2px; }
 #productivity-bar-fill, #exp-bar-fill {
-  position: relative; z-index: 1; height: 100%; width: 0; border-radius: 0;
-  clip-path: var(--meter-notch);
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
   transition: width .7s cubic-bezier(.22, .8, .3, 1);
 }
-#productivity-bar-fill {
-  background:
-    linear-gradient(to bottom, rgba(255, 246, 224, 0.42) 0 1px, transparent 1px),
-    repeating-linear-gradient(90deg, transparent 0 5px, rgba(63, 47, 33, 0.12) 5px 6px),
-    repeating-linear-gradient(0deg, rgba(255, 246, 224, 0.14) 0 1px, transparent 1px 3px),
-    var(--color-accent-rust);
-}
-#exp-bar-fill {
-  background:
-    linear-gradient(to bottom, rgba(255, 246, 224, 0.45) 0 1px, transparent 1px),
-    repeating-linear-gradient(90deg, transparent 0 5px, rgba(63, 47, 33, 0.12) 5px 6px),
-    repeating-linear-gradient(0deg, rgba(255, 246, 224, 0.14) 0 1px, transparent 1px 3px),
-    var(--color-kraft-500);
-}
+#productivity-bar-fill { background: linear-gradient(to bottom, rgba(255, 253, 248, 0.28), transparent 55%), var(--color-sage-600); }
+#exp-bar-fill { background: linear-gradient(to bottom, rgba(255, 253, 248, 0.28), transparent 55%), var(--color-kraft-500); }
+#productivity-bar-label, #exp-bar-label { top: -15px; left: 0; line-height: 1; font-family: var(--font-body); font-size: 10px; font-weight: 500; letter-spacing: .02em; color: var(--color-text-muted); text-shadow: none; white-space: pre; }
+
 #productivity-bar-fill.no-anim, #exp-bar-fill.no-anim { transition: none !important; }
 
-/* Soft, pill-shaped corners */
-#top-meter-bar { border-radius: 20px; padding: 9px 18px 10px; }
-#productivity-bar-wrap, #exp-bar-wrap { height: 7px; }
-#exp-bar-wrap { height: 6px; }
-#productivity-bar-wrap::before, #exp-bar-wrap::before,
-#productivity-bar-fill, #exp-bar-fill { clip-path: none; border-radius: 999px; }
-#productivity-bar-fill, #exp-bar-fill { overflow: hidden; }
+/* Meter store tag + hover note */
 #top-meter-bar #meter-note { border-radius: 12px; }
 #meter-store-btn.meter-cart, #modal-content .meter-cart { width: 26px; height: 24px; border-radius: 999px; }
-#modal-content .meter-sheet { border-radius: 18px; }
-#modal-content .meter-sheet::before { border-radius: 999px; }
-#modal-content .meter-track { clip-path: none; border-radius: 999px; overflow: hidden; }
-#modal-content .meter-track i { border-radius: 999px; }
-#modal-content:has(.meter-page) { border-radius: 22px; }
 
-/* Green palette (replaces the pink accents) */
-#top-meter-bar {
-  background-image:
-    repeating-linear-gradient(0deg, rgba(86, 110, 58, 0.07) 0 4px, transparent 4px 12px),
-    repeating-linear-gradient(90deg, rgba(86, 110, 58, 0.07) 0 4px, transparent 4px 12px);
-}
-#productivity-bar-fill {
-  background:
-    linear-gradient(to bottom, rgba(255, 246, 224, 0.42) 0 1px, transparent 1px),
-    repeating-linear-gradient(90deg, transparent 0 5px, rgba(63, 47, 33, 0.12) 5px 6px),
-    repeating-linear-gradient(0deg, rgba(255, 246, 224, 0.14) 0 1px, transparent 1px 3px),
-    #7f9a5c;
-}
-.meter-note-line.is-down, .meter-row.is-down { color: var(--color-brown-600); }
-#modal-content:has(.meter-page) {
-  background-image:
-    repeating-linear-gradient(0deg, rgba(86, 110, 58, 0.09) 0 10px, transparent 10px 24px),
-    repeating-linear-gradient(90deg, rgba(86, 110, 58, 0.09) 0 10px, transparent 10px 24px),
-    repeating-linear-gradient(0deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(90deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px);
-}
-#modal-content .meter-sheet::before {
-  background: color-mix(in srgb, #7f9a5c 18%, var(--color-cream-100));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #7f9a5c 16%, transparent);
-}
-.meter-prod b { color: var(--color-sage-800); }
+/* Meter palette: sage productivity, kraft EXP, no decorative patterns */
 #productivity-bar-label, #exp-bar-label { z-index: 2; white-space: nowrap; pointer-events: none; }
 #productivity-bar-label b, #exp-bar-label b { display: inline-block; font-weight: 700; color: var(--color-brown-700); }
 #exp-bar-label b.is-new { animation: meterTick .32s steps(3); }
@@ -6828,47 +6784,40 @@ button.cassette-media-remove {
 #meter-note.is-on { opacity: .92; visibility: visible; transform: rotate(-.6deg); transition-delay: 0s; }
 .meter-note-line { min-height: 1.35em; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
 .meter-note-line.is-up, .meter-row.is-up { color: var(--color-sage-700); }
-.meter-note-line.is-down, .meter-row.is-down { color: var(--color-accent-rust); }
+.meter-note-line.is-down, .meter-row.is-down { color: var(--color-brown-600); }
 .meter-note-line.is-dim, .meter-row.is-dim { opacity: .7; }
 .meter-note-line.is-total, .meter-row.is-total { margin-top: 2px; padding-top: 2px; border-top: 1px dotted var(--color-border); color: var(--color-brown-700); }
 
-/* Expanded page: scrapbook sheet on a plaid mat, pixel-notched track */
+/* Expanded page: cream sheet on a quiet sage card */
 #modal-content:has(.meter-page) {
   padding: var(--space-4);
-  background-color: var(--color-cream-200);
-  background-image:
-        repeating-linear-gradient(0deg, rgba(181, 86, 107, 0.07) 0 10px, transparent 10px 24px),
-    repeating-linear-gradient(90deg, rgba(181, 86, 107, 0.07) 0 10px, transparent 10px 24px),
-    repeating-linear-gradient(0deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px),
-    repeating-linear-gradient(90deg, rgba(255, 253, 248, 0.4) 0 1px, transparent 1px 24px);
-  border: 2px solid var(--color-kraft-400);
-  border-radius: 4px;
-  box-shadow: 4px 4px 0 rgba(63, 47, 33, 0.26), var(--shadow-lg);
+  background: var(--color-sage-100);
+  border: 1px solid var(--color-sage-300);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
 }
-.meter-sheet { position: relative; padding: var(--space-4) var(--space-4) var(--space-3); background: var(--color-cream-050); border: 1px solid var(--color-border); box-shadow: 1px 1px 0 rgba(63, 47, 33, 0.14); font-family: var(--font-body); color: var(--color-text); }
-.meter-sheet::before { content: ''; position: absolute; top: -7px; left: 50%; width: 46px; height: 12px; margin-left: -23px; transform: rotate(-2deg); border-radius: 999px; background: color-mix(in srgb, var(--color-accent-rust-soft) 16%, var(--color-cream-100)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-rust-soft) 14%, transparent); }
+.meter-sheet { position: relative; padding: var(--space-4) var(--space-4) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: var(--shadow-sm); font-family: var(--font-body); color: var(--color-text); }
 .meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .meter-lv { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--color-brown-700); }
 .meter-total { font-size: var(--text-xs); color: var(--color-text-muted); opacity: .8; }
 .meter-track {
   position: relative; height: 8px; margin: 8px 0 4px;
-  background: color-mix(in srgb, var(--color-brown-700) 12%, var(--color-cream-200));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brown-700) 28%, transparent);
-  clip-path: polygon(1px 0, calc(100% - 1px) 0, 100% 1px, 100% calc(100% - 1px), calc(100% - 1px) 100%, 1px 100%, 0 calc(100% - 1px), 0 1px);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-sage-100);
+  box-shadow: inset 0 0 0 1px var(--color-sage-300);
 }
 .meter-track i {
   display: block; height: 100%; width: var(--w, 0%);
-  background:
-    linear-gradient(to bottom, rgba(255, 246, 224, 0.45) 0 1px, transparent 1px),
-    repeating-linear-gradient(90deg, transparent 0 5px, rgba(63, 47, 33, 0.12) 5px 6px),
-    var(--color-kraft-500);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to bottom, rgba(255, 253, 248, 0.28), transparent 55%), var(--color-kraft-500);
   animation: meterGrow .7s cubic-bezier(.22, .8, .3, 1) both;
 }
 @keyframes meterGrow { from { width: 0; } }
 .meter-foot { font-size: var(--text-xs); color: var(--color-text-muted); opacity: .8; }
 .meter-prod { display: flex; align-items: baseline; gap: 6px; margin-top: var(--space-3); }
 .meter-prod span { font-size: var(--text-sm); color: var(--color-text-muted); }
-.meter-prod b { font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-accent-rust); }
+.meter-prod b { font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-sage-800); }
 .meter-prod small { font-size: var(--text-xs); color: var(--color-text-muted); }
 .meter-sub { margin-top: 2px; font-size: var(--text-xs); color: var(--color-text-muted); opacity: .8; }
 .meter-more { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px dotted var(--color-border); }
