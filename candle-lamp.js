@@ -42,10 +42,11 @@ const CandleLamp = (function () {
   const MAX_MINUTES = 90;
 
   const CSS = `
-  .candle-lamp-mount {
-position: fixed;
-bottom: 0;
-right: 16%;
+  .candle-lamp-mount,
+  #study-layout > .candle-lamp-mount:not(#study-wallpaper-layer) {
+    position: absolute;
+    bottom: 0;
+    right: clamp(14px, 5%, 64px);
     width: ${CANDLE_W}px;
     height: ${CANDLE_H}px;
     z-index: 4;
@@ -278,8 +279,13 @@ animation: candleIgnite 2.6s cubic-bezier(0.16, 1, 0.3, 1) 1 both, candleFlicker
 
     const dimOverlay = MiscCore.createEl('div', { className: 'candle-dim-overlay' });
 if (reduced) dimOverlay.style.transition = 'none';
-    (options.dimTarget || document.body).appendChild(dimOverlay);
+        (options.dimTarget || document.body).appendChild(dimOverlay);
     container.appendChild(wrap);
+    dimOverlay.addEventListener('click', function (e) {
+      if (!focused) return;
+      const r = wrap.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) wrap.click();
+    });
 
     const base = wrap.querySelector('.candle-base');
     
