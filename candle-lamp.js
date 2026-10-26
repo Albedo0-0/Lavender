@@ -180,7 +180,7 @@ const CandleLamp = (function () {
     height: ${GLOW}px;
     left: 50%;
     margin-left: -${GLOW / 2}px;
-    top: ${CANDLE_H * 0.12 - GLOW / 2}px;
+    top: ${40 - GLOW / 2}px;
     transform: scale(0.2);
     background-size: 100% 100%;
     background-repeat: no-repeat;
@@ -188,7 +188,7 @@ const CandleLamp = (function () {
     image-rendering: crisp-edges;
     image-rendering: pixelated;
     opacity: 0;
-    transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1), top 1.2s linear;
+    transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1), top 1.2s steps(3, end);
     pointer-events: none;
   }
   .candle-lamp-mount.no-anim .candle-base,
@@ -513,7 +513,7 @@ if (reduced) dimOverlay.style.transition = 'none';
       base.style.height = baseH + 'px';
       const drop = FULL_H - baseH;
       riders.style.transform = 'translateY(' + drop + 'px)';
-      glow.style.top = (CANDLE_H * 0.12 + drop - GLOW / 2) + 'px';
+      glow.style.top = (40 + drop - GLOW / 2) + 'px';
       const wickFull = FULL_H - CANDLE_H * 0.2 - 100;
       const wickCut = snap(CANDLE_H * 0.05 * fraction);
       wick.style.height = (wickFull - wickCut) + 'px';
