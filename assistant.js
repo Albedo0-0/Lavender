@@ -39,7 +39,10 @@ const Assistant = (function () {
     { go: 'tags', label: 'Tags', rows: [
       '............', '............', '...ooooooooo', '..okkkkkkkko',
       '.okckkkkkkko', 'okkkkkkkkkko', 'okkkkgggkkko', '.okkkkkkkkko',
-      '..okkgggkkko', '...ooooooooo', '............', '............'] }
+            '..okkgggkkko', '...ooooooooo', '............', '............'] },
+    { go: 'habits', label: 'Habits', rows: [
+      '............', '..oooooooo..', '.occcccccco.', '.occcccccco.', '.occccccgco.', '.ocgcccggco.',
+      '.ocggcggcco.', '.occgggccco.', '.occcgcccco.', '.occcccccco.', '..oooooooo..', '............'] }
   ];
     const FAN_ARC_START_DEG = 60;
   const FAN_ARC_SPAN_DEG = 120;
@@ -272,8 +275,10 @@ const Assistant = (function () {
         if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open({ create: true, from: 'assistant' });
       } else if (go === 'alarms') {
         openAlarms();
-      } else if (go === 'tags') {
+            } else if (go === 'tags') {
         if (typeof Tags !== 'undefined' && Tags.openManager) Tags.openManager({ onBack: openMain });
+      } else if (go === 'habits') {
+        if (typeof Habits !== 'undefined' && Habits.open) Habits.open();
       }
     } catch (err) {
       console.error('Assistant action failed for', go, err);
