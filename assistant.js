@@ -43,7 +43,7 @@ const Assistant = (function () {
   ];
     const FAN_ARC_START_DEG = 60;
   const FAN_ARC_SPAN_DEG = 120;
-  const FAN_RADIUS_MAX = 210;
+    const FAN_RADIUS_MAX = 160;
   const FAN_RADIUS_MIN = 96;
   const FAN_EDGE_PAD = 8;
   const FAN_OPT_W = 80;
