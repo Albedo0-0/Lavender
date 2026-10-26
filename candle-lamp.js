@@ -18,13 +18,16 @@
  * mirrors how studyClock already persists Stopwatch/Timer configuration,
  * it is not a parallel accounting system.
  *
- * The candle is drawn as pixel art on a strict 4px grid (PX): hard-stop
- * colour bands, stepped corners, sprite-built flame frames and an
- * ordered-dither glow texture — no smooth gradients or blur.
+ * The candle is hand-built pixel art drawn onto a small canvas (104 x 150
+ * art pixels, each 2 CSS px) and shown with nearest-neighbour scaling, so
+ * every pixel is a deliberate, hard-edged cell: banded wax shading with
+ * ordered-dither transitions, a procedurally flickering flame, layered
+ * dithered light, drifting embers and a wisp of smoke when it burns out.
+ * No CSS gradients, blur or filters are used for the artwork.
  *
  * The melt visual (shrinking base, rim drips trailing the melting top,
- * a growing puddle) is our own CSS-in-JS implementation, adapted from
- * an open-source Sass candle animation the project owner supplied as a
+ * a growing puddle) is our own implementation, adapted from an
+ * open-source Sass candle animation the project owner supplied as a
  * reference — driven here by real fractional progress instead of a
  * fixed CSS animation-duration, since our duration is hidden/dynamic.
  *
@@ -44,70 +47,60 @@ const CandleLamp = (function () {
   const CANDLE_W = 104; // px
   const MIN_MINUTES = 10;
   const MAX_MINUTES = 90;
-  const PX = 4;          // px — one art pixel
-  const GLOW = 1504;     // px — glow pool size (188 cells of 8px)
-  const GLOW_CELL = 8;   // px — one glow cell (2 art pixels)
-  const FULL_H = 180;    // px — unmelted body height (grid-snapped)
-  const MIN_H = 24;      // px — fully melted body height (grid-snapped)
+  const GLOW = 1504;     // px — ambient glow texture size (188 cells)
+  const GLOW_CELL = 8;   // px — one ambient glow cell
+  const FULL_H = 180;    // px — unmelted body height
+  const MIN_H = 24;      // px — fully melted body height
 
-  function snap(v) { return Math.round(v / PX) * PX; }
+  // --- Art canvas: 104 x 150 art pixels, 2 CSS px each ------------------
+  const ART = 2;
+  const AW = 104, AH = 150;
+  const YO = 20;                      // art rows of headroom above the scene
+  const BODY_L = 28, BODY_W = 48;     // body columns (96px wide, as before)
+  const FCX = 51.5, CX = 52;          // flame axis / body centre
+  const BODY_FULL = FULL_H / ART;     // 90 art rows
+  const BODY_MIN = MIN_H / ART;       // 12 art rows
 
-  // --- Flame sprite frames (8 x 16 art pixels) -------------------------
-  const FLAME_COLORS = { r: '#e8611a', o: '#ff8c26', m: '#ffc94d', c: '#fff1b0', w: '#fffdf0' };
-  const FLAME_A = [
-    '...rr...', '...oo...', '..oooo..', '..oooo..',
-    '..ommo..', '.oommoo.', '.ommmmo.', '.ommmmo.',
-    'ommccmmo', 'ommccmmo', 'ommcwcmo', 'ommcwcmo',
-    '.omccmo.', '.ommmmo.', '..oooo..', '...oo...'
-  ];
-  const FLAME_B = [
-    '........', '..rr....', '..oooo..', '..ooooo.',
-    '.oommo..', '.oommoo.', '.ommmmo.', '.ommmmo.',
-    'ommccmmo', 'ommccmmo', 'ommcwcmo', 'ommcwcmo',
-    '.omccmo.', '.ommmmo.', '..oooo..', '...oo...'
-  ];
-  const FLAME_C = [
-    '....rr..', '...oo...', '...ooo..', '..oooo..',
-    '..ommoo.', '.oommoo.', '.ommmmo.', '.ommmmo.',
-    'ommccmmo', 'ommccmmo', 'ommcwcmo', 'ommcwcmo',
-    '.omccmo.', '.ommmmo.', '..oooo..', '...oo...'
-  ];
-
-  function spriteShadow(rows) {
-    const out = [];
-    rows.forEach(function (row, y) {
-      for (let x = 0; x < row.length; x++) {
-        const ch = row.charAt(x);
-        if (ch !== '.') out.push((x * PX) + 'px ' + (y * PX) + 'px 0 0 ' + FLAME_COLORS[ch]);
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  function bay(x, y) { return (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16; }
+  function hash(x, y, s) {
+    let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1274126177);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function hexToRgb(h) {
+    h = h.replace('#', '');
+    return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+  }
+  function mixc(a, b, t) {
+    return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+  }
+  // Reads one of Lavender's design tokens so the candle's outline and shadow
+  // pick up the site's own brown / sage; falls back to a fixed colour.
+  function cssColorRgb(name, fallback) {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      if (v) {
+        const c = document.createElement('canvas').getContext('2d');
+        c.fillStyle = '#010203';
+        c.fillStyle = v;
+        const out = c.fillStyle;
+        if (out !== '#010203') {
+          if (out.charAt(0) === '#') return hexToRgb(out);
+          const m = out.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (m) return [+m[1], +m[2], +m[3]];
+        }
       }
-    });
-    return out.join(',');
+    } catch (e) { /* fall through to fallback */ }
+    return hexToRgb(fallback);
   }
 
-  function mod(n, m) { return ((n % m) + m) % m; }
+  // Wax ramp, dark -> light. The candle's own cream identity.
+  const WAX = ['#a8926a', '#c7b088', '#cdb894', '#dccaa2', '#efe2c4', '#f6ecd4', '#fffaf0', '#fffdf5'].map(hexToRgb);
+  const WARM = [255, 214, 138];
 
-  // Warm glow around the flame: discrete, stippled 4px clusters.
-  function haloShadow() {
-    const out = [];
-    for (let y = -1; y <= 17; y++) {
-      for (let x = -4; x <= 11; x++) {
-        const d = Math.hypot((x + 0.5 - 4) / 7, (y + 0.5 - 8) / 9.5);
-        let a = 0;
-        if (d < 0.62) a = 0.3;
-        else if (d < 0.85) a = mod(x + y, 2) === 0 ? 0.24 : 0;
-        else if (d < 1.15) a = mod(x + 2 * y, 4) === 0 ? 0.15 : 0;
-        if (a > 0) out.push((x * PX) + 'px ' + (y * PX) + 'px 0 0 rgba(255,170,70,' + a + ')');
-      }
-    }
-    return out.join(',');
-  }
-
-  const FLAME_SHADOW_A = spriteShadow(FLAME_A);
-  const FLAME_SHADOW_B = spriteShadow(FLAME_B);
-  const FLAME_SHADOW_C = spriteShadow(FLAME_C);
-  const HALO_SHADOW = haloShadow();
-
-  // --- Glow texture: ordered-dither, 4 alpha tiers, baked once ----------
+  // --- Ambient glow texture: ordered-dither, 4 alpha tiers, baked once ---
   let glowURL = null;
   function buildGlowTexture() {
     if (glowURL !== null) return glowURL;
@@ -119,31 +112,337 @@ const CandleLamp = (function () {
       const ctx = c.getContext('2d');
       if (!ctx) return glowURL;
       const img = ctx.createImageData(N, N);
-      const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+      const MAXA = 0.36;
       const tiers = [null, [255, 130, 50], [255, 145, 65], [255, 160, 80], [255, 176, 92]];
       const half = N / 2;
       for (let y = 0; y < N; y++) {
         for (let x = 0; x < N; x++) {
           const d = Math.hypot(x + 0.5 - half, y + 0.5 - half) / half;
           let a;
-          if (d < 0.36) a = 0.55 - 0.33 * (d / 0.36);
-          else if (d < 0.67) a = 0.22 - 0.15 * ((d - 0.36) / 0.31);
-          else if (d < 1) a = 0.07 * (1 - (d - 0.67) / 0.33);
+          if (d < 0.3) a = MAXA - 0.22 * (d / 0.3);
+          else if (d < 0.62) a = 0.14 - 0.10 * ((d - 0.3) / 0.32);
+          else if (d < 1) a = 0.04 * (1 - (d - 0.62) / 0.38);
           else a = 0;
-          const sc = a / 0.55 * 4;
+          const sc = a / MAXA * 4;
           const fl = Math.floor(sc);
-          const lvl = fl + ((sc - fl) > (bayer[(y % 4) * 4 + (x % 4)] + 0.5) / 16 ? 1 : 0);
+          const lvl = fl + ((sc - fl) > bay(x, y) ? 1 : 0);
           if (lvl <= 0) continue;
           const col = tiers[Math.min(4, lvl)];
           const i = (y * N + x) * 4;
           img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2];
-          img.data[i + 3] = Math.round(lvl / 4 * 0.55 * 255);
+          img.data[i + 3] = Math.round(lvl / 4 * MAXA * 255);
         }
       }
       ctx.putImageData(img, 0, 0);
       glowURL = c.toDataURL();
     } catch (e) { glowURL = ''; }
     return glowURL;
+  }
+
+  // --- The candle artwork ------------------------------------------------
+  function createArt(canvas, reduced) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    canvas.width = AW; canvas.height = AH;
+    const img = ctx.createImageData(AW, AH);
+    const buf = img.data;
+
+    const OUT_DARK = cssColorRgb('--color-brown-600', '#6f5c40');
+    const OUT_LIGHT = mixc(OUT_DARK, WAX[1], 0.45);
+    const SAGE = cssColorRgb('--color-sage-300', '#9db5a5');
+    const SHADOW = mixc(OUT_DARK, [40, 28, 16], 0.5);
+
+    // Pre-mixed wax colours: [shade][warm light level 0..3]
+    const WC = [];
+    for (let i = 0; i < 8; i++) {
+      for (let lv = 0; lv < 4; lv++) {
+        let c = WAX[i];
+        if (lv === 0 && i <= 2) c = mixc(c, SAGE, 0.12);   // cool desk bounce in the shade
+        if (lv > 0) c = mixc(c, WARM, 0.14 * lv);           // flame light on the wax
+        WC.push(c);
+      }
+    }
+    function wax(idx, lv) { return WC[clamp(idx, 0, 7) * 4 + lv]; }
+
+    const C_WHITE = hexToRgb('#fffdf0'), C_CORE = hexToRgb('#fff1b0'), C_MID = hexToRgb('#ffc94d');
+    const C_ORANGE = hexToRgb('#ff8c26'), C_RED = hexToRgb('#e8611a'), C_TIP = hexToRgb('#c8461a');
+    const C_BLUE1 = hexToRgb('#5f7fd0'), C_BLUE2 = hexToRgb('#8aa4e6');
+    const HALO_TIERS = [null, [255, 130, 50], [255, 150, 66], [255, 170, 80], [255, 190, 100]];
+    const GLINTS = [[-13, -7], [12, -11], [-9, 7], [15, 3], [1, -21], [-17, -1]];
+    const EMBER_COLS = [hexToRgb('#fff1b0'), hexToRgb('#ffc94d'), hexToRgb('#ff8c26'), hexToRgb('#b84a1c')];
+    const DRIP_X = [30, 42, 54, 66];
+    const DRIP_REACH = [0.5, 0.85, 0.35, 0.65];
+    const DRIP_RAMP = [3, 5, 6, 7, 6, 6, 4, 2];
+    const embers = [];
+
+    function put(x, y, c, a) {
+      if (x < 0 || y < 0 || x >= AW || y >= AH) return;
+      const i = (y * AW + x) * 4;
+      if (a === undefined || a >= 1) {
+        buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+        return;
+      }
+      const da = buf[i + 3] / 255;
+      const oa = a + da * (1 - a);
+      if (oa <= 0) return;
+      buf[i] = (c[0] * a + buf[i] * da * (1 - a)) / oa;
+      buf[i + 1] = (c[1] * a + buf[i + 1] * da * (1 - a)) / oa;
+      buf[i + 2] = (c[2] * a + buf[i + 2] * da * (1 - a)) / oa;
+      buf[i + 3] = oa * 255;
+    }
+
+    function lightAt(x, y, s) {
+      if (!s.lightI) return 0;
+      const d = Math.hypot(x - FCX, (y - s.fy) * 0.85);
+      const a = Math.max(0, 1 - d / 34) * s.lightI;
+      return Math.min(3, Math.floor(a * 3 + bay(x, y)));
+    }
+
+    function drawGround(s) {
+      if (s.groundA < 0.03) return;
+      const hws = [30, 40, 44, 34];
+      for (let j = 0; j < 4; j++) {
+        const hw = Math.round(hws[j] * (0.6 + 0.4 * s.groundA));
+        const y = AH - 4 + j;
+        for (let x = CX - hw; x < CX + hw; x++) {
+          const edge = (x < CX - hw + 3 || x >= CX + hw - 3);
+          if (edge && ((x + y) & 1)) continue;
+          put(x, y, SHADOW, 0.3 * s.groundA);
+        }
+      }
+    }
+
+    function drawHalo(s) {
+      const R = 30 * (0.4 + 0.6 * s.ign) * (0.97 + 0.03 * s.flick);
+      const k = s.lightI * (1 + s.burst * 0.6);
+      const y0 = Math.max(0, Math.floor(s.fy - R * 1.2)), y1 = Math.min(AH - 1, Math.ceil(s.fy + R * 1.2));
+      const x0 = Math.max(0, Math.floor(CX - R)), x1 = Math.min(AW - 1, Math.ceil(CX + R));
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const dx = (x + 0.5 - CX) / R, dy = (y + 0.5 - s.fy) / (R * 1.2);
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d >= 1) continue;
+          const v = Math.pow(1 - d, 1.8) * k;
+          const lv = Math.floor(v * 4 + bay(x, y));
+          if (lv <= 0) continue;
+          const l = Math.min(4, lv);
+          put(x, y, HALO_TIERS[l], l / 4 * 0.46);
+        }
+      }
+    }
+
+    function drawPuddle(s, ph, pw) {
+      if (ph < 1) return;
+      const a = pw / 2, b = ph / 2;
+      for (let j = 0; j < ph; j++) {
+        const yy = (j + 0.5 - b) / b;
+        const hw = a * Math.sqrt(Math.max(0, 1 - yy * yy));
+        const y = AH - ph + j;
+        for (let x = Math.ceil(CX - hw - 0.5); x <= Math.floor(CX + hw - 0.5); x++) {
+          let c;
+          const edge = Math.abs(x + 0.5 - CX) > hw - 1.1;
+          if (edge) c = hexToRgb('#c4ac82');
+          else if (j === 0) c = hexToRgb('#fff6dc');
+          else if (j === ph - 1) c = hexToRgb('#d9c4a3');
+          else c = (bay(x, y) > 0.7 && j < b) ? hexToRgb('#fff6dc') : hexToRgb('#ecdcb6');
+          if (s.lit && !edge && j < b && Math.abs(x + 0.5 - CX) < 9 && bay(x, y) < 0.35 * s.lightI) c = hexToRgb('#ffe8b0');
+          put(x, y, c);
+        }
+      }
+    }
+
+    function drawBody(topY, s) {
+      for (let y = topY; y < AH; y++) {
+        const yb = AH - y; // texture is anchored to the ground so melting reveals it
+        for (let i = 0; i < BODY_W; i++) {
+          const x = BODY_L + i;
+          if (i === 0) { put(x, y, OUT_LIGHT); continue; }
+          if (i === BODY_W - 1) { put(x, y, OUT_DARK); continue; }
+          const n = (i + 0.5 - BODY_W / 2) / (BODY_W / 2);
+          const nz = Math.sqrt(Math.max(0, 1 - n * n));
+          const L = 0.1 + 0.78 * nz - n * 0.2;
+          let idx = Math.floor(L * 7.6 + (bay(x, y) - 0.5) * 0.9 + 0.5);
+          if (i >= BODY_W - 3) idx += 1;
+          const hn = hash(x, yb, 7);
+          if (hn < 0.035) idx -= 1; else if (hn > 0.975) idx += 1;
+          if (hash(i, 0, 3) > 0.82 && hash(i, yb >> 3, 5) > 0.5) idx -= 1;
+          put(x, y, wax(idx, lightAt(x, y, s)));
+        }
+      }
+    }
+
+    function drawCap(topY, s) {
+      const lit = s.lit;
+      for (let j = 0; j < 8; j++) {
+        const y = topY - 4 + j;
+        const yy = (j + 0.5 - 4) / 4;
+        const hw = 24 * Math.sqrt(Math.max(0, 1 - yy * yy));
+        for (let x = BODY_L - 1; x <= BODY_L + BODY_W; x++) {
+          if (Math.abs(x + 0.5 - CX) > hw) continue;
+          const dn = Math.hypot((x + 0.5 - CX) / 24, yy) + (bay(x, y) - 0.5) * 0.12;
+          let c;
+          if (dn > 0.86) c = yy < 0 ? hexToRgb('#c4aa74') : hexToRgb(lit ? '#fff3cf' : '#efe2c4');
+          else if (dn < 0.26) c = hexToRgb(lit ? (hash(x, s.frame >> 1, 4) > 0.6 ? '#ffe9b0' : '#ffd98a') : '#e6cf9f');
+          else if (dn < 0.55) c = hexToRgb(lit ? '#ffeab4' : '#ffe2a0');
+          else c = hexToRgb('#f7d99b');
+          put(x, y, c);
+        }
+      }
+    }
+
+    function drawDrips(topY, baseHA, df, s) {
+      for (let d = 0; d < 4; d++) {
+        const lenCss = Math.min(Math.max(0, df - 0.06 * (d + 1)) * DRIP_REACH[d] * FULL_H * 1.3, baseHA * ART - 12);
+        const len = Math.floor(Math.max(0, lenCss) / ART);
+        if (len < 2) continue;
+        const x0 = DRIP_X[d];
+        for (let y = topY; y < topY + len; y++) {
+          for (let k = 0; k < 8; k++) {
+            const x = x0 + k;
+            if (k === 0) { put(x, y, WAX[1]); continue; }
+            if (k === 7) { put(x, y, WAX[0]); continue; }
+            put(x, y, wax(DRIP_RAMP[k] + (hash(x, y, 11) > 0.93 ? -1 : 0), lightAt(x, y, s)));
+          }
+        }
+        const hws = [3.9, 3.3, 2.5, 1.3];
+        for (let r = 0; r < 4; r++) {
+          const y = topY + len + r;
+          for (let x = Math.ceil(x0 + 3.5 - hws[r]); x <= Math.floor(x0 + 3.5 + hws[r] - 0.01); x++) {
+            const k = x - x0;
+            const edge = Math.abs(x + 0.5 - (x0 + 4)) > hws[r] - 1;
+            put(x, y, edge ? WAX[1] : wax(DRIP_RAMP[clamp(k, 0, 7)], lightAt(x, y, s)));
+          }
+        }
+        put(x0 + 2, topY + len, wax(7, 0));   // specular glint on the bulb
+        put(x0 + 3, topY + len + 1, wax(7, 0));
+      }
+    }
+
+    function drawWick(wickTop, topY, s) {
+      for (let y = wickTop; y < topY + 1; y++) {
+        put(51, y, [58, 42, 26]);
+        put(52, y, [28, 19, 12]);
+      }
+      put(51, wickTop, [24, 16, 10]);
+      if (s.lit && hash(s.frame, 3, 3) > 0.25) put(52, wickTop, [255, 106, 32]);
+      if (s.out && s.outT < 3.5) put(52, wickTop, [255, 90, 26], 1 - s.outT / 3.5);
+    }
+
+    function drawFlame(s, flameBottom, size, sway) {
+      const Hf = Math.round(32 * size);
+      if (Hf < 2) return;
+      const Wmax = 7.4 * Math.pow(Math.min(1.05, size), 0.85);
+      for (let yb = 0; yb < Hf; yb++) {
+        const q = yb / (Hf - 1);
+        let hw;
+        if (q < 0.28) { const k = (0.28 - q) / 0.3; hw = Wmax * Math.sqrt(Math.max(0, 1 - k * k)); }
+        else hw = Wmax * Math.pow((1 - q) / 0.72, 1.35);
+        hw = Math.max(hw, 0.5);
+        const cxr = FCX + Math.round(sway * Math.pow(q, 1.5));
+        const y = flameBottom - 1 - yb;
+        for (let x = Math.ceil(cxr - hw); x <= Math.floor(cxr + hw); x++) {
+          const r = Math.abs(x - cxr) / hw;
+          if (r > 0.78 && hash(x, yb, s.frame) < 0.16 * (0.4 + q)) continue; // ragged licking edge
+          const e = r + (bay(x, y) - 0.5) * 0.14;
+          const coreLim = 0.34 * (1 - 0.75 * q);
+          let c, a = 1;
+          if (yb === 0 && r < 0.6) { c = C_BLUE1; a = 0.85; }
+          else if (yb === 1 && r < 0.4) { c = C_BLUE2; a = 0.75; }
+          else if (q > 0.9) c = C_TIP;
+          else if (q < 0.62 && e < coreLim * 0.55) c = C_WHITE;
+          else if (q < 0.7 && e < coreLim) c = C_CORE;
+          else if (e < 0.58 - 0.15 * q) c = C_MID;
+          else if (e < 0.84) c = C_ORANGE;
+          else c = C_RED;
+          put(x, y, c, a);
+        }
+      }
+    }
+
+    function drawGlints(s, fy) {
+      for (let k = 0; k < GLINTS.length; k++) {
+        if (hash(s.frame >> 1, k, 21) < 0.5) continue;
+        const bright = hash(s.frame >> 1, k, 22) > 0.7;
+        put(Math.round(CX + GLINTS[k][0] * s.ign), Math.round(fy + GLINTS[k][1] * s.ign), WARM, bright ? 0.9 : 0.5);
+      }
+    }
+
+    function stepEmbers(s, flameBottom, size) {
+      if (s.lit && !reduced && s.ign >= 1 && embers.length < 5 && hash(s.frame, 9, 9) < 0.09) {
+        embers.push({
+          x0: FCX + (hash(s.frame, 1, 9) - 0.5) * 7,
+          y0: flameBottom - Math.round(32 * size) + 2,
+          ph: hash(s.frame, 2, 9) * 6.28,
+          sp: 8 + hash(s.frame, 3, 9) * 3,
+          born: s.t,
+          max: 1.1 + hash(s.frame, 4, 9) * 0.5
+        });
+      }
+      for (let i = embers.length - 1; i >= 0; i--) {
+        const e = embers[i];
+        const age = s.t - e.born;
+        if (age > e.max || !s.lit) { embers.splice(i, 1); continue; }
+        const p = age / e.max;
+        const x = Math.round(e.x0 + Math.sin(age * 3 + e.ph) * (1 + age * 1.6));
+        const y = Math.round(e.y0 - age * e.sp);
+        const c = EMBER_COLS[p < 0.25 ? 0 : p < 0.55 ? 1 : p < 0.8 ? 2 : 3];
+        put(x, y, c, 1 - p * p);
+        if (p < 0.4) put(x, y - 1, c, 0.45);
+      }
+    }
+
+    function drawSmoke(s, wickTop) {
+      if (!s.out || reduced || s.outT > 5) return;
+      for (let j = 0; j < 14; j++) {
+        const age = s.outT - j * 0.18;
+        if (age < 0 || age > 2.6) continue;
+        const y = Math.round(wickTop - 2 - age * 14);
+        const x = Math.round(FCX + Math.sin(age * 2.6 + j) * (1 + age * 2.2));
+        const a = (1 - age / 2.6) * 0.55;
+        const c = j % 2 ? [201, 195, 184] : [154, 148, 138];
+        put(x, y, c, a);
+        if (age > 1) put(x + 1, y, c, a * 0.6);
+      }
+    }
+
+    function draw(s) {
+      buf.fill(0);
+      const baseHA = Math.round(BODY_FULL - (BODY_FULL - BODY_MIN) * s.df);
+      const topY = AH - baseHA;
+      const dropA = BODY_FULL - baseHA;
+      const flameBottom = YO + 34 + dropA;
+      const wickTop = YO + 26 + dropA + Math.round(6.5 * s.df);
+      s.fy = flameBottom - 14;
+
+      // flame life: smooth noise quantised to whole pixels
+      const tf = s.still ? 0 : s.t;
+      const n = 0.55 * Math.sin(tf * 1.7) + 0.3 * Math.sin(tf * 3.1 + 2.1) + 0.15 * Math.sin(tf * 6.3 + 0.7);
+      let sway = n * 2.4;
+      if (!s.still && hash(s.frame >> 3, 0, 9) > 0.9) sway += (hash(s.frame >> 3, 1, 9) > 0.5 ? 1 : -1) * 1.5;
+      let hs = 0.95 + 0.05 * Math.sin(tf * 4.3 + 1);
+      if (!s.still && hash(s.frame, 1, 2) < 0.06) hs -= 0.07;
+      s.flick = s.still ? 1 : (hs - 0.9) / 0.1;
+      const size = s.ign * (1 - 0.12 * s.df) * hs;
+      s.lightI = s.lit ? clamp(0.9 + 0.2 * (s.flick - 0.5), 0.8, 1.1) * Math.min(1, s.ign * 1.2) : 0;
+
+      drawGround(s);
+      if (s.lit) drawHalo(s);
+      drawPuddle(s, Math.round(9 * clamp((s.df - 0.15) / 0.85, 0, 1)), Math.round(52 * (1 + 0.9 * clamp((s.df - 0.15) / 0.85, 0, 1))));
+      drawBody(topY, s);
+      drawDrips(topY, baseHA, s.df, s);
+      drawCap(topY, s);
+      drawWick(wickTop, topY, s);
+      if (s.lit) {
+        drawFlame(s, flameBottom, size, sway);
+        drawGlints(s, s.fy);
+      }
+      stepEmbers(s, flameBottom, size);
+      drawSmoke(s, wickTop);
+      ctx.putImageData(img, 0, 0);
+      return dropA * ART;
+    }
+
+    return { draw: draw, hasEmbers: function () { return embers.length > 0; } };
   }
 
   const CSS = `
@@ -173,6 +472,8 @@ const CandleLamp = (function () {
   }
   .candle-dim-overlay.is-active { opacity: 1; pointer-events: auto; }
   body.candle-scroll-lock { overflow: hidden; height: 100%; }
+
+  /* Ambient light: a baked, ordered-dither texture (see buildGlowTexture). */
   .candle-glow-pool {
     position: absolute;
     z-index: 0;
@@ -182,216 +483,45 @@ const CandleLamp = (function () {
     margin-left: -${GLOW / 2}px;
     top: ${40 - GLOW / 2}px;
     transform: scale(0.2);
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    image-rendering: pixelated;
     opacity: 0;
     transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1), top 1.2s steps(3, end);
     pointer-events: none;
   }
-  .candle-lamp-mount.no-anim .candle-base,
-  .candle-lamp-mount.no-anim .candle-riders,
-  .candle-lamp-mount.no-anim .candle-blob,
-  .candle-lamp-mount.no-anim .candle-puddle { transition: none !important; }
-  .candle-lamp-mount.no-anim .candle-glow-pool { transition: opacity 2s ease, transform 2.2s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  .candle-glow-pool::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--candle-glow);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    animation: candleGlowPulse 3.6s steps(1, end) infinite;
+  }
+  @keyframes candleGlowPulse {
+    0% { opacity: 1; }
+    22% { opacity: 0.9; }
+    41% { opacity: 0.97; }
+    63% { opacity: 0.86; }
+    80% { opacity: 0.95; }
+    100% { opacity: 1; }
+  }
   .candle-lamp-mount.is-focused .candle-glow-pool { opacity: 1; transform: scale(1); }
   .candle-lamp-mount.is-out .candle-glow-pool { opacity: 0; }
-
-  .candle-scene { position: relative; z-index: 1; width: ${CANDLE_W}px; height: ${CANDLE_H}px; overflow: hidden; }
-  .candle-riders { position: absolute; inset: 0; transition: transform 1.2s steps(3, end); }
-
-  /* Body: hard-stop colour bands on the 4px grid, no smooth shading. */
-  .candle-base {
-    position: absolute;
-    bottom: 0; left: 4px;
-    width: ${CANDLE_W - 8}px;
-    height: ${FULL_H}px;
-    background: linear-gradient(90deg,
-      #8a7350 0, #8a7350 4px,
-      #cdb894 4px, #cdb894 12px,
-      #f6ecd4 12px, #f6ecd4 24px,
-      #fffaf0 24px, #fffaf0 48px,
-      #efe2c4 48px, #efe2c4 68px,
-      #dccaa2 68px, #dccaa2 84px,
-      #c7b088 84px, #c7b088 92px,
-      #8a7350 92px, #8a7350 100%);
-    transition: height 1.2s steps(3, end);
-  }
-  /* Lit: the wax is warmed by the flame, so the body reads bright against the dark. */
-  .candle-lamp-mount.is-lit:not(.is-out) .candle-base {
-    background-image:
-      repeating-conic-gradient(rgba(255,214,130,0.55) 0 25%, transparent 0 50%),
-      linear-gradient(90deg,
-        #a68a5c 0, #a68a5c 4px,
-        #e2c78f 4px, #e2c78f 12px,
-        #fbeccb 12px, #fbeccb 24px,
-        #fffdf3 24px, #fffdf3 48px,
-        #f6e6bb 48px, #f6e6bb 68px,
-        #ecd5a2 68px, #ecd5a2 84px,
-        #d3b67e 84px, #d3b67e 92px,
-        #a68a5c 92px, #a68a5c 100%);
-    background-size: 8px 8px, 100% 100%;
-    background-position: 0 8px, 0 0;
-    background-repeat: repeat-x, no-repeat;
-  }
-  /* Molten top: stepped oval, banded colours. */
-  .candle-base::before {
-    content: "";
-    position: absolute;
-    top: -8px; left: 0; right: 0;
-    height: 16px;
-    background:
-      linear-gradient(180deg, transparent 0, transparent 12px, rgba(138,115,80,0.45) 12px),
-      linear-gradient(90deg,
-        #d8bf86 0, #d8bf86 8px,
-        #f7d99b 8px, #f7d99b 24px,
-        #ffe2a0 24px, #ffe2a0 72px,
-        #f7d99b 72px, #f7d99b 88px,
-        #d8bf86 88px, #d8bf86 100%);
-    clip-path: polygon(8px 0, calc(100% - 8px) 0, calc(100% - 8px) 4px, 100% 4px, 100% 12px, calc(100% - 8px) 12px, calc(100% - 8px) 16px, 8px 16px, 8px 12px, 0 12px, 0 4px, 8px 4px);
-  }
-  /* Wax specks: single art pixels. */
-  .candle-base::after {
-    content: "";
-    position: absolute;
-    top: 0; left: 0;
-    width: ${PX}px; height: ${PX}px;
-    box-shadow:
-      28px 40px 0 0 #e6d6b2, 60px 76px 0 0 #e6d6b2, 44px 112px 0 0 #fff6dc,
-      16px 140px 0 0 #dccaa2, 72px 24px 0 0 #fff6dc, 68px 148px 0 0 #d3c09a;
-  }
-
-  /* Drips: banded columns with a stepped bulb. */
-  .candle-blob {
-    position: absolute;
-    top: ${CANDLE_H * 0.3 + 2}px;
-    width: 16px; height: 0;
-    opacity: 0;
-    background: linear-gradient(90deg, #cdb894 0, #cdb894 4px, #fffaf0 4px, #fffaf0 12px, #e6d6b2 12px, #e6d6b2 100%);
-    transition: height 1.2s steps(3, end), opacity 0.6s steps(2, end);
-  }
-  .candle-blob::after {
-    content: "";
-    position: absolute;
-    left: 0; bottom: -4px;
-    width: 16px; height: 8px;
-    background: linear-gradient(90deg, #cdb894 0, #cdb894 4px, #fffaf0 4px, #fffaf0 12px, #e6d6b2 12px, #e6d6b2 100%);
-    clip-path: polygon(0 0, 100% 0, 100% 4px, calc(100% - 4px) 4px, calc(100% - 4px) 100%, 4px 100%, 4px 4px, 0 4px);
-  }
-  .candle-blob[data-i="0"] { left: 8px; }
-  .candle-blob[data-i="1"] { left: 32px; }
-  .candle-blob[data-i="2"] { left: 56px; }
-  .candle-blob[data-i="3"] { left: 80px; }
-
-  .candle-wick {
-    position: absolute;
-    top: ${CANDLE_H * 0.2}px;
-    left: 48px;
-    width: ${PX}px; height: ${FULL_H - CANDLE_H * 0.2 - 100}px;
-    background: linear-gradient(180deg, #1c130c 0, #1c130c 4px, #4a3421 4px, #4a3421 20px, #3a2a1a 20px, #3a2a1a 100%);
-  }
-  @keyframes candleIgnite {
-    0% { transform: translateX(-50%) scale(0.05); opacity: 0; }
-    55% { transform: translateX(-50%) scale(0.75); opacity: 1; }
-    100% { transform: translateX(-50%) scale(1); opacity: 1; }
-  }
-  .candle-lamp-mount.is-lit .candle-flame {
-    display: block;
-    animation: candleIgnite 2.6s steps(8, end) 1 both, candleFlicker 3.4s step-end 2.6s infinite;
-  }
-  /* Flame: transparent 32x64 box; the art lives in box-shadow sprites. */
-  .candle-flame {
-    display: none;
-    position: absolute;
-    top: 4px; left: 50%;
-    width: 32px; height: 64px;
-    transform: translateX(-50%);
-    transform-origin: 50% 100%;
-    transition: opacity 0.9s steps(6, end);
-  }
-  .candle-flame::before {
-    content: "";
-    position: absolute;
-    left: 0; top: 0;
-    width: ${PX}px; height: ${PX}px;
-    z-index: 1;
-    box-shadow: ${FLAME_SHADOW_A};
-    animation: candleFlamePx 1.6s step-end infinite;
-  }
-  .candle-flame::after {
-    content: "";
-    position: absolute;
-    left: 0; top: 0;
-    width: ${PX}px; height: ${PX}px;
-    z-index: -1;
-    box-shadow: ${HALO_SHADOW};
-  }
-  @keyframes candleFlamePx {
-    0% { box-shadow: ${FLAME_SHADOW_A}; }
-    28% { box-shadow: ${FLAME_SHADOW_B}; }
-    46% { box-shadow: ${FLAME_SHADOW_A}; }
-    70% { box-shadow: ${FLAME_SHADOW_C}; }
-    84% { box-shadow: ${FLAME_SHADOW_A}; }
-    100% { box-shadow: ${FLAME_SHADOW_A}; }
-  }
-  .candle-lamp-mount.reduced-motion .candle-flame,
-  .candle-lamp-mount.reduced-motion .candle-flame::before,
-  .candle-lamp-mount.reduced-motion .candle-spark { animation: none; }
+  .candle-lamp-mount.reduced-motion .candle-glow-pool::before { animation: none; }
   .candle-lamp-mount.reduced-motion, .candle-lamp-mount.reduced-motion * { transition-duration: 0.01s !important; }
-  .candle-lamp-mount.is-out .candle-flame,
-  .candle-lamp-mount.is-out .candle-spark { display: none; }
-  .candle-spark {
-    position: absolute;
-    bottom: 8px; left: 12px;
-    width: ${PX}px; height: ${PX}px;
-    background: #ffe27a;
-    opacity: 0;
-    animation: candleSpark 2.6s steps(6, end) infinite;
-  }
-  @keyframes candleFlicker {
-    0%, 100% { transform: translateX(-50%); }
-    52% { transform: translateX(calc(-50% - 4px)); }
-    60% { transform: translateX(-50%); }
-    82% { transform: translateX(calc(-50% + 4px)); }
-    88% { transform: translateX(-50%); }
-  }
-  @keyframes candleSpark {
-    0% { transform: translate(0, 0); opacity: 0; }
-    15% { opacity: 0.5; }
-    35% { opacity: 0.75; }
-    80% { opacity: 0.2; }
-    100% { transform: translate(4px, -48px); opacity: 0; }
-  }
 
-  /* Ground shadow: flat colour, stepped oval. */
-  .candle-ground-shadow {
+  /* The artwork: ${AW} x ${AH} art pixels shown at ${ART}x with hard edges. */
+  .candle-art {
     position: absolute;
-    z-index: 0;
-    bottom: 0;
-    left: 50%;
-    width: 176px;
-    height: 16px;
-    transform: translateX(-50%) scaleX(0.6);
-    background: rgba(60,42,22,0.26);
-    clip-path: polygon(24px 0, calc(100% - 24px) 0, calc(100% - 24px) 4px, calc(100% - 8px) 4px, calc(100% - 8px) 12px, calc(100% - 24px) 12px, calc(100% - 24px) 16px, 24px 16px, 24px 12px, 8px 12px, 8px 4px, 24px 4px);
-    opacity: 0;
+    z-index: 1;
+    left: ${-((AW * ART - CANDLE_W) / 2)}px;
+    top: ${-YO * ART}px;
+    width: ${AW * ART}px;
+    height: ${AH * ART}px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
     pointer-events: none;
-    transition: opacity 1.8s ease, transform 1.8s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .candle-lamp-mount.is-lit .candle-ground-shadow { opacity: 1; transform: translateX(-50%) scaleX(1); }
-  .candle-puddle {
-    position: absolute;
-    z-index: 0;
-    bottom: 0;
-    left: 50%;
-    width: ${CANDLE_W}px;
-    height: 0;
-    background: linear-gradient(180deg, #fff6dc 0, #fff6dc 4px, #ecdcb6 4px, #ecdcb6 calc(100% - 4px), #d9c4a3 calc(100% - 4px), #d9c4a3 100%);
-    clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
-    transform: translateX(-50%);
-    transition: width 1.2s steps(3, end), height 1.2s steps(3, end);
   }
 
   .candle-message {
@@ -430,23 +560,7 @@ const CandleLamp = (function () {
     });
     wrap.innerHTML =
       '<div class="candle-glow-pool"></div>' +
-      '<div class="candle-ground-shadow"></div>' +
-      '<div class="candle-puddle"></div>' +
-      '<div class="candle-scene">' +
-      '<div class="candle-base"></div>' +
-      '<div class="candle-riders">' +
-      '<div class="candle-blob" data-i="0"></div>' +
-      '<div class="candle-blob" data-i="1"></div>' +
-      '<div class="candle-blob" data-i="2"></div>' +
-      '<div class="candle-blob" data-i="3"></div>' +
-      '<div class="candle-wick"></div>' +
-      '<div class="candle-flame">' +
-      '<div class="candle-spark" style="animation-delay:-0.1s"></div>' +
-      '<div class="candle-spark" style="animation-delay:-0.5s"></div>' +
-      '<div class="candle-spark" style="animation-delay:-0.9s"></div>' +
-      '</div>' +
-      '</div>' +
-      '</div>' +
+      '<canvas class="candle-art" aria-hidden="true"></canvas>' +
       '<div class="candle-message"></div>';
 
     const dimOverlay = MiscCore.createEl('div', { className: 'candle-dim-overlay' });
@@ -459,17 +573,12 @@ if (reduced) dimOverlay.style.transition = 'none';
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) wrap.click();
     });
 
-    const base = wrap.querySelector('.candle-base');
-    
-    const blobs = wrap.querySelectorAll('.candle-blob');
-    const puddle = wrap.querySelector('.candle-puddle');
-    const flame = wrap.querySelector('.candle-flame');
-    const riders = wrap.querySelector('.candle-riders');
-    const wick = wrap.querySelector('.candle-wick');
+    const artCanvas = wrap.querySelector('.candle-art');
     const glow = wrap.querySelector('.candle-glow-pool');
     const glowTex = buildGlowTexture();
-    if (glowTex) glow.style.backgroundImage = 'url(' + glowTex + ')';
+    if (glowTex) glow.style.setProperty('--candle-glow', 'url(' + glowTex + ')');
     const messageEl = wrap.querySelector('.candle-message');
+    const art = createArt(artCanvas, reduced);
 
     let lit = false;
     let flameDrop = 0;
@@ -477,6 +586,60 @@ if (reduced) dimOverlay.style.transition = 'none';
     let focused = false;
     let expireCallbacks = [];
     let fireflySwarm = null;
+
+    // --- Render loop: runs only while something is animating ------------
+    const FRAME_MS = 1000 / 14;      // pixel-art cadence: ~14 steps per second
+    let target = 0, df = 0, visualInit = false;
+    let rafId = 0, running = false, lastDraw = 0, frame = 0;
+    let igniteAt = 0, outAt = 0, wasLit = false, wasOut = false, groundA = 0, lastDropCss = -1;
+
+    function requestRender() {
+      if (running || !art) return;
+      running = true;
+      rafId = requestAnimationFrame(loop);
+    }
+
+    function loop(now) {
+      rafId = 0;
+      if (now - lastDraw < FRAME_MS - 1) { rafId = requestAnimationFrame(loop); return; }
+      const dt = Math.min(0.25, (now - lastDraw) / 1000);
+      lastDraw = now;
+      frame++;
+
+      if (lit && !wasLit) igniteAt = now;
+      wasLit = lit;
+      if (expired && !wasOut) outAt = now;
+      wasOut = expired;
+
+      const rawIgn = lit ? (reduced ? 1 : Math.min(1, (now - igniteAt) / 2600)) : 0;
+      const ign = Math.round((1 - Math.pow(1 - rawIgn, 2.2)) * 12) / 12;   // stepped ease-out
+      const burst = lit && !reduced ? Math.max(0, 1 - (now - igniteAt) / 700) : 0;
+
+      const diff = target - df;
+      if (Math.abs(diff) < 0.0008) df = target; else df += diff * Math.min(1, dt * 3.2);
+
+      const groundGoal = wrap.classList.contains('is-lit') ? 1 : 0;
+      groundA += (groundGoal - groundA) * Math.min(1, dt * 1.8);
+      if (Math.abs(groundGoal - groundA) < 0.01) groundA = groundGoal;
+
+      const dropCss = art.draw({
+        df: df, lit: lit, out: expired, outT: (now - outAt) / 1000,
+        ign: ign, burst: burst, t: now / 1000, frame: frame,
+        groundA: groundA, still: reduced, fy: 0, lightI: 0, flick: 1
+      });
+      if (dropCss !== lastDropCss) {
+        lastDropCss = dropCss;
+        flameDrop = dropCss;
+        glow.style.top = (40 + dropCss - GLOW / 2) + 'px';
+      }
+
+      const needs = lit ||
+        (expired && !reduced && now - outAt < 5200) ||
+        Math.abs(target - df) > 0.0008 ||
+        Math.abs(groundGoal - groundA) > 0.01 ||
+        art.hasEmbers();
+      if (needs) rafId = requestAnimationFrame(loop); else running = false;
+    }
 
     function spawnAmbientFireflies() {
       if (fireflySwarm || typeof Firefly === 'undefined' || reduced) return;
@@ -524,30 +687,10 @@ if (reduced) dimOverlay.style.transition = 'none';
 
     function updateVisual(fraction) {
       fraction = MiscCore.clamp(fraction, 0, 1);
-      if (fraction === 0) {
-        wrap.classList.add('no-anim');
-        requestAnimationFrame(function () { requestAnimationFrame(function () { wrap.classList.remove('no-anim'); }); });
-      }
-      const baseH = snap(FULL_H - (FULL_H - MIN_H) * fraction);
-      base.style.height = baseH + 'px';
-      const drop = FULL_H - baseH;
-      flameDrop = drop;
-      riders.style.transform = 'translateY(' + drop + 'px)';
-      glow.style.top = (40 + drop - GLOW / 2) + 'px';
-      const wickFull = FULL_H - CANDLE_H * 0.2 - 100;
-      const wickCut = snap(CANDLE_H * 0.05 * fraction);
-      wick.style.height = (wickFull - wickCut) + 'px';
-      wick.style.marginTop = wickCut + 'px';
-      const reach = [0.5, 0.85, 0.35, 0.65];
-      blobs.forEach(function (blob, i) {
-        const len = snap(Math.max(0, Math.min(Math.max(0, fraction - 0.06 * (i + 1)) * reach[i % 4] * FULL_H * 1.3, baseH - 12)));
-        blob.style.height = len + 'px';
-        blob.style.opacity = len > 2 ? '1' : '0';
-      });
-      const puddleT = MiscCore.clamp((fraction - 0.15) / 0.85, 0, 1);
-      puddle.style.width = (Math.round(CANDLE_W * (1 + 0.9 * puddleT) / 8) * 8) + 'px';
-      puddle.style.height = snap(18 * puddleT) + 'px';
-      flame.style.opacity = String(1 - fraction * 0.35);
+      target = fraction;
+      if (fraction === 0 || !visualInit) df = fraction;   // resets and resumes jump, never animate
+      visualInit = true;
+      requestRender();
     }
 
     function persist(startedAt, durationMs) {
@@ -669,6 +812,8 @@ if (reduced) dimOverlay.style.transition = 'none';
       spawnAmbientFireflies();
     })();
 
+    requestRender();
+
     return {
       element: wrap,
       isLit: function () { return lit; },
@@ -678,6 +823,8 @@ if (reduced) dimOverlay.style.transition = 'none';
         unsubscribeTick();
         document.removeEventListener('keydown', onKey);
         clearAmbientFireflies();
+        if (rafId) cancelAnimationFrame(rafId);
+        running = false;
         document.body.classList.remove('candle-scroll-lock');
         wrap.remove();
         dimOverlay.remove();
