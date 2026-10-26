@@ -282,8 +282,11 @@
         studyScreen.style.position = studyScreen.style.position || 'relative';
         CandleLamp.mount(studyScreen);
       }
-      if (objectsLayer && typeof PaperPocket !== 'undefined') {
-        PaperPocket.mount(objectsLayer, { rotation: -2, position: { position: 'absolute', left: '8px', bottom: '8px'} });
+      // Paper Pocket lives inside the sidebar (docked at its foot) so it shares the sidebar's layout, collapse and stacking context.
+      const mainNav = document.getElementById('main-nav');
+      if (mainNav && typeof PaperPocket !== 'undefined') {
+        const pocket = PaperPocket.mount(mainNav);
+        if (pocket && pocket.element) pocket.element.setAttribute('title', 'Paper Pocket');
       }
       const paintbrushBtn = document.getElementById('paintbrush-icon');
       if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
