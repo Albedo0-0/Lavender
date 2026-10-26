@@ -37,10 +37,13 @@ const Nav = (function () {
     }
   }
   function init() {
-    document.querySelectorAll('.nav-btn').forEach(function (btn) {
+        document.querySelectorAll('.nav-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        btn.classList.add('tip-suppressed');
         switchTo(btn.dataset.screen);
       });
+      btn.addEventListener('mouseleave', function () { btn.classList.remove('tip-suppressed'); });
+      btn.addEventListener('blur', function () { if (!btn.matches(':hover')) btn.classList.remove('tip-suppressed'); });
     });
 
     const utilBtn = document.getElementById('utility-menu-btn');
