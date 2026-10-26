@@ -292,27 +292,55 @@
       if (paintbrushBtn && typeof MiscCosmetics !== 'undefined') MiscCosmetics.mountPaintbrushButton(paintbrushBtn);
     }
 
-  // Sidebar presentation only: remembers the collapsed rail and mirrors the active screen name in the top bar.
+  // Sidebar presentation only: remembers the collapsed rail (desktop), runs the off-canvas drawer (mobile) and mirrors the active screen name in the top bar.
   (function () {
     var body = document.body;
     var btn = document.getElementById('nav-collapse-btn');
     var nav = document.getElementById('main-nav');
     var label = document.getElementById('nav-context-label');
     var KEY = 'lavender-nav-collapsed';
+    var mq = window.matchMedia ? window.matchMedia('(max-width: 860px)') : null;
+    function isMobile() { return !!(mq && mq.matches); }
+    function syncBtn() {
+      if (!btn) return;
+      var expanded = isMobile() ? body.classList.contains('nav-open') : !body.classList.contains('nav-collapsed');
+      btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      var t = isMobile() ? (expanded ? 'Close navigation' : 'Open navigation') : (expanded ? 'Collapse navigation' : 'Expand navigation');
+      btn.setAttribute('aria-label', t);
+      btn.setAttribute('title', t);
+    }
     function setCollapsed(on) {
       body.classList.toggle('nav-collapsed', on);
-      if (btn) {
-        btn.setAttribute('aria-expanded', on ? 'false' : 'true');
-        var t = on ? 'Expand navigation' : 'Collapse navigation';
-        btn.setAttribute('aria-label', t);
-        btn.setAttribute('title', t);
-      }
+      syncBtn();
+    }
+    function setOpen(on) {
+      body.classList.toggle('nav-open', on);
+      syncBtn();
     }
     try { setCollapsed(localStorage.getItem(KEY) === '1'); } catch (e) {}
+    syncBtn();
     if (btn) btn.addEventListener('click', function () {
+      if (isMobile()) { setOpen(!body.classList.contains('nav-open')); return; }
       var on = !body.classList.contains('nav-collapsed');
       setCollapsed(on);
       try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+    });
+    // Mobile drawer: close after choosing a screen, on a scrim tap, or on Escape (unless a modal owns it).
+    if (nav) nav.addEventListener('click', function (e) {
+      if (isMobile() && e.target.closest('.nav-btn')) setOpen(false);
+    });
+    document.addEventListener('click', function (e) {
+      if (isMobile() && e.target === body && body.classList.contains('nav-open')) setOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || !isMobile() || !body.classList.contains('nav-open')) return;
+      var ov = document.getElementById('modal-overlay');
+      if (ov && getComputedStyle(ov).display !== 'none') return;
+      setOpen(false);
+    });
+    if (mq && mq.addEventListener) mq.addEventListener('change', function () {
+      body.classList.remove('nav-open');
+      syncBtn();
     });
     function syncLabel() {
       if (!nav || !label) return;
