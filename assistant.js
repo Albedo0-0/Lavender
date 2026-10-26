@@ -1,0 +1,689 @@
+// assistant.js — Assistant UI (§B.7) + Assistant Makeover (Itinerary Phase 10). Depends on:
+// State, Modal, Settings, AssistantData, PlanData, PlanningAgent (Plan opens its composer),
+// GeneralAlarm (Alarms), AssistantLVPackData, MiscCore. The Assistant's quarter-circle fan holds
+// exactly three buttons: Alarms, Plan, Tags. Store and Search stay reachable through
+// Assistant.openStore and the header search button.
+// Not an AI chatbot — every screen here is a plain read-only render of existing data.
+// Note: Assistant no longer has its own subject/topic browsing UI — Library is the single
+// place to browse topics (Feature 10, resolving prior Assistant/Library overlap).
+//
+// Makeover (Section 9 of the workflow doc): the old static `#assistant-icon` (still present in
+// the utility drawer, untouched, still opens the exact same modal) is joined by a persistent,
+// draggable, pixel-art companion element mounted directly on <body>, positioned beside the
+// music player button in the header by default. Its artwork/idle animation is supplied entirely
+// by whichever AssistantLVPackData pack is active — this engine only ever asks that module "what
+// does the active pack look like right now", never hardcodes a creature. Position persists via
+// Settings (`settings.assistantPosition`); idle animation respects MiscCore.prefersReducedMotion.
+// A small drag-distance threshold tells a click apart from a drag, so clicking still opens the
+// same main modal as before.
+//
+// Styling Phase 3: hooked into the shared primitives only (.modal-header/.modal-title,
+// .btn-secondary, .list-row/.list-row-title/.list-row-meta, .empty-state, .form-row,
+// .divider, .section-title, .micro-label) — no new layout system, no screen-specific
+// redesign (that's Phase 13).
+const Assistant = (function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&]/g, function (c) { return c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&amp;'; }); }
+
+    // ---------- Quarter-circle fan menu (replaces the old modal-style main menu) ----------
+  // Three options sit on a true 120-degree arc around the Assistant. Screen-space angles:
+  // 90 = straight down, 180 = straight left (the lower-left quadrant from the header position).
+  const FAN_PALETTE = { o: '#3f2f21', k: '#d9c4a3', c: '#fffdf8', g: '#566e3a', r: '#c8776a', y: '#e3c27a' };
+  const FAN_OPTIONS = [
+    { go: 'alarms', label: 'Alarms', rows: [
+      '....oooo....', '...oyyyyo...', '..oycyyyyo..', '..oycyyyyo..', '..oyyyyyyo..', '.oyyyyyyyyo.',
+      '.oyyyyyyyyo.', 'oooooooooooo', '............', '....oyyo....', '....oooo....', '............'] },
+    { go: 'plan', label: 'Plan', rows: [
+      '....oooo....', '..ooccccoo..', '.occcccccco.', '.ocgyyyycco.',
+      '.ocyycyyyco.', '.ocyyyyyyco.', '.occcccccco.', '..ooccccoo..',
+      '....oooo....', '....oyyo....', '....oooo....', '............'] },
+    { go: 'tags', label: 'Tags', rows: [
+      '............', '............', '...ooooooooo', '..okkkkkkkko',
+      '.okckkkkkkko', 'okkkkkkkkkko', 'okkkkgggkkko', '.okkkkkkkkko',
+            '..okkgggkkko', '...ooooooooo', '............', '............'] },
+    { go: 'habits', label: 'Habits', rows: [
+      '............', '..oooooooo..', '.occcccccco.', '.occcccccco.', '.occccccgco.', '.ocgcccggco.',
+      '.ocggcggcco.', '.occgggccco.', '.occcgcccco.', '.occcccccco.', '..oooooooo..', '............'] }
+  ];
+    const FAN_ARC_START_DEG = 60;
+  const FAN_ARC_SPAN_DEG = 120;
+    const FAN_RADIUS_MAX = 160;
+  const FAN_RADIUS_MIN = 96;
+  const FAN_EDGE_PAD = 8;
+  const FAN_OPT_W = 80;
+  const FAN_ICON = 48;
+  const FAN_OPT_BELOW = 60;
+  const FAN_LINE_GAP_ORIGIN = 26;
+  const FAN_LINE_GAP_ICON = FAN_ICON / 2 + 6;
+  const FAN_DUR_MS = 250;
+  const FAN_STAGGER_MS = 30;
+  const FAN_CLOSE_SPEED = 1.3;
+
+  let fanEl = null;
+  let fanItems = [];
+  let fanGeo = null;
+  let fanOpen = false;
+  let fanT = 0;
+  let fanLast = 0;
+  let fanRaf = 0;
+    let fanPollHandle = null;
+  let fanLines = [];
+  let fanOriginEl = null;
+
+  function fanTotalMs() { return FAN_DUR_MS + FAN_STAGGER_MS * (FAN_OPTIONS.length - 1); }
+  function fanReducedMotion() { return (typeof MiscCore !== 'undefined') && MiscCore.prefersReducedMotion(); }
+
+    function fanIconSvg(rows, size) {
+    var rects = '';
+    rows.forEach(function (row, y) {
+      var x = 0;
+      while (x < row.length) {
+        var ch = row.charAt(x);
+        if (ch === '.' || !FAN_PALETTE[ch]) { x++; continue; }
+        var x2 = x;
+        while (x2 < row.length && row.charAt(x2) === ch) x2++;
+        rects += '<rect x="' + x + '" y="' + y + '" width="' + (x2 - x) + '" height="1" fill="' + FAN_PALETTE[ch] + '"/>';
+        x = x2;
+      }
+    });
+        return '<svg viewBox="0 0 12 12" width="' + (size || FAN_ICON) + '" height="' + (size || FAN_ICON) + '" shape-rendering="crispEdges" aria-hidden="true">' + rects + '</svg>';
+  }
+
+  // Origin = centre of the Assistant. All options share one radius; angles are evenly spaced
+  // along the arc. The radius shrinks (never the geometry) when the viewport is tight.
+  function fanGeometry() {
+    var anchor = document.getElementById('assistant-pixel-entity') || document.getElementById('header-assistant-slot');
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var rect = anchor ? anchor.getBoundingClientRect() : null;
+    var cx = rect ? rect.left + rect.width / 2 : vw - 40;
+    var cy = rect ? rect.top + rect.height / 2 : 30;
+    var step = FAN_ARC_SPAN_DEG / FAN_OPTIONS.length;
+    var angles = FAN_OPTIONS.map(function (o, i) { return (FAN_ARC_START_DEG + step * (i + 0.5)) * Math.PI / 180; });
+    var r = FAN_RADIUS_MAX;
+    angles.forEach(function (a) {
+      var c = Math.cos(a), s = Math.sin(a);
+      if (c < -1e-6) r = Math.min(r, (cx - FAN_OPT_W / 2 - FAN_EDGE_PAD) / -c);
+      if (c > 1e-6) r = Math.min(r, (vw - cx - FAN_OPT_W / 2 - FAN_EDGE_PAD) / c);
+      if (s > 1e-6) r = Math.min(r, (vh - cy - FAN_OPT_BELOW - FAN_EDGE_PAD) / s);
+    });
+    return { cx: cx, cy: cy, r: Math.max(FAN_RADIUS_MIN, r), angles: angles };
+  }
+
+    function fanPlace() {
+    if (!fanGeo) return;
+    fanItems.forEach(function (el) {
+      el.style.left = (fanGeo.cx - FAN_OPT_W / 2) + 'px';
+      el.style.top = (fanGeo.cy - FAN_ICON / 2) + 'px';
+    });
+    if (fanOriginEl) {
+      fanOriginEl.style.left = (fanGeo.cx - PIXEL_CANVAS_SIZE / 2) + 'px';
+      fanOriginEl.style.top = (fanGeo.cy - PIXEL_CANVAS_SIZE / 2) + 'px';
+    }
+  }
+
+  // Polar motion: radius eases out fast while the angle sweeps from the arc start to the option's
+  // own angle, so each option visibly rides the circle's circumference. Running the same clock
+  // backwards gives the exact reverse path on close.
+    function fanRender() {
+    if (!fanEl || !fanGeo) return;
+    var startRad = FAN_ARC_START_DEG * Math.PI / 180;
+        var bgP = Math.max(0, Math.min(1, fanT / fanTotalMs()));
+    fanEl.style.background = 'rgba(32, 24, 17, ' + (bgP * 0.55).toFixed(3) + ')';
+    fanEl.style.backdropFilter = 'blur(' + (bgP * 8).toFixed(2) + 'px)';
+    fanEl.style.webkitBackdropFilter = 'blur(' + (bgP * 8).toFixed(2) + 'px)';
+    fanItems.forEach(function (el, i) {
+      var p = Math.max(0, Math.min(1, (fanT - i * FAN_STAGGER_MS) / FAN_DUR_MS));
+      var rad = fanGeo.r * (1 - Math.pow(1 - p, 4));
+      var ang = startRad + (fanGeo.angles[i] - startRad) * (1 - Math.pow(1 - p, 3));
+      var cos = Math.cos(ang), sin = Math.sin(ang);
+      var fade = Math.min(1, p * 2.5);
+      el.style.transform = 'translate(' + (rad * cos).toFixed(2) + 'px,' + (rad * sin).toFixed(2) + 'px)';
+      el.style.opacity = String(fade);
+            el.style.setProperty('--fan-p', p.toFixed(3));
+      var lab = el.lastChild;
+      if (lab) lab.style.opacity = (p * 0.85).toFixed(3);
+      el.style.pointerEvents = (fanOpen && p > 0.6) ? 'auto' : 'none';
+      var ln = fanLines[i];
+      if (ln) {
+        var from = FAN_LINE_GAP_ORIGIN;
+        var to = rad - FAN_LINE_GAP_ICON;
+        if (to > from) {
+          ln.setAttribute('x1', (fanGeo.cx + from * cos).toFixed(2));
+          ln.setAttribute('y1', (fanGeo.cy + from * sin).toFixed(2));
+          ln.setAttribute('x2', (fanGeo.cx + to * cos).toFixed(2));
+          ln.setAttribute('y2', (fanGeo.cy + to * sin).toFixed(2));
+          ln.style.opacity = String((0.7 * fade).toFixed(3));
+        } else {
+          ln.style.opacity = '0';
+        }
+      }
+    });
+  }
+
+  function fanTick(now) {
+    fanRaf = 0;
+    var dt = Math.max(0, now - fanLast);
+    fanLast = now;
+    var total = fanTotalMs();
+    fanT = Math.max(0, Math.min(total, fanT + (fanOpen ? dt : -dt * FAN_CLOSE_SPEED)));
+    fanRender();
+    if (fanOpen ? fanT < total : fanT > 0) fanRaf = window.requestAnimationFrame(fanTick);
+    else if (!fanOpen) destroyFan();
+  }
+
+  function fanKick() {
+    if (fanRaf) return;
+    fanLast = performance.now();
+    fanRaf = window.requestAnimationFrame(fanTick);
+  }
+
+    function fanSyncOrigin() {
+    if (fanOriginEl && pixelCanvasEl) {
+      var octx = fanOriginEl.getContext('2d');
+      if (octx) {
+        octx.imageSmoothingEnabled = false;
+        octx.clearRect(0, 0, PIXEL_CANVAS_SIZE, PIXEL_CANVAS_SIZE);
+        octx.drawImage(pixelCanvasEl, 0, 0);
+      }
+    }
+  }
+
+  function fanOnKey(e) { if (e.key === 'Escape') { e.preventDefault(); closeFan(); } }
+  function fanOnResize() { if (!fanEl) return; fanGeo = fanGeometry(); fanPlace(); fanRender(); }
+
+  function destroyFan() {
+    if (fanRaf) { window.cancelAnimationFrame(fanRaf); fanRaf = 0; }
+    if (fanPollHandle) { window.clearInterval(fanPollHandle); fanPollHandle = null; }
+    document.removeEventListener('keydown', fanOnKey);
+    window.removeEventListener('resize', fanOnResize);
+    if (fanEl && fanEl.parentNode) fanEl.parentNode.removeChild(fanEl);
+        fanEl = null; fanItems = []; fanGeo = null; fanOpen = false; fanT = 0;
+    fanLines = []; fanOriginEl = null;
+    if (pixelEntityEl) pixelEntityEl.style.visibility = '';
+  }
+
+  function closeFan() {
+    if (!fanEl || !fanOpen) return;
+    fanOpen = false;
+    pixelReact('happy', 900);
+        if (pixelEntityEl) {
+      pixelEntityEl.style.visibility = '';
+      pixelEntityEl.focus({ preventScroll: true });
+    }
+    if (fanReducedMotion()) { destroyFan(); return; }
+    fanKick();
+  }
+
+  function openFan() {
+    if (fanEl) { fanOpen = true; fanKick(); return; }
+    fanGeo = fanGeometry();
+    fanEl = document.createElement('div');
+    fanEl.id = 'assistant-fan';
+    fanEl.setAttribute('role', 'menu');
+    fanEl.setAttribute('aria-label', Settings.assistantLabel() || 'Assistant');
+    fanEl.addEventListener('click', function (e) { if (e.target === fanEl) closeFan(); });
+    fanItems = FAN_OPTIONS.map(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'assistant-fan-opt';
+      b.dataset.go = o.go;
+      b.setAttribute('role', 'menuitem');
+      b.setAttribute('aria-label', o.label);
+      b.innerHTML = '<span class="assistant-fan-icon">' + fanIconSvg(o.rows) + '</span>' +
+                '<span class="assistant-fan-label">' + esc(o.label).replace(' / ', ' /<br>') + '</span>';
+      b.addEventListener('click', function () { closeFan(); runAction(o.go); });
+      fanEl.appendChild(b);
+      return b;
+    });
+        var svgNS = 'http://www.w3.org/2000/svg';
+    var linesSvg = document.createElementNS(svgNS, 'svg');
+    linesSvg.setAttribute('class', 'assistant-fan-lines');
+    linesSvg.setAttribute('aria-hidden', 'true');
+    fanLines = fanItems.map(function () {
+      var ln = document.createElementNS(svgNS, 'line');
+      linesSvg.appendChild(ln);
+      return ln;
+    });
+    fanEl.insertBefore(linesSvg, fanEl.firstChild);
+    fanOriginEl = document.createElement('canvas');
+    fanOriginEl.width = PIXEL_CANVAS_SIZE;
+    fanOriginEl.height = PIXEL_CANVAS_SIZE;
+    fanOriginEl.className = 'assistant-fan-origin';
+    fanEl.appendChild(fanOriginEl);
+    if (pixelEntityEl) pixelEntityEl.style.visibility = 'hidden';
+    fanPlace();
+    document.body.appendChild(fanEl);
+    fanOpen = true;
+    fanT = fanReducedMotion() ? fanTotalMs() : 0;
+    fanRender();
+    document.addEventListener('keydown', fanOnKey);
+    window.addEventListener('resize', fanOnResize);
+    pixelReact('perk', 1100);
+    fanSyncOrigin();
+    fanPollHandle = window.setInterval(fanSyncOrigin, 1000);
+    if (!fanReducedMotion()) fanKick();
+    fanItems[0].focus({ preventScroll: true });
+  }
+
+  function openMain() {
+    if (fanEl && fanOpen) closeFan();
+    else openFan();
+  }
+
+
+  function runAction(go) {
+    try {
+      if (go === 'plan') {
+        if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open({ create: true, from: 'assistant' });
+      } else if (go === 'alarms') {
+        openAlarms();
+            } else if (go === 'tags') {
+        if (typeof Tags !== 'undefined' && Tags.openManager) Tags.openManager({ onBack: openMain });
+      } else if (go === 'habits') {
+        if (typeof Habits !== 'undefined' && Habits.open) Habits.open();
+      }
+    } catch (err) {
+      console.error('Assistant action failed for', go, err);
+      Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-plain"><h3 class="section-title">' + esc(go) + '</h3><div class="empty-state">Couldn\'t load this right now.</div></div>');
+      wireBack();
+    }
+  }
+
+  function backBtnHtml() { return '<div class="modal-header"><button id="assistant-back-btn" class="btn-secondary">\u2190 Back</button></div>'; }
+      function wireBack(fn) {
+    document.getElementById('assistant-back-btn').addEventListener('click', fn || function () { Modal.close(); openMain(); });
+  }
+
+  // ---------- Store (§7.3) ----------
+
+  const WORLD_COST = 1000;
+
+  function storeRowHtml(w) {
+    const owned = w.owned || w.cost === 0;
+    return '<div class="assistant-store-item" data-world-id="' + esc(w.id) + '">' +
+      '<span class="assistant-store-item-name">' + esc(w.name) + '</span>' +
+      (owned
+        ? '<span class="tag tag-neutral">Owned</span>'
+        : '<button class="btn-secondary assistant-store-buy" data-world-id="' + esc(w.id) + '">Buy \u2014 ' + WORLD_COST + ' EXP</button>') +
+      '<span class="assistant-store-msg" data-world-id="' + esc(w.id) + '"></span>' +
+    '</div>';
+  }
+
+  function storeBodyHtml() {
+    if (typeof MyWorldContent === 'undefined') return '<div class="empty-state">Store unavailable.</div>';
+    const worlds = MyWorldContent.list('world');
+    if (!worlds.length) return '<div class="empty-state">No worlds registered yet.</div>';
+    return '<div class="assistant-store-list">' + worlds.map(storeRowHtml).join('') + '</div>';
+  }
+
+  // ---------- Assistant LV Packs, inside the same Store (Section 9/10 — "purchasable through
+  // the existing Store", using the existing Cosmetics/ownership system for unlocked/active) ----------
+
+  function packRowHtml(p) {
+    return '<div class="assistant-store-item" data-pack-id="' + esc(p.id) + '">' +
+      '<span class="assistant-store-item-name">' + esc(p.name) + '</span>' +
+      (p.unlocked
+        ? (p.active
+            ? '<span class="tag tag-neutral">Active</span>'
+            : '<button class="btn-secondary assistant-pack-switch" data-pack-id="' + esc(p.id) + '">Switch to this</button>')
+        : '<button class="btn-secondary assistant-pack-buy" data-pack-id="' + esc(p.id) + '">Buy \u2014 ' + p.cost + ' EXP</button>') +
+      '<span class="assistant-store-msg" data-pack-id="' + esc(p.id) + '"></span>' +
+    '</div>';
+  }
+
+  function assistantPacksBodyHtml() {
+    if (typeof AssistantLVPackData === 'undefined') return '<div class="empty-state">Packs unavailable.</div>';
+    const packs = AssistantLVPackData.list();
+    if (!packs.length) return '<div class="empty-state">No companion packs registered yet.</div>';
+    return '<div class="assistant-store-list">' + packs.map(packRowHtml).join('') + '</div>';
+  }
+
+  function wireStore() {
+    document.querySelectorAll('.assistant-store-buy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.worldId;
+        const msg = document.querySelector('.assistant-store-msg[data-world-id="' + id + '"]');
+        const gam = GamificationData.getGamState();
+        if (gam.totalExp < WORLD_COST) {
+          if (msg) msg.textContent = 'Not enough EXP';
+          return;
+        }
+        GamificationData.spendExp(WORLD_COST, 'World unlocked: ' + id);
+        MyWorldContent.grant(id);
+        if (typeof Gamification !== 'undefined' && Gamification.renderMeter) Gamification.renderMeter();
+        openStore();
+      });
+    });
+    document.querySelectorAll('.assistant-pack-buy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.dataset.packId;
+        const msg = document.querySelector('.assistant-store-msg[data-pack-id="' + id + '"]');
+        const result = AssistantLVPackData.purchase(id);
+        if (!result.ok) { if (msg) msg.textContent = result.error || 'Could not buy this.'; return; }
+        AssistantLVPackData.setActive(id);
+        if (typeof Gamification !== 'undefined' && Gamification.renderMeter) Gamification.renderMeter();
+        refreshPixelEntitySkin();
+        openStore();
+      });
+    });
+    document.querySelectorAll('.assistant-pack-switch').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        AssistantLVPackData.setActive(btn.dataset.packId);
+        refreshPixelEntitySkin();
+        openStore();
+      });
+    });
+  }
+
+    // Where Back returns to. Set only by an external opener (e.g. the Productivity/EXP page); the
+  // Store's own refreshes after a purchase call openStore() directly and keep it.
+  let storeBack = null;
+  function openStoreFrom(fn) {
+    storeBack = typeof fn === 'function' ? fn : null;
+    openStore();
+  }
+
+  function openStore() {
+    Modal.open(backBtnHtml() +
+      '<div class="assistant-page assistant-page-plain">' +
+        '<h3 class="section-title">Store</h3>' +
+        '<h4 class="section-title">Worlds</h4>' +
+        '<div class="assistant-store-card">' + storeBodyHtml() + '</div>' +
+        '<h4 class="section-title">Companion Packs</h4>' +
+        '<div class="assistant-store-card">' + assistantPacksBodyHtml() + '</div>' +
+      '</div>');
+    wireBack(storeBack ? function () { Modal.close(); storeBack(); } : undefined);
+    wireStore();
+  }
+
+
+
+  // ---------- Global Search (§7.3) ----------
+
+  function resultRowHtml(r) {
+    const ref = r.ref || {};
+    return '<div class="assistant-search-row assistant-search-result assistant-index-row list-row list-row-compact" data-kind="' + esc(ref.kind || '') + '" data-task-id="' + esc(ref.taskId || '') + '" data-subject="' + esc(ref.subject || '') + '" data-topic-id="' + esc(ref.topicId || '') + '" data-tag-id="' + esc(ref.tagId || '') + '" data-habit-id="' + esc(ref.habitId || '') + '" data-date="' + esc(ref.date || r.date || '') + '">' +
+      '<span class="list-row-title"><strong>' + esc(r.type) + '</strong> \u2014 ' + esc(r.text) + '</span>' +
+      '<span class="list-row-meta">' + esc(r.date) + '</span>' +
+    '</div>';
+  }
+
+  function navigateToResult(ds) {
+    if (ds.kind === 'task') {
+            const task = PlanningAgent.getTask(ds.taskId);
+      if (!task) return;
+      Modal.close();
+      if (task.completed && Planner.openHistory) Planner.openHistory(task.subject, task.topicId);
+      else if (Planner.openDate) Planner.openDate(task.date);
+      Nav.switchTo('library');
+    } else if (ds.kind === 'topic') {
+      Modal.close();
+      if (typeof Library !== 'undefined' && Library.openTopic) Library.openTopic(ds.subject, ds.topicId);
+      Nav.switchTo('library');
+        } else if (ds.kind === 'tag') {
+      Modal.close();
+      if (typeof PTPEView !== 'undefined') PTPEView.openExplorer({ dim: 'tag', id: ds.tagId, metric: 'studyHours' });
+      Nav.switchTo('progress');
+    } else if (ds.kind === 'habit') {
+      Modal.close();
+      if (typeof Habits !== 'undefined' && Habits.open) Habits.open();
+    } else if (ds.kind === 'journal') {
+      Modal.close();
+      if (typeof Journal !== 'undefined' && Journal.openDate) Journal.openDate(ds.date);
+      Nav.switchTo('journal');
+    }
+  }
+
+  function openSearch() {
+    Modal.open(backBtnHtml() + '<div class="assistant-page assistant-page-search"><h3 class="section-title">Global Search</h3>' +
+      '<div class="assistant-search-index">' +
+        '<span class="assistant-search-glass" aria-hidden="true"></span>' +
+        '<div class="form-row"><input type="text" id="assistant-search-input" placeholder="Search everything..."></div>' +
+      '</div>' +
+      '<button id="assistant-search-btn" class="btn-secondary">Search</button>' +
+      '<div id="assistant-search-results" style="margin-top: var(--space-3);"></div></div>');
+    wireBack();
+    function runSearch() {
+      const results = AssistantData.search(document.getElementById('assistant-search-input').value);
+      document.getElementById('assistant-search-results').innerHTML = results.length ? results.map(resultRowHtml).join('') : '<div class="empty-state">No matches.</div>';
+      document.querySelectorAll('.assistant-search-result').forEach(function (el) {
+        el.addEventListener('click', function () { navigateToResult(el.dataset); });
+      });
+    }
+    document.getElementById('assistant-search-btn').addEventListener('click', runSearch);
+    document.getElementById('assistant-search-input').addEventListener('keydown', function (e) { if (e.key === 'Enter') runSearch(); });
+  }
+
+  // ---------- Alarms (§6.1 — General Alarm lives here, near Notepad, now that Assistant exists) ----------
+
+    function openAlarms() {
+    if (typeof GeneralAlarm !== 'undefined' && GeneralAlarm.open) GeneralAlarm.open();
+  }
+
+  
+
+  // ---------- Pixel companion entity (Section 9/10 — "Assistant Makeover") ----------
+  // A persistent, localized, draggable DOM element separate from the existing static
+  // #assistant-icon (left completely alone, still works). Not tab-specific. Position stored in
+  // settings.assistantPosition ({x,y}, top-left in px) via Settings/State.patch('settings', ...).
+  // Idle animation is a small local state machine (breathe/blink), CSS/JS driven, never wandering
+  // (Ladybug.mount's roaming pattern is explicitly NOT reused — Firefly's "restrained, fixed,
+  // ambient" philosophy is the model instead), and respects MiscCore.prefersReducedMotion().
+  // Cosmetic-swappable: the character shown is whatever AssistantLVPackData.getActive() returns
+  // right now — this engine owns drag/position/interaction/state/navigation only, never the art.
+
+  const PIXEL_GRID = 8;       // sprite is an 8x8 logical grid
+  const PIXEL_SCALE = 5;      // each logical pixel is rendered PIXEL_SCALE screen px on a side
+  const PIXEL_CANVAS_SIZE = PIXEL_GRID * PIXEL_SCALE;
+  const DRAG_THRESHOLD_PX = 6; // movement beyond this during a pointer-down/up counts as a drag, not a click
+
+  let pixelEntityEl = null;
+  let pixelCanvasEl = null;
+  let idleTimerHandle = null;
+  let idleFrameIndex = 0;
+  let idleIsBlinking = false;
+  // Rich-animation state, used only by packs that supply pixel.render (the refined cat).
+  const anim = {
+    nextBlink: 0, blinkAt: 0, nextEar: 0, earLUntil: 0, earRUntil: 0,
+    nextLook: 0, look: 0, lookUntil: 0, nextMood: 0, mood: 'normal', moodUntil: 0, lastKey: ''
+  };
+  const TAIL_SEQ = [0, 1, 2, 2, 1, 0];
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function drawPixelFrame(rows, palette) {
+    if (!pixelCanvasEl) return;
+    const ctx = pixelCanvasEl.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, PIXEL_CANVAS_SIZE, PIXEL_CANVAS_SIZE);
+    // Each frame may use its own grid (8x8 legacy packs, 20x20 refined cat); the grid always
+    // fills the same canvas, so the displayed size never changes.
+    const cell = PIXEL_CANVAS_SIZE / rows.length;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const y0 = Math.round(r * cell);
+      const hgt = Math.round((r + 1) * cell) - y0;
+      for (let c = 0; c < row.length; c++) {
+        const ch = row[c];
+        if (ch === '.' || !palette[ch]) continue;
+        const x0 = Math.round(c * cell);
+        ctx.fillStyle = palette[ch];
+        ctx.fillRect(x0, y0, Math.round((c + 1) * cell) - x0, hgt);
+      }
+    }
+  }
+
+  function richState(now) {
+    const a = anim;
+    if (!a.nextBlink) {
+      a.nextBlink = now + rand(1500, 3500);
+      a.nextEar = now + rand(3000, 6000);
+      a.nextLook = now + rand(5000, 9000);
+      a.nextMood = now + rand(20000, 40000);
+    }
+    if (a.mood !== 'normal' && now >= a.moodUntil) a.mood = 'normal';
+
+    // Blink (sometimes a quick double blink)
+    if (!a.blinkAt && now >= a.nextBlink && a.mood !== 'happy') {
+      a.blinkAt = now;
+      a.nextBlink = now + (Math.random() < 0.25 ? 380 : rand(2600, 5500));
+    }
+    let blink = 0;
+    if (a.blinkAt) {
+      const e = now - a.blinkAt;
+      if (e < 80) blink = 1; else if (e < 240) blink = 2; else if (e < 320) blink = 1; else a.blinkAt = 0;
+    }
+
+    // Ear twitch (left, right or both)
+    if (now >= a.nextEar) {
+      const p = Math.random();
+      if (p < 0.4 || p >= 0.8) a.earLUntil = now + 170;
+      if (p >= 0.4) a.earRUntil = now + 170;
+      a.nextEar = now + rand(4000, 9000);
+    }
+
+    // Occasional glance
+    if (a.look && now >= a.lookUntil) a.look = 0;
+    if (!a.look && now >= a.nextLook) {
+      a.look = Math.random() < 0.5 ? -1 : 1;
+      a.lookUntil = now + rand(800, 1400);
+      a.nextLook = now + rand(6000, 12000);
+    }
+
+    // Rare content squint
+    if (a.mood === 'normal' && now >= a.nextMood) {
+      a.mood = 'happy';
+      a.moodUntil = now + 1300;
+      a.nextMood = now + rand(25000, 50000);
+    }
+
+    const perk = a.mood === 'perk';
+    const step = perk ? 110 : (a.mood === 'happy' ? 150 : 230);
+    return {
+      blink: blink,
+      look: a.look,
+      earL: perk ? 2 : (now < a.earLUntil ? 1 : 0),
+      earR: perk ? 2 : (now < a.earRUntil ? 1 : 0),
+      tail: TAIL_SEQ[Math.floor(now / step) % TAIL_SEQ.length],
+      breath: (now % 3600) < 2000 ? 0 : 1,
+      mood: a.mood
+    };
+  }
+
+  function renderActivePackFrame() {
+    if (typeof AssistantLVPackData === 'undefined') return;
+    const pack = AssistantLVPackData.getActive();
+    if (!pack || !pack.pixel) return;
+    const reduced = (typeof MiscCore !== 'undefined') && MiscCore.prefersReducedMotion();
+    let frame;
+    if (typeof pack.pixel.render === 'function') {
+      const st = reduced
+        ? { blink: 0, look: 0, earL: 0, earR: 0, tail: 0, breath: 0, mood: 'normal' }
+        : richState(performance.now());
+      const key = pack.id + '|' + st.blink + st.look + st.earL + st.earR + st.tail + st.breath + st.mood;
+      if (key === anim.lastKey) return; // nothing changed, skip the redraw
+      anim.lastKey = key;
+      frame = pack.pixel.render(st);
+    } else {
+      const frames = idleIsBlinking && pack.pixel.blink ? [pack.pixel.blink] : pack.pixel.idle;
+      frame = reduced ? frames[0] : frames[idleFrameIndex % frames.length];
+    }
+    drawPixelFrame(frame, pack.pixel.palette);
+    if (fanEl && fanOriginEl) fanSyncOrigin(); // keep the fan's copy of the Assistant animating
+  }
+
+  // Short reaction (e.g. 'perk' when the fan opens, 'happy' when it closes).
+  function pixelReact(mood, ms) {
+    if (!pixelCanvasEl) return;
+    if (typeof MiscCore !== 'undefined' && MiscCore.prefersReducedMotion()) return;
+    anim.mood = mood;
+    anim.moodUntil = performance.now() + ms;
+    anim.blinkAt = 0;
+    renderActivePackFrame();
+  }
+
+  // Called by anything that changes the active pack (Store buy/switch, future Cosmetics switch)
+  // so the on-screen creature updates immediately, without a page reload.
+  function refreshPixelEntitySkin() {
+    idleFrameIndex = 0;
+    idleIsBlinking = false;
+    anim.lastKey = '';
+    renderActivePackFrame();
+  }
+
+  // Small local idle loop: alternates breathing frames, with an occasional blink — no wandering,
+  // no position change, purely a skin-level animation. Stopped/never started under reduced motion.
+  function startIdleLoop() {
+    if (idleTimerHandle) return;
+    if (typeof MiscCore !== 'undefined' && MiscCore.prefersReducedMotion()) { renderActivePackFrame(); return; }
+    let tick = 0;
+    let legacyLast = 0;
+    // 80ms heartbeat; the rich path only redraws when the pose actually changes, and the legacy
+    // 8x8 packs still step at their original 700ms pace.
+    idleTimerHandle = window.setInterval(function () {
+      if (document.hidden) return;
+      const pack = AssistantLVPackData.getActive();
+      if (pack && pack.pixel && typeof pack.pixel.render === 'function') { renderActivePackFrame(); return; }
+      const now = Date.now();
+      if (now - legacyLast < 700) return;
+      legacyLast = now;
+      tick++;
+      idleIsBlinking = (tick % 6 === 0);
+      if (!idleIsBlinking) idleFrameIndex++;
+      renderActivePackFrame();
+    }, 80);
+  }
+
+  // Docks beside the Search button: centered on the header's reserved slot (#header-assistant-slot).
+  
+
+  // Docks permanently inside the header's reserved slot (#header-assistant-slot), beside Search.
+  // No drag, no saved/persisted position — it is a fixed member of the header, not a free-floating
+  // element, so there is no stale-position state that can ever pull it elsewhere (e.g. Study).
+  function mountPixelEntity() {
+    if (pixelEntityEl || typeof AssistantLVPackData === 'undefined') return;
+    const slot = document.getElementById('header-assistant-slot');
+    if (!slot) return;
+
+    pixelEntityEl = document.createElement('div');
+    pixelEntityEl.id = 'assistant-pixel-entity';
+    pixelEntityEl.setAttribute('role', 'button');
+    pixelEntityEl.setAttribute('tabindex', '0');
+    var _label = (typeof Settings !== 'undefined' && typeof Settings.assistantLabel === 'function') ? (Settings.assistantLabel() || 'Assistant') : 'Assistant';
+    pixelEntityEl.setAttribute('aria-label', _label);
+    pixelEntityEl.title = _label;
+
+    pixelCanvasEl = document.createElement('canvas');
+    pixelCanvasEl.width = PIXEL_CANVAS_SIZE;
+    pixelCanvasEl.height = PIXEL_CANVAS_SIZE;
+    pixelCanvasEl.className = 'assistant-pixel-entity-canvas';
+    pixelEntityEl.appendChild(pixelCanvasEl);
+
+    slot.removeAttribute('aria-hidden');
+    slot.appendChild(pixelEntityEl);
+
+    pixelEntityEl.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMain(); }
+    });
+    pixelEntityEl.addEventListener('click', openMain);
+
+    refreshPixelEntitySkin();
+    startIdleLoop();
+  }
+
+  function init() {
+    
+    const searchBtn = document.getElementById('header-search-btn');
+    if (searchBtn) searchBtn.addEventListener('click', openSearch);
+    mountPixelEntity();
+  }
+
+    return {
+      init: init,
+      openMain: openMain,
+            openPlan: function (opts) { if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open(opts); },
+      openSearch: openSearch,
+      openStore: openStoreFrom,
+      refreshPixelEntitySkin: refreshPixelEntitySkin
+    };
+})();
