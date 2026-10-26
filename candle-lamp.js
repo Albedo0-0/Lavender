@@ -165,7 +165,7 @@ const CandleLamp = (function () {
   .candle-dim-overlay {
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse 65% 75% at 80% 88%, rgba(40,20,8,0.3) 0%, rgba(8,5,14,0.82) 46%, rgba(3,2,8,0.92) 100%);
+    background: radial-gradient(ellipse 65% 75% at var(--candle-x, 80%) var(--candle-y, 88%), rgba(40,20,8,0.3) 0%, rgba(8,5,14,0.82) 46%, rgba(3,2,8,0.92) 100%);
     opacity: 0;
     transition: opacity 2s ease;
     pointer-events: none;
@@ -472,6 +472,7 @@ if (reduced) dimOverlay.style.transition = 'none';
     const messageEl = wrap.querySelector('.candle-message');
 
     let lit = false;
+    let flameDrop = 0;
     let expired = false;
     let focused = false;
     let expireCallbacks = [];
@@ -489,8 +490,25 @@ if (reduced) dimOverlay.style.transition = 'none';
       if (fireflySwarm) { fireflySwarm.destroy(); fireflySwarm = null; }
     }
 
+    // Centre the dim overlay's clear zone on the flame (not on the screen corner).
+    function centerDimOnFlame() {
+      const r = wrap.getBoundingClientRect();
+      if (!r.width) return;
+      dimOverlay.style.setProperty('--candle-x', (r.left + r.width * (CANDLE_W / 2) / CANDLE_W) + 'px');
+      dimOverlay.style.setProperty('--candle-y', (r.top + r.height * (40 + flameDrop) / CANDLE_H) + 'px');
+    }
+
+    function trackDimCenter() {
+      const t0 = performance.now();
+      (function step() {
+        centerDimOnFlame();
+        if (performance.now() - t0 < 2600) requestAnimationFrame(step);
+      })();
+    }
+
     function syncDim() {
       const showing = focused && container.offsetParent !== null;
+      if (showing) centerDimOnFlame();
       dimOverlay.classList.toggle('is-active', showing);
       document.body.classList.toggle('candle-scroll-lock', showing);
       if (showing) spawnAmbientFireflies(); else clearAmbientFireflies();
@@ -499,6 +517,7 @@ if (reduced) dimOverlay.style.transition = 'none';
     function setFocused(next) {
       focused = next;
       wrap.classList.toggle('is-focused', focused);
+      trackDimCenter();
       document.body.classList.toggle('candle-scroll-lock', focused);
       syncDim();
     }
@@ -512,6 +531,7 @@ if (reduced) dimOverlay.style.transition = 'none';
       const baseH = snap(FULL_H - (FULL_H - MIN_H) * fraction);
       base.style.height = baseH + 'px';
       const drop = FULL_H - baseH;
+      flameDrop = drop;
       riders.style.transform = 'translateY(' + drop + 'px)';
       glow.style.top = (40 + drop - GLOW / 2) + 'px';
       const wickFull = FULL_H - CANDLE_H * 0.2 - 100;
