@@ -9120,19 +9120,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 /* ==========================================================================
    Refinement 3 — Break (drawer tag + takeover), modal polish
    ========================================================================== */
-/* Break tag: the one primary tag on the hanging string */
-#utility-drawer #global-break-btn {
-  color: var(--color-cream-050);
-  background: var(--color-sage-700);
-  border-color: var(--color-sage-800);
-  box-shadow: 0 3px 8px rgba(54, 85, 70, 0.28);
-}
-#utility-drawer #global-break-btn:hover {
-  background: var(--color-sage-800);
-  border-color: var(--color-sage-800);
-  box-shadow: 0 5px 12px rgba(54, 85, 70, 0.34);
-}
-#utility-drawer #global-break-btn:focus-visible { outline-color: var(--color-sage-800); outline-offset: 3px; }
+/* Break tag: uses the shared #utility-drawer button styling like every other tag */
 
 /* Break takeover: calm paper card centred on the wallpaper */
 .break-takeover-inner {
