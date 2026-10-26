@@ -330,10 +330,10 @@ const WishButterfly = (function () {
           if (s.biasT <= 0) { s.bias = MiscCore.rand(-1.9, 1.9); s.biasT = 0.22; }
           steer(offEdge ? toCenter : s.th + s.bias, 7, dt);
           speed = 420; trailEvery = 0.03; long = true;
-          if (s.t > 1.6) { s.phase = 'leave'; s.exitPt = pickExit(); }
+                    if (s.t > 0.3) { s.phase = 'leave'; s.exitPt = pickExit(); }
         } else if (s.phase === 'leave') {
-          steer(Math.atan2(s.exitPt.y - s.y, s.exitPt.x - s.x), 5, dt);
-          speed = 560; trailEvery = 0.03; long = true;
+                    steer(Math.atan2(s.exitPt.y - s.y, s.exitPt.x - s.x), 8, dt);
+          speed = 900; trailEvery = 0.02; long = true;
         }
 
         s.x += Math.cos(s.th) * speed * dt;
