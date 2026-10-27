@@ -372,12 +372,12 @@ const PTPEView = (function () {
   }
 
   function controlsHtml() {
-    const dimOpts = [{ id: 'overall', label: 'Overall' }, { id: 'subject', label: 'Subject' }, { id: 'tag', label: 'Tag' }, { id: 'habit', label: 'Habit' }];
+    const dimOpts = [{ id: 'overall', label: 'Overall' }, { id: 'subject', label: 'Subject' }, { id: 'topic', label: 'Topic' }, { id: 'tag', label: 'Tag' }, { id: 'habit', label: 'Habit' }];
     const items = ex.dim === 'overall' ? [] : PTPE.dimensionItems(ex.dim);
     const metricOpts = PTPE.metricsFor(dimObj()).map(function (m) { return { id: m.key, label: m.label }; });
     const ranges = Object.keys(PTPE.RANGES).map(function (k) { return '<button type="button" class="ptpe-tab' + (k === ex.range ? ' on' : '') + '" data-r="' + k + '">' + PTPE.RANGES[k] + '</button>'; }).join('');
     const types = [['line', 'Line'], ['bar', 'Bar']].map(function (t) { return '<button type="button" class="ptpe-tab' + (t[0] === ex.type ? ' on' : '') + '" data-t="' + t[0] + '">' + t[1] + '</button>'; }).join('');
-    const itemSel = ex.dim === 'overall' ? '' : (items.length ? sel('ptpe-item', items, ex.id) : '<span class="ptpe-hint">' + (ex.dim === 'tag' ? 'No tags yet \u2014 add some in Library.' : ex.dim === 'habit' ? 'No habits yet.' : 'No subjects yet.') + '</span>');
+    const itemSel = ex.dim === 'overall' ? '' : (items.length ? sel('ptpe-item', items, ex.id) : '<span class="ptpe-hint">' + (ex.dim === 'tag' ? 'No tags yet \u2014 add some in Library.' :  ex.dim === 'habit' ? 'No habits yet.' : ex.dim === 'topic' ? 'No topics yet.' : 'No subjects yet.'
     const custom = ex.range === 'custom' ? '<div class="ptpe-custom"><input type="date" id="ptpe-from" value="' + esc(ex.from) + '"><span>to</span><input type="date" id="ptpe-to" value="' + esc(ex.to) + '"></div>' : '';
     return '<div class="ptpe-row ptpe-gc"><div class="ptpe-seg">' + ranges + '</div><div class="ptpe-seg">' + types + '</div></div>' + custom +
       '<div class="ptpe-ctl"><label><span>Show</span>' + sel('ptpe-metric', metricOpts, ex.metric) + '</label>' +
@@ -479,7 +479,8 @@ const PTPEView = (function () {
   function openExplorer(sel) {
     sel = sel || {};
     if (sel.dim) { ex.dim = sel.dim; ex.id = sel.id || null; }
-    if (sel.metric) ex.metric = sel.metric;
+        if (sel.metric) ex.metric = sel.metric;
+    if (sel.range) ex.range = sel.range;
     view = 'explore'; pendingExplorer = true; render();
   }
   // Quiet live refresh of the overview only (no animation replay, throttled, never while the Explorer is open).
