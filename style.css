@@ -3798,7 +3798,7 @@ button.library-info-chip:focus-visible {
 }
 #library-search {
   width: 100%;
-  min-height: 44px;
+    min-height: 38px;
   margin: 0;
   padding: 0 var(--space-4) 0 48px;
   font-size: var(--text-base);
