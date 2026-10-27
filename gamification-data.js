@@ -28,8 +28,7 @@ const GamificationData = (function () {
   const STUDY_FULL_MS = 6 * 3600000;  // study EXP is full-rate to 6h, half-rate to 9h, nothing beyond
   const STUDY_HARD_MS = 9 * 3600000;
   const LATE_TASK_MULT = 0.5;         // tasks finished after their due date
-  const DAILY_FULL_TASKS = 6;         // tasks beyond this per day earn half; beyond DAILY_MAX_TASKS earn nothing
-  const DAILY_MAX_TASKS = 12;
+    const DAILY_FULL_TASKS = 6;         // tasks beyond this per day earn half (no daily maximum)
   const PENDING_PENALTY_CAP = 200;    // one bad day cannot cost more than this in pending-task penalties
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -156,10 +155,7 @@ const GamificationData = (function () {
     let exp = (isR6 && !earlierRevisionsDone(task)) ? 100 : taskExpValue(task);
     if (task.date && task.date < dateStr) exp *= LATE_TASK_MULT;
     const already = tasksRewardedOn(dateStr);
-        if (already >= DAILY_MAX_TASKS) {
-      noteZero('Task completed: ' + (task.topicName || task.title || PlannerData.taskLabel(task)), 'daily task EXP limit reached (' + DAILY_MAX_TASKS + ')');
-      return;
-    }
+        
     if (already >= DAILY_FULL_TASKS) exp *= 0.5;
     const label = isR6
       ? 'Revision cycle completed (R6): ' + (task.topicName || '')
