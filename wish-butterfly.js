@@ -39,9 +39,9 @@ const WishButterfly = (function () {
     function markAppearedToday() {
     State.set({ miscWishButterfly: { date: todayStr(), appeared: true } });
   }
-  function isEnabled() {
+    function isEnabled() {
     const s = State.get().settings;
-    return !(s && s.wishButterflyEnabled === false);
+    return !!(s && s.wishButterflyEnabled === true);
   }
   
 
@@ -179,7 +179,8 @@ const WishButterfly = (function () {
     let spawnTimer = null;
     let reducedTimer = null;
     let rafId = null;
-    let live = null;
+        let live = null;
+    function area() { return { w: wrap.clientWidth || window.innerWidth, h: wrap.clientHeight || window.innerHeight }; }
 
     function scheduleSpawn(ms) {
       if (spawnTimer) clearTimeout(spawnTimer);
@@ -200,7 +201,7 @@ const WishButterfly = (function () {
       if (!isEnabled()) return;
       if (hasAppearedToday()) return; // already had its one appearance today — waits for rollover
       markAppearedToday();
-      const vw = window.innerWidth, vh = window.innerHeight;
+      const vw = area().w, vh = area().h;
       const butterfly = MiscCore.createEl('div', {
         className: 'wish-butterfly wb-fly is-glowing' + (reduced ? ' reduced-motion' : ''),
         html: svgMarkup(),
@@ -256,7 +257,7 @@ const WishButterfly = (function () {
       }
 
       function pickExit() {
-        const w = window.innerWidth, h = window.innerHeight;
+                const w = area().w, h = area().h;
         const d = [s.x, w - s.x, s.y, h - s.y];
         const m = Math.min.apply(null, d);
         const j = MiscCore.rand(-100, 100);
@@ -294,7 +295,8 @@ const WishButterfly = (function () {
         if (rafId) cancelAnimationFrame(rafId);
         rafId = null;
         butterfly.style.transition = 'opacity 0.7s ease';
-        butterfly.style.opacity = '0';
+                butterfly.style.opacity = '0';
+        butterfly.style.pointerEvents = 'none';
         halo.classList.remove('is-on');
         setTimeout(end, 750);
       }
@@ -354,8 +356,8 @@ const WishButterfly = (function () {
         if (s.open || s.phase === 'excited' || s.phase === 'leave' || s.phase === 'exit') return;
         s.open = true;
         butterfly.classList.add('is-open');
-        bubble.style.left = MiscCore.clamp(s.x - 100, 8, window.innerWidth - 240) + 'px';
-        bubble.style.top = MiscCore.clamp(s.y + 30, 8, window.innerHeight - 170) + 'px';
+                bubble.style.left = MiscCore.clamp(s.x - 100, 8, area().w - 240) + 'px';
+        bubble.style.top = MiscCore.clamp(s.y + 30, 8, area().h - 170) + 'px';
         bubble.classList.add('is-visible');
         textarea.value = '';
         sendBtn.disabled = true;
