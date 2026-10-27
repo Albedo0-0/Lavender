@@ -60,13 +60,15 @@ const PTPE = (function () {
       const set = Object.create(null), topics = topicsMap();
       if (dim.type === 'tag') {
         Object.keys(topics).forEach(function (id) { if ((topics[id].tags || []).indexOf(dim.id) !== -1) set[id] = true; });
-      } else if (dim.type === 'subject') {
+            } else if (dim.type === 'subject') {
         Object.keys(topics).forEach(function (id) { if (topics[id].subject === dim.id) set[id] = true; });
+      } else if (dim.type === 'topic') {
+        if (topics[dim.id]) set[dim.id] = true;
       }
       return set;
     });
   }
-  function isScoped(dim) { return !!dim && (dim.type === 'subject' || dim.type === 'tag'); }
+    function isScoped(dim) { return !!dim && (dim.type === 'subject' || dim.type === 'tag' || dim.type === 'topic'); }
   function taskInDim(t, dim) {
     if (!dim || dim.type === 'overall') return true;
     if (!isScoped(dim)) return false;
@@ -277,10 +279,11 @@ const PTPE = (function () {
   }
 
   // ---------- metric catalogue ----------
-  const ALL3 = ['overall', 'subject', 'tag'];
+    const ALL3 = ['overall', 'subject', 'tag'];
+  const WITH_TOPIC = ALL3.concat(['topic']);   // study time and questions are attributed per topic by studyParts()
   const METRICS = {
-    studyHours: { label: 'Study hours', kind: 'sum', dims: ALL3, floor: 0.3, fmt: function (v) { return fmtHours(v); } },
-    questions: { label: 'Questions solved', kind: 'sum', dims: ALL3, floor: 3, fmt: function (v) { return Math.round(v) + ''; } },
+        studyHours: { label: 'Study hours', kind: 'sum', dims: WITH_TOPIC,
+        questions: { label: 'Questions solved', kind: 'sum', dims: WITH_TOPIC,
     productivity: { label: 'Productivity', kind: 'mean', dims: ALL3, max: 10, floor: 0.3, fmt: function (v) { return round1(v) + ' / 10'; } },
         exp: { label: 'EXP earned', kind: 'sum', dims: ALL3, floor: 20, fmt: function (v) { return Math.round(v) + ' EXP'; } },
     testScore: { label: 'Test score', kind: 'mean', dims: ['overall', 'subject'], max: 100, floor: 3, events: true, fmt: pctFmt },
@@ -368,6 +371,11 @@ const PTPE = (function () {
             Object.keys(topics).forEach(function (id) { const s = topics[id].subject; if (s && names.indexOf(s) === -1) names.push(s); });
       testList().forEach(function (t) { t.subjects.forEach(function (x) { if (names.indexOf(x.subject) === -1) names.push(x.subject); }); });
       return names.map(function (s) { return { id: s, label: s }; });
+    }
+        if (type === 'topic') {
+      const topics = topicsMap();
+      return Object.keys(topics).map(function (id) { return { id: id, label: (topics[id].subject ? topics[id].subject + ' \u00b7 ' : '') + topics[id].topicName }; })
+        .sort(function (a, b) { return a.label.localeCompare(b.label); });
     }
     if (type === 'tag') return TagsData.getAllTagsList().map(function (t) { return { id: t.tagId, label: t.name, color: t.color }; });
     if (type === 'habit') return HabitData.getHabits({ includeArchived: true }).map(function (h) { return { id: h.habitId, label: h.title + (h.archived ? ' (archived)' : ''), color: h.color }; });
