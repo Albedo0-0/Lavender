@@ -282,8 +282,8 @@ const PTPE = (function () {
     const ALL3 = ['overall', 'subject', 'tag'];
   const WITH_TOPIC = ALL3.concat(['topic']);   // study time and questions are attributed per topic by studyParts()
   const METRICS = {
-        studyHours: { label: 'Study hours', kind: 'sum', dims: WITH_TOPIC,
-        questions: { label: 'Questions solved', kind: 'sum', dims: WITH_TOPIC,
+            studyHours: { label: 'Study hours', kind: 'sum', dims: WITH_TOPIC, floor: 0.3, fmt: function (v) { return fmtHours(v); } },
+            questions: { label: 'Questions solved', kind: 'sum', dims: WITH_TOPIC, floor: 3, fmt: function (v) { return Math.round(v) + ''; } },
     productivity: { label: 'Productivity', kind: 'mean', dims: ALL3, max: 10, floor: 0.3, fmt: function (v) { return round1(v) + ' / 10'; } },
         exp: { label: 'EXP earned', kind: 'sum', dims: ALL3, floor: 20, fmt: function (v) { return Math.round(v) + ' EXP'; } },
     testScore: { label: 'Test score', kind: 'mean', dims: ['overall', 'subject'], max: 100, floor: 3, events: true, fmt: pctFmt },
