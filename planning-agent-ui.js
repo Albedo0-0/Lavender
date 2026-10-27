@@ -2533,6 +2533,7 @@ const PlanningAgentUI = (function () {
     return '<div class="pl-sub' + (s.open ? ' is-open' : '') + (fresh ? ' is-new' : '') + '">' +
       '<div class="pl-sub-row"><span class="pl-num" aria-hidden="true">' + (i + 1) + '</span>' +
         '<input type="text" class="pl-input" id="pl-st-' + u + '" data-f="s-title" data-u="' + u + '" maxlength="120" placeholder="Subtask title" aria-label="Subtask ' + (i + 1) + ' title" value="' + esc(s.title) + '">' +
+                '<button type="button" class="pl-rm" data-pl="rm-sub" data-u="' + u + '" aria-label="Remove subtask ' + (i + 1) + '"><span aria-hidden="true">&minus;</span></button>' +
         '<button type="button" class="pl-more" data-pl="toggle" data-u="' + u + '" aria-expanded="' + s.open + '" aria-label="' + (s.open ? 'Hide' : 'Show') + ' details for subtask ' + (i + 1) + '"><span class="pl-caret" aria-hidden="true"></span></button></div>' +
       (s.open ? detailsHtml(s) : summaryHtml(s)) +
       (s.err ? '<p class="pl-err" role="alert">' + esc(s.err) + '</p>' : '') +
@@ -2594,8 +2595,18 @@ const PlanningAgentUI = (function () {
     return !t.archived && !t.completed && t.type !== 'break' && (!dash.subject || info(t).subject === dash.subject);
   }
 
-  function dashTasks(from, to) { return PlanningAgentTasks.getTasksForDateRange(from, to).filter(keepTask); }
+    function dashTasks(from, to) { return PlanningAgentTasks.getTasksForDateRange(from, to).filter(keepTask); }
 
+  // Today also lists tasks completed today (by real completion time), including ones that were never scheduled.
+  function dayTasks(d) {
+    const open = dashTasks(d, d);
+    if (d !== todayStr()) return open;
+    const seen = {};
+    open.forEach(function (t) { seen[t.id] = true; });
+    return open.concat(PlanningAgentTasks.getCompletedToday().filter(function (t) {
+      return !seen[t.id] && !t.archived && t.type !== 'break' && (!dash.subject || info(t).subject === dash.subject);
+    }));
+  }
   function planOf(t) {
     const tg = t.targetId ? TargetsData.getTarget(t.targetId) : null;
     return tg && tg.isPlan ? tg : null;
@@ -2828,7 +2839,7 @@ const PlanningAgentUI = (function () {
   }
 
   function dayHtml(d) {
-    const items = itemsFor(dashTasks(d, d));
+        const items = itemsFor(dayTasks(d));
     return '<p class="pl-date">' + esc(dayName(d)) + '</p>' +
       (items.length ? itemsHtml(items, d, true) : blankHtml(d === todayStr() ? 'Nothing planned for today.' : 'Nothing planned for this day.', true));
   }
@@ -3131,6 +3142,12 @@ const PlanningAgentUI = (function () {
         const s = holderOf(el.dataset.u);
         if (s) { s.open = !s.open; if (!s.open) state.pop = ''; }
         render(false, '[data-pl="toggle"][data-u="' + el.dataset.u + '"]');
+        return;
+      }
+            case 'rm-sub': {
+        state.subs = state.subs.filter(function (s) { return String(s.uid) !== el.dataset.u; });
+        state.pop = '';
+        render(false, '[data-pl="add-sub"]');
         return;
       }
       case 'add-sub': {
