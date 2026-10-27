@@ -56,7 +56,7 @@ const Settings = (function () {
       '<p class="settings-subtitle">Personalize how Lavender looks and feels on this device.</p>' +
 
       '<section class="settings-section"><h4 class="section-title settings-section-title">Experience</h4>' +
-      toggleRow('settings-wish-butterfly', 'Wish Butterfly &#129419;', 'A little butterfly that visits once a day.', cur.wishButterflyEnabled !== false) +
+      toggleRow('settings-wish-butterfly', 'Wish Butterfly &#129419;', 'A little butterfly that visits once a day.', cur.wishButterflyEnabled === true) +
       toggleRow('settings-force-fullscreen', 'Force fullscreen', '', typeof ForcedFullscreen !== 'undefined' && ForcedFullscreen.isEnabled()) +
       '</section>' +
 
