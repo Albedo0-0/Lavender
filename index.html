@@ -262,10 +262,16 @@
         if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
         if (typeof MiscWeather !== 'undefined') MiscWeather.mount(ambientLayer);
       }
-      const objectsLayer = document.getElementById('misc-objects-layer');
-      if (objectsLayer && typeof WishButterfly !== 'undefined') {
+            const objectsLayer = document.getElementById('misc-objects-layer');
+      let wishButterflyMounted = false;
+      function mountWishButterfly() {
+        if (wishButterflyMounted || !objectsLayer || typeof WishButterfly === 'undefined') return;
+        if ((State.get().settings || {}).wishButterflyEnabled !== true) return;
+        wishButterflyMounted = true;
         WishButterfly.mount(objectsLayer, { top: '16%', left: '86%' });
       }
+      mountWishButterfly();
+      window.addEventListener('lavender-wish-butterfly-setting', mountWishButterfly);
       const studyScreen = document.getElementById('screen-study');
       if (studyScreen && typeof CandleLamp !== 'undefined') {
         studyScreen.style.position = studyScreen.style.position || 'relative';
