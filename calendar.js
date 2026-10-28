@@ -769,24 +769,7 @@ const Calendar = (function () {
         cell.appendChild(fire);
       }
 
-      if (typeof JournalData !== 'undefined' && JournalData.isBlueFire(dateStr)) {
-        const blueFire = document.createElement('span');
-        blueFire.className = 'cal-bluefire';
-        blueFire.textContent = '\uD83D\uDD35';
-        cell.appendChild(blueFire);
-      }
-
-      if (typeof JournalData !== 'undefined') {
-        const jEntry = JournalData.getEntry(dateStr);
-        if (jEntry.mood) {
-          const moodEl = document.createElement('span');
-          moodEl.className = 'cal-mood';
-          moodEl.textContent = jEntry.mood.split(' ')[0];
-          cell.appendChild(moodEl);
-        }
-      }
-
-      if (hub.events && hub.events.length) {
+            if (hub.events && hub.events.length) {
         const evtSnippet = document.createElement('div');
         evtSnippet.className = 'cal-event-snippet';
         const shownEvts = hub.events.slice(0, 2);
@@ -986,8 +969,7 @@ const Calendar = (function () {
         '</section>' +
         '<div class="datehub-footer">' +
           '<div class="datehub-quicknav">' +
-            '<button id="datehub-goto-journal" class="btn btn-secondary">\uD83D\uDCD4 Journal</button>' +
-            '<button id="datehub-goto-day" class="btn btn-secondary">\uD83D\uDDD3 Day</button>' +
+                        '<button id="datehub-goto-day" class="btn btn-secondary">\uD83D\uDDD3 Day</button>' +
           '</div>' +
           '<button id="datehub-save" class="btn btn-primary">Save</button>' +
         '</div>' +
@@ -1170,18 +1152,24 @@ const Calendar = (function () {
     }
     bindTodo();
 
+        let colorTouched = false;
+
     document.getElementById('datehub-save').addEventListener('click', function () {
       const note = document.getElementById('datehub-note').value;
-      const color = document.getElementById('datehub-color').value;
-      DateHub.update(dateStr, { note: note, color: color });
+      const patch = { note: note };
+      if (colorTouched) patch.color = document.getElementById('datehub-color').value;
+      DateHub.update(dateStr, patch);
       render();
       Modal.close();
     });
 
-    document.getElementById('datehub-color').addEventListener('change', function (e) {
+    function applyHubColor(e) {
+      colorTouched = true;
       DateHub.update(dateStr, { color: e.target.value });
       render();
-    });
+    }
+    document.getElementById('datehub-color').addEventListener('input', applyHubColor);
+    document.getElementById('datehub-color').addEventListener('change', applyHubColor);
 
     const photoInput = document.getElementById('datehub-photo-input');
     const photoRemove = document.getElementById('datehub-photo-remove');
@@ -1216,16 +1204,7 @@ const Calendar = (function () {
       });
     }
 
-    // Placeholder hooks — Journal/Planner tabs don't read the selected date yet.
-    // Once those tabs exist, they should read this date from DateHub/State instead
-    // of these buttons growing their own logic.
-    document.getElementById('datehub-goto-journal').addEventListener('click', function () {
-      Modal.close();
-      if (typeof Journal !== 'undefined' && Journal.openDate) Journal.openDate(dateStr);
-      Nav.switchTo('journal');
-    });
-
-    document.getElementById('datehub-goto-day').addEventListener('click', function () {
+        document.getElementById('datehub-goto-day').addEventListener('click', function () {
       openDay(dateStr, 'datehub');
     });
   }
