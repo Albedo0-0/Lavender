@@ -173,7 +173,7 @@ const Study = (function () {
     const autofsRow = document.getElementById('study-autofs-toggle-row');
     if (alarmIcon) alarmIcon.style.display = active ? 'none' : 'inline-block';
     if (linksIcon) linksIcon.style.display = active ? 'none' : 'inline-block';
-    if (breakBtn) breakBtn.style.display = active ? 'none' : 'inline-block';
+        if (breakBtn) breakBtn.style.display = active ? 'none' : '';
     if (autofsRow) autofsRow.style.display = active ? 'none' : '';
   }
   function currentClockMs() {
@@ -637,8 +637,8 @@ function renderFocusMode(active) {
     if (!btn) return;
     const gb = TimeEngine.getGlobalBreak();
     if ((gb && gb.active) || TimeEngine.isSessionActive()) { btn.style.display = 'none'; return; }
-    btn.style.display = 'inline-block';
-    btn.textContent = 'Break';
+        btn.style.display = '';
+    if (btn.textContent !== '\u2615') btn.textContent = '\u2615';
     btn.disabled = false;
   }
 
@@ -699,17 +699,37 @@ function renderFocusMode(active) {
     breakInputOpen = true;
     const defaultMin = (State.get().settings || {}).defaultBreakDuration;
     Modal.open(
-      '<h3>Take a break</h3>' +
-'<input type="number" id="global-break-minutes" min="1" placeholder="Minutes"' + (defaultMin ? ' value="' + defaultMin + '"' : '') + '>' +
-'<input type="text" id="global-break-note" placeholder="Note (optional)">' +
-'<button id="global-break-confirm">Start Break</button>' +
-'<button id="break-timeline-toggle" style="margin-left:8px">Timeline</button>' +
-'<hr>' +
-'<h4>Already took a break?</h4>' +
-'<input type="number" id="unrecorded-break-minutes" min="1" placeholder="Minutes">' +
-'<input type="text" id="unrecorded-break-note" placeholder="Note (optional)">' +
-'<button id="unrecorded-break-confirm">Log it</button>'
+            '<div class="break-modal">' +
+        '<h3>Take a break</h3>' +
+        '<div class="break-modal-presets">' +
+          '<button type="button" class="break-chip" data-min="5">5 min</button>' +
+          '<button type="button" class="break-chip" data-min="10">10 min</button>' +
+          '<button type="button" class="break-chip" data-min="15">15 min</button>' +
+          '<button type="button" class="break-chip" data-min="30">30 min</button>' +
+        '</div>' +
+        '<input type="number" id="global-break-minutes" min="1" placeholder="Minutes"' + (defaultMin ? ' value="' + defaultMin + '"' : '') + '>' +
+        '<input type="text" id="global-break-note" placeholder="Note (optional)">' +
+        '<div class="break-modal-actions">' +
+          '<button type="button" id="break-timeline-toggle" class="break-btn-ghost">Timeline</button>' +
+          '<button type="button" id="global-break-confirm">Start Break</button>' +
+        '</div>' +
+        '<details class="break-modal-log">' +
+          '<summary>Already took a break?</summary>' +
+          '<div class="break-modal-log-body">' +
+            '<input type="number" id="unrecorded-break-minutes" min="1" placeholder="Minutes">' +
+            '<input type="text" id="unrecorded-break-note" placeholder="Note (optional)">' +
+            '<div class="break-modal-actions">' +
+              '<button type="button" id="unrecorded-break-confirm">Log it</button>' +
+            '</div>' +
+          '</div>' +
+        '</details>' +
+      '</div>'
     );
+        document.querySelectorAll('.break-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        document.getElementById('global-break-minutes').value = chip.dataset.min;
+      });
+    });
     document.getElementById('global-break-confirm').addEventListener('click', function () {
       const minutes = parseInt(document.getElementById('global-break-minutes').value, 10);
       if (!minutes || minutes <= 0) { alert('Enter a valid number of minutes.'); return; }
