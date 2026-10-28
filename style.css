@@ -9618,6 +9618,92 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Break — renovated takeover + start dialog */
+#global-break-takeover .break-takeover-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  width: min(340px, 86vw);
+  padding: var(--space-6) var(--space-5) var(--space-5);
+}
+#global-break-takeover .break-takeover-inner h2 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-sage-700);
+}
+#global-break-takeover .break-takeover-remaining {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-sage-800);
+}
+#global-break-takeover .break-takeover-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1, 4px);
+}
+#global-break-takeover .break-takeover-inner button {
+  min-height: 34px;
+  padding: 6px 18px;
+  font-size: var(--text-sm);
+  border-radius: 10px;
+}
+#global-break-takeover #break-takeover-add {
+  color: var(--color-sage-800);
+  background: transparent;
+  border: 1px solid var(--color-sage-400);
+  box-shadow: none;
+}
+#global-break-takeover #break-takeover-add:hover { background: var(--color-sage-100); }
+
+.break-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(340px, 78vw);
+}
+.break-modal h3 { margin: 0; }
+.break-modal input { width: 100%; box-sizing: border-box; margin: 0; }
+.break-modal-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.break-modal .break-chip {
+  min-height: 0;
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+  border-radius: var(--radius-pill);
+  color: var(--color-sage-800);
+  background: var(--color-cream-200);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+.break-modal .break-chip:hover { background: var(--color-sage-100); border-color: var(--color-sage-400); }
+.break-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.break-modal-actions button {
+  min-height: 34px;
+  padding: 6px 16px;
+  font-size: var(--text-sm);
+  border-radius: 10px;
+}
+.break-modal .break-btn-ghost {
+  margin-right: auto;
+  color: var(--color-sage-800);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.break-modal .break-btn-ghost:hover { background: var(--color-sage-100); }
+.break-modal-log { border-top: 1px dashed var(--color-border); padding-top: var(--space-3); }
+.break-modal-log summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
+.break-modal-log[open] summary { margin-bottom: var(--space-3); }
+.break-modal-log-body { display: flex; flex-direction: column; gap: var(--space-3); }
+
 /* Modal polish: form rhythm, confirmations, scrolling */
 #modal-content:where(:not(:has(.radio-modal, .pixel-chooser, .cassette-player, .cassette-playlist, .alarm-tabs, #itinerary-today-live, #alarm-text-input, #itinerary-template-name-input, .assistant-page, .journal-lock-modal))) {
   scrollbar-width: thin;
