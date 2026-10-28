@@ -11261,3 +11261,196 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 @media (prefers-reduced-motion: reduce) {
   .cal-view-btn, .cal-view-today { transition: none; }
 }
+
+/* ==========================================================================
+   Part 4 — Calendar & DateHub renovation
+   ========================================================================== */
+
+/* ----- Calendar header:  ‹  October 2026 ▾  › ----- */
+#calendar-header { justify-content: center; gap: 10px; padding: 12px var(--space-5) 10px; }
+#calendar-header button {
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 19px; font-weight: 600; line-height: 1;
+  color: var(--dh-ink-soft);
+  background-color: var(--dh-felt-sunk);
+  border: 1px solid #d4c6a3; border-radius: 50%;
+  box-shadow: 0 1px 0 rgba(255, 252, 244, 0.8);
+  cursor: pointer;
+}
+#calendar-header button:hover { color: var(--dh-ink); background-color: var(--dh-felt-deep); border-color: #bfae87; }
+#calendar-header button:active { transform: scale(0.93); box-shadow: inset 0 1px 3px rgba(110, 90, 56, 0.28); }
+#calendar-header button:focus-visible,
+#calendar-month-label:focus-visible { outline: 2px solid var(--dh-focus); outline-offset: 2px; }
+#calendar-month-label {
+  display: inline-flex; align-items: baseline; justify-content: center; gap: 6px;
+  min-width: 170px; padding: 3px 12px 4px;
+  border-radius: 999px;
+  font-size: 20px; font-weight: 700; letter-spacing: 0.01em;
+  color: var(--dh-ink);
+  background: none;
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-soft), transform 120ms ease;
+}
+#calendar-month-label:hover { background: var(--dh-felt-deep); }
+#calendar-month-label:active { transform: scale(0.98); }
+#calendar-month-label::after { content: '\25BE'; font-size: 11px; color: var(--dh-ink-soft); opacity: 0.6; }
+#calendar-month-label .cal-yr { font-weight: 500; color: var(--dh-ink-soft); }
+
+/* ----- Calendar: faint "Week N" labels ----- */
+#calendar-grid:not(.cal-grid-year):not(.cal-grid-week) { grid-template-columns: 38px repeat(7, minmax(0, 1fr)); }
+#calendar-grid .cal-week {
+  flex-direction: column; gap: 2px;
+  border-radius: 8px;
+  color: var(--dh-ink-soft);
+  opacity: 0.5;
+  transition: opacity 150ms var(--ease-soft), background-color 150ms var(--ease-soft), transform 120ms ease;
+}
+#calendar-grid .cal-week .cal-week-word { font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1; }
+#calendar-grid .cal-week .cal-week-n { font-size: 12px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+#calendar-grid .cal-week:hover,
+#calendar-grid .cal-week:focus-visible { opacity: 1; background-color: rgba(191, 174, 135, 0.22); }
+#calendar-grid .cal-week:active { transform: scale(0.94); background-color: rgba(191, 174, 135, 0.36); }
+#calendar-grid .cal-week:focus-visible { outline: 2px solid var(--dh-focus); outline-offset: -2px; }
+#calendar-grid .cal-week.is-current { opacity: 0.8; color: #a8683a; }
+#calendar-grid .cal-week.is-selected { opacity: 1; color: var(--dh-ink); background-color: rgba(191, 174, 135, 0.3); box-shadow: inset 3px 0 0 var(--dh-orange); }
+.cal-cell.cal-in-week:not(.cal-today):not(.cal-colored):not(.cal-lens):not(.cal-blank) { background-color: #f4ebd3; border-color: #d6c59c; }
+
+/* ----- Heatmap row: only the selector remains; hidden when empty (week view) ----- */
+#calendar-lens:has(.cal-views:empty) { display: none; }
+.cal-views { justify-content: flex-end; }
+.cal-lens-label { font-size: 11.5px; font-weight: 500; opacity: 0.8; }
+
+@media (max-width: 640px) {
+  #calendar-grid:not(.cal-grid-year):not(.cal-grid-week) { grid-template-columns: 30px repeat(7, minmax(0, 1fr)); }
+  #calendar-month-label { min-width: 0; font-size: 17px; }
+  #calendar-grid .cal-week .cal-week-word { font-size: 7px; letter-spacing: 0.06em; }
+}
+
+/* ----- DateHub: shell + header ----- */
+#modal-content:has(.datehub) { padding: 20px 26px 20px; }
+.datehub .datehub-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 12px; }
+.datehub .datehub-masthead { text-align: left; font-size: 11.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dh-ink-soft); }
+.datehub .datehub-header-actions { gap: 6px; }
+.datehub .datehub-header-actions .datehub-options-btn,
+.datehub .datehub-header-actions .datehub-close {
+  width: 32px; height: 32px; min-width: 32px;
+  font-size: 18px;
+  background-color: var(--dh-felt-sunk);
+  background-image: none;
+  border: 1px solid #cdbd98;
+  box-shadow: 0 1px 0 rgba(255, 252, 244, 0.8);
+}
+.datehub .datehub-options { margin: 0 0 12px; }
+
+/* ----- DateHub: date hero ----- */
+.datehub .datehub-hero { display: flex; align-items: center; gap: 16px; margin: 0 0 14px; }
+.datehub .datehub-daynum {
+  flex: none; display: grid; place-items: center;
+  width: 78px; height: 78px;
+  border-radius: 22px;
+  font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--dh-ink);
+  background-color: var(--dh-felt-sunk);
+  box-shadow: inset 0 2px 5px rgba(110, 90, 56, 0.2), 0 1px 0 rgba(255, 252, 244, 0.7);
+  outline: 1.5px dashed var(--dh-stitch); outline-offset: -5px;
+}
+.datehub .datehub-heroinfo { min-width: 0; }
+.datehub .datehub-fulldate {
+  display: grid; gap: 1px; margin: 0;
+  text-align: left; font-size: 15px; font-weight: 500; line-height: 1.2;
+  letter-spacing: 0; text-shadow: none; color: var(--dh-ink-soft);
+}
+.datehub .dh-wd { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; color: #34353a; }
+.datehub .datehub-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.datehub .datehub-chip {
+  padding: 2px 10px 3px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.3;
+  color: var(--dh-ink-soft);
+  background-color: var(--dh-felt-sunk);
+  box-shadow: inset 0 0 0 1px #d4c6a3;
+}
+.datehub .datehub-chip-today { color: #33302a; background-color: var(--dh-orange); box-shadow: none; }
+.datehub .datehub-chips .datehub-itinerary-summary { margin: 0; text-align: left; font-size: 12px; }
+
+/* ----- DateHub: quick-add row ----- */
+.datehub .datehub-addbar {
+  margin: 0 0 14px; padding: 4px 4px 4px 14px;
+  background-color: var(--dh-felt-sunk);
+  border: 1px solid #d4c6a3;
+  box-shadow: inset 0 1.5px 3px rgba(110, 90, 56, 0.16);
+  outline: none;
+}
+.datehub .datehub-addbar .input { height: 34px; padding: 0; font-size: 15px; }
+.datehub .datehub-addbtn { min-height: 34px; padding: 0 14px; font-size: 13.5px; }
+
+/* ----- DateHub: two-column body, flat sections ----- */
+.datehub .datehub-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
+.datehub .datehub-grid:has(.datehub-event-editor) { grid-template-columns: minmax(0, 1fr); }
+.datehub .datehub-col { min-width: 0; }
+.datehub .datehub-panel {
+  margin: 0; padding: 10px 0 12px;
+  background: none; box-shadow: none; outline: none; border-radius: 0;
+  border-top: 1.5px dashed var(--dh-stitch);
+}
+.datehub .datehub-panel-title {
+  margin: 0 0 6px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dh-ink-soft);
+}
+.datehub .datehub-panel-title label { letter-spacing: inherit; text-transform: inherit; }
+.datehub .datehub-panel-hint { margin-left: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: none; opacity: 0.75; }
+.datehub .datehub-event-list,
+.datehub .datehub-task-list,
+.datehub .datehub-targets-list { gap: 2px; }
+
+/* Events: light rows with a colour dot instead of one pill each */
+.datehub .datehub-event {
+  position: relative; min-height: 0;
+  padding: 5px 6px 5px 22px; border-radius: 10px;
+  background-color: transparent; background-image: none; box-shadow: none;
+  transition: background-color 150ms var(--ease-soft);
+}
+.datehub .datehub-event:hover { background-color: rgba(191, 174, 135, 0.2); }
+.datehub .datehub-event::before {
+  content: ''; position: absolute; left: 8px; top: 50%;
+  width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+  background: var(--dh-orange);
+}
+.datehub .datehub-event.dh-pill-1::before { background: var(--dh-pink); }
+.datehub .datehub-event.dh-pill-2::before { background: var(--dh-blue); }
+.datehub .datehub-event-time,
+.datehub .datehub-event-sep { display: none; }
+.datehub .datehub-event-line { font-size: 15px; }
+.datehub .datehub-event .datehub-tag { max-width: 40%; font-size: 12px; padding: 1px 9px 2px; box-shadow: none; }
+
+/* ----- DateHub: footer ----- */
+.datehub .datehub-footer { margin-top: 12px; padding: 10px 0 0; border-top: 1.5px dashed var(--dh-stitch); }
+.datehub .datehub-footer .datehub-quicknav .btn {
+  min-height: 32px; padding: 0 12px;
+  font-size: 13px; color: var(--dh-ink-soft);
+  background-color: transparent; border: 1px solid #cdbd98; border-radius: 999px;
+  text-decoration: none;
+  transition: background-color 150ms var(--ease-soft), border-color 150ms var(--ease-soft), color 150ms var(--ease-soft), transform 120ms ease;
+}
+.datehub .datehub-footer .datehub-quicknav .btn:hover { color: var(--dh-ink); background-color: var(--dh-felt-sunk); border-color: var(--dh-stitch); text-decoration: none; }
+.datehub .datehub-footer .datehub-quicknav .btn:active { transform: translateY(1px); }
+.datehub .datehub-footer .btn-primary {
+  min-height: 32px; padding: 0 20px;
+  font-size: 13.5px; font-weight: 700; color: #2c3a1b;
+  background-color: var(--dh-green); background-image: var(--dh-noise);
+  border: none; border-radius: 999px;
+  box-shadow: inset 0 1.5px 0 rgba(255, 252, 244, 0.5), 0 1px 3px rgba(90, 72, 40, 0.3);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.datehub .datehub-footer .btn-primary:hover { transform: translateY(-1px); }
+.datehub .datehub-footer .btn-primary:active { transform: translateY(1px); }
+
+@media (max-width: 560px) {
+  #modal-content:has(.datehub) { padding: 18px 16px 16px; }
+  .datehub .datehub-grid { grid-template-columns: minmax(0, 1fr); }
+  .datehub .datehub-daynum { width: 64px; height: 64px; font-size: 32px; border-radius: 18px; }
+  .datehub .dh-wd { font-size: 23px; }
+  .datehub .datehub-addbar { padding: 6px 8px 8px 12px; }
+}
