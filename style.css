@@ -8,6 +8,7 @@
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Kalam:wght@300;400;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&display=swap');
 
 :root {
   /* Fonts */
@@ -11453,4 +11454,258 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   .datehub .datehub-daynum { width: 64px; height: 64px; font-size: 32px; border-radius: 18px; }
   .datehub .dh-wd { font-size: 23px; }
   .datehub .datehub-addbar { padding: 6px 8px 8px 12px; }
+}
+
+
+/* ==========================================================================
+   DateHub — neo-brutalist redesign (visual only; scoped to the DateHub modal)
+   Palette: #3F5E4D + white / off-white / green tints. Appended last to win.
+   ========================================================================== */
+#modal-overlay #modal-content:has(.datehub) {
+  --dhn-ink: #1f2b24;
+  --dhn-green: #3f5e4d;
+  --dhn-green-2: #5f7d6c;
+  --dhn-green-3: #8fa898;
+  --dhn-tint-1: #c9d8ce;
+  --dhn-tint-2: #e4ece6;
+  --dhn-tint-3: #f1f5f2;
+  --dhn-paper: #faf8f2;
+  --dhn-white: #ffffff;
+  --dhn-font: 'DM Sans', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  width: min(600px, 94vw);
+  max-width: 600px;
+  padding: 20px 22px 18px;
+  background-color: var(--dhn-paper);
+  background-image: none;
+  border: 2.5px solid var(--dhn-ink);
+  border-radius: 28px;
+  box-shadow: 6px 6px 0 var(--dhn-ink);
+  outline: none;
+  color: var(--dhn-ink);
+  font-family: var(--dhn-font);
+}
+#modal-content .datehub,
+#modal-content .datehub * { font-family: var(--dhn-font); }
+#modal-content .datehub { color: var(--dhn-ink); }
+
+/* ----- Header ----- */
+#modal-content .datehub .datehub-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 14px; }
+#modal-content .datehub .datehub-masthead {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 12px 4px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dhn-white); background: var(--dhn-green);
+  border: 2px solid var(--dhn-ink); border-radius: 999px;
+}
+#modal-content .datehub .datehub-header-actions { display: flex; gap: 8px; }
+#modal-content .datehub .datehub-header-actions .datehub-options-btn,
+#modal-content .datehub .datehub-header-actions .datehub-close {
+  width: 32px; height: 32px; min-width: 32px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 700; line-height: 1;
+  color: var(--dhn-ink); background: var(--dhn-white); background-image: none;
+  border: 2px solid var(--dhn-ink); border-radius: 50%;
+  box-shadow: 2px 2px 0 var(--dhn-ink);
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+#modal-content .datehub .datehub-header-actions .datehub-options-btn:hover,
+#modal-content .datehub .datehub-header-actions .datehub-close:hover { background: var(--dhn-tint-1); transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-header-actions .datehub-options-btn[aria-expanded="true"] { background: var(--dhn-green); color: var(--dhn-white); }
+#modal-content .datehub .datehub-header-actions .datehub-options-btn:active,
+#modal-content .datehub .datehub-header-actions .datehub-close:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--dhn-ink); }
+
+/* ----- Hero ----- */
+#modal-content .datehub .datehub-hero { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; }
+#modal-content .datehub .datehub-daynum {
+  flex: none; display: grid; place-items: center;
+  width: 72px; height: 72px; border-radius: 22px;
+  font-size: 36px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--dhn-white); background: var(--dhn-green);
+  border: 2.5px solid var(--dhn-ink); box-shadow: 3px 3px 0 var(--dhn-ink); outline: none;
+}
+#modal-content .datehub .datehub-fulldate { display: grid; gap: 1px; margin: 0; text-align: left; font-size: 14px; font-weight: 600; color: var(--dhn-green-2); text-shadow: none; }
+#modal-content .datehub .dh-wd { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--dhn-ink); }
+#modal-content .datehub .datehub-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+#modal-content .datehub .datehub-chip {
+  padding: 2px 10px 3px; font-size: 11.5px; font-weight: 700; line-height: 1.3;
+  color: var(--dhn-ink); background: var(--dhn-white);
+  border: 2px solid var(--dhn-ink); border-radius: 999px; box-shadow: none;
+}
+#modal-content .datehub .datehub-chip-today { color: var(--dhn-white); background: var(--dhn-green); }
+
+/* ----- Options drawer ----- */
+#modal-content .datehub .datehub-options { margin: 0 0 14px; padding: 12px 14px; background: var(--dhn-tint-2); border: 2px solid var(--dhn-ink); border-radius: 18px; box-shadow: 3px 3px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-field-label { font-size: 10.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dhn-green); }
+#modal-content .datehub .datehub-options input[type="color"] { width: 56px; height: 32px; padding: 2px; background: var(--dhn-white); border: 2px solid var(--dhn-ink); border-radius: 10px; cursor: pointer; }
+#modal-content .datehub .datehub-photo-row input[type="file"] { font-size: 12.5px; color: var(--dhn-ink); }
+#modal-content .datehub .datehub-photo-row input[type="file"]::file-selector-button {
+  margin-right: 8px; padding: 5px 12px; font: 700 12px var(--dhn-font);
+  color: var(--dhn-ink); background: var(--dhn-white);
+  border: 2px solid var(--dhn-ink); border-radius: 999px; box-shadow: 2px 2px 0 var(--dhn-ink); cursor: pointer;
+}
+
+/* ----- Inputs ----- */
+#modal-content .datehub .input,
+#modal-content .datehub textarea.input,
+#modal-content .datehub select.input,
+#modal-content .datehub #datehub-note {
+  font-size: 14.5px; color: var(--dhn-ink);
+  background: var(--dhn-white); background-image: none;
+  border: 2px solid var(--dhn-ink); border-radius: 14px; box-shadow: none;
+}
+#modal-content .datehub .input::placeholder { color: var(--dhn-green-3); }
+#modal-content .datehub .input:focus,
+#modal-content .datehub #datehub-note:focus { outline: none; background: var(--dhn-tint-3); box-shadow: 3px 3px 0 var(--dhn-green); }
+
+/* ----- Quick-add bar ----- */
+#modal-content .datehub .datehub-addbar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding: 5px 5px 5px 14px;
+  background: var(--dhn-white); border: 2px solid var(--dhn-ink); border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--dhn-ink); outline: none;
+}
+#modal-content .datehub .datehub-addbar .input { flex: 1 1 auto; min-width: 0; height: 32px; padding: 0; background: transparent; border: none; box-shadow: none; font-size: 14.5px; }
+#modal-content .datehub .datehub-addbar .input:focus { background: transparent; box-shadow: none; }
+#modal-content .datehub .datehub-addbtn {
+  min-height: 32px; padding: 0 14px; font-size: 12.5px; font-weight: 800;
+  border: 2px solid var(--dhn-ink); border-radius: 999px; cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+#modal-content .datehub .datehub-addbtn-event { color: var(--dhn-white); background: var(--dhn-green); box-shadow: 2px 2px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-addbtn-task { color: var(--dhn-ink); background: var(--dhn-tint-1); box-shadow: 2px 2px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-addbtn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-addbtn:active { transform: translate(2px, 2px); box-shadow: none; }
+
+/* ----- Panels ----- */
+#modal-content .datehub .datehub-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 12px; }
+#modal-content .datehub .datehub-grid:has(.datehub-event-editor) { grid-template-columns: minmax(0, 1fr); }
+#modal-content .datehub .datehub-col { display: grid; gap: 12px; min-width: 0; }
+#modal-content .datehub .datehub-panel {
+  margin: 0; padding: 12px 14px 14px;
+  background: var(--dhn-white); background-image: none;
+  border: 2px solid var(--dhn-ink); border-radius: 20px;
+  box-shadow: 3px 3px 0 var(--dhn-ink); outline: none;
+}
+#modal-content .datehub .datehub-panel-events { background: var(--dhn-tint-2); }
+#modal-content .datehub .datehub-panel-note { margin-bottom: 12px; }
+#modal-content .datehub .datehub-panel-title {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dhn-green);
+}
+#modal-content .datehub .datehub-panel-hint { margin: 0; padding: 1px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: none; color: var(--dhn-ink); background: var(--dhn-white); border: 1.5px solid var(--dhn-ink); border-radius: 999px; opacity: 1; }
+#modal-content .datehub .datehub-empty { padding: 2px 0; font-size: 13.5px; font-weight: 500; color: var(--dhn-green-2); }
+#modal-content .datehub #datehub-note { padding: 8px 12px; min-height: 52px; }
+
+/* ----- Events ----- */
+#modal-content .datehub .datehub-event-list,
+#modal-content .datehub .datehub-task-list,
+#modal-content .datehub .datehub-targets-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+#modal-content .datehub .datehub-event {
+  position: relative; display: flex; align-items: center; gap: 8px; min-height: 0;
+  padding: 5px 8px 5px 12px; border-radius: 14px;
+  background: var(--dhn-white); background-image: none;
+  border: 2px solid var(--dhn-ink); box-shadow: 2px 2px 0 var(--dhn-ink);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+#modal-content .datehub .datehub-event::before { content: none; }
+#modal-content .datehub .datehub-event.dh-pill-0 { background: var(--dhn-white); }
+#modal-content .datehub .datehub-event.dh-pill-1 { background: var(--dhn-tint-1); }
+#modal-content .datehub .datehub-event.dh-pill-2 { background: var(--dhn-green-3); }
+#modal-content .datehub .datehub-event:hover { background-color: var(--dhn-tint-3); transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--dhn-ink); }
+#modal-content .datehub .datehub-event-main { color: var(--dhn-ink); }
+#modal-content .datehub .datehub-event-line { font-size: 14px; }
+#modal-content .datehub .datehub-event-time { display: inline; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dhn-green); }
+#modal-content .datehub .datehub-event-sep { display: none; }
+#modal-content .datehub .datehub-event-title { font-weight: 700; }
+#modal-content .datehub .datehub-event-note { font-size: 12px; color: var(--dhn-green-2); }
+
+/* ----- Tag chips ----- */
+#modal-content .datehub .datehub-tag,
+#modal-content .datehub-tag {
+  max-width: 42%; padding: 1px 10px 2px; font-size: 11px; font-weight: 800; line-height: 1.3;
+  color: var(--dhn-ink); background: var(--dhn-tint-1); background-image: none;
+  border: 1.5px solid var(--dhn-ink); border-radius: 999px; box-shadow: none;
+}
+#modal-content .datehub .datehub-tag.dh-tone-0 { background: var(--dhn-tint-1); color: var(--dhn-ink); }
+#modal-content .datehub .datehub-tag.dh-tone-1 { background: var(--dhn-green-3); color: var(--dhn-ink); }
+#modal-content .datehub .datehub-tag.dh-tone-2 { background: var(--dhn-green); color: var(--dhn-white); }
+#modal-content .datehub .datehub-tag.dh-tone-3 { background: var(--dhn-tint-2); color: var(--dhn-ink); }
+#modal-content .datehub .datehub-tag.dh-tone-4 { background: var(--dhn-green-2); color: var(--dhn-white); }
+
+/* ----- Tasks & targets ----- */
+#modal-content .datehub .datehub-task { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+#modal-content .datehub .datehub-task-label { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 10px; }
+#modal-content .datehub .datehub-task-name { font-size: 14px; font-weight: 600; }
+#modal-content .datehub .datehub-task-done .datehub-task-name { color: var(--dhn-green-3); text-decoration: line-through; text-decoration-thickness: 2px; }
+#modal-content .datehub .datehub-task-done .datehub-tag { opacity: 0.55; }
+#modal-content .datehub input.datehub-todo-check,
+#modal-content .datehub input.datehub-target-check {
+  -webkit-appearance: none; appearance: none; flex: none;
+  width: 18px; height: 18px; margin: 0; cursor: pointer;
+  background: var(--dhn-white); border: 2px solid var(--dhn-ink); border-radius: 6px; box-shadow: 1.5px 1.5px 0 var(--dhn-ink);
+  display: inline-block; position: relative;
+}
+#modal-content .datehub input.datehub-todo-check:checked,
+#modal-content .datehub input.datehub-target-check:checked { background: var(--dhn-green); }
+#modal-content .datehub input.datehub-todo-check:checked::after,
+#modal-content .datehub input.datehub-target-check:checked::after {
+  content: ''; position: absolute; left: 4px; top: 0.5px; width: 4px; height: 9px;
+  border: solid var(--dhn-white); border-width: 0 2.5px 2.5px 0; transform: rotate(40deg);
+}
+#modal-content .datehub .datehub-targets-list .list-row,
+#modal-content .datehub .datehub-targets-list .switch-label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--dhn-ink); background: none; border: none; padding: 0; }
+#modal-content .datehub .datehub-task-label:has(input:focus-visible),
+#modal-content .datehub .datehub-event-main:focus-visible { outline: 2px solid var(--dhn-green); outline-offset: 2px; }
+#modal-content .datehub .datehub-task-more { margin-top: 8px; padding: 2px 10px; font-size: 11.5px; font-weight: 800; color: var(--dhn-ink); background: var(--dhn-white); border: 2px solid var(--dhn-ink); border-radius: 999px; cursor: pointer; }
+#modal-content .datehub .datehub-task-more:hover { background: var(--dhn-tint-1); }
+
+/* ----- Event editor ----- */
+#modal-content .datehub .datehub-event-editor {
+  display: grid; gap: 6px; padding: 14px;
+  background: var(--dhn-white); border: 2px solid var(--dhn-ink); border-radius: 18px;
+  box-shadow: 3px 3px 0 var(--dhn-ink); outline: none;
+}
+#modal-content .datehub .datehub-ev-reminder-row { display: flex; gap: 8px; }
+#modal-content .datehub .datehub-ev-hint { font-size: 12px; color: var(--dhn-green-2); }
+#modal-content .datehub .datehub-ev-error { font-size: 12.5px; font-weight: 700; color: #8a2f22; }
+#modal-content .datehub .datehub-editor-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+#modal-content .datehub .datehub-editor-spacer { flex: 1 1 auto; }
+
+/* ----- Buttons (shared) ----- */
+#modal-content .datehub .btn {
+  min-height: 32px; padding: 0 16px; font-size: 13px; font-weight: 800; letter-spacing: 0;
+  background-image: none; border: 2px solid var(--dhn-ink); border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--dhn-ink); cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+#modal-content .datehub .btn-primary { color: var(--dhn-white); background-color: var(--dhn-green); }
+#modal-content .datehub .btn-secondary { color: var(--dhn-ink); background-color: var(--dhn-white); }
+#modal-content .datehub .btn-danger { color: #8a2f22; background-color: var(--dhn-white); }
+#modal-content .datehub .btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--dhn-ink); filter: none; }
+#modal-content .datehub .btn-secondary:hover { background-color: var(--dhn-tint-1); }
+#modal-content .datehub .btn-danger:hover { background-color: #f3d9d3; }
+#modal-content .datehub .btn:active { transform: translate(2px, 2px); box-shadow: none; }
+#modal-content .datehub .btn:disabled { opacity: 0.45; transform: none; box-shadow: none; cursor: not-allowed; }
+#modal-content .datehub .datehub-photo-row .btn { min-height: 28px; padding: 0 12px; font-size: 12px; }
+
+/* ----- Footer ----- */
+#modal-content .datehub .datehub-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 0; padding: 12px 0 0; border-top: 2.5px solid var(--dhn-ink); }
+#modal-content .datehub .datehub-footer .datehub-quicknav { display: flex; gap: 8px; margin: 0; }
+#modal-content .datehub .datehub-footer .datehub-quicknav .btn { min-height: 32px; padding: 0 14px; font-size: 12.5px; color: var(--dhn-ink); background: var(--dhn-white); border: 2px solid var(--dhn-ink); text-decoration: none; }
+#modal-content .datehub .datehub-footer .datehub-quicknav .btn:hover { background: var(--dhn-tint-1); text-decoration: none; }
+#modal-content .datehub .datehub-footer .btn-primary { min-height: 32px; padding: 0 22px; font-size: 13px; color: var(--dhn-white); background: var(--dhn-green); border: 2px solid var(--dhn-ink); }
+
+@media (max-width: 560px) {
+  #modal-overlay #modal-content:has(.datehub) { padding: 16px 14px 14px; border-radius: 24px; box-shadow: 4px 4px 0 var(--dhn-ink); }
+  #modal-content .datehub .datehub-grid { grid-template-columns: minmax(0, 1fr); }
+  #modal-content .datehub .datehub-daynum { width: 60px; height: 60px; font-size: 30px; border-radius: 18px; }
+  #modal-content .datehub .dh-wd { font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #modal-content .datehub .btn,
+  #modal-content .datehub .datehub-addbtn,
+  #modal-content .datehub .datehub-event,
+  #modal-content .datehub .datehub-header-actions button { transition: none; }
 }
