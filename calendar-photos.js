@@ -68,8 +68,9 @@ const CalendarPhotos = (function () {
     if (!file || !/^image\//.test(file.type || '')) return Promise.resolve(false);
     const id = ID_PREFIX + dateStr;
     const record = { id: id, kind: 'calendar-photo', date: dateStr, name: file.name || '', type: file.type, blob: file };
-    return idb('readwrite', function (s) { return s.put(record); }).then(function () {
+        return idb('readwrite', function (s) { return s.put(record); }).then(function () {
       releaseUrl(dateStr);
+      delete pending[dateStr];
       const next = Object.assign({}, map());
       next[dateStr] = id;
       return State.set({ calendarPhotos: next });
@@ -88,11 +89,20 @@ const CalendarPhotos = (function () {
       .catch(function () { return true; });
   }
 
-  function paint(cell, url) {
-    cell.style.backgroundImage = 'url("' + url + '")';
-    cell.style.backgroundSize = 'cover';
-    cell.style.backgroundPosition = 'center';
-    cell.style.backgroundRepeat = 'no-repeat';
+    function paint(cell, url, onFail) {
+    const probe = new Image();
+    probe.onload = function () {
+      cell.classList.add('cal-has-photo');
+      cell.style.backgroundImage = 'url("' + url + '")';
+      cell.style.backgroundSize = 'cover';
+      cell.style.backgroundPosition = 'center';
+      cell.style.backgroundRepeat = 'no-repeat';
+    };
+    probe.onerror = function () {
+      clear(cell);
+      if (onFail) onFail();
+    };
+    probe.src = url;
   }
 
   function clear(cell) {
@@ -104,13 +114,15 @@ const CalendarPhotos = (function () {
   }
 
   // Calendar calls only this: it decides whether the cell has a photo and presents it.
-  function apply(cell, dateStr) {
+    function apply(cell, dateStr) {
     if (!has(dateStr)) { clear(cell); return; }
-    cell.classList.add('cal-has-photo');
     const cached = urlCache[dateStr];
-    if (cached && cached.id === mediaId(dateStr)) { paint(cell, cached.url); return; }
+    if (cached && cached.id === mediaId(dateStr)) {
+      paint(cell, cached.url, function () { releaseUrl(dateStr); });
+      return;
+    }
     getUrl(dateStr).then(function (url) {
-      if (url && has(dateStr)) paint(cell, url);
+      if (url && has(dateStr)) paint(cell, url, function () { releaseUrl(dateStr); });
       else clear(cell);
     });
   }
