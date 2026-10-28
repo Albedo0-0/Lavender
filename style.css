@@ -9564,9 +9564,13 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 /* Break takeover: calm paper card centred on the wallpaper */
 .break-takeover-inner {
   position: relative;
-  width: min(440px, 88vw);
+    width: min(380px, 88vw);
   box-sizing: border-box;
-  padding: var(--space-6) var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
   background: var(--color-cream-050);
   border: 1px solid var(--color-cream-300);
   border-radius: 24px;
@@ -9580,15 +9584,20 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   letter-spacing: 0.01em;
   color: var(--color-brown-700);
 }
-.break-takeover-inner p { margin: 0 0 var(--space-3); line-height: 1.55; color: var(--color-ink-soft); }
+.break-takeover-inner p { margin: 0; line-height: 1.5; font-size: var(--text-sm); color: var(--color-ink-soft); }
+.break-takeover-inner :is(h1, h2, h3) { margin: 0; font-size: var(--text-md); }
+.break-takeover-inner :is([id*="timer"], [id*="countdown"]) { font-size: 2.25rem; line-height: 1.1; margin: 0; }
+.break-takeover-inner :is(div, form):has(> button) { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin: 0; }
+.break-takeover-inner > :empty, .break-takeover-inner [hidden] { display: none; }
 .break-takeover-inner :is([id*="timer"], [id*="countdown"], [class*="timer"], [class*="countdown"]) {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   color: var(--color-sage-800);
 }
 .break-takeover-inner button {
-  min-height: 40px;
-  padding: 8px 20px;
+  min-height: 34px;
+  padding: 6px 16px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-cream-050);
   background: var(--color-sage-700);
