@@ -4162,6 +4162,7 @@ body:has(#utility-drawer:not(.utility-drawer-hidden)) #app-header::after { opaci
 
 /* labels for icon-only utilities (Break already has text) */
 #utility-drawer button::after { font-family: var(--font-hand); font-size: 17px; font-weight: 700; }
+#global-break-btn::after      { content: 'Break'; }
 #unrecorded-study-icon::after { content: 'Unrecorded Study'; }
 #habits-icon::after           { content: 'Habits'; }
 #notepad-icon::after          { content: 'Notepad'; }
