@@ -102,14 +102,7 @@ const Calendar = (function () {
     const tagId = hasPTPE ? activeLensTag(lens) : null;
     const showLens = hasPTPE && viewMode !== 'week';
 
-    let html = '<div class="cal-views">' +
-      '<div class="cal-view-tabs" role="group" aria-label="Calendar view">' +
-        VIEW_MODES.map(function (v) {
-          const on = v.key === viewMode;
-          return '<button type="button" class="cal-view-btn' + (on ? ' is-active' : '') + '" data-view="' + v.key + '" aria-pressed="' + on + '">' + v.label + '</button>';
-        }).join('') +
-      '</div>' +
-      '<button type="button" class="cal-view-today" data-act="today"' + (isAtToday() ? ' disabled' : '') + '>Today</button>';
+        let html = '<div class="cal-views">';
 
     if (showLens) {
       html += '<span class="cal-views-spacer"></span>' +
@@ -644,7 +637,7 @@ const Calendar = (function () {
     if (!grid || !label) return;
 
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-            label.textContent = monthNames[viewMonth] + ' ' + viewYear;
+            label.innerHTML = monthNames[viewMonth] + ' <span class="cal-yr">' + viewYear + '</span>';
     label.title = viewMode === 'month' ? 'Year overview' : 'Back to month';
     const navUnit = viewMode === 'week' ? 'week' : (viewMode === 'year' ? 'year' : 'month');
     ['prev', 'next'].forEach(function (k) {
@@ -682,9 +675,11 @@ const Calendar = (function () {
       const wk = document.createElement('button');
       wk.type = 'button';
       wk.className = 'cal-week';
-      wk.textContent = wkNum;
+            wk.innerHTML = '<span class="cal-week-word">Week</span><span class="cal-week-n">' + wkNum + '</span>';
       wk.dataset.weekStart = ws;
-      wk.title = 'Week ' + wkNum;
+      if (ws === selectedWeekStart) wk.classList.add('is-selected');
+      if (ws === currentWeekStart()) wk.classList.add('is-current');
+      wk.title = 'Open week ' + wkNum;
       wk.setAttribute('aria-label', 'Week ' + wkNum);
       wk.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -719,8 +714,9 @@ const Calendar = (function () {
 
       const cell = document.createElement('div');
             cell.className = 'cal-cell';
-      if ((firstDay + day - 1) % 7 >= 5) cell.classList.add('cal-weekend');
-      if (dateStr === today) cell.classList.add('cal-today');
+            if ((firstDay + day - 1) % 7 >= 5) cell.classList.add('cal-weekend');
+      if (selectedWeekStart && weekStartOf(viewYear, viewMonth, day) === selectedWeekStart) cell.classList.add('cal-in-week');
+      if (dateStr === today) { cell.classList.add('cal-today'); cell.setAttribute('aria-current', 'date'); }
       if (hub.color) {
         cell.classList.add('cal-colored');
         cell.style.setProperty('--cal-user-color', hub.color);
@@ -931,19 +927,30 @@ const Calendar = (function () {
     const hubDate = new Date(dateStr + 'T00:00:00');
     const hubWeekday = hubDate.toLocaleDateString('en-US', { weekday: 'long' });
     const hubMonth = hubDate.toLocaleDateString('en-US', { month: 'long' });
-    const fullDate = hubWeekday + ', ' + hubMonth + ' ' + hubDate.getDate() + ' ' + hubDate.getFullYear();
+        const fullDate = hubWeekday + ', ' + hubMonth + ' ' + hubDate.getDate() + ' ' + hubDate.getFullYear();
+    const dayDiff = daysUntil(dateStr);
+    const relText = dayDiff === 0 ? 'Today' : dayDiff === 1 ? 'Tomorrow' : dayDiff === -1 ? 'Yesterday'
+      : dayDiff > 0 ? 'In ' + dayDiff + ' days' : Math.abs(dayDiff) + ' days ago';
     const html =
       '<div class="datehub">' +
         '<div class="datehub-header">' +
-          '<div class="datehub-header-actions datehub-header-left">' +
-            '<button type="button" id="datehub-options-btn" class="datehub-options-btn btn btn-secondary" aria-label="Options" aria-expanded="false" aria-controls="datehub-options">\u22EE</button>' +
-          '</div>' +
-          '<div class="datehub-masthead">DateHub <span aria-hidden="true">\u273F</span> ' + hubMonth + ' ' + hubDate.getFullYear() + '</div>' +
+          '<div class="datehub-masthead">DateHub <span aria-hidden="true">\u273F</span></div>' +
           '<div class="datehub-header-actions">' +
+            '<button type="button" id="datehub-options-btn" class="datehub-options-btn btn btn-secondary" aria-label="Options" title="Background &amp; photo" aria-expanded="false" aria-controls="datehub-options">\u22EE</button>' +
             '<button id="datehub-close" class="datehub-close btn btn-secondary" aria-label="Close">&times;</button>' +
           '</div>' +
         '</div>' +
-        '<h3 class="datehub-fulldate" title="' + escHtml(formatLong(dateStr)) + '">' + escHtml(fullDate) + '</h3>' +
+        '<div class="datehub-hero">' +
+          '<div class="datehub-daynum" aria-hidden="true">' + hubDate.getDate() + '</div>' +
+          '<div class="datehub-heroinfo">' +
+            '<h3 class="datehub-fulldate" title="' + escHtml(formatLong(dateStr)) + '" aria-label="' + escHtml(fullDate) + '"><span class="dh-wd">' + escHtml(hubWeekday) + '</span><span class="dh-my">' + escHtml(hubMonth) + ' ' + hubDate.getFullYear() + '</span></h3>' +
+            '<div class="datehub-chips">' +
+              '<span class="datehub-chip' + (dayDiff === 0 ? ' datehub-chip-today' : '') + '">' + relText + '</span>' +
+              '<span class="datehub-chip">Week ' + isoWeekOf(dateStr) + '</span>' +
+              (hub.itinerarySummary ? '<span class="datehub-chip datehub-itinerary-summary">' + escHtml(itinerarySummaryLabel(hub.itinerarySummary)) + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
         '<div id="datehub-options" class="datehub-options" hidden>' +
           '<label class="datehub-field-label" for="datehub-color">Background</label>' +
           '<input type="color" id="datehub-color" class="input" value="' + escHtml(hub.color || '#ffffff') + '">' +
@@ -955,25 +962,28 @@ const Calendar = (function () {
               '</div>'
             : '') +
         '</div>' +
-        (hub.itinerarySummary ? '<div class="datehub-itinerary-summary">' + escHtml(itinerarySummaryLabel(hub.itinerarySummary)) + '</div>' : '') +
-        '<section class="datehub-panel datehub-panel-events">' +
-          '<h4 class="datehub-panel-title">Events</h4>' +
-          '<div id="datehub-events-list"></div>' +
-        '</section>' +
-        '<section class="datehub-panel datehub-panel-tasks">' +
-          '<h4 class="datehub-panel-title">Tasks</h4>' +
-          '<div id="datehub-todo-list"></div>' +
-        '</section>' +
-        (typeof TargetsData !== 'undefined' ? renderTargetsSection(dateStr) : '') +
-        '<section class="datehub-panel datehub-panel-note">' +
-          '<h4 class="datehub-panel-title"><label for="datehub-note">Note</label></h4>' +
-          '<textarea id="datehub-note" class="input" rows="2" placeholder="A line about this day...">' + escHtml(hub.note || '') + '</textarea>' +
-        '</section>' +
-        '<div class="datehub-addbar">' +
+                '<div class="datehub-addbar">' +
           '<input type="text" id="datehub-event-input" class="input" maxlength="120" placeholder="Add to ' + escHtml(hubMonth + ' ' + hubDate.getDate()) + '\u2026" aria-label="Add an event on ' + escHtml(formatLong(dateStr)) + '">' +
           '<button type="button" id="datehub-event-add-btn" class="datehub-addbtn datehub-addbtn-event">+ Event</button>' +
           '<button type="button" id="datehub-goto-plan" class="datehub-addbtn datehub-addbtn-task">+ Task</button>' +
         '</div>' +
+        '<div class="datehub-grid">' +
+          '<section class="datehub-panel datehub-panel-events">' +
+            '<h4 class="datehub-panel-title">Events <span class="datehub-panel-hint">all day</span></h4>' +
+            '<div id="datehub-events-list"></div>' +
+          '</section>' +
+          '<div class="datehub-col">' +
+            '<section class="datehub-panel datehub-panel-tasks">' +
+              '<h4 class="datehub-panel-title">Tasks</h4>' +
+              '<div id="datehub-todo-list"></div>' +
+            '</section>' +
+            (typeof TargetsData !== 'undefined' ? renderTargetsSection(dateStr) : '') +
+          '</div>' +
+        '</div>' +
+        '<section class="datehub-panel datehub-panel-note">' +
+          '<h4 class="datehub-panel-title"><label for="datehub-note">Note</label></h4>' +
+          '<textarea id="datehub-note" class="input" rows="2" placeholder="A line about this day...">' + escHtml(hub.note || '') + '</textarea>' +
+        '</section>' +
         '<div class="datehub-footer">' +
           '<div class="datehub-quicknav">' +
             '<button id="datehub-goto-journal" class="btn btn-secondary">\uD83D\uDCD4 Journal</button>' +
