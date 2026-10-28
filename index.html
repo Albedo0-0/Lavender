@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Kalam:wght@300;400;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Pixelify+Sans:wght@400..700&family=VT323&display=swap">
 <link rel="stylesheet" href="style.css?v=8">
 <link rel="stylesheet" href="myworld.css">
+<link rel="stylesheet" href="gallery.css">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
@@ -66,7 +67,8 @@
   <div class="utility-drawer-divider"></div>
 <div class="utility-drawer-group" data-group="personal">
         <button id="notepad-icon" title="Notepad">&#128221;</button>
-    <button id="paintbrush-icon" title="Cosmetics">&#128396;</button>
+        <button id="paintbrush-icon" title="Cosmetics">&#128396;</button>
+    <button id="gallery-icon" title="Gallery">&#128444;</button>
   </div>
   <div class="utility-drawer-divider"></div>
   <div class="utility-drawer-group" data-group="system">
@@ -195,7 +197,8 @@
   <script src="ptpe-ui.js"></script>
   <script src="assistant-data.js"></script>
   <script src="assistant.js"></script>
-  <script src="notepad.js"></script>
+    <script src="notepad.js"></script>
+  <script src="gallery.js"></script>
   <script src="radio-data.js"></script>
   <script src="music-data.js"></script>
 <script src="player.js"></script>
@@ -242,7 +245,8 @@
     Study.init();
     StudyWallpaper.init();
     Progress.init();
-    Notepad.init();
+        Notepad.init();
+    Gallery.init();
     Player.init();
     UnrecordedStudy.init();
     Gamification.init();
