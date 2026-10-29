@@ -307,21 +307,212 @@ const Player = (function () {
     }, 1000);
   }
 
-  function chooserHtml() {
-        return '<div class="pixel-chooser">' +
-      '<div class="pixel-chooser-body">' +
-        '<div class="pixel-plate">Radio &amp; Music</div>' +
-        '<div class="pixel-chooser-keys">' +
-          '<button id="player-open-radio-btn" class="pixel-chooser-key"><span class="pixel-chooser-icon pixel-chooser-icon-radio" aria-hidden="true"></span>Radio</button>' +
-          '<button id="player-open-music-btn" class="pixel-chooser-key"><span class="pixel-chooser-icon pixel-chooser-icon-tape" aria-hidden="true"></span>Music Player</button>' +
-        '</div>' +
+    // ---- Chooser: calm cassette cards + "Morph Into Place" transition ----
+  const MORPH_MS = 560;
+  const MORPH_EASE = 'cubic-bezier(0.32, 0.72, 0.24, 1)';
+  let morphBusy = false;
+
+  function tapeHtml(id, mode, name, note) {
+    return '<button type="button" id="' + id + '" class="lav-tape lav-tape-' + mode + '" data-mode="' + mode + '">' +
+      '<span class="lav-tape-label"><span class="lav-tape-name">' + name + '</span><span class="lav-tape-note">' + note + '</span></span>' +
+      '<span class="lav-tape-deck" aria-hidden="true"><span class="lav-tape-reel"></span><span class="lav-tape-reel"></span></span>' +
+    '</button>';
+  }
+  function chooserHtml(noIntro) {
+    return '<div class="lav-chooser' + (noIntro ? ' lav-no-intro' : '') + '">' +
+      '<div class="lav-chooser-kicker"><span>listening room</span><i class="lav-chooser-rule" aria-hidden="true"></i></div>' +
+      '<div class="lav-chooser-title">Radio &amp; Music</div>' +
+      '<div class="lav-chooser-tapes">' +
+        tapeHtml('player-open-music-btn', 'music', 'Music Player', 'your playlist') +
+        tapeHtml('player-open-radio-btn', 'radio', 'Radio', 'live stations') +
       '</div>' +
     '</div>';
   }
-  function openChooser() {
-    Modal.open(chooserHtml());
-    document.getElementById('player-open-radio-btn').addEventListener('click', openRadioModal);
-    document.getElementById('player-open-music-btn').addEventListener('click', openMusicModal);
+
+  function canMorph() {
+    if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return false;
+    return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  // Transform that maps the `base` box onto the `target` box (origin = base's top-left).
+  function fitTransform(target, base) {
+    return 'translate(' + (target.left - base.left) + 'px,' + (target.top - base.top) + 'px) scale(' +
+      (target.width / (base.width || 1)) + ',' + (target.height / (base.height || 1)) + ')';
+  }
+  // Points the modal's closing animation at the pill trigger; falls back to the centre
+  // when the trigger is missing or off-screen.
+  function aimClose() {
+    const content = document.getElementById('modal-content');
+    if (!content) return;
+    const trig = document.getElementById('player-music-btn');
+    const r = trig ? trig.getBoundingClientRect() : null;
+    const visible = r && r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 &&
+      r.top < window.innerHeight && r.left < window.innerWidth;
+    if (!visible) { content.style.removeProperty('--lav-origin'); return; }
+    const c = content.getBoundingClientRect();
+    content.style.setProperty('--lav-origin', (r.left + r.width / 2 - c.left) + 'px ' + (r.top + r.height / 2 - c.top) + 'px');
+  }
+  function makeGhost(src, rect, extraClass) {
+    const g = document.createElement('div');
+    g.className = 'lav-ghost' + (extraClass ? ' ' + extraClass : '');
+    g.setAttribute('aria-hidden', 'true');
+    g.style.left = rect.left + 'px';
+    g.style.top = rect.top + 'px';
+    g.style.width = rect.width + 'px';
+    g.style.height = rect.height + 'px';
+    const c = src.cloneNode(true);
+    c.removeAttribute('id');
+    c.querySelectorAll('[id]').forEach(function (n) { n.removeAttribute('id'); });
+    g.appendChild(c);
+    document.body.appendChild(g);
+    return g;
+  }
+  function runMorph(anims, ghost, tidy) {
+    let done = false;
+    function end() {
+      if (done) return;
+      done = true;
+      anims.forEach(function (a) { try { a.cancel(); } catch (e) {} });
+      if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      if (tidy) tidy();
+      morphBusy = false;
+    }
+    Promise.all(anims.map(function (a) { return a.finished.catch(function () {}); })).then(end);
+    setTimeout(end, MORPH_MS + 400);
+  }
+
+  // Chooser -> Radio / Music Player: the card flows into the existing interface while the
+  // chosen button's label settles near the top as a small, faint title.
+  function morphToMode(btn, openFn, rootSel, bodySel) {
+    if (morphBusy) return;
+    const content = document.getElementById('modal-content');
+    const card = content && content.querySelector('.lav-chooser');
+    const nameEl = btn && btn.querySelector('.lav-tape-name');
+    if (!canMorph() || !card || !nameEl) { openFn(); return; }
+
+    const from = card.getBoundingClientRect();
+    const nameRect = nameEl.getBoundingClientRect();
+    const label = nameEl.textContent;
+    const mode = btn.getAttribute('data-mode');
+    const ghost = makeGhost(card, from, '');
+    const ghostCard = ghost.firstChild;
+    const anims = [];
+    const ghostName = ghostCard.querySelector('.lav-tape[data-mode="' + mode + '"] .lav-tape-name');
+    if (ghostName) ghostName.style.visibility = 'hidden';
+    const ghostOther = ghostCard.querySelector('.lav-tape:not([data-mode="' + mode + '"])');
+    if (ghostOther) anims.push(ghostOther.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease-out', fill: 'forwards' }));
+
+    morphBusy = true;
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.style.overflow = 'hidden';
+    function tidyOverlay() { if (overlay) overlay.style.overflow = ''; }
+    try { openFn(); } catch (err) {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      tidyOverlay();
+      morphBusy = false;
+      throw err;
+    }
+
+    const next = document.getElementById('modal-content');
+    const root = next && next.querySelector(rootSel);
+    const body = root && root.querySelector(bodySel);
+    if (!root || !body) {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      tidyOverlay();
+      morphBusy = false;
+      return;
+    }
+    root.classList.add('lav-morph-in');
+    aimClose();
+    const rootRect = root.getBoundingClientRect();
+    const to = body.getBoundingClientRect();
+    const title = document.createElement('span');
+    title.className = 'lav-mode-title';
+    title.setAttribute('aria-hidden', 'true');
+    title.textContent = label;
+    next.appendChild(title);
+    const tRect = title.getBoundingClientRect();
+    root.style.transformOrigin = (to.left - rootRect.left) + 'px ' + (to.top - rootRect.top) + 'px';
+
+    const opts = { duration: MORPH_MS, easing: MORPH_EASE };
+    anims.push(root.animate([
+      { transform: fitTransform(from, to), opacity: 0, offset: 0 },
+      { opacity: 0, offset: 0.3 },
+      { transform: 'none', opacity: 1, offset: 1 }
+    ], opts));
+    anims.push(ghost.animate([
+      { transform: 'none', opacity: 1, offset: 0 },
+      { opacity: 0, offset: 0.6 },
+      { transform: fitTransform(to, from), opacity: 0, offset: 1 }
+    ], { duration: MORPH_MS, easing: MORPH_EASE, fill: 'forwards' }));
+    anims.push(title.animate([
+      {
+        transform: 'translate(' + (nameRect.left - tRect.left) + 'px,' + (nameRect.top - tRect.top) + 'px) scale(' + (nameRect.width / (tRect.width || 1)) + ')',
+        opacity: 1, color: 'rgb(58, 50, 38)'
+      },
+      { transform: 'none', opacity: 0.62, color: 'rgb(250, 246, 238)' }
+    ], { duration: MORPH_MS + 80, easing: MORPH_EASE }));
+    runMorph(anims, ghost, function () { root.style.transformOrigin = ''; tidyOverlay(); });
+  }
+
+  // Radio / Music Player -> Chooser: the interface folds back into the selection card.
+  function backToChooser() {
+    if (morphBusy) return;
+    const content = document.getElementById('modal-content');
+    const root = content && content.querySelector('.radio-modal, .cassette-player');
+    const body = root && root.querySelector('.radio-body, .cassette-body');
+    if (!canMorph() || !root || !body) { openChooser(); return; }
+
+    const from = body.getBoundingClientRect();
+    const crect = content.getBoundingClientRect();
+    morphBusy = true;
+    const ghost = makeGhost(content, crect, 'lav-ghost-hang');
+    ghost.style.transformOrigin = (from.left - crect.left) + 'px ' + (from.top - crect.top) + 'px';
+    ghost.style.setProperty('--lav-cord', Math.max(0, crect.top) + 'px');
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) overlay.style.overflow = 'hidden';
+    function tidyOverlay() { if (overlay) overlay.style.overflow = ''; }
+    try { openChooser(true); } catch (err) {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      tidyOverlay();
+      morphBusy = false;
+      throw err;
+    }
+
+    const next = document.getElementById('modal-content');
+    const card = next && next.querySelector('.lav-chooser');
+    if (!card) {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      tidyOverlay();
+      morphBusy = false;
+      return;
+    }
+    const to = card.getBoundingClientRect();
+    card.style.transformOrigin = '0 0';
+    const opts = { duration: MORPH_MS, easing: MORPH_EASE };
+    const anims = [
+      card.animate([
+        { transform: fitTransform(from, to), opacity: 0, offset: 0 },
+        { opacity: 0, offset: 0.35 },
+        { transform: 'none', opacity: 1, offset: 1 }
+      ], opts),
+      ghost.animate([
+        { transform: 'none', opacity: 1, offset: 0 },
+        { opacity: 0, offset: 0.55 },
+        { transform: fitTransform(to, from), opacity: 0, offset: 1 }
+      ], { duration: MORPH_MS, easing: MORPH_EASE, fill: 'forwards' })
+    ];
+    runMorph(anims, ghost, function () { card.style.transformOrigin = ''; tidyOverlay(); });
+  }
+
+  function openChooser(noIntro) {
+    Modal.open(chooserHtml(noIntro === true));
+    document.getElementById('player-open-radio-btn').addEventListener('click', function (e) {
+      morphToMode(e.currentTarget, openRadioModal, '.radio-modal', '.radio-body');
+    });
+    document.getElementById('player-open-music-btn').addEventListener('click', function (e) {
+      morphToMode(e.currentTarget, openMusicModal, '.cassette-player', '.cassette-body');
+    });
+    aimClose();
   }
 
   function radioHtml() {
@@ -402,8 +593,8 @@ const Player = (function () {
     document.getElementById('radio-play-btn').addEventListener('click', function () {
       if (currentStationId) playStation(currentStationId);
     });
-    document.getElementById('radio-pause-btn').addEventListener('click', pauseRadio);
-    document.getElementById('player-back-btn').addEventListener('click', openChooser);
+        document.getElementById('radio-pause-btn').addEventListener('click', pauseRadio);
+    document.getElementById('player-back-btn').addEventListener('click', backToChooser);
   }
 
   function musicHtml() {
@@ -450,8 +641,8 @@ const Player = (function () {
     document.getElementById('music-next-btn').addEventListener('click', next);
     document.getElementById('music-playpause-btn').addEventListener('click', togglePlayPause);
     document.getElementById('music-shuffle-btn').addEventListener('click', function () { toggleShuffle(); updateMusicToggleUi(); });
-    document.getElementById('music-autoplay-btn').addEventListener('click', function () { autoplayOn = !autoplayOn; updateMusicToggleUi(); });
-    document.getElementById('music-playlist-btn').addEventListener('click', openPlaylistModal);
+        document.getElementById('music-playlist-btn').addEventListener('click', openPlaylistModal);
+    document.getElementById('player-back-btn').addEventListener('click', backToChooser);
     document.getElementById('player-back-btn').addEventListener('click', openChooser);
     document.getElementById('music-seek-bar').addEventListener('change', function (e) { seekMusic(Number(e.target.value)); });
     updateProgressUi();
