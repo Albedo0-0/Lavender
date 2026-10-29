@@ -143,11 +143,12 @@ self.addEventListener('fetch', function (e) {
   e.respondWith(
     caches.match(e.request).then(function (cached) {
       // Stale-while-revalidate: serve cache immediately, refresh in background
-      var networkFetch = fetch(e.request).then(function (response) {
+            var networkFetch = fetch(e.request).then(function (response) {
         if (response && response.status === 200 && response.type !== 'opaque') {
+          var copy = response.clone();
           caches.open(CACHE_VERSION).then(function (cache) {
-            cache.put(e.request, response.clone());
-          });
+            cache.put(e.request, copy);
+          }).catch(function () {});
         }
         return response;
       }).catch(function () { return null; });
