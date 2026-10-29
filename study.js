@@ -609,28 +609,32 @@ function renderClock() {
     mount.style.setProperty('--candle-dy', Math.round(sr.bottom - GAP - by) + 'px');
   }
 
-  // ---- Manual workspace fullscreen: the whole #study-layout expands; nothing is re-rendered ----
+    // ---- Manual fullscreen: ONLY #study-clock-box morphs. #study-layout, the Study Log, the Empty Box and the
+  // Tools Box (and the candle's slot inside it) never move, so nothing else is re-rendered or re-laid-out. ----
   let studyFsBusy = false;
-    let studyFsHome = null; // the window's own rect (viewport coords) when fullscreen was entered
   function studyFsViewport() {
     return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight, r: 0 };
   }
-  // Morphs the SAME #study-layout element (Clock Box, Study Log, Empty Box and Tools Box all live inside it) between two rects.
-  // The candle is re-anchored to its Tools Box slot every frame so it rides along with the morph.
-  function studyFsMorph(layout, from, to, done) {
-    if (!layout.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+  // The Clock Box's own grid-cell rect (viewport coords), measured fresh so a resize or scroll while in
+  // fullscreen cannot leave a stale target. While fullscreen the box is fixed, so the fullscreen class is
+  // lifted for one synchronous read and put straight back (no paint happens in between).
+  function studyFsHomeRect(screen, box) {
+    const wasOn = screen.classList.contains('study-fs-on');
+    if (wasOn) screen.classList.remove('study-fs-on');
+    const r = box.getBoundingClientRect();
+    if (wasOn) screen.classList.add('study-fs-on');
+    return { top: r.top, left: r.left, width: r.width, height: r.height, r: 22 };
+  }
+  // Morphs the SAME #study-clock-box element between two viewport rects. Its wallpaper, blur panel, nav buttons,
+  // fullscreen toggle and alarm icon are children of the box, so they stay clipped to it and scale with it.
+  // The candle is anchored to the (unmoving) Tools Box slot, so it is only re-synced once, when the morph ends.
+  function studyFsMorph(box, from, to, done) {
+    if (!box.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
     function frame(r) {
       return { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px', borderRadius: r.r + 'px' };
     }
-    const a = layout.animate([frame(from), frame(to)], { duration: 560, easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)', fill: 'forwards' });
-    let raf = 0;
-    (function follow() {
-      syncCandleSlot();
-      window.dispatchEvent(new Event('lavender-candle-recenter'));
-      raf = requestAnimationFrame(follow);
-    })();
+    const a = box.animate([frame(from), frame(to)], { duration: 560, easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)', fill: 'forwards' });
     a.onfinish = function () {
-      cancelAnimationFrame(raf);
       a.cancel(); // release the forwards-fill first, so the reads in done() see the real CSS geometry
       done();
       window.dispatchEvent(new Event('lavender-candle-recenter'));
@@ -643,23 +647,19 @@ function renderClock() {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.title = on ? 'Exit fullscreen' : 'Enter fullscreen';
   }
-  function enterStudyFs() {
+    function enterStudyFs() {
     const screen = document.getElementById('screen-study');
-    const layout = document.getElementById('study-layout');
-    if (!screen || !layout) return;
+    const box = document.getElementById('study-clock-box');
+    if (!screen || !box) return;
     studyFsBusy = true;
-        const fr = layout.getBoundingClientRect();
-    const first = { top: fr.top, left: fr.left, width: fr.width, height: fr.height, r: 22 };
-    studyFsHome = first;
-    const scs = getComputedStyle(screen);
-    const spad = scs.boxSizing === 'border-box' ? (parseFloat(scs.paddingTop) + parseFloat(scs.paddingBottom)) : 0;
-    screen.style.minHeight = (first.height + spad) + 'px'; // keeps the page from collapsing while the window is fixed
+    const br = box.getBoundingClientRect();
+    const first = { top: br.top, left: br.left, width: br.width, height: br.height, r: 22 };
     document.body.classList.add('study-fs-busy');
     screen.classList.add('study-fs-on');
     document.body.classList.add('study-fs-on');
     setStudyFsBtn(true);
     syncCandleSlot();
-        studyFsMorph(layout, first, studyFsViewport(), function () {
+    studyFsMorph(box, first, studyFsViewport(), function () {
       studyFsBusy = false;
       document.body.classList.remove('study-fs-busy');
       syncCandleSlot();
@@ -668,14 +668,13 @@ function renderClock() {
   }
   function leaveStudyFs(skipApi) {
     const screen = document.getElementById('screen-study');
-    const layout = document.getElementById('study-layout');
-    if (!screen || !layout) return;
+    const box = document.getElementById('study-clock-box');
+    if (!screen || !box) return;
     studyFsBusy = true;
     document.body.classList.add('study-fs-busy');
     function finish() {
       screen.classList.remove('study-fs-on');
       document.body.classList.remove('study-fs-on');
-      screen.style.minHeight = '';
       setStudyFsBtn(false);
       syncCandleSlot();
       requestAnimationFrame(function () {
@@ -683,10 +682,8 @@ function renderClock() {
         studyFsBusy = false;
       });
     }
-        function run() {
-      const b = screen.getBoundingClientRect();
-      const home = studyFsHome || { top: b.top, left: b.left, width: b.width, height: b.height, r: 22 };
-      studyFsMorph(layout, studyFsViewport(), home, finish);
+    function run() {
+      studyFsMorph(box, studyFsViewport(), studyFsHomeRect(screen, box), finish);
     }
     if (!skipApi && isBrowserFullscreen()) {
       exitBrowserFullscreen().catch(function () {}).then(function () {
