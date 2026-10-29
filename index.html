@@ -127,20 +127,29 @@
       </div>
     </section>
     <section id="screen-study" class="screen">
-      <div id="study-layout">
+            <div id="study-layout" class="study-ws">
              <div id="study-wallpaper-layer"></div>
         <video id="study-wallpaper-video" muted loop playsinline autoplay></video>
         <label id="study-autofs-toggle-row"><input type="checkbox" id="study-autofs-toggle"> Auto fullscreen</label>
-        <button id="study-wallpaper-prev" class="study-wallpaper-nav" title="Previous wallpaper">&#8592;</button>
-        <button id="study-wallpaper-next" class="study-wallpaper-nav" title="Next wallpaper">&#8594;</button>
+                <button id="study-wallpaper-prev" class="study-wallpaper-nav" title="Previous wallpaper" aria-label="Previous wallpaper"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg></button>
+        <button id="study-wallpaper-next" class="study-wallpaper-nav" title="Next wallpaper" aria-label="Next wallpaper"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button>
+        <button id="study-fs-btn" type="button" title="Enter fullscreen" aria-label="Toggle fullscreen" aria-pressed="false">
+          <svg class="ico-enter" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          <svg class="ico-exit" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+        </button>
         <div id="study-header">
           <h3>Study</h3>
         </div>
         <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
-        <div id="study-clock-panel"></div>
-        <div id="study-session-panel"></div>
-        <div id="study-cutoff-view" style="display:none"></div>
-        <div id="study-log-panel"></div>
+                <div id="study-main">
+          <div id="study-clock-panel"></div>
+          <div id="study-session-panel"></div>
+          <div id="study-cutoff-view" style="display:none"></div>
+        </div>
+        <aside id="study-side">
+          <div id="study-log-panel"></div>
+          <div id="study-dock"></div>
+        </aside>
       </div>
     </section>
     <section id="screen-progress" class="screen"></section>
@@ -279,7 +288,8 @@
       const studyScreen = document.getElementById('screen-study');
       if (studyScreen && typeof CandleLamp !== 'undefined') {
         studyScreen.style.position = studyScreen.style.position || 'relative';
-        CandleLamp.mount(studyScreen);
+                CandleLamp.mount(studyScreen);
+        if (typeof Study !== 'undefined' && Study.syncCandleSlot) Study.syncCandleSlot();
       }
       // Paper Pocket lives inside the sidebar (docked at its foot) so it shares the sidebar's layout, collapse and stacking context.
       const mainNav = document.getElementById('main-nav');
