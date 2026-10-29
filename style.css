@@ -10556,8 +10556,9 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 /* ---- Fullscreen: ONLY the Clock Box is fixed to the viewport, edge to edge (the morph is animated from study.js).
    The layout and the other three boxes keep their grid cells and never move. ---- */
 #screen-study.study-fs-on #study-layout.study-ws > #study-clock-box {
-  position: fixed; inset: 0; width: auto; height: auto; margin: 0; z-index: 9000;
-  border: 0; border-radius: 0; box-shadow: none;
+    position: fixed; inset: 0; width: auto; height: auto; min-width: 0; min-height: 0;
+  max-width: none; max-height: none; margin: 0; z-index: 9000;
+  border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
   padding:
     max(clamp(14px, 2vw, 28px), env(safe-area-inset-top, 0px))
     max(clamp(14px, 2vw, 28px), env(safe-area-inset-right, 0px))
