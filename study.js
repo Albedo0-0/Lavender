@@ -619,14 +619,35 @@ function renderClock() {
     const r = box.getBoundingClientRect();
     return { top: r.top, left: r.left, width: r.width, height: r.height, r: 0 };
   }
+    // Top-layer promotion: while fullscreen, the Clock Box is shown as a manual popover. Top-layer elements
+  // ignore every ancestor's stacking context, overflow, transform and containment, and are positioned against
+  // the real viewport — so nothing of the Study layout / header / nav can sit above or around it.
+  function studyFsTopLayerOn(box) {
+    if (typeof box.showPopover !== 'function') return;
+    if (!box.hasAttribute('popover')) box.setAttribute('popover', 'manual');
+    try { if (!box.matches(':popover-open')) box.showPopover(); } catch (e) {}
+  }
+  function studyFsTopLayerOff(box) {
+    if (box.hasAttribute('popover')) {
+      try { if (box.matches(':popover-open')) box.hidePopover(); } catch (e) {}
+      box.removeAttribute('popover');
+    }
+  }
   // The Clock Box's own grid-cell rect (viewport coords), measured fresh so a resize or scroll while in
-  // fullscreen cannot leave a stale target. While fullscreen the box is fixed, so the fullscreen class is
-  // lifted for one synchronous read and put straight back (no paint happens in between).
+  // fullscreen cannot leave a stale target. While fullscreen the box is fixed in the top layer, so the
+  // fullscreen class and the popover are lifted for one synchronous read and put straight back
+  // (no paint happens in between).
   function studyFsHomeRect(screen, box) {
     const wasOn = screen.classList.contains('study-fs-on');
-    if (wasOn) screen.classList.remove('study-fs-on');
+    if (wasOn) {
+      screen.classList.remove('study-fs-on');
+      studyFsTopLayerOff(box);
+    }
     const r = box.getBoundingClientRect();
-    if (wasOn) screen.classList.add('study-fs-on');
+    if (wasOn) {
+      studyFsTopLayerOn(box);
+      screen.classList.add('study-fs-on');
+    }
     return { top: r.top, left: r.left, width: r.width, height: r.height, r: 22 };
   }
   // Morphs the SAME #study-clock-box element between two viewport rects. Its wallpaper, blur panel, nav buttons,
@@ -659,7 +680,8 @@ function renderClock() {
     const br = box.getBoundingClientRect();
     const first = { top: br.top, left: br.left, width: br.width, height: br.height, r: 22 };
     document.body.classList.add('study-fs-busy');
-    screen.classList.add('study-fs-on');
+        screen.classList.add('study-fs-on');
+    studyFsTopLayerOn(box);
     document.body.classList.add('study-fs-on');
     setStudyFsBtn(true);
     syncCandleSlot();
@@ -676,7 +698,8 @@ function renderClock() {
     if (!screen || !box) return;
     studyFsBusy = true;
     document.body.classList.add('study-fs-busy');
-    function finish() {
+        function finish() {
+      studyFsTopLayerOff(box);
       screen.classList.remove('study-fs-on');
       document.body.classList.remove('study-fs-on');
       setStudyFsBtn(false);
