@@ -913,7 +913,7 @@ function renderClock() {
     if (screen && screen.classList.contains('study-fs-on')) leaveStudyFs(false); else enterStudyFs();
   }
 
-  function     initStudyWorkspace();
+    function initStudyWorkspace() {
     if (typeof CanonicalTaskStore !== 'undefined' && CanonicalTaskStore.subscribe) {
       let pbTimer = null;
       CanonicalTaskStore.subscribe(function () {
