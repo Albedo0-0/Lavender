@@ -137,7 +137,7 @@
             <svg class="ico-enter" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
             <svg class="ico-exit" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
           </button>
-          <button id="study-alarm-icon" title="Today's alarms" aria-label="Today's alarms">&#9200;</button>
+          
           <div id="study-clock-panel"></div>
           <div id="study-cutoff-view" style="display:none"></div>
         </div>
@@ -220,12 +220,12 @@
   <script src="misc-cosmetics.js"></script>
   <script src="assistant-lvpacks-data.js"></script>
   <script src="misc-sound.js"></script>
-  <script src="pressed-paper.js"></script>
+  
   
   <script src="paper-pocket.js"></script>
   
-  <script src="rain-ambience.js"></script>
-  <script src="sunlight-ambience.js"></script>
+  
+
   <script src="wish-butterfly.js"></script>
   <script src="firefly.js"></script>
 <script src="ladybug.js"></script>
@@ -262,12 +262,12 @@
       if (typeof MiscSound !== 'undefined') MiscSound.bindGlobalUI();
       const ambientLayer = document.getElementById('misc-ambient-layer');
       if (typeof CustomCursor !== 'undefined') CustomCursor.init();
-      if (typeof PressedPaper !== 'undefined') PressedPaper.autoInit();
+      
       
       if (ambientLayer) {
         if (typeof Firefly !== 'undefined') Firefly.mount(ambientLayer, { count: 6 });
         if (typeof Ladybug !== 'undefined') Ladybug.mount(ambientLayer);
-        if (typeof MiscWeather !== 'undefined') MiscWeather.mount(ambientLayer);
+        
       }
             const objectsLayer = document.getElementById('misc-objects-layer');
       let wishButterflyMounted = false;
