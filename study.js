@@ -98,6 +98,15 @@ const Study = (function () {
     renderClockPanel();
   }
 
+    function stopClockForPlanTask(taskKey) {
+    const c = getClock();
+    if (!c.planTaskId || !isClockActive(c)) return;
+    const loaded = String(c.planTaskId);
+    const key = String(taskKey);
+    if (loaded !== key && loaded !== 'legacy_' + key) return;
+    saveClockAndReset();
+  }
+
   function reschedulePlanTask(t, date, start, stop) {
     const key = String(t.id).indexOf('legacy_') === 0 ? String(t.id).slice(7) : null;
     if (key && typeof PlanData !== 'undefined' && PlanData.getTask(key)) {
@@ -1544,5 +1553,5 @@ function openBreakTimelinePanel() {
     renderBreakTakeover();
     renderStudyLog();
   }
-    return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive, syncCandleSlot: syncCandleSlot };
+        return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive, syncCandleSlot: syncCandleSlot, stopClockForPlanTask: stopClockForPlanTask };
 })();
