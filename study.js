@@ -78,10 +78,7 @@ const Study = (function () {
 
   function startClock(mode, timerTotalMs) {
     setClock({ mode: mode, running: true, startedAt: Date.now(), timerTotalMs: timerTotalMs || 0, elapsedMs: 0, awaitingDecision: false });
-    const _s = State.get().settings || {};
-    if (_s.studyAutoFullscreen && !isBrowserFullscreen() && !_s.userExitedFullscreen) {
-      requestBrowserFullscreen().catch(function () {});
-    }
+        // Fullscreen is manual only (#study-fs-btn) — starting a clock never changes the layout.
     renderClockPanel();
   }
   function startStopwatch() { startClock('stopwatch', 0); }
@@ -148,12 +145,12 @@ const Study = (function () {
   function applyClockFocusUI(active) {
     const sessionPanel = document.getElementById('study-session-panel');
     const clockPanel = document.getElementById('study-clock-panel');
-    if (sessionPanel) sessionPanel.style.display = active ? 'none' : 'block';
-    if (clockPanel) clockPanel.classList.toggle('study-clock-focus', !!active);
+        if (sessionPanel) sessionPanel.style.display = 'block';
+    if (clockPanel) clockPanel.classList.remove('study-clock-focus');
         const layout = document.getElementById('study-layout');
     if (layout) {
       const _ss = TimeEngine.getActiveSession();
-      layout.classList.toggle('study-wallpaper-fullscreen', !!active || !!_ss);
+            layout.classList.toggle('study-wallpaper-fullscreen', !!_ss);
       layout.dataset.studyState = _ss ? (_ss.state === 'paused' ? 'paused' : 'running') : (active ? (getClock().running ? 'running' : 'paused') : 'idle');
     }
     applyChromeVisibility();
@@ -166,7 +163,7 @@ const Study = (function () {
   // whenever EITHER a planner session OR the manual Stopwatch/Timer is active, computed fresh
   // every time so the two flows can never fight each other and cause a flicker.
   function applyChromeVisibility() {
-    const active = !!TimeEngine.getActiveSession() || isClockActive(getClock());
+        const active = !!TimeEngine.getActiveSession();
     const alarmIcon = document.getElementById('study-alarm-icon');
     const linksIcon = document.getElementById('study-links-icon');
     const breakBtn = document.getElementById('global-break-btn');
@@ -212,11 +209,20 @@ function renderClock() {
       renderClockPanel();
       return;
     }
-    const display = document.getElementById('study-clock-display');
-    if (display) display.textContent = fmtDuration(currentClockMs());
+        const act = isClockActive(fresh);
+    const ms = displayClockMs(fresh, act);
+    setPixelClock(fmtDuration(ms));
+    updateClockProgress(fresh, ms, act);
+    const cap = document.getElementById('study-clock-caption');
+    const capText = clockCaption(fresh, act);
+    if (cap && cap.textContent !== capText) cap.textContent = capText;
     const toggleBtn = document.getElementById('study-clock-toggle');
-    if (toggleBtn) toggleBtn.textContent = fresh.running ? 'Pause' : 'Resume';
-    applyClockFocusUI(isClockActive(fresh));
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('is-running', !!fresh.running);
+      const lbl = document.getElementById('study-clock-toggle-label');
+      if (lbl) lbl.textContent = fresh.running ? 'Pause' : 'Resume';
+    }
+    applyClockFocusUI(act);
     renderStudyLog();
   }
   // ---------- temporary chronological study log (bottom-left, Study tab only) ----------
@@ -230,17 +236,470 @@ function renderClock() {
     return entry.label + ' - ' + totalMin + 'min';
   }
 
+    function fmtLogDur(e) {
+    const t = Math.round(e.ms / 60000);
+    if (e.kind === 'hr') {
+      const h = Math.floor(t / 60), m = t % 60;
+      return m > 0 ? (h + 'hr ' + m + 'min') : (h + 'hr');
+    }
+    return t + 'min';
+  }
+
   function renderStudyLog() {
     const panel = document.getElementById('study-log-panel');
     if (!panel) return;
     const entries = TimeEngine.getLogForDate(todayStr());
-    if (!entries.length) { panel.innerHTML = '<strong>Today\'s study log</strong><div>Nothing recorded yet.</div>'; return; }
-    panel.innerHTML = '<strong>Today\'s study log</strong>' +
-      entries.map(function (e) { return '<div>' + fmtLogEntry(e) + '</div>'; }).join('');
+    const total = entries.reduce(function (a, e) { return a + (e.ms || 0); }, 0);
+    const head = '<div class="sp-log-head"><span>Today\u2019s study log</span>' +
+      (entries.length ? '<span class="sp-log-total">' + fmtLogDur({ ms: total, kind: 'hr' }) + '</span>' : '') + '</div>';
+    const html = !entries.length
+      ? head + '<div class="sp-log-empty">Nothing recorded yet.</div>'
+      : head + '<div class="sp-log-list">' + entries.map(function (e) {
+          return '<div class="sp-log-row"><span class="sp-log-label">' + e.label + '</span><span class="sp-log-dur">' + fmtLogDur(e) + '</span></div>';
+        }).join('') + '</div>';
+    if (panel._spHtml === html) return; // renderClock calls this every tick — only touch the DOM when it changed
+    panel._spHtml = html;
+    panel.innerHTML = html;
   }
 
   
+    // ---------- Study workspace UI (Phase 6 · Part 1) — presentation only; timing/state untouched ----------
+  let pendingTimerMin = 25;   // configured (not yet started) timer length, in minutes
+  let pendingPreset = null;   // null | 'pomodoro' — which preset the configured length came from
+  let pxFill = -1;
+
+  function spIco(path, cls) {
+    return '<svg class="sp-ico' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+  }
+  const SP_ICONS = {
+    timer: spIco('<path d="M7 3h10M7 21h10M8 3v3.5c0 1.6 1.2 2.6 4 5.5-2.8 2.9-4 3.9-4 5.5V21M16 3v3.5c0 1.6-1.2 2.6-4 5.5 2.8 2.9 4 3.9 4 5.5V21"/>'),
+    pomodoro: spIco('<path d="M12 7.5c-4.6 0-7.5 2.8-7.5 6.6 0 3.6 3 6.4 7.5 6.4s7.5-2.8 7.5-6.4c0-3.8-2.9-6.6-7.5-6.6z"/><path d="M9 6.2c1 .3 2 .9 3 1.3 1-.4 2-1 3-1.3M12 7.5V4.5"/>'),
+    stopwatch: spIco('<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V9.5M10 3h4M18.2 6.8l1.3-1.3"/>'),
+    templates: spIco('<rect x="4" y="4" width="16" height="4.5" rx="1.2"/><rect x="4" y="10.5" width="16" height="4.5" rx="1.2"/><path d="M4 18.5h10"/>'),
+    duration: spIco('<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>'),
+    play: spIco('<path d="M8.5 5.5v13l10-6.5z" fill="currentColor" stroke="none"/>', 'sp-ico-play'),
+    pause: spIco('<path d="M8 6v12M16 6v12" stroke-width="2.4"/>', 'sp-ico-pause'),
+    check: spIco('<path d="M5 12.5l4.5 4.5L19 7.5"/>')
+  };
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });
+  }
+  function fmtPendingMin(m) {
+    const h = Math.floor(m / 60), r = m % 60;
+    return h ? (h + ' h' + (r ? ' ' + r + ' min' : '')) : (r + ' min');
+  }
+
+  // 5x7 pixel glyphs (colon is 3 wide). Unlit cells are drawn as faint "ghost" pixels.
+  const SPX_GLYPHS = {
+    '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+    '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+    '2': ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+    '3': ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+    '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+    '5': ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+    '6': ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+    '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+    '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+    '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+    ':': ['000', '000', '010', '000', '010', '000', '000']
+  };
+  function spxSvg(ch) {
+    const g = SPX_GLYPHS[ch];
+    if (!g) return '';
+    const w = g[0].length;
+    let r = '';
+    for (let y = 0; y < 7; y++) {
+      for (let x = 0; x < w; x++) {
+        r += '<rect x="' + (x + 0.07) + '" y="' + (y + 0.07) + '" width="0.86" height="0.86" rx="0.14"' + (g[y].charAt(x) === '1' ? ' class="on"' : '') + '/>';
+      }
+    }
+    return '<svg viewBox="0 0 ' + w + ' 7" shape-rendering="crispEdges" aria-hidden="true">' + r + '</svg>';
+  }
+
+  // Builds the digit row only when its shape changes (e.g. 59:59 -> 1:00:00); otherwise only changed digits are swapped.
+  function setPixelClock(str) {
+    const root = document.getElementById('study-clock-display');
+    if (!root) return;
+    const shape = str.replace(/\d/g, '9');
+    if (root.dataset.shape !== shape) {
+      root.dataset.shape = shape;
+      root.dataset.long = shape.length > 5 ? '1' : '';
+      root.innerHTML = str.split('').map(function (ch) {
+        return '<span class="' + (ch === ':' ? 'px-c' : 'px-d') + '" data-ch="' + ch + '">' + spxSvg(ch) + '</span>';
+      }).join('');
+      root.setAttribute('aria-label', str);
+      return;
+    }
+    const kids = root.children;
+    for (let i = 0; i < kids.length; i++) {
+      const ch = str.charAt(i);
+      if (kids[i].dataset.ch === ch) continue;
+      kids[i].dataset.ch = ch;
+      kids[i].innerHTML = spxSvg(ch);
+      kids[i].classList.remove('px-swap');
+      void kids[i].offsetWidth;
+      kids[i].classList.add('px-swap');
+    }
+    root.setAttribute('aria-label', str);
+  }
+
+  // Timer: a 60-cell bar that drains toward the left. Stopwatch: a seconds track that fills toward the right.
+  function updateClockProgress(c, ms, active) {
+    const bar = document.getElementById('study-clock-progress');
+    if (!bar) return;
+    let fill;
+    if (c.mode === 'timer') {
+      const tot = active ? TimeEngine.safeMs(c.timerTotalMs) : 0;
+      fill = active ? (tot > 0 ? Math.min(60, Math.ceil(60 * ms / tot)) : 0) : 60;
+    } else {
+      fill = active ? Math.floor((ms / 1000) % 60) + 1 : 0;
+    }
+    bar.dataset.kind = c.mode;
+    bar.classList.toggle('is-idle', !active);
+    bar.classList.toggle('is-paused', active && !c.running);
+    const cells = bar.children;
+    for (let i = 0; i < cells.length; i++) {
+      const on = i < fill;
+      const edge = active && i === fill - 1;
+      if (cells[i].classList.contains('on') !== on) cells[i].classList.toggle('on', on);
+      if (cells[i].classList.contains('edge') !== edge) cells[i].classList.toggle('edge', edge);
+    }
+    pxFill = fill;
+  }
+
+  function displayClockMs(c, active) {
+    return (c.mode === 'timer' && !active) ? pendingTimerMin * 60000 : currentClockMs();
+  }
+  function clockCaption(c, active) {
+    const name = c.mode === 'stopwatch' ? 'Stopwatch' : (pendingPreset === 'pomodoro' ? 'Pomodoro' : 'Timer');
+    return name + ' \u00B7 ' + (active ? (c.running ? 'Running' : 'Paused') : 'Ready');
+  }
+
+  function applyPomodoroPreset() {
+    const list = (typeof StudyTemplatesData !== 'undefined') ? StudyTemplatesData.getAllTemplates() : [];
+    const p = list.find(function (t) { return t.isPomodoroDefault; });
+    pendingTimerMin = (p && p.workMin) || 25;
+    pendingPreset = 'pomodoro';
+    setClock({ mode: 'timer', timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+  }
+
+  // Custom duration picker (replaces any native time input).
+  function openDurationPicker() {
+    let h = Math.floor(pendingTimerMin / 60), m = pendingTimerMin % 60;
+    function opts(n, padIt) {
+      let s = '';
+      for (let i = 0; i < n; i++) s += '<button type="button" class="sp-opt" data-v="' + i + '">' + (padIt ? pad(i) : i) + '</button>';
+      return s;
+    }
+    Modal.open(
+      '<div class="sp-modal">' +
+        '<h3 class="sp-title">Set duration</h3>' +
+        '<div class="sp-picker">' +
+          '<div class="sp-col-wrap"><span class="sp-col-label">Hours</span><div class="sp-col" data-col="h">' + opts(13, false) + '</div></div>' +
+          '<span class="sp-sep">:</span>' +
+          '<div class="sp-col-wrap"><span class="sp-col-label">Minutes</span><div class="sp-col" data-col="m">' + opts(60, true) + '</div></div>' +
+        '</div>' +
+        '<div class="sp-presets">' + [5, 10, 15, 25, 45, 60, 90].map(function (p) {
+          return '<button type="button" class="sp-chip sp-preset" data-min="' + p + '">' + fmtPendingMin(p) + '</button>';
+        }).join('') + '</div>' +
+        '<div class="sp-modal-actions"><button type="button" id="sp-dur-cancel" class="sp-btn">Cancel</button><button type="button" id="sp-dur-ok" class="sp-btn sp-primary">Set time</button></div>' +
+      '</div>'
+    );
+    const root = document.querySelector('.sp-modal');
+    if (!root) return;
+    const cols = { h: root.querySelector('[data-col="h"]'), m: root.querySelector('[data-col="m"]') };
+    const ok = document.getElementById('sp-dur-ok');
+    function paint(smooth) {
+      [['h', h], ['m', m]].forEach(function (p) {
+        const col = cols[p[0]];
+        col.querySelectorAll('.sp-opt').forEach(function (b) { b.classList.toggle('is-on', +b.dataset.v === p[1]); });
+        const on = col.querySelector('.is-on');
+        if (on) col.scrollTo({ top: on.offsetTop - (col.clientHeight - on.offsetHeight) / 2, behavior: smooth ? 'smooth' : 'auto' });
+      });
+      ok.disabled = (h * 60 + m) < 1;
+    }
+    ['h', 'm'].forEach(function (k) {
+      cols[k].addEventListener('click', function (e) {
+        const b = e.target.closest('.sp-opt');
+        if (!b) return;
+        if (k === 'h') h = +b.dataset.v; else m = +b.dataset.v;
+        paint(true);
+      });
+    });
+    root.querySelectorAll('.sp-preset').forEach(function (b) {
+      b.addEventListener('click', function () { const p = +b.dataset.min; h = Math.floor(p / 60); m = p % 60; paint(true); });
+    });
+    document.getElementById('sp-dur-cancel').addEventListener('click', function () { Modal.close(); });
+    ok.addEventListener('click', function () {
+      if (h * 60 + m < 1) return;
+      pendingTimerMin = h * 60 + m;
+      pendingPreset = null;
+      Modal.close();
+      renderClockPanel();
+    });
+    paint(false);
+  }
+
+  // Template picker — selecting configures the clock only; Start is always explicit.
+  function openTemplatesModal() {
+    const list = (typeof StudyTemplatesData !== 'undefined') ? StudyTemplatesData.getAllTemplates() : [];
+    Modal.open(
+      '<div class="sp-modal">' +
+        '<h3 class="sp-title">Templates</h3>' +
+        '<div class="sp-tpl-list">' + (list.map(function (t) {
+          return '<div class="sp-tpl" role="button" tabindex="0" data-template-id="' + escHtml(t.templateId) + '">' +
+            '<span class="sp-tpl-name">' + escHtml(t.name) + '</span>' +
+            '<span class="sp-tpl-meta">' + fmtPendingMin(t.workMin || 25) + '</span>' +
+            (t.isPomodoroDefault ? '' : '<button type="button" class="sp-tpl-del" aria-label="Delete template" data-template-id="' + escHtml(t.templateId) + '">&times;</button>') +
+          '</div>';
+        }).join('') || '<p class="sp-empty">No templates yet.</p>') + '</div>' +
+        '<div id="sp-tpl-form" class="sp-tpl-form" hidden>' +
+          '<input type="text" id="sp-tpl-name" placeholder="Template name" maxlength="40">' +
+          '<input type="number" id="sp-tpl-work" min="1" placeholder="Work min">' +
+          '<input type="number" id="sp-tpl-break" min="0" placeholder="Break min">' +
+          '<input type="number" id="sp-tpl-cycles" min="1" placeholder="Cycles">' +
+        '</div>' +
+        '<div class="sp-modal-actions"><button type="button" id="sp-tpl-new" class="sp-btn">New template</button><button type="button" id="sp-tpl-close" class="sp-btn">Close</button></div>' +
+      '</div>'
+    );
+    const root = document.querySelector('.sp-modal');
+    if (!root) return;
+    root.querySelectorAll('.sp-tpl').forEach(function (row) {
+      function choose() {
+        const tpl = StudyTemplatesData.getTemplate(row.dataset.templateId);
+        if (!tpl || isClockActive(getClock())) { Modal.close(); return; }
+        setClock({ mode: 'timer', timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+        pendingTimerMin = tpl.workMin || 25;
+        pendingPreset = tpl.isPomodoroDefault ? 'pomodoro' : null;
+        Modal.close();
+        renderClockPanel();
+      }
+      row.addEventListener('click', function (e) { if (!e.target.closest('.sp-tpl-del')) choose(); });
+      row.addEventListener('keydown', function (e) { if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); choose(); } });
+    });
+    root.querySelectorAll('.sp-tpl-del').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        StudyTemplatesData.deleteTemplate(btn.dataset.templateId);
+        renderClockPanel();
+        openTemplatesModal();
+      });
+    });
+    document.getElementById('sp-tpl-close').addEventListener('click', function () { Modal.close(); });
+    const form = document.getElementById('sp-tpl-form');
+    const newBtn = document.getElementById('sp-tpl-new');
+    newBtn.addEventListener('click', function () {
+      if (form.hidden) {
+        form.hidden = false;
+        newBtn.textContent = 'Save template';
+        newBtn.classList.add('sp-primary');
+        document.getElementById('sp-tpl-name').focus();
+        return;
+      }
+      const name = document.getElementById('sp-tpl-name').value.trim();
+      if (!name) { document.getElementById('sp-tpl-name').focus(); return; }
+      const workMin = parseInt(document.getElementById('sp-tpl-work').value, 10) || 25;
+      const breakMin = parseInt(document.getElementById('sp-tpl-break').value, 10) || 0;
+      const cycles = parseInt(document.getElementById('sp-tpl-cycles').value, 10) || 1;
+      StudyTemplatesData.createTemplate(name, workMin, breakMin, cycles);
+      renderClockPanel();
+      openTemplatesModal();
+    });
+  }
+
   function renderClockPanel() {
+    const container = document.getElementById('study-clock-panel');
+    if (!container) return;
+    const dock = document.getElementById('study-dock');
+    const c = getClock();
+    const active = isClockActive(c);
+    const isTimer = c.mode === 'timer';
+    const dis = active ? ' disabled' : '';
+    function seg(key, label, on) {
+      return '<button type="button" class="sp-seg' + (on ? ' is-on' : '') + '" data-mode-key="' + key + '" aria-pressed="' + (on ? 'true' : 'false') + '"' + dis + '>' + SP_ICONS[key] + '<span>' + label + '</span></button>';
+    }
+
+    container.innerHTML =
+      '<div id="study-clock-caption" class="sp-caption"></div>' +
+      '<div id="study-clock-display" class="px-clock" role="timer"></div>' +
+      '<div id="study-clock-progress" class="px-progress" aria-hidden="true">' + new Array(61).join('<i></i>') + '</div>' +
+      '<div class="study-clock-controls sp-actions">' +
+        '<button type="button" id="study-clock-start" class="sp-btn sp-primary" style="display:' + (active ? 'none' : 'inline-flex') + '">' + SP_ICONS.play + '<span>Start</span></button>' +
+        '<button type="button" id="study-clock-toggle" class="sp-btn' + (c.running ? ' is-running' : '') + '" style="display:' + (active ? 'inline-flex' : 'none') + '">' + SP_ICONS.play + SP_ICONS.pause + '<span id="study-clock-toggle-label">' + (c.running ? 'Pause' : 'Resume') + '</span></button>' +
+        '<button type="button" id="study-clock-save" class="sp-btn" style="display:' + (active ? 'inline-flex' : 'none') + '">' + SP_ICONS.check + '<span>Save</span></button>' +
+      '</div>';
+
+    if (dock) {
+      dock.innerHTML =
+        '<div class="sp-segs" role="group" aria-label="Clock mode">' +
+          seg('timer', 'Timer', isTimer && pendingPreset !== 'pomodoro') +
+          seg('pomodoro', 'Pomodoro', isTimer && pendingPreset === 'pomodoro') +
+          seg('stopwatch', 'Stopwatch', !isTimer) +
+        '</div>' +
+        '<div class="sp-dock-row">' +
+          '<div class="sp-dock-col">' +
+            '<button type="button" id="study-duration-btn" class="sp-chip"' + ((active || !isTimer) ? ' disabled' : '') + '>' + SP_ICONS.duration + '<span>' + (isTimer ? fmtPendingMin(pendingTimerMin) : 'No limit') + '</span></button>' +
+            '<button type="button" id="study-template-open" class="sp-chip"' + dis + '>' + SP_ICONS.templates + '<span>Templates</span></button>' +
+          '</div>' +
+          '<div id="study-candle-slot" class="sp-candle-slot" aria-hidden="true"></div>' +
+        '</div>';
+
+      dock.querySelectorAll('.sp-seg').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          // Switching modes is only allowed from a fully idle clock (same rule as before).
+          if (isClockActive(getClock())) return;
+          const key = btn.dataset.modeKey;
+          if (key === 'stopwatch') {
+            pendingPreset = null;
+            setClock({ mode: 'stopwatch', timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+          } else if (key === 'pomodoro') {
+            applyPomodoroPreset();
+          } else {
+            if (pendingPreset === 'pomodoro') pendingPreset = null;
+            setClock({ mode: 'timer', timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false });
+          }
+          renderClockPanel();
+        });
+      });
+      document.getElementById('study-duration-btn').addEventListener('click', function () {
+        if (!isClockActive(getClock())) openDurationPicker();
+      });
+      document.getElementById('study-template-open').addEventListener('click', function () {
+        if (!isClockActive(getClock())) openTemplatesModal();
+      });
+    }
+
+    document.getElementById('study-clock-start').addEventListener('click', function () {
+      if (getClock().mode === 'timer') {
+        if (!pendingTimerMin || pendingTimerMin <= 0) { openDurationPicker(); return; }
+        startTimer(pendingTimerMin);
+      } else {
+        startStopwatch();
+      }
+    });
+    document.getElementById('study-clock-toggle').addEventListener('click', function () {
+      if (getClock().running) pauseClock(); else resumeClock();
+    });
+    document.getElementById('study-clock-save').addEventListener('click', function (e) {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      saveClockAndReset();
+    });
+
+    lastClockUiMode = active ? 'active' : 'idle';
+    applyClockFocusUI(active);
+    renderClock();
+    syncCandleSlot();
+  }
+
+  // Visual only: slides the candle's existing element between the dock slot (resting) and its original
+  // corner (lit/focused) by setting two CSS variables. The candle's logic and state are never touched.
+  function syncCandleSlot() {
+    const screen = document.getElementById('screen-study');
+    const slot = document.getElementById('study-candle-slot');
+    const mount = screen && screen.querySelector(':scope > .candle-lamp-mount');
+    if (!slot || !mount) return;
+    const sr = slot.getBoundingClientRect();
+    if (!sr.width) return;
+    const op = mount.offsetParent;
+    const cr = op ? op.getBoundingClientRect() : { right: window.innerWidth, bottom: window.innerHeight };
+    const cs = getComputedStyle(mount);
+    const S = 0.32; // candle-lamp.js resting scale (transform-origin: bottom right)
+    const cx = cr.right - (parseFloat(cs.right) || 0) - mount.offsetWidth * S / 2;
+    const cy = cr.bottom - (parseFloat(cs.bottom) || 0) - mount.offsetHeight * S / 2;
+    mount.style.setProperty('--candle-dx', Math.round(sr.left + sr.width / 2 - cx) + 'px');
+    mount.style.setProperty('--candle-dy', Math.round(sr.top + sr.height / 2 - cy) + 'px');
+  }
+
+  // ---- Manual workspace fullscreen: the whole #study-layout expands; nothing is re-rendered ----
+  let studyFsBusy = false;
+  function studyFsClip(r) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    return 'inset(' + Math.max(0, r.top) + 'px ' + Math.max(0, vw - r.right) + 'px ' + Math.max(0, vh - r.bottom) + 'px ' + Math.max(0, r.left) + 'px round 22px)';
+  }
+  const STUDY_FS_FULL = 'inset(0px 0px 0px 0px round 0px)';
+  function studyFsAnimate(layout, from, to, done) {
+    if (!layout.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+    const a = layout.animate([{ clipPath: from }, { clipPath: to }], { duration: 480, easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)', fill: 'forwards' });
+    a.onfinish = function () { done(); a.cancel(); };
+  }
+  function setStudyFsBtn(on) {
+    const btn = document.getElementById('study-fs-btn');
+    if (!btn) return;
+    btn.classList.toggle('is-fs', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'Exit fullscreen' : 'Enter fullscreen';
+  }
+  function enterStudyFs() {
+    const screen = document.getElementById('screen-study');
+    const layout = document.getElementById('study-layout');
+    if (!screen || !layout) return;
+    studyFsBusy = true;
+    const first = layout.getBoundingClientRect();
+    screen.style.minHeight = first.height + 'px'; // keeps the page from collapsing while the layout is fixed
+    document.body.classList.add('study-fs-busy');
+    screen.classList.add('study-fs-on');
+    document.body.classList.add('study-fs-on');
+    setStudyFsBtn(true);
+    syncCandleSlot();
+    studyFsAnimate(layout, studyFsClip(first), STUDY_FS_FULL, function () {
+      studyFsBusy = false;
+      document.body.classList.remove('study-fs-busy');
+      syncCandleSlot();
+      if (!isBrowserFullscreen()) requestBrowserFullscreen().catch(function () {});
+    });
+  }
+  function leaveStudyFs(skipApi) {
+    const screen = document.getElementById('screen-study');
+    const layout = document.getElementById('study-layout');
+    if (!screen || !layout) return;
+    studyFsBusy = true;
+    document.body.classList.add('study-fs-busy');
+    function finish() {
+      screen.classList.remove('study-fs-on');
+      document.body.classList.remove('study-fs-on');
+      screen.style.minHeight = '';
+      setStudyFsBtn(false);
+      syncCandleSlot();
+      requestAnimationFrame(function () {
+        document.body.classList.remove('study-fs-busy');
+        studyFsBusy = false;
+      });
+    }
+    function run() { studyFsAnimate(layout, STUDY_FS_FULL, studyFsClip(screen.getBoundingClientRect()), finish); }
+    if (!skipApi && isBrowserFullscreen()) {
+      exitBrowserFullscreen().catch(function () {}).then(function () {
+        requestAnimationFrame(function () { requestAnimationFrame(run); });
+      });
+    } else {
+      run();
+    }
+  }
+  function toggleStudyFullscreen() {
+    if (studyFsBusy) return;
+    const screen = document.getElementById('screen-study');
+    if (screen && screen.classList.contains('study-fs-on')) leaveStudyFs(false); else enterStudyFs();
+  }
+
+  function initStudyWorkspace() {
+    const layout = document.getElementById('study-layout');
+    if (!layout || layout.dataset.wsBound) return;
+    layout.dataset.wsBound = '1';
+    const fsBtn = document.getElementById('study-fs-btn');
+    if (fsBtn) fsBtn.addEventListener('click', toggleStudyFullscreen);
+    window.addEventListener('resize', syncCandleSlot);
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(syncCandleSlot);
+      ro.observe(layout);
+      const dock = document.getElementById('study-dock');
+      if (dock) ro.observe(dock);
+    }
+  }
+
+  // Legacy (pre-redesign) clock renderer — no longer called; Part 2 removes it.
+  function renderClockPanelLegacy() {
     const container = document.getElementById('study-clock-panel');
     if (!container) return;
     const c = getClock();
@@ -441,7 +900,7 @@ function renderClock() {
     const layout = document.getElementById('study-layout');
         if (layout) {
       const _cc = getClock();
-      layout.classList.toggle('study-wallpaper-fullscreen', !!active || isClockActive(_cc));
+            layout.classList.toggle('study-wallpaper-fullscreen', !!active);
       layout.dataset.studyState = active ? (active.state === 'paused' ? 'paused' : 'running') : (isClockActive(_cc) ? (_cc.running ? 'running' : 'paused') : 'idle');
     }
 
@@ -988,12 +1447,15 @@ function openBreakTimelinePanel() {
         State.patch('settings', { studyAutoFullscreen: autoFsToggle.checked });
       });
     }
-    const fsBtn = document.getElementById('fullscreen-btn');
+        const fsBtn = document.getElementById('fullscreen-btn');
     if (fsBtn) fsBtn.addEventListener('click', toggleBrowserFullscreen);
+    initStudyWorkspace();
     function onFullscreenChange() {
       syncFullscreenBtn();
-      const _wasFs = isBrowserFullscreen();
+            const _wasFs = isBrowserFullscreen();
       State.patch('settings', { userExitedFullscreen: !_wasFs });
+      const _studyScr = document.getElementById('screen-study');
+      if (!_wasFs && _studyScr && _studyScr.classList.contains('study-fs-on') && !studyFsBusy) leaveStudyFs(true);
     }
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
@@ -1035,5 +1497,5 @@ function openBreakTimelinePanel() {
     renderBreakTakeover();
     renderStudyLog();
   }
-  return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive };
+    return { init: init, render: render, startTaskSession: startTaskSession, isSessionActive: isSessionActive, syncCandleSlot: syncCandleSlot };
 })();
