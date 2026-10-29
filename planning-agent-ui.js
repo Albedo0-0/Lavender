@@ -2557,7 +2557,9 @@ const PlanningAgentUI = (function () {
     trash: ico('<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>'),
     close: ico('<path d="M6 6l12 12M18 6L6 18"/>'),
     back: ico('<path d="M15 5l-7 7 7 7"/>'),
-    chevron: ico('<path d="M6 9l6 6 6-6"/>')
+        chevron: ico('<path d="M6 9l6 6 6-6"/>'),
+    clock: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')
+  };
   };
 
   function isDateStr(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
@@ -2916,7 +2918,8 @@ const PlanningAgentUI = (function () {
     };
     return '<div class="plan-agent pl pl-dash">' +
       '<header class="pl-head"><h3 class="plan-agent-title">Plans</h3><span class="pl-head-acts">' +
-        (dash.from === 'assistant' ? '<button type="button" class="pl-hbtn" data-pl="back">' + ICONS.back + '<span>Back</span></button>' : '') +
+                (dash.from === 'assistant' ? '<button type="button" class="pl-hbtn" data-pl="back">' + ICONS.back + '<span>Back</span></button>' : '') +
+        '<button type="button" class="pl-hbtn" data-pl="d-study" title="Open Study">' + ICONS.clock + '<span>Study</span></button>' +
         '<button type="button" class="btn btn-primary pl-new-btn" data-pl="d-new">' + ICONS.plus + '<span>New plan</span></button>' +
         '<button type="button" class="pl-ib pl-close" data-pl="close" aria-label="Close" title="Close">' + ICONS.close + '</button></span></header>' +
       '<div class="pl-side">' +
@@ -3118,7 +3121,14 @@ const PlanningAgentUI = (function () {
         return;
       }
       case 'd-del-yes': dashRemove(el.dataset.kind, el.dataset.id, el.dataset.mode); return;
-      case 'd-more': dash.limit += 14; render(false); return;
+            case 'd-more': dash.limit += 14; render(false); return;
+      case 'd-study': {
+        // Navigation only: closes the planner and opens the Study tab. Nothing is loaded or started.
+        Modal.close();
+        const studyTab = document.querySelector('#main-nav .nav-btn[data-screen="study"]');
+        if (studyTab) studyTab.click();
+        return;
+      }
       case 'd-clear-subject': dash.subject = ''; render(false); return;
       case 'd-new':
         state = freshState({ from: dash ? dash.from : '' });
