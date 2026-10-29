@@ -615,14 +615,17 @@ function renderClock() {
 
   // ---- Manual workspace fullscreen: the whole #study-layout expands; nothing is re-rendered ----
   let studyFsBusy = false;
-  function studyFsClip(r) {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    return 'inset(' + Math.max(0, r.top) + 'px ' + Math.max(0, vw - r.right) + 'px ' + Math.max(0, vh - r.bottom) + 'px ' + Math.max(0, r.left) + 'px round 22px)';
+    let studyFsHome = null; // the window's own rect (viewport coords) when fullscreen was entered
+  function studyFsViewport() {
+    return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight, r: 0 };
   }
-  const STUDY_FS_FULL = 'inset(0px 0px 0px 0px round 0px)';
-  function studyFsAnimate(layout, from, to, done) {
+  // Morphs the SAME #study-layout element (wallpaper, blur box and clock all live inside it) between two rects.
+  function studyFsMorph(layout, from, to, done) {
     if (!layout.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
-    const a = layout.animate([{ clipPath: from }, { clipPath: to }], { duration: 480, easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)', fill: 'forwards' });
+    function frame(r) {
+      return { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px', borderRadius: r.r + 'px' };
+    }
+    const a = layout.animate([frame(from), frame(to)], { duration: 560, easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)', fill: 'forwards' });
     a.onfinish = function () { done(); a.cancel(); };
   }
   function setStudyFsBtn(on) {
@@ -637,14 +640,18 @@ function renderClock() {
     const layout = document.getElementById('study-layout');
     if (!screen || !layout) return;
     studyFsBusy = true;
-    const first = layout.getBoundingClientRect();
-    screen.style.minHeight = first.height + 'px'; // keeps the page from collapsing while the layout is fixed
+        const fr = layout.getBoundingClientRect();
+    const first = { top: fr.top, left: fr.left, width: fr.width, height: fr.height, r: 22 };
+    studyFsHome = first;
+    const scs = getComputedStyle(screen);
+    const spad = scs.boxSizing === 'border-box' ? (parseFloat(scs.paddingTop) + parseFloat(scs.paddingBottom)) : 0;
+    screen.style.minHeight = (first.height + spad) + 'px'; // keeps the page from collapsing while the window is fixed
     document.body.classList.add('study-fs-busy');
     screen.classList.add('study-fs-on');
     document.body.classList.add('study-fs-on');
     setStudyFsBtn(true);
     syncCandleSlot();
-    studyFsAnimate(layout, studyFsClip(first), STUDY_FS_FULL, function () {
+        studyFsMorph(layout, first, studyFsViewport(), function () {
       studyFsBusy = false;
       document.body.classList.remove('study-fs-busy');
       syncCandleSlot();
@@ -668,7 +675,11 @@ function renderClock() {
         studyFsBusy = false;
       });
     }
-    function run() { studyFsAnimate(layout, STUDY_FS_FULL, studyFsClip(screen.getBoundingClientRect()), finish); }
+        function run() {
+      const b = screen.getBoundingClientRect();
+      const home = studyFsHome || { top: b.top, left: b.left, width: b.width, height: b.height, r: 22 };
+      studyFsMorph(layout, studyFsViewport(), home, finish);
+    }
     if (!skipApi && isBrowserFullscreen()) {
       exitBrowserFullscreen().catch(function () {}).then(function () {
         requestAnimationFrame(function () { requestAnimationFrame(run); });
