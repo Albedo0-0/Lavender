@@ -10553,10 +10553,11 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   & .sp-log-empty { color: var(--study-fg-soft); }
 }
 
-/* ---- Fullscreen: the same workspace fixed to the viewport (the morph is animated from study.js) ---- */
-#screen-study.study-fs-on #study-layout.study-ws {
+/* ---- Fullscreen: ONLY the Clock Box is fixed to the viewport (the morph is animated from study.js).
+   The layout and the other three boxes keep their grid cells and never move. ---- */
+#screen-study.study-fs-on #study-layout.study-ws > #study-clock-box {
   position: fixed; top: 0; left: 0; right: auto; bottom: auto;
-  width: 100%; height: 100%; z-index: 9000; border-radius: 0; box-shadow: none;
+  width: 100%; height: 100%; margin: 0; z-index: 9000; border-radius: 0;
 }
 
 /* ---- Narrow screens: same four boxes, stacked ---- */
