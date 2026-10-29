@@ -1887,6 +1887,8 @@ const PlanningAgent = (function () {
     }
     PlanData.updateTask(taskId, provPatch);
 
+    if (typeof Study !== 'undefined' && Study.stopClockForPlanTask) Study.stopClockForPlanTask(taskId);
+
     return { ok: true, task: PlanData.getTask(taskId) };
   }
 
