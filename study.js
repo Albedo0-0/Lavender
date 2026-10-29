@@ -921,6 +921,94 @@ function renderClock() {
       run();
     }
   }
+    // Adaptive clock colour: samples the wallpaper region behind the clock and toggles
+  // .study-clock-on-light (charcoal text) / .study-clock-mixed (subtle shadow) on #study-layout.
+  function initClockAdaptiveColor(layout) {
+    const box = document.getElementById('study-clock-box');
+    const layer = document.getElementById('study-wallpaper-layer');
+    const video = document.getElementById('study-wallpaper-video');
+    if (!layout || !box || !layer || layer.dataset.adaptBound) return;
+    layer.dataset.adaptBound = '1';
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 24;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    const lin = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const L_LIGHT = 0.2126 * lin(246) + 0.7152 * lin(242) + 0.0722 * lin(232); // warm off-white
+    const L_DARK = 0.2126 * lin(38) + 0.7152 * lin(34) + 0.0722 * lin(29);     // deep charcoal
+    let img = null, imgUrl = '', token = 0, timer = 0, onLight = false;
+
+    function setState(light, mixed) {
+      onLight = light;
+      layout.classList.toggle('study-clock-on-light', light);
+      layout.classList.toggle('study-clock-mixed', mixed);
+    }
+    function apply(src, iw, ih) {
+      if (!iw || !ih) return;
+      const br = box.getBoundingClientRect();
+      if (!br.width || !br.height) return;
+      const panel = box.querySelector(':scope > #study-clock-panel, :scope > #study-cutoff-view');
+      const pr = panel && panel.offsetWidth ? panel.getBoundingClientRect() : br;
+      const scale = Math.max(br.width / iw, br.height / ih); // object-fit / background-size: cover
+      const ox = (iw - br.width / scale) / 2, oy = (ih - br.height / scale) / 2;
+      let sx = ox + (pr.left - br.left) / scale, sy = oy + (pr.top - br.top) / scale;
+      let sw = pr.width / scale, sh = pr.height / scale;
+      sx = Math.max(0, Math.min(iw - 1, sx)); sy = Math.max(0, Math.min(ih - 1, sy));
+      sw = Math.max(1, Math.min(iw - sx, sw)); sh = Math.max(1, Math.min(ih - sy, sh));
+      let data;
+      try {
+        cx.drawImage(src, sx, sy, sw, sh, 0, 0, 24, 24);
+        data = cx.getImageData(0, 0, 24, 24).data;
+      } catch (e) { return; } // tainted / not ready: keep current colour
+      const ys = [];
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const y = 0.2126 * lin(data[i]) + 0.7152 * lin(data[i + 1]) + 0.0722 * lin(data[i + 2]);
+        ys.push(y); sum += y;
+      }
+      const Y = sum / ys.length;
+      const cW = (L_LIGHT + 0.05) / (Y + 0.05);
+      const cD = (Y + 0.05) / (L_DARK + 0.05);
+      let light = onLight;
+      if (cD > cW + 1) light = true; else if (cW > cD + 1) light = false; // hysteresis: no flip-flopping
+      const Lt = light ? L_DARK : L_LIGHT;
+      let poor = 0;
+      ys.forEach(function (y) {
+        const c = light ? (y + 0.05) / (Lt + 0.05) : (Lt + 0.05) / (y + 0.05);
+        if (c < 3) poor++;
+      });
+      setState(light, poor / ys.length > 0.2);
+    }
+    function sample() {
+      const my = ++token;
+      if (video && video.classList.contains('is-active') && video.readyState >= 2) {
+        apply(video, video.videoWidth, video.videoHeight);
+        return;
+      }
+      const m = /url\((['"]?)(.*?)\1\)/.exec(getComputedStyle(layer).backgroundImage || '');
+      if (!m) { setState(false, false); return; } // no wallpaper: dark base, off-white text
+      if (img && imgUrl === m[2] && img.complete && img.naturalWidth) { apply(img, img.naturalWidth, img.naturalHeight); return; }
+      const im = new Image();
+      im.crossOrigin = 'anonymous';
+      im.onload = function () {
+        if (my !== token) return;
+        img = im; imgUrl = m[2];
+        apply(im, im.naturalWidth, im.naturalHeight);
+      };
+      im.src = m[2];
+    }
+    function queue(ms) { clearTimeout(timer); timer = setTimeout(sample, ms || 150); }
+
+    new MutationObserver(function () { queue(150); }).observe(layer, { attributes: true, attributeFilter: ['style', 'class'] });
+    if (video) {
+      new MutationObserver(function () { queue(150); }).observe(video, { attributes: true, attributeFilter: ['class', 'src'] });
+      video.addEventListener('loadeddata', function () { queue(150); });
+      setInterval(function () {
+        if (!document.hidden && video.classList.contains('is-active') && !video.paused) sample();
+      }, 5000);
+    }
+    if (window.ResizeObserver) new ResizeObserver(function () { queue(350); }).observe(box);
+    queue(0);
+  }
   function toggleStudyFullscreen() {
     if (studyFsBusy) return;
     const screen = document.getElementById('screen-study');
@@ -939,7 +1027,8 @@ function renderClock() {
     if (!layout || layout.dataset.wsBound) return;
     layout.dataset.wsBound = '1';
     const fsBtn = document.getElementById('study-fs-btn');
-    if (fsBtn) fsBtn.addEventListener('click', toggleStudyFullscreen);
+        if (fsBtn) fsBtn.addEventListener('click', toggleStudyFullscreen);
+    initClockAdaptiveColor(layout);
     window.addEventListener('resize', syncCandleSlot);
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(syncCandleSlot);
