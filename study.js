@@ -53,6 +53,197 @@ const Study = (function () {
   }
 
   
+    // ---------- Planning Agent link (plan box, loaded plan, reschedule, complete) ----------
+  // The loaded plan is just the canonical task id kept on State.studyClock (planTaskId). Tasks, scheduling and
+  // completion all go through PlanningAgent / PlanningAgentTasks; nothing is stored or scheduled here.
+  let pbView = 'today';
+  let pbDate = '';
+
+  function hmToMin(hm) { return Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)); }
+  function planStartable(t) {
+    return !!(t && t.date && /^\d{2}:\d{2}$/.test(t.startTime || '') && /^\d{2}:\d{2}$/.test(t.stopTime || '') && t.stopTime > t.startTime);
+  }
+  function planTitleOf(t) {
+    const lt = (typeof PlanData !== 'undefined' && t.taskId) ? PlanData.getTask(t.taskId) : null;
+    return (lt && lt.title) || t.title || (lt && lt.topicName) || t.topicName || 'Task';
+  }
+
+  // The task currently loaded into the clock, or null. A task that was completed, cancelled, archived or deleted elsewhere is unloaded.
+  function getLoadedPlan() {
+    const c = getClock();
+    if (!c.planTaskId) return null;
+    const t = (typeof PlanningAgent !== 'undefined' && PlanningAgent.getTask) ? PlanningAgent.getTask(c.planTaskId) : null;
+    if (!t || t.completed || t.archived || t.status === 'cancelled') {
+      setClock({ planTaskId: null, planTitle: '' });
+      return null;
+    }
+    return t;
+  }
+
+  function loadPlanTask(id) {
+    if (isClockActive(getClock())) return;                  // never replace a run in progress
+    const t = (typeof PlanningAgent !== 'undefined') ? PlanningAgent.getTask(id) : null;
+    if (!t || t.completed || !planStartable(t)) return;     // unscheduled / no end time: not startable
+    const dur = hmToMin(t.stopTime) - hmToMin(t.startTime);
+    if (dur < 1) return;
+    pendingTimerMin = dur;
+    pendingPreset = null;
+    setClock({ mode: 'timer', timerTotalMs: 0, elapsedMs: 0, awaitingDecision: false, planTaskId: t.id, planTitle: planTitleOf(t) });
+    renderClockPanel();                                     // loads only; Start is always an explicit click
+  }
+
+  function unloadPlanTask() {
+    if (isClockActive(getClock())) return;
+    setClock({ planTaskId: null, planTitle: '' });
+    renderClockPanel();
+  }
+
+  function reschedulePlanTask(t, date, start, stop) {
+    const key = String(t.id).indexOf('legacy_') === 0 ? String(t.id).slice(7) : null;
+    if (key && typeof PlanData !== 'undefined' && PlanData.getTask(key)) {
+      const r = PlanningAgent.rescheduleTask(key, date, start, stop, 'user', 'study-reschedule');
+      if (r && r.ok) PlanningAgentTasks.sync();
+      return r;
+    }
+    return CanonicalTaskStore.updateTask(t.id, { date: date, time: start, duration: hmToMin(stop) - hmToMin(start) });
+  }
+
+  function openPlanReschedule() {
+    const t = getLoadedPlan();
+    if (!t) return;
+    Modal.open(
+      '<h3>Reschedule</h3>' +
+      '<p>' + escHtml(planTitleOf(t)) + '</p>' +
+      '<input type="date" id="study-resched-date" value="' + escHtml(t.date || todayStr()) + '" min="' + todayStr() + '">' +
+      '<div class="planner-slot-row">' +
+        '<div><label class="planner-field-label">Start</label><input type="time" id="study-resched-start" value="' + escHtml(t.startTime || '') + '"></div>' +
+        '<div><label class="planner-field-label">End</label><input type="time" id="study-resched-stop" value="' + escHtml(t.stopTime || '') + '"></div>' +
+      '</div>' +
+      '<button id="study-resched-confirm">Reschedule</button>'
+    );
+    const btn = document.getElementById('study-resched-confirm');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      const date = document.getElementById('study-resched-date').value;
+      const start = document.getElementById('study-resched-start').value;
+      const stop = document.getElementById('study-resched-stop').value;
+      if (!date) { alert('Pick a date.'); return; }
+      if (!start || !stop) { alert('Set both a start time and an end time.'); return; }
+      if (stop <= start) { alert('The end time must be after the start time.'); return; }
+      const cur = getLoadedPlan();
+      if (!cur) { Modal.close(); return; }
+      const r = reschedulePlanTask(cur, date, start, stop);
+      if (!r || !r.ok) { alert((r && r.error) || 'Could not reschedule this task.'); return; }
+      Modal.close();
+      syncPlanTitle();
+      renderPlanBox();
+    });
+  }
+
+  // Completes the exact loaded task through the Agent's own completion path (EXP / goal progress stay correct).
+  function completePlanFromStudy() {
+    const t = getLoadedPlan();
+    if (!t) return;
+    saveClockAndReset();                                    // logs any elapsed study time exactly once, then resets the clock
+    PlanningAgent.toggleTask(t.taskId);
+    setClock({ planTaskId: null, planTitle: '' });
+    renderClockPanel();
+  }
+
+  function syncPlanTitle() {
+    const had = !!getClock().planTaskId;
+    const t = getLoadedPlan();
+    if (had && !t) { renderClockPanel(); return; }
+    const el = document.getElementById('study-plan-title-text');
+    if (t && el) {
+      const txt = planTitleOf(t);
+      if (el.textContent !== txt) el.textContent = txt;
+    }
+  }
+
+  function pbTasks() {
+    if (typeof PlanningAgent === 'undefined') return [];
+    const today = todayStr();
+    let list = [];
+    if (pbView === 'today') list = PlanningAgent.getTasksForDateRange(today, today);
+    else if (pbView === 'overdue') list = PlanningAgent.getPendingTasks();
+    else if (pbView === 'pick') list = pbDate ? PlanningAgent.getTasksForDateRange(pbDate, pbDate) : [];
+    else if (pbView === 'unscheduled') list = PlanningAgentTasks.getOpenTasks().filter(function (t) { return !t.date; });
+    else list = PlanningAgentTasks.getOpenTasks();
+    return list.filter(function (t) { return !t.completed && !t.archived && t.type !== 'break'; })
+      .sort(function (a, b) {
+        const ka = (a.date || '~') + (a.startTime || '~'), kb = (b.date || '~') + (b.startTime || '~');
+        return ka < kb ? -1 : (ka > kb ? 1 : 0);
+      });
+  }
+
+  function pbWhen(t) {
+    const bits = [];
+    if (!t.date) bits.push('Unscheduled');
+    else if (t.date !== todayStr()) bits.push(t.date.slice(5));
+    if (planStartable(t)) bits.push(t.startTime + '\u2013' + t.stopTime);
+    else if (t.date) bits.push(t.startTime ? 'No end time' : 'No time');
+    return bits.join(' \u00B7 ');
+  }
+
+  function renderPlanBox() {
+    const box = document.getElementById('study-empty-box');
+    if (!box) return;
+    if (!box.dataset.pbBuilt) {
+      box.dataset.pbBuilt = '1';
+      box.classList.add('sp-pb');
+      box.removeAttribute('aria-hidden');
+      box.innerHTML =
+        '<div class="sp-pb-head">' +
+          '<select id="study-pb-view" class="sp-pb-select" aria-label="Plans to show">' +
+            '<option value="today">Today</option><option value="overdue">Overdue</option><option value="unscheduled">Unscheduled</option>' +
+            '<option value="pick">Pick a date</option><option value="all">All plans</option>' +
+          '</select>' +
+          '<input type="date" id="study-pb-date" class="sp-pb-date" aria-label="Date" hidden>' +
+        '</div>' +
+        '<div id="study-pb-list" class="sp-pb-list"></div>';
+      document.getElementById('study-pb-view').addEventListener('change', function (e) {
+        pbView = e.target.value;
+        if (pbView === 'pick' && !pbDate) pbDate = todayStr();
+        renderPlanBox();
+      });
+      document.getElementById('study-pb-date').addEventListener('change', function (e) {
+        pbDate = e.target.value;
+        renderPlanBox();
+      });
+      box.addEventListener('click', function (e) {
+        const row = e.target.closest('[data-pb-id]');
+        if (row && !row.disabled) loadPlanTask(row.getAttribute('data-pb-id'));
+      });
+    }
+    const sel = document.getElementById('study-pb-view');
+    const dIn = document.getElementById('study-pb-date');
+    const listEl = document.getElementById('study-pb-list');
+    if (!sel || !dIn || !listEl) return;
+    if (sel.value !== pbView) sel.value = pbView;
+    dIn.hidden = pbView !== 'pick';
+    if (pbView === 'pick' && dIn.value !== pbDate) dIn.value = pbDate;
+
+    const busy = isClockActive(getClock());
+    const loadedId = getClock().planTaskId || '';
+    const tasks = pbTasks();
+    const groups = [], idx = {};
+    tasks.forEach(function (t) {
+      const tg = (t.targetId && typeof TargetsData !== 'undefined') ? TargetsData.getTarget(t.targetId) : null;
+      const gk = (tg && tg.isPlan) ? tg.targetId : '';
+      if (!idx.hasOwnProperty(gk)) { idx[gk] = groups.length; groups.push({ title: gk ? (tg.title || 'Plan') : '', items: [] }); }
+      groups[idx[gk]].items.push(t);
+    });
+    const html = !groups.length ? '<div class="sp-pb-empty">Nothing here.</div>' : groups.map(function (g) {
+      return (g.title ? '<div class="sp-pb-group-h">' + escHtml(g.title) + '</div>' : '') + g.items.map(function (t) {
+        const ok = planStartable(t) && !busy;
+        return '<button type="button" class="sp-pb-row' + (t.id === loadedId ? ' is-on' : '') + (planStartable(t) ? '' : ' is-locked') + '" data-pb-id="' + escHtml(t.id) + '"' + (ok ? '' : ' disabled') + '>' +
+          '<span class="sp-pb-name">' + escHtml(planTitleOf(t)) + '</span><span class="sp-pb-when">' + escHtml(pbWhen(t)) + '</span></button>';
+      }).join('');
+    }).join('');
+    if (listEl._pbHtml !== html) { listEl._pbHtml = html; listEl.innerHTML = html; }
+  }
+
   // ---------- 3.1 Clock ----------
 
   function getClock() { return State.get().studyClock; }
@@ -508,7 +699,8 @@ function renderClock() {
     const c = getClock();
     const active = isClockActive(c);
     const isTimer = c.mode === 'timer';
-    const dis = active ? ' disabled' : '';
+        const dis = active ? ' disabled' : '';
+    const loadedPlan = getLoadedPlan();
     function seg(key, label, on) {
       return '<button type="button" class="sp-seg' + (on ? ' is-on' : '') + '" data-mode-key="' + key + '" aria-pressed="' + (on ? 'true' : 'false') + '"' + dis + '>' + SP_ICONS[key] + '<span>' + label + '</span></button>';
     }
@@ -516,11 +708,19 @@ function renderClock() {
     container.innerHTML =
       '<div id="study-clock-caption" class="sp-caption"></div>' +
       '<div id="study-clock-display" class="px-clock" role="timer"></div>' +
-      '<div id="study-clock-progress" class="px-progress" aria-hidden="true">' + new Array(61).join('<i></i>') + '</div>' +
+            '<div id="study-clock-progress" class="px-progress" aria-hidden="true">' + new Array(61).join('<i></i>') + '</div>' +
+      (loadedPlan
+        ? '<div id="study-plan-title" class="sp-plan-title"><span id="study-plan-title-text">' + escHtml(planTitleOf(loadedPlan)) + '</span>' +
+          (active ? '' : '<button type="button" id="study-plan-unload" class="sp-plan-x" aria-label="Unload plan" title="Unload">&times;</button>') + '</div>'
+        : '') +
       '<div class="study-clock-controls sp-actions">' +
         '<button type="button" id="study-clock-start" class="sp-btn sp-primary" style="display:' + (active ? 'none' : 'inline-flex') + '">' + SP_ICONS.play + '<span>Start</span></button>' +
         '<button type="button" id="study-clock-toggle" class="sp-btn' + (c.running ? ' is-running' : '') + '" style="display:' + (active ? 'inline-flex' : 'none') + '">' + SP_ICONS.play + SP_ICONS.pause + '<span id="study-clock-toggle-label">' + (c.running ? 'Pause' : 'Resume') + '</span></button>' +
-        '<button type="button" id="study-clock-save" class="sp-btn" style="display:' + (active ? 'inline-flex' : 'none') + '">' + SP_ICONS.check + '<span>Save</span></button>' +
+                '<button type="button" id="study-clock-save" class="sp-btn" style="display:' + (active ? 'inline-flex' : 'none') + '">' + SP_ICONS.check + '<span>Save</span></button>' +
+        (loadedPlan
+          ? '<button type="button" id="study-plan-resched" class="sp-btn">' + SP_ICONS.duration + '<span>Reschedule</span></button>' +
+            '<button type="button" id="study-plan-done" class="sp-btn">' + SP_ICONS.check + '<span>Done</span></button>'
+          : '') +
       '</div>';
 
     if (dock) {
@@ -581,10 +781,22 @@ function renderClock() {
       saveClockAndReset();
     });
 
+        const reschedBtn = document.getElementById('study-plan-resched');
+    if (reschedBtn) reschedBtn.addEventListener('click', openPlanReschedule);
+    const doneBtn = document.getElementById('study-plan-done');
+    if (doneBtn) doneBtn.addEventListener('click', function (e) {
+      if (e.currentTarget.disabled) return;
+      e.currentTarget.disabled = true;
+      completePlanFromStudy();
+    });
+    const unloadBtn = document.getElementById('study-plan-unload');
+    if (unloadBtn) unloadBtn.addEventListener('click', unloadPlanTask);
+
     lastClockUiMode = active ? 'active' : 'idle';
     applyClockFocusUI(active);
     renderClock();
     syncCandleSlot();
+    renderPlanBox();
   }
 
   // Visual only: anchors the candle's existing element (its bottom-centre, which is also its scale origin and
@@ -701,7 +913,14 @@ function renderClock() {
     if (screen && screen.classList.contains('study-fs-on')) leaveStudyFs(false); else enterStudyFs();
   }
 
-  function initStudyWorkspace() {
+  function     initStudyWorkspace();
+    if (typeof CanonicalTaskStore !== 'undefined' && CanonicalTaskStore.subscribe) {
+      let pbTimer = null;
+      CanonicalTaskStore.subscribe(function () {
+        if (pbTimer) return;
+        pbTimer = setTimeout(function () { pbTimer = null; syncPlanTitle(); renderPlanBox(); }, 60);
+      });
+    }
     const layout = document.getElementById('study-layout');
     if (!layout || layout.dataset.wsBound) return;
     layout.dataset.wsBound = '1';
