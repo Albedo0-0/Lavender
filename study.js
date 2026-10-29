@@ -612,8 +612,12 @@ function renderClock() {
     // ---- Manual fullscreen: ONLY #study-clock-box morphs. #study-layout, the Study Log, the Empty Box and the
   // Tools Box (and the candle's slot inside it) never move, so nothing else is re-rendered or re-laid-out. ----
   let studyFsBusy = false;
-  function studyFsViewport() {
-    return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight, r: 0 };
+    // The fullscreen target is read from the Clock Box's real fullscreen CSS geometry (position: fixed; inset: 0),
+  // so the morph ends on exactly the rect the stylesheet gives it. This keeps scrollbar, dynamic toolbars and
+  // safe-area differences from causing a snap. Call it only while .study-fs-on is set and no morph is running.
+  function studyFsViewport(box) {
+    const r = box.getBoundingClientRect();
+    return { top: r.top, left: r.left, width: r.width, height: r.height, r: 0 };
   }
   // The Clock Box's own grid-cell rect (viewport coords), measured fresh so a resize or scroll while in
   // fullscreen cannot leave a stale target. While fullscreen the box is fixed, so the fullscreen class is
@@ -659,7 +663,7 @@ function renderClock() {
     document.body.classList.add('study-fs-on');
     setStudyFsBtn(true);
     syncCandleSlot();
-    studyFsMorph(box, first, studyFsViewport(), function () {
+        studyFsMorph(box, first, studyFsViewport(box), function () {
       studyFsBusy = false;
       document.body.classList.remove('study-fs-busy');
       syncCandleSlot();
@@ -683,7 +687,7 @@ function renderClock() {
       });
     }
     function run() {
-      studyFsMorph(box, studyFsViewport(), studyFsHomeRect(screen, box), finish);
+            studyFsMorph(box, studyFsViewport(box), studyFsHomeRect(screen, box), finish);
     }
     if (!skipApi && isBrowserFullscreen()) {
       exitBrowserFullscreen().catch(function () {}).then(function () {
