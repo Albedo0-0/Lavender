@@ -107,7 +107,6 @@
 
 /* Protected components keep their original palette (Radio, Music Player, Assistant icon) */
 .radio-modal,
-.pixel-chooser,
 .cassette-player,
 .cassette-playlist,
 #assistant-pixel-entity {
@@ -6230,14 +6229,12 @@ button.pixel-key:active {
 .pixel-key:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 button.pixel-key:focus-visible,
 button.cassette-btn:focus-visible,
-button.cassette-toggle-btn:focus-visible,
-button.pixel-chooser-key:focus-visible {
+button.cassette-toggle-btn:focus-visible {
   outline: calc(var(--rpx) / 2) dashed var(--color-cream-050);
   outline-offset: calc(var(--rpx) * 1.5);
 }
 
-/* ---- Chooser ---- */
-.pixel-chooser-body,
+/* ---- Playlist body ---- */
 .cassette-playlist-body {
   padding: calc(var(--rpx) * 4);
   background-color: var(--color-kraft-300);
@@ -6247,47 +6244,7 @@ button.pixel-chooser-key:focus-visible {
     inset var(--rpx) var(--rpx) 0 0 var(--color-cream-200),
     inset calc(var(--rpx) * -1) calc(var(--rpx) * -2) 0 0 var(--color-kraft-500);
 }
-.pixel-chooser-keys {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: calc(var(--rpx) * 4);
-  margin-top: calc(var(--rpx) * 4);
-}
-button.pixel-chooser-key {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(var(--rpx) * 2);
-  padding: calc(var(--rpx) * 4) calc(var(--rpx) * 2) calc(var(--rpx) * 3);
-  font-family: 'Pixelify Sans', 'VT323', var(--font-body), monospace;
-  font-size: 14px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--color-brown-800);
-  background: var(--color-cream-050);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--r-outline), inset 0 calc(var(--rpx) * -1) 0 0 var(--color-kraft-500);
-  cursor: pointer;
-}
-.pixel-chooser-key:hover { background: var(--color-sage-100); transform: none; }
-.pixel-chooser-key:hover .pixel-chooser-icon { transform: translateY(calc(var(--rpx) * -1)); }
-button.pixel-chooser-key:active {
-  transform: translateY(var(--rpx));
-  box-shadow: var(--r-outline), inset 0 var(--rpx) 0 0 var(--color-kraft-500);
-}
-.pixel-chooser-icon {
-  width: calc(var(--rpx) * 14);
-  height: calc(var(--rpx) * 14);
-  background: center / 100% 100% no-repeat;
-  image-rendering: pixelated;
-}
-.pixel-chooser-icon-radio {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' shape-rendering='crispEdges'%3E%3Cpath fill='%233f2f21' d='M10 0h2v1h-2zM8 1h2v1H8zM6 2h2v1H6zM1 3h12v1H1zM0 4h1v9H0zM13 4h1v9h-1zM1 13h12v1H1z'/%3E%3Cpath fill='%23d9c4a3' d='M1 4h12v9H1z'/%3E%3Cpath fill='%23566e3a' d='M2 5h5v3H2z'/%3E%3Cpath fill='%23cfe8b0' d='M3 6h1v1H3z'/%3E%3Cpath fill='%237a5c3e' d='M8 5h2v2H8z'/%3E%3Cpath fill='%235c4530' d='M2 9h10v3H2z'/%3E%3C/svg%3E");
-}
-.pixel-chooser-icon-tape {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' shape-rendering='crispEdges'%3E%3Cpath fill='%232a1c10' d='M1 2h12v1H1zM0 3h1v9H0zM13 3h1v9h-1zM1 12h12v1H1z'/%3E%3Cpath fill='%23a9865a' d='M1 3h12v9H1z'/%3E%3Cpath fill='%23fbf8f0' d='M2 4h10v3H2z'/%3E%3Cpath fill='%232a1c10' d='M3 5h3v3H3zM8 5h3v3H8z'/%3E%3Cpath fill='%23fbf8f0' d='M4 6h1v1H4zM9 6h1v1H9z'/%3E%3Cpath fill='%235c4530' d='M3 9h8v3H3z'/%3E%3Cpath fill='%23a9865a' d='M4 10h1v1H4zM6 10h2v1H6zM9 10h1v1H9z'/%3E%3C/svg%3E");
-}
+/* Chooser styles live in the "Phase 6" block at the end of this file. */
 
 /* ---- Music Player: cassette deck ---- */
 .cassette-body {
@@ -11695,7 +11652,272 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 
 @media (prefers-reduced-motion: reduce) {
   #modal-content .datehub .btn,
-  #modal-content .datehub .datehub-addbtn,
+    #modal-content .datehub .datehub-addbtn,
   #modal-content .datehub .datehub-event,
   #modal-content .datehub .datehub-header-actions button { transition: none; }
+}
+
+/* ==========================================================================
+   Phase 6 — Radio & Music chooser: calm cassette cards + "Morph Into Place"
+   ========================================================================== */
+@keyframes lavChooserIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes lavSheetOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(6px) scale(0.92); }
+}
+@keyframes lavCordIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lavCordOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* One shared scrim so chooser -> player never flashes between two backdrops */
+#modal-overlay:has(.lav-chooser, .lav-morph-in) {
+  background: rgba(38, 52, 46, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+#modal-overlay:has(.lav-chooser) {
+  align-items: center;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+#modal-overlay:has(.lav-chooser:not(.lav-no-intro)) { animation: modalOverlayIn 220ms ease-out; }
+#modal-overlay:has(.lav-chooser.lav-no-intro, .lav-morph-in) { animation: none; }
+#modal-overlay:has(.lav-chooser, .lav-morph-in).modal-closing { animation: modalOverlayOut 180ms ease-in forwards; }
+
+/* The chooser card is the surface; the modal box itself stays transparent */
+#modal-content:has(.lav-chooser) {
+  width: min(92vw, 340px);
+  max-width: 340px;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
+  transform-origin: var(--lav-origin, 50% 50%);
+  animation: lavChooserIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+#modal-content:has(.lav-chooser.lav-no-intro, .lav-morph-in) { animation: none; }
+#modal-content:has(.lav-chooser, .lav-morph-in).modal-closing {
+  transform-origin: var(--lav-origin, 50% 50%);
+  animation: lavSheetOut 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+/* Hanging cord of the existing player fades in/out instead of dropping */
+#modal-content:has(.lav-morph-in)::before,
+#modal-content:has(.lav-morph-in)::after { animation: lavCordIn 520ms ease-out 120ms both; }
+#modal-content:has(.lav-morph-in).modal-closing::before,
+#modal-content:has(.lav-morph-in).modal-closing::after { animation: lavCordOut 160ms ease-in forwards; }
+
+/* ---- Chooser card ---- */
+.lav-chooser {
+  position: relative;
+  box-sizing: border-box;
+  padding: 16px 16px 18px;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(226, 218, 239, 0.6), transparent 58%),
+    radial-gradient(110% 80% at 0% 100%, rgba(213, 227, 218, 0.65), transparent 62%),
+    var(--color-cream-050);
+  border: 1px solid rgba(154, 134, 189, 0.42);
+  border-radius: 22px;
+  box-shadow:
+    0 5px 0 -1px var(--color-lavender-200),
+    0 6px 0 -1px rgba(154, 134, 189, 0.42),
+    0 22px 40px -16px rgba(30, 44, 38, 0.5);
+}
+.lav-chooser-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--color-ink-soft);
+}
+.lav-chooser-rule {
+  flex: 1;
+  height: 1px;
+  background: rgba(154, 134, 189, 0.4);
+}
+.lav-chooser-title {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--color-brown-800);
+}
+.lav-chooser-tapes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* ---- Cassette buttons ---- */
+.lav-chooser button.lav-tape {
+  --tape-base: #e9e5f5;
+  --tape-edge: #bdb4de;
+  --tape-accent: #8d86c4;
+  --tape-deep: #5d5890;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 9px 11px;
+  font: inherit;
+  color: var(--color-ink);
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 50%), var(--tape-base);
+  border: 1px solid var(--tape-edge);
+  border-radius: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 5px 10px -7px rgba(40, 50, 60, 0.45);
+  cursor: pointer;
+  transition: transform 0.22s var(--ease-soft), box-shadow 0.22s var(--ease-soft), border-color 0.2s var(--ease-soft);
+  -webkit-tap-highlight-color: transparent;
+}
+.lav-chooser button.lav-tape-radio {
+  --tape-base: #e3ede6;
+  --tape-edge: #a9c4b5;
+  --tape-accent: #6f9a85;
+  --tape-deep: #3f6552;
+}
+.lav-chooser button.lav-tape::before,
+.lav-chooser button.lav-tape::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--tape-edge);
+}
+.lav-chooser button.lav-tape::before { left: 7px; }
+.lav-chooser button.lav-tape::after { right: 7px; }
+.lav-chooser button.lav-tape:hover {
+  transform: translateY(-2px);
+  border-color: var(--tape-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 16px -9px rgba(40, 50, 60, 0.5);
+}
+.lav-chooser button.lav-tape:active { transform: translateY(0) scale(0.985); }
+.lav-chooser button.lav-tape:focus-visible {
+  outline: 2px solid var(--tape-accent);
+  outline-offset: 3px;
+}
+.lav-tape-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 6px 6px;
+  background: var(--color-cream-050);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 7px;
+  box-shadow: 0 1px 2px rgba(40, 50, 60, 0.1);
+}
+.lav-tape-label::after {
+  content: '';
+  height: 2px;
+  margin: 5px 16px 0;
+  border-radius: 2px;
+  background: var(--tape-accent);
+  opacity: 0.35;
+}
+.lav-tape-name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+.lav-tape-note {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--tape-deep);
+  opacity: 0.75;
+}
+.lav-tape-deck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 26px;
+  margin: 0 12px;
+  border: 1px solid var(--tape-edge);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 2px rgba(60, 60, 90, 0.12);
+}
+.lav-tape-reel {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--tape-accent);
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--tape-accent) 0 14deg, transparent 14deg 120deg,
+    var(--tape-accent) 120deg 134deg, transparent 134deg 240deg,
+    var(--tape-accent) 240deg 254deg, transparent 254deg);
+  transition: transform 0.9s var(--ease-soft);
+}
+.lav-chooser button.lav-tape:hover .lav-tape-reel { transform: rotate(180deg); }
+
+/* ---- Morph helpers ---- */
+.lav-ghost {
+  position: fixed;
+  z-index: 9601;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+.lav-ghost > div { position: relative; }
+.lav-ghost-hang::before {
+  content: '';
+  position: absolute;
+  left: calc(50% - 3px);
+  bottom: 100%;
+  width: 6px;
+  height: var(--lav-cord, 60px);
+  background: repeating-linear-gradient(135deg, var(--color-brown-700) 0 2px, var(--color-kraft-500) 2px 4px);
+}
+.lav-mode-title {
+  position: absolute;
+  top: 22px;
+  right: 12px;
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 0 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 10.5px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: rgb(250, 246, 238);
+  opacity: 0.62;
+}
+
+@media (max-width: 340px) {
+  .lav-chooser { padding: 14px 12px 16px; }
+  .lav-chooser-tapes { gap: 8px; }
+  .lav-tape-name { font-size: 12px; }
+  .lav-tape-deck { gap: 12px; margin: 0 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lav-chooser button.lav-tape,
+  .lav-tape-reel { transition: none; }
+  .lav-chooser button.lav-tape:hover { transform: none; }
+  #modal-content:has(.lav-chooser) { animation: none; }
+  #modal-content:has(.lav-chooser, .lav-morph-in).modal-closing { animation: none; opacity: 0; }
 }
