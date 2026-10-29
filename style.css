@@ -488,7 +488,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 .screen {
   padding: var(--space-5);
-  animation: screenIn 0.28s var(--ease-soft) both;
+    animation: screenIn 0.28s var(--ease-soft) backwards;
 }
 @keyframes screenIn {
   from { opacity: 0; }
