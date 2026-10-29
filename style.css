@@ -10449,7 +10449,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   /* ---- Transparent blur panel around the clock (and the end-of-day view) ---- */
   & #study-clock-box > :is(#study-clock-panel, #study-cutoff-view) {
     position: relative; z-index: 2; box-sizing: border-box;
-    width: min(100%, 640px); max-height: 100%; margin: 0; overflow: auto; scrollbar-width: none;
+        width: min(100%, max(640px, 50cqw)); max-height: 100%; margin: 0; overflow: auto; scrollbar-width: none;
     padding: clamp(16px, 4cqh, 32px) clamp(16px, 4cqw, 40px);
     text-align: center;
     background: var(--study-glass);
@@ -10553,11 +10553,29 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   & .sp-log-empty { color: var(--study-fg-soft); }
 }
 
-/* ---- Fullscreen: ONLY the Clock Box is fixed to the viewport (the morph is animated from study.js).
+/* ---- Fullscreen: ONLY the Clock Box is fixed to the viewport, edge to edge (the morph is animated from study.js).
    The layout and the other three boxes keep their grid cells and never move. ---- */
 #screen-study.study-fs-on #study-layout.study-ws > #study-clock-box {
-  position: fixed; top: 0; left: 0; right: auto; bottom: auto;
-  width: 100%; height: 100%; margin: 0; z-index: 9000; border-radius: 0;
+  position: fixed; inset: 0; width: auto; height: auto; margin: 0; z-index: 9000;
+  border: 0; border-radius: 0; box-shadow: none;
+  padding:
+    max(clamp(14px, 2vw, 28px), env(safe-area-inset-top, 0px))
+    max(clamp(14px, 2vw, 28px), env(safe-area-inset-right, 0px))
+    max(clamp(14px, 2vw, 28px), env(safe-area-inset-bottom, 0px))
+    max(clamp(14px, 2vw, 28px), env(safe-area-inset-left, 0px));
+}
+/* Corner controls keep clear of notches / home indicators while the box covers the whole screen */
+#screen-study.study-fs-on #study-layout.study-ws > #study-clock-box > #study-wallpaper-prev {
+  left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+#screen-study.study-fs-on #study-layout.study-ws > #study-clock-box > #study-wallpaper-next {
+  right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+#screen-study.study-fs-on #study-layout.study-ws > #study-clock-box > #study-fs-btn {
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+}
+#screen-study.study-fs-on #study-layout.study-ws > #study-clock-box > #study-alarm-icon {
+  top: max(16px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 /* ---- Narrow screens: same four boxes, stacked ---- */
@@ -10582,7 +10600,9 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   translate: var(--candle-dx, 0px) var(--candle-dy, 0px);
   transition: transform 2.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease;
 }
-#screen-study.study-fs-on > .candle-lamp-mount { position: fixed; z-index: 9200 !important; }
+/* The candle belongs to the Study tab layer underneath the Clock Box: while the Clock Box is fullscreen it is
+   covered by it (Clock Box z-index 9000). It stays absolutely positioned as normal, so nothing jumps on enter/exit. */
+#screen-study.study-fs-on > .candle-lamp-mount { z-index: 1 !important; }
 body.study-fs-on .candle-dim-overlay { z-index: 9100 !important; }
 body.study-fs-on .candle-ambient-firefly { z-index: 9150 !important; }
 
