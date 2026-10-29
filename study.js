@@ -886,7 +886,12 @@ function renderClock() {
       studyFsBusy = false;
       document.body.classList.remove('study-fs-busy');
       syncCandleSlot();
-      if (!isBrowserFullscreen()) requestBrowserFullscreen().catch(function () {});
+            if ((document.fullscreenElement || document.webkitFullscreenElement) !== box) {
+        try {
+          const p = requestBrowserFullscreen(box);
+          if (p && p.catch) p.catch(function () {});
+        } catch (e) {}
+      }
     });
   }
   function leaveStudyFs(skipApi) {
@@ -908,7 +913,7 @@ function renderClock() {
     function run() {
             studyFsMorph(box, studyFsViewport(box), studyFsHomeRect(screen, box), finish);
     }
-    if (!skipApi && isBrowserFullscreen()) {
+        if (!skipApi && (document.fullscreenElement || document.webkitFullscreenElement) === box) {
       exitBrowserFullscreen().catch(function () {}).then(function () {
         requestAnimationFrame(function () { requestAnimationFrame(run); });
       });
@@ -1454,8 +1459,8 @@ function openBreakTimelinePanel() {
   function isBrowserFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
   }
-  function requestBrowserFullscreen() {
-    const el = document.documentElement;
+    function requestBrowserFullscreen(target) {
+    const el = target || document.documentElement;
     const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
     if (!req) return Promise.reject(new Error('Fullscreen API unavailable'));
     return req.call(el);
