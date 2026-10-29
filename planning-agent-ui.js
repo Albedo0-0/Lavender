@@ -2560,7 +2560,7 @@ const PlanningAgentUI = (function () {
         chevron: ico('<path d="M6 9l6 6 6-6"/>'),
     clock: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')
   };
-  };
+
 
   function isDateStr(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
   function isDash(v) { return DASH_VIEWS.some(function (d) { return d[0] === v; }); }
