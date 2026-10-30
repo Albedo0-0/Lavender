@@ -1,21 +1,24 @@
 /*
  * Lavender — Paper Pocket.
  *
- * A decorative, physical-looking diary envelope: layered paper construction, a flap that
- * hinges open and closed, a letter that slides out, a glued label card holding the kept
- * photo/note, and a little depth. Reusable component only — no new storage/data system.
+ * A minimal, contemporary paper envelope for the diary sidebar: a clean silhouette, soft paper
+ * grain, quiet folds, a flap that hinges open and closed, and a letter that rises out of it.
+ * The label card (.pocket-contents) holding the kept photo / note is unchanged in behaviour.
  *
  * The artwork is generated in code (no SVG, no image assets, no emoji): every layer is drawn
- * pixel-by-pixel onto its own canvas on a 160×108 art grid (2 art px per CSS px), then shown
- * at 80×54 CSS px with pixelated scaling. Layers are separate elements so each can be
- * restyled or animated independently:
+ * pixel-by-pixel onto its own canvas on a 64×58 art grid and scaled with pixelated rendering.
+ * Everything is sized in the pocket's own width (container units), so the envelope grows and
+ * shrinks with the sidebar and keeps its aspect ratio. Layers are separate elements:
  *
  *   .pp-back     inner lining of the envelope
- *   .pp-paper    the letter (slides up on open)
- *   .pp-front    folded front panels (side flaps + bottom flap, fold lines, paper texture)
- *   .pocket-contents  glued label card that shows the kept photo / note (existing element)
- *   .pp-corners  photo corners holding the card
- *   .pp-flap     3D hinge wrapper with two faces: .pp-flap-out (wax seal) / .pp-flap-in (lining)
+ *   .pp-paper    the letter (rises on open)
+ *   .pp-front    folded front panels (side + bottom flaps, fold lines, paper grain)
+ *   .pocket-contents  small card that shows the kept photo / note (existing element; hidden while empty)
+ *   .pp-flap     3D hinge wrapper with two faces: .pp-flap-out (outside paper) / .pp-flap-in (lining)
+ *
+ * Art grid: the envelope body is rows 22..57; the 22 rows above it are headroom for the open
+ * flap and the raised letter. The pocket's layout box is the body only; the headroom overflows
+ * upward (--pp-reach tells the note panel how far).
  *
  * Usage:
  *   const pocket = PaperPocket.mount(container);
@@ -27,24 +30,22 @@ const PaperPocket = (function () {
   /* ------------------------------------------------------------------ *
    *  Pixel-art generator
    * ------------------------------------------------------------------ */
-  const GW = 160, GH = 108;                       // art grid
-  // envelope body, hinge, apex of the folded "X", and flap tip (art px)
-  const BX0 = 2, BX1 = 158, BY0 = 22, BY1 = 106, CX = 80, AY = 58, FT = 62;
-  // glued label card (art px) — mirrored by .pocket-contents in CSS (left/right 11px, top 31px, bottom 3px)
-  const CARD = { x0: 22, y0: 62, x1: 138, y1: 102 };
+  const GW = 64, GH = 58;                         // art grid
+  // envelope body, centre line, apex of the folded "V", and the closed flap's tip (art px)
+  const BX0 = 1, BX1 = 63, BY0 = 22, BY1 = 58, CX = 32, AY = 40, FT = 43;
 
   function rgb(h) { h = h.replace('#', ''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
   function ramp(list) { return list.map(rgb); }
 
-  // warm cream paper, light → deep (index 5 doubles as the soft ink line)
-  const PAPER = ramp(['#fdf9ef', '#f8f0df', '#f1e5cc', '#e8d9bb', '#decba8', '#c7b08a']);
-  // lavender lining
-  const LINING = { base: rgb('#ddd3ec'), dot: rgb('#cdc1e1'), deep: rgb('#a898c4'), edge: rgb('#8f7fb0') };
-  // wax seal
-  const WAX = ramp(['#c1b4dc', '#a595c9', '#8877b0', '#6a5892', '#52427a']);
-  const SAGE = { l: rgb('#9db89e'), d: rgb('#6f8f78') };
-  const SHADOW = rgb('#4d3a5e');
-  const WHITE = rgb('#fffdf6');
+  // soft warm-white paper, light → deep
+  const PAPER = ramp(['#fefdfa', '#f8f6ef', '#efece2', '#e2ded1', '#cfcabb', '#aaa595']);
+  // quiet grey-sage lining, light → deep
+  const LIN = ramp(['#e4e9e5', '#d5ddd8', '#c2ccc6', '#aab7b0']);
+  const INK = rgb('#3a4547');                     // outline, as in the reference
+  const INK2 = rgb('#7d8a88');                    // softer interior fold line
+  const TEXT = rgb('#74827f');                    // letter lines
+  const WHITE = rgb('#fffefb');
+  const SHADOW = rgb('#2f3a3c');
 
   const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
   function bayer(x, y) { return (BAYER[y & 3][x & 3] + 0.5) / 16; }
@@ -82,8 +83,8 @@ const PaperPocket = (function () {
 
   // ---- geometry ----
   function tt(x) { return 1 - Math.abs(x + 0.5 - CX) / (CX - BX0); }      // 0 at the sides → 1 at the centre
-  function yTop(x) { return BY0 + (AY - BY0) * tt(x); }                    // fold line, top corners → apex (mouth edge)
-  function yBot(x) { return BY1 - (BY1 - AY) * tt(x); }                    // fold line, bottom corners → apex
+  function yTop(x) { return BY0 + (AY - BY0) * tt(x); }                    // mouth edge, top corners → apex
+  function yBot(x) { return BY1 - (BY1 - AY) * tt(x); }                    // bottom fold, bottom corners → apex
   function yFlap(x) { return BY0 + (FT - BY0) * tt(x); }                   // closed flap's lower edge
   function distSeg(px, py, ax, ay, bx, by) {
     const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
@@ -103,37 +104,22 @@ const PaperPocket = (function () {
     const px = x + 0.5, py = y + 0.5;
     return px < CX ? distSeg(px, py, BX0, BY0, CX, FT) : distSeg(px, py, BX1, BY0, CX, FT);
   }
-  function inBody(x, y) { return x >= BX0 && x < BX1 && y >= BY0 && y < BY1; }
 
-  // paper grain: speckle + short horizontal fibres, returned as a ramp-level offset
+  // fine paper grain, returned as a small ramp-level offset
   function grain(x, y) {
-    let g = (hash(x, y, 1) - 0.5) * 0.34;
-    if (hash(x >> 2, y, 7) > 0.94) g += 0.55;                // fibre dash
-    if (hash(x, y >> 1, 11) > 0.985) g -= 0.5;               // light fleck
+    let g = (hash(x, y, 1) - 0.5) * 0.22;
+    if (hash(x >> 2, y, 7) > 0.95) g += 0.3;                 // faint fibre
     return g;
-  }
-
-  function envelopeOutline(buf, x, y) {                      // soft ink edge + paper thickness on the body
-    if (x === BX0 || x === BX1 - 1 || y === BY1 - 1) { buf.set(x, y, PAPER[5]); return true; }
-    if (y === BY1 - 2) { buf.set(x, y, PAPER[4]); return true; }
-    if (x === BX0 + 1) { buf.set(x, y, PAPER[0]); return true; }
-    if (x === BX1 - 2) { buf.set(x, y, PAPER[4]); return true; }
-    return false;
   }
 
   function drawBack() {
     const b = new Buf();
     for (let y = BY0; y < BY1; y++) for (let x = BX0; x < BX1; x++) {
-      if ((x === BX0 || x === BX1 - 1) && (y === BY0)) continue;               // softened top corners
-      let c = LINING.base;
-      const row = (y >> 2), off = (row & 1) * 4;
-      if ((((x + off) & 7) < 2) && ((y & 7) < 2)) c = LINING.dot;               // fine staggered dot print
-      // shade under the flap hinge
-      const k = (y - BY0) / 16;
-      if (k < 1 && (1 - k) * 0.55 > bayer(x, y)) c = LINING.deep;
+      if ((x === BX0 || x === BX1 - 1) && y === BY0) continue;
+      const f = 2.2 * Math.max(0, 1 - (y - BY0) / 14) + (hash(x, y, 4) - 0.5) * 0.2;   // shade under the hinge
+      let c = dith(LIN, f, x, y);
+      if (y === BY0 || x === BX0 || x === BX1 - 1) c = INK;
       b.set(x, y, c);
-      if (y === BY0 || x === BX0 || x === BX1 - 1 || y === BY1 - 1) b.set(x, y, PAPER[5]);
-      else if (y === BY0 + 1) b.set(x, y, LINING.edge);
     }
     return toCanvas(b);
   }
@@ -147,82 +133,55 @@ const PaperPocket = (function () {
       const dT = dTopLine(x, y), dB = dBotLine(x, y);
 
       if (py < top) {                                                           // the open mouth: only a soft cast shadow
-        if (dT < 5 && (1 - dT / 5) * 0.9 > bayer(x, y)) b.mix(x, y, SHADOW, 0.2);   // dithered, stays crisp
+        if (dT < 4 && (1 - dT / 4) * 0.7 > bayer(x, y)) b.mix(x, y, SHADOW, 0.16);
         continue;
       }
       let f;
-      if (py > bot) f = 0.45 + 1.0 * ((py - bot) / (BY1 - bot));                // bottom flap: lightest at the fold
-      else if (left) f = 1.35 + 0.8 * t * t;                                     // left side flap (lit)
-      else f = 2.35 + 0.9 * t * t;                                               // right side flap (in shade)
-      f += grain(x, y);
-      // folds: ink line, lit lip on the flap side, shade where one panel tucks under another
-      let c = null;
-      if (dT < 1.0) c = PAPER[5];
+      if (py > bot) f = 0.15 + 0.9 * ((py - bot) / (BY1 - bot));                // bottom panel: lightest at the fold
+      else if (left) f = 0.55 + 0.5 * t * t;                                     // left side panel (lit)
+      else f = 1.1 + 0.6 * t * t;                                                // right side panel (in shade)
+      f += grain(x, y) * 0.6;
+
+      let c = null;                                                              // folds: soft line, lit lip, tuck shade
+      if (dT < 1.0) c = INK2;
       else if (dT < 2.0) c = PAPER[0];
-      else if (dB < 1.0) c = PAPER[5];
-      else if (dB < 2.0 && py > bot) c = WHITE;
-      else if (dB < 3.6 && py <= bot) c = PAPER[4];
-      else if (dB < 4.6 && py <= bot && bayer(x, y) < 0.5) c = PAPER[3];
+      else if (dB < 1.0) c = PAPER[4];
+      else if (dB < 2.0 && py > bot) c = PAPER[0];
+      else if (dB < 3.4 && py <= bot) c = (bayer(x, y) < 0.55) ? PAPER[3] : PAPER[2];
       b.set(x, y, c || dith(PAPER, f, x, y));
-      envelopeOutline(b, x, y);
+
+      // outer edge: ink outline, paper thickness along the foot, lit inner lip
+      if (x === BX0 || x === BX1 - 1 || y === BY1 - 1) b.set(x, y, INK);
+      else if (y === BY1 - 2) b.set(x, y, PAPER[3]);
+      else if (x === BX0 + 1) b.set(x, y, PAPER[0]);
+      else if (x === BX1 - 2) b.set(x, y, PAPER[3]);
     }
-    // contact shadow under the glued card
-    for (let y = CARD.y1; y < CARD.y1 + 3; y++) for (let x = CARD.x0 + 1; x < CARD.x1 + 2; x++)
-      b.mix(x, y, SHADOW, y === CARD.y1 ? 0.22 : 0.12);
-    for (let y = CARD.y0 + 1; y < CARD.y1 + 1; y++) for (let x = CARD.x1; x < CARD.x1 + 2; x++)
-      b.mix(x, y, SHADOW, x === CARD.x1 ? 0.2 : 0.1);
     return toCanvas(b);
   }
 
   function drawPaper() {
     const b = new Buf();
-    const X0 = 16, X1 = 144, Y0 = 26, Y1 = 98;
+    const X0 = 11, X1 = 53, Y0 = 28, Y1 = BY1;                // letter, in its closed (tucked) position
     for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) {
       let c = WHITE;
       const n = hash(x, y, 3);
-      if (n > 0.9) c = PAPER[0]; else if (n < 0.04) c = PAPER[1];
-      if (hash(x >> 2, y, 5) > 0.965) c = PAPER[1];
-      if (x === X0 || y === Y0) c = PAPER[2];
-      if (x === X1 - 1 || y === Y1 - 1) c = PAPER[3];
+      if (n > 0.93) c = PAPER[0]; else if (n < 0.03) c = PAPER[1];
+      if (x === X1 - 2) c = PAPER[2];                          // soft shade along the right edge
+      if (x === X0 || x === X1 - 1 || y === Y0) c = INK;
       b.set(x, y, c);
     }
-    // faint lavender ruling
-    for (let y = Y0 + 18; y < Y1 - 6; y += 7) {
-      const end = (y === Y0 + 18) ? X1 - 46 : X1 - 14;
-      for (let x = X0 + 12; x < end; x++) if (hash(x, y, 9) > 0.04) b.set(x, y, rgb('#e2daef'));
-    }
-    // folded-letter crease
-    for (let y = 58; y < 62; y++) for (let x = X0 + 1; x < X1 - 1; x++) b.mix(x, y, SHADOW, (y === 59 || y === 60) ? 0.07 : 0.03);
-    // small pressed sprig, top right
-    const sx = X1 - 22, sy = Y0 + 6;
-    for (let i = 0; i < 14; i++) b.set(sx + Math.round(Math.sin(i / 3.2) * 1.2), sy + i, SAGE.d);
-    [[3, 'l'], [6, 'r'], [9, 'l'], [12, 'r']].forEach(function (p, i) {
-      const yy = sy + p[0], dir = p[1] === 'l' ? -1 : 1, x0 = sx + Math.round(Math.sin(p[0] / 3.2) * 1.2);
-      b.set(x0 + dir, yy - 1, SAGE.l); b.set(x0 + dir * 2, yy - 1, SAGE.l); b.set(x0 + dir * 3, yy - 2, SAGE.l);
-      b.set(x0 + dir, yy, SAGE.d);
-    });
-    return toCanvas(b);
-  }
-
-  function drawCorners() {
-    const b = new Buf();
-    const K = rgb('#a9946e'), KH = rgb('#d6c498'), KD = rgb('#7e6b4c');
-    const L = 11;
-    function corner(cx, cy, sx, sy) {                       // sx, sy = ±1 pointing into the card
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
-        if (i + j > L - 1) continue;
-        const x = cx + sx * i, y = cy + sy * j;
-        let c = K;
-        if (i + j >= L - 2) c = KD;                          // hypotenuse edge
-        else if (i === 0 || j === 0) c = KD;                 // cut edges
-        else if (i === 1 || j === 1) c = KH;                 // lit lip
-        b.set(x, y, c);
+    // handwritten-looking lines, short title first (like the reference)
+    const rows = [[5, 16, 11], [9, 6, 31], [13, 6, 31], [17, 6, 24], [21, 6, 31], [25, 6, 27], [29, 6, 20]];
+    rows.forEach(function (r, ri) {
+      const y = Y0 + r[0], xs = X0 + r[1];
+      let gap = 4 + Math.floor(hash(ri, 3, 31) * 5);
+      for (let i = 0; i < r[2]; i++) {
+        if (i === gap) { gap += 5 + Math.floor(hash(ri, i, 33) * 6); continue; }   // word space
+        b.set(xs + i, y, TEXT);
       }
-    }
-    corner(CARD.x0 - 1, CARD.y0 - 1, 1, 1);
-    corner(CARD.x1, CARD.y0 - 1, -1, 1);
-    corner(CARD.x0 - 1, CARD.y1, 1, -1);
-    corner(CARD.x1, CARD.y1, -1, -1);
+    });
+    // faint fold crease across the letter
+    for (let y = Y0 + 13; y < Y0 + 15; y++) for (let x = X0 + 1; x < X1 - 1; x++) b.mix(x, y, SHADOW, y === Y0 + 13 ? 0.05 : 0.03);
     return toCanvas(b);
   }
 
@@ -233,34 +192,14 @@ const PaperPocket = (function () {
       if (py > edgeY) continue;
       if ((x === BX0 || x === BX1 - 1) && y === BY0) continue;
       const left = (x + 0.5) < CX, d = dFlapEdge(x, y);
-      let f = 0.0 + 0.85 * ((py - BY0) / (FT - BY0)) + (left ? 0 : 0.35) + grain(x, y);
+      const f = 0.05 + 0.55 * ((py - BY0) / (FT - BY0)) + (left ? 0 : 0.3) + grain(x, y) * 0.5;
       let c = dith(PAPER, f, x, y);
-      if (d < 1.0) c = PAPER[5];                                                // ink edge
-      else if (d < 2.2) c = (bayer(x, y) < 0.6) ? PAPER[3] : PAPER[2];          // paper thickness on the lower edge
-      if (y === BY0) c = PAPER[5];                                              // hinge fold
-      else if (y === BY0 + 1) c = PAPER[3];
-      else if (y === BY0 + 2 && d >= 2.2) c = PAPER[0];
-      if (x === BX0 || x === BX1 - 1) c = PAPER[5];
+      if (d < 1.0) c = INK;                                                      // outline
+      else if (d < 2.2) c = (bayer(x, y) < 0.55) ? PAPER[3] : PAPER[2];          // paper thickness
+      else if (y === BY0 + 1) c = PAPER[0];                                      // lit hinge lip
+      if (y === BY0 || x === BX0 || x === BX1 - 1) c = INK;
       b.set(x, y, c);
     }
-    // wax seal (embossed sprig), with a soft contact shadow
-    const sx = 80, sy = 51, R = 8.2;
-    for (let y = sy - 11; y <= sy + 12; y++) for (let x = sx - 11; x <= sx + 11; x++) {
-      const dx = x + 0.5 - sx, dy = y + 0.5 - sy, r = Math.sqrt(dx * dx + dy * dy);
-      const wob = (hash(x, y, 21) - 0.5) * 0.9 + Math.sin(Math.atan2(dy, dx) * 5) * 0.35;
-      const sdx = dx - 1.6, sdy = dy - 2.2, sr = Math.sqrt(sdx * sdx + sdy * sdy);
-      if (r > R + wob && sr < R + 1.8 && sr > R - 1 + wob && bayer(x, y) < 0.6) b.mix(x, y, SHADOW, 0.22);
-      if (r > R + wob) continue;
-      const light = Math.sqrt((dx + 2.4) * (dx + 2.4) + (dy + 2.8) * (dy + 2.8)) / (R * 1.9);
-      let c = dith(WAX, 0.3 + light * 3.0, x, y);
-      if (r > R - 1.3 + wob) c = WAX[3];                                       // rim
-      else if (r > R - 2.4 && r < R - 1.5) c = dith(WAX, 1.4 + light * 2.4, x, y); // inner groove
-      b.set(x, y, c);
-    }
-    // sprig imprint
-    for (let i = 0; i < 9; i++) b.set(sx - 1, sy - 4 + i, WAX[4]), b.set(sx, sy - 4 + i, WAX[4]);
-    [[-2, -1], [-3, -2], [1, 0], [2, -1], [-2, 2], [-3, 1], [1, 3], [2, 2]].forEach(function (p) { b.set(sx + p[0] - (p[0] < 0 ? 0 : 0), sy + p[1], WAX[4]); });
-    [[-1, -4], [0, -5]].forEach(function (p) { b.set(sx + p[0], sy + p[1], WAX[0]); });
     return toCanvas(b);
   }
 
@@ -271,15 +210,11 @@ const PaperPocket = (function () {
       if (py > edgeY) continue;
       if ((x === BX0 || x === BX1 - 1) && y === BY0) continue;
       const d = dFlapEdge(x, y);
-      let c = LINING.base;
-      const row = (y >> 2), off = (row & 1) * 4;
-      if ((((x + off) & 7) < 2) && ((y & 7) < 2)) c = LINING.dot;
-      const k = (py - BY0) / 14;                                               // hinge end is the shaded end
-      if (k < 1 && (1 - k) * 0.7 > bayer(x, y)) c = LINING.deep;
-      if (d < 1.0) c = PAPER[5];
+      const f = 2.2 * Math.max(0, 1 - (py - BY0) / 14) + (hash(x, y, 4) - 0.5) * 0.2;   // hinge end is the shaded end
+      let c = dith(LIN, f, x, y);
+      if (d < 1.0) c = INK;
       else if (d < 2.2) c = (bayer(x, y) < 0.55) ? PAPER[1] : PAPER[0];
-      if (y === BY0) c = PAPER[5];
-      if (x === BX0 || x === BX1 - 1) c = PAPER[5];
+      if (y === BY0 || x === BX0 || x === BX1 - 1) c = INK;
       b.set(x, y, c);
     }
     return toCanvas(b);
@@ -289,7 +224,7 @@ const PaperPocket = (function () {
   function art() {
     if (!ART) ART = {
       back: drawBack(), paper: drawPaper(), front: drawFront(),
-      corners: drawCorners(), flapOut: drawFlapOut(), flapIn: drawFlapIn()
+      flapOut: drawFlapOut(), flapIn: drawFlapIn()
     };
     return ART;
   }
@@ -303,57 +238,59 @@ const PaperPocket = (function () {
   }
 
   /* ------------------------------------------------------------------ *
-   *  Styles
+   *  Styles — every size is a share of the pocket's own width (cqw), so the envelope
+   *  scales with the sidebar. Layout box = envelope body (64:36); art stage = 64:58.
    * ------------------------------------------------------------------ */
   const CSS = `
   .paper-pocket {
     position: relative;
-    width: 80px;
-    height: 54px;
+    width: 80px;                                /* standalone default; the sidebar sets 100% */
+    height: auto;
+    aspect-ratio: 64 / 36;
+    container-type: inline-size;
     cursor: pointer;
     pointer-events: auto;
-    transform: rotate(-1.2deg);
-    --pp-body-dip: 1px;                         /* how far the envelope settles while the letter is drawn out */
-    --pp-open-flap: .62s;                       /* per-layer timings, tweak independently */
-    --pp-open-paper: .52s;
+    --pp-reach: 61.2%;                          /* headroom above the body (22 of 36 rows), used by the note panel */
+    --pp-hinge: 37.93%;                         /* hinge row (22 of 58) within the art stage */
+    --pp-lift: -34.5%;                          /* how far the letter rises (20 of 58 rows) */
+    --pp-dip: 1.4%;                             /* the body settles slightly while the letter is drawn out */
+    --pp-open-flap: .6s;                        /* per-layer timings, tweak independently */
+    --pp-open-paper: .5s;
     --pp-close-flap: .5s;
-    --pp-close-paper: .34s;
+    --pp-close-paper: .36s;
   }
   .pp-art {
     position: absolute;
-    left: 50%; bottom: 0;                       /* native 80×54 art box, centred in whatever box the pocket is given */
-    width: 80px; height: 54px;
-    margin-left: -40px;
-    perspective: 260px;
-    perspective-origin: 50% 20%;
-    filter: drop-shadow(0 2px 1.5px rgba(90, 70, 50, 0.22));
+    left: 0; right: 0; bottom: 0;
+    aspect-ratio: 64 / 58;                      /* taller than the box: the extra rises above it */
+    perspective: 300cqw;
+    perspective-origin: 50% 30%;
+    filter: drop-shadow(0 0.9cqw 0.8cqw rgba(20, 34, 26, 0.26));
   }
   .pp-layer {
     position: absolute;
     left: 0; top: 0;
-    width: 80px; height: 54px;
+    width: 100%; height: 100%;
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     transition: transform .3s cubic-bezier(.3, .7, .3, 1);
   }
-  .pp-back    { z-index: 1; }
-  .pp-paper   {
+  .pp-back  { z-index: 1; }
+  .pp-paper {
     z-index: 2;
-    transform-origin: 50% 100%;
     transition: transform var(--pp-close-paper) cubic-bezier(.5, 0, .3, 1);
   }
-  .pp-front   { z-index: 3; }
-  .pp-corners { z-index: 5; }
+  .pp-front { z-index: 3; }
 
   .pp-flap {
     position: absolute;
     left: 0; top: 0;
-    width: 80px; height: 54px;
+    width: 100%; height: 100%;
     z-index: 6;
-    transform-origin: 50% 11px;                 /* the hinge: top edge of the envelope body */
+    transform-origin: 50% var(--pp-hinge);      /* the hinge: top edge of the envelope body */
     transform-style: preserve-3d;
-    transition: transform var(--pp-close-flap) cubic-bezier(.5, 0, .25, 1) .14s, z-index 0s linear .2s;
+    transition: transform var(--pp-close-flap) cubic-bezier(.45, 0, .25, 1) .14s, z-index 0s linear .2s;
     will-change: transform;
   }
   .pp-flap .pp-layer {
@@ -363,41 +300,42 @@ const PaperPocket = (function () {
   }
   .pp-flap-in { transform: rotateY(180deg); }
 
-  .pocket-contents {
+  .pocket-contents {                            /* small card for the kept photo / note */
     position: absolute;
-    left: 11px; right: 11px; top: 31px; bottom: 3px;   /* the glued label card */
+    left: 21.9%; right: 21.9%; top: 75.9%; bottom: 5.2%;
     z-index: 4;
     overflow: hidden;
     box-sizing: border-box;
-    padding: 1px 3px;
-    background: #fbf6ea;
-    box-shadow: inset 0 0 0 1px #d8c7a4, inset 0 1px 0 #fffdf6;
-    transition: transform .3s cubic-bezier(.3, .7, .3, 1);
+    padding: 1.2cqw 1.8cqw;
+    background: #fbfaf5;
+    font-size: clamp(5px, 5.4cqw, 12px);
+    box-shadow: 0 0 0 1px rgba(58, 69, 71, 0.7), 0 1.2cqw 1.6cqw -0.8cqw rgba(30, 40, 38, 0.35);
+    transition: transform .3s cubic-bezier(.3, .7, .3, 1), opacity .25s ease;
   }
+  .pocket-contents:empty { opacity: 0; visibility: hidden; }   /* nothing kept → a clean envelope */
 
-  /* open: flap hinges back, letter slides up, the body settles a pixel */
+  /* open: flap hinges back, letter rises, the body settles a touch */
   .paper-pocket.is-open .pp-flap {
-    transform: translateY(var(--pp-body-dip)) rotateX(-180deg);
+    transform: translateY(var(--pp-dip)) rotateX(-180deg);
     z-index: 1;                                 /* once past vertical it lies behind the letter */
-    transition: transform var(--pp-open-flap) cubic-bezier(.3, 1.08, .5, 1), z-index 0s linear .27s;
+    transition: transform var(--pp-open-flap) cubic-bezier(.4, 0, .2, 1), z-index 0s linear .27s;
   }
   .paper-pocket.is-open .pp-paper {
-    transform: translateY(-15px) rotate(-1.1deg);
-    transition: transform var(--pp-open-paper) cubic-bezier(.22, .8, .3, 1) .16s;
+    transform: translateY(var(--pp-lift));
+    transition: transform var(--pp-open-paper) cubic-bezier(.22, .8, .3, 1) .18s;
   }
   .paper-pocket.is-open .pp-back,
   .paper-pocket.is-open .pp-front,
-  .paper-pocket.is-open .pp-corners,
-  .paper-pocket.is-open .pocket-contents { transform: translateY(var(--pp-body-dip)); }
+  .paper-pocket.is-open .pocket-contents { transform: translateY(var(--pp-dip)); }
 
   @media (hover: hover) {
-    .paper-pocket:not(.is-open):hover .pp-flap { transform: rotateX(-16deg); transition-delay: 0s; }
-    .paper-pocket:not(.is-open):hover .pp-paper { transform: translateY(-1px); }
+    .paper-pocket:not(.is-open):hover .pp-flap { transform: rotateX(-14deg); transition-delay: 0s; }
+    .paper-pocket:not(.is-open):hover .pp-paper { transform: translateY(-1.5%); }
   }
 
   .pocket-panel {
     position: absolute;
-    bottom: calc(100% + 10px);
+    bottom: calc(100% + var(--pp-reach) + 10px);   /* clears the raised flap and letter */
     left: 0;
     width: 190px;
     padding: 10px;
@@ -444,7 +382,6 @@ const PaperPocket = (function () {
     stage.appendChild(layerCanvas('pp-front', A.front));
     const contentsHost = MiscCore.createEl('div', { className: 'pocket-contents' });
     stage.appendChild(contentsHost);
-    stage.appendChild(layerCanvas('pp-corners', A.corners));
     const flap = MiscCore.createEl('div', { className: 'pp-flap' });
     flap.appendChild(layerCanvas('pp-flap-out', A.flapOut));
     flap.appendChild(layerCanvas('pp-flap-in', A.flapIn));
@@ -476,7 +413,7 @@ const PaperPocket = (function () {
       contentsEl.style.padding = '';
       const note = MiscCore.createEl('div', { text: text });
       note.style.fontFamily = 'var(--font-hand, inherit)';
-      note.style.fontSize = '9px';
+      note.style.fontSize = 'clamp(5px, 5.4cqw, 12px)';
       note.style.lineHeight = '1.1';
       note.style.color = 'var(--color-text, #3a3226)';
       contentsEl.appendChild(note);
