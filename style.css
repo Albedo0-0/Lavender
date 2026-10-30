@@ -10369,13 +10369,13 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 #screen-study { padding: var(--space-5); overflow: clip; }
 
 #screen-study #study-layout.study-ws {
-  --study-fg: #f4f1e8;
+  --study-fg: #f6f2e8;
   --study-fg-soft: color-mix(in srgb, var(--study-fg) 70%, transparent);
-  --study-accent: #e6d7a3;
-  --study-on-accent: #18201b;
-  --study-glass: rgba(255, 255, 255, 0.07);
-  --study-glass-edge: rgba(255, 255, 255, 0.28);
-  --study-hover: rgba(255, 255, 255, 0.16);
+  --study-accent: #d4b08a;
+  --study-on-accent: #2e2218;
+  --study-glass: rgba(255, 253, 248, 0.08);
+  --study-glass-edge: rgba(255, 253, 248, 0.34);
+  --study-hover: rgba(255, 253, 248, 0.16);
   --study-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
   --study-gap: 14px;
   position: relative;
@@ -10388,19 +10388,23 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   height: max(560px, calc(100vh - 170px));
   overflow: hidden;
   border-radius: 22px;
-  background: #3a4b41;
+    background: #3f5b4a;
   box-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.4);
-  color: #f4f1e8;
+  color: #f6f2e8;
   transition: --study-fg 700ms ease, --study-accent 700ms ease;
 
-  &.study-clock-on-light {
-    --study-fg: #241f33;
-    --study-accent: #4d3f7a;
-    --study-on-accent: #f7f4ea;
-    --study-glass: rgba(255, 255, 255, 0.16);
-    --study-glass-edge: rgba(255, 255, 255, 0.55);
-    --study-hover: rgba(36, 31, 51, 0.1);
+    &.study-clock-on-light {
+    --study-fg: #26221d;
+    --study-accent: #6b4a30;
+    --study-on-accent: #fbf7ee;
+    --study-glass: rgba(255, 253, 248, 0.16);
+    --study-glass-edge: rgba(255, 253, 248, 0.55);
+    --study-hover: rgba(38, 34, 29, 0.1);
   }
+  &.study-clock-mixed .px-clock { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)); }
+  &.study-clock-mixed .sp-caption { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28); }
+  &.study-clock-mixed.study-clock-on-light .px-clock { filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.35)); }
+  &.study-clock-mixed.study-clock-on-light .sp-caption { text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35); }
 
   & .sp-ico { width: 16px; height: 16px; flex: none; }
 
@@ -10410,15 +10414,15 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   }
   /* Log, Empty and Tools keep the normal workspace look (never the wallpaper's adaptive colours) */
   & > :is(#study-log-panel, #study-empty-box, #study-dock) {
-    --study-fg: #f4f1e8;
-    --study-fg-soft: rgba(244, 241, 232, 0.7);
-    --study-accent: #e6d7a3;
-    --study-on-accent: #18201b;
-    --study-glass-edge: rgba(255, 255, 255, 0.28);
-    --study-hover: rgba(255, 255, 255, 0.16);
+        --study-fg: #f6f2e8;
+    --study-fg-soft: rgba(246, 242, 232, 0.7);
+    --study-accent: #d4b08a;
+    --study-on-accent: #2e2218;
+    --study-glass-edge: rgba(255, 253, 248, 0.34);
+    --study-hover: rgba(255, 253, 248, 0.16);
     position: relative; overflow: hidden;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 253, 248, 0.08);
+    border: 1px solid rgba(255, 253, 248, 0.24);
     color: var(--study-fg);
   }
   & > #study-clock-box {
@@ -10426,8 +10430,8 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
     position: relative; isolation: isolate; overflow: hidden; container-type: size;
     display: grid; place-items: center;
     padding: clamp(14px, 2vw, 28px);
-    background: #2a3830; /* only visible when no wallpaper is set */
-    border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #34503f; /* only visible when no wallpaper is set */
+    border: 1px solid rgba(255, 253, 248, 0.24);
     color: var(--study-fg);
   }
   & > #study-log-panel { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; padding: 16px 16px 12px; font-size: 13px; }
