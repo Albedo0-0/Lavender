@@ -921,93 +921,209 @@ function renderClock() {
       run();
     }
   }
-    // Adaptive clock colour: samples the wallpaper region behind the clock and toggles
-  // .study-clock-on-light (charcoal text) / .study-clock-mixed (subtle shadow) on #study-layout.
+  // Adaptive clock colour (single owner). Measures the wallpaper pixels actually behind the clock text,
+  // scores neutral light/dark tones by per-pixel WCAG contrast, then sets on #study-layout:
+  //   --study-clock-fg (chosen tone), .study-clock-on-light (dark text), .study-clock-mixed (subtle shadow).
+  let clockAdaptTeardown = null;
   function initClockAdaptiveColor(layout) {
+    if (clockAdaptTeardown) { clockAdaptTeardown(); clockAdaptTeardown = null; } // never stack observers/listeners
     const box = document.getElementById('study-clock-box');
     const layer = document.getElementById('study-wallpaper-layer');
     const video = document.getElementById('study-wallpaper-video');
-    if (!layout || !box || !layer || layer.dataset.adaptBound) return;
-    layer.dataset.adaptBound = '1';
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = 24;
-    const cx = cv.getContext('2d', { willReadFrequently: true });
+    if (!layout || !box || !layer) return;
+
     const lin = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const L_LIGHT = 0.2126 * lin(246) + 0.7152 * lin(242) + 0.0722 * lin(232); // warm off-white
-    const L_DARK = 0.2126 * lin(38) + 0.7152 * lin(34) + 0.0722 * lin(29);     // deep charcoal
-    let img = null, imgUrl = '', token = 0, timer = 0, onLight = false;
+    const lumHex = function (h) {
+      const n = parseInt(h.slice(1), 16);
+      return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    };
+    // Neutral tones ordered softest -> strongest; the softest one that reads comfortably wins.
+    const LIGHT = ['#e9e3d4', '#f3eee2', '#fbf8f0'].map(function (h) { return { hex: h, L: lumHex(h) }; });
+    const DARK = ['#35302a', '#26221d', '#1b1915'].map(function (h) { return { hex: h, L: lumHex(h) }; });
 
-    function setState(light, mixed) {
-      onLight = light;
-      layout.classList.toggle('study-clock-on-light', light);
-      layout.classList.toggle('study-clock-mixed', mixed);
-    }
-    function apply(src, iw, ih) {
-      if (!iw || !ih) return;
-      const br = box.getBoundingClientRect();
-      if (!br.width || !br.height) return;
-      const panel = box.querySelector(':scope > #study-clock-panel, :scope > #study-cutoff-view');
-      const pr = panel && panel.offsetWidth ? panel.getBoundingClientRect() : br;
-      const scale = Math.max(br.width / iw, br.height / ih); // object-fit / background-size: cover
-      const ox = (iw - br.width / scale) / 2, oy = (ih - br.height / scale) / 2;
-      let sx = ox + (pr.left - br.left) / scale, sy = oy + (pr.top - br.top) / scale;
-      let sw = pr.width / scale, sh = pr.height / scale;
-      sx = Math.max(0, Math.min(iw - 1, sx)); sy = Math.max(0, Math.min(ih - 1, sy));
-      sw = Math.max(1, Math.min(iw - sx, sw)); sh = Math.max(1, Math.min(ih - sy, sh));
-      let data;
-      try {
-        cx.drawImage(src, sx, sy, sw, sh, 0, 0, 24, 24);
-        data = cx.getImageData(0, 0, 24, 24).data;
-      } catch (e) { return; } // tainted / not ready: keep current colour
-      const ys = [];
-      let sum = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const y = 0.2126 * lin(data[i]) + 0.7152 * lin(data[i + 1]) + 0.0722 * lin(data[i + 2]);
-        ys.push(y); sum += y;
-      }
-      const Y = sum / ys.length;
-      const cW = (L_LIGHT + 0.05) / (Y + 0.05);
-      const cD = (Y + 0.05) / (L_DARK + 0.05);
-      let light = onLight;
-      if (cD > cW + 1) light = true; else if (cW > cD + 1) light = false; // hysteresis: no flip-flopping
-      const Lt = light ? L_DARK : L_LIGHT;
-      let poor = 0;
-      ys.forEach(function (y) {
-        const c = light ? (y + 0.05) / (Lt + 0.05) : (Lt + 0.05) / (y + 0.05);
-        if (c < 3) poor++;
+    const cv = document.createElement('canvas');
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    const imgCache = new Map(); // url -> Promise<HTMLImageElement|null>
+    const VIDEO_EVENTS = ['playing', 'pause', 'emptied', 'loadeddata'];
+    let token = 0, timer = 0, due = 0, vTimer = 0, lastKey = '', onLight = false, disposed = false;
+
+    function loadImage(url) {
+      if (imgCache.has(url)) return imgCache.get(url);
+      const p = new Promise(function (res) {
+        const im = new Image();
+        im.crossOrigin = 'anonymous';
+        im.onload = function () {
+          const done = function () { res(im); };
+          if (im.decode) im.decode().then(done, done); else done();
+        };
+        im.onerror = function () { res(null); };
+        im.src = url;
       });
-      setState(light, poor / ys.length > 0.2);
+      imgCache.set(url, p);
+      p.then(function (v) { if (!v) imgCache.delete(url); });
+      if (imgCache.size > 3) imgCache.delete(imgCache.keys().next().value);
+      return p;
     }
-    function sample() {
-      const my = ++token;
-      if (video && video.classList.contains('is-active') && video.readyState >= 2) {
-        apply(video, video.videoWidth, video.videoHeight);
-        return;
-      }
-      const m = /url\((['"]?)(.*?)\1\)/.exec(getComputedStyle(layer).backgroundImage || '');
-      if (!m) { setState(false, false); return; } // no wallpaper: dark base, off-white text
-      if (img && imgUrl === m[2] && img.complete && img.naturalWidth) { apply(img, img.naturalWidth, img.naturalHeight); return; }
-      const im = new Image();
-      im.crossOrigin = 'anonymous';
-      im.onload = function () {
-        if (my !== token) return;
-        img = im; imgUrl = m[2];
-        apply(im, im.naturalWidth, im.naturalHeight);
-      };
-      im.src = m[2];
-    }
-    function queue(ms) { clearTimeout(timer); timer = setTimeout(sample, ms || 150); }
 
-    new MutationObserver(function () { queue(150); }).observe(layer, { attributes: true, attributeFilter: ['style', 'class'] });
-    if (video) {
-      new MutationObserver(function () { queue(150); }).observe(video, { attributes: true, attributeFilter: ['class', 'src'] });
-      video.addEventListener('loadeddata', function () { queue(150); });
-      setInterval(function () {
-        if (!document.hidden && video.classList.contains('is-active') && !video.paused) sample();
-      }, 5000);
+    // The wallpaper currently *targeted* (inline style / active video), never the mid-transition computed value.
+    function currentSource() {
+      if (video && video.classList.contains('is-active')) {
+        return { key: 'v:' + (video.currentSrc || video.getAttribute('src') || ''), video: true };
+      }
+      const raw = layer.style.backgroundImage || getComputedStyle(layer).backgroundImage || '';
+      const m = /url\((['"]?)(.*?)\1\)/.exec(raw);
+      if (!m) return null;
+      const url = m[2].replace(/\\(.)/g, '$1');
+      return { key: 'i:' + url, url: url };
     }
-    if (window.ResizeObserver) new ResizeObserver(function () { queue(350); }).observe(box);
+
+    // Union of the clock digits (+ caption) rect, padded; falls back to the panel, then the box.
+    function textRegion() {
+      let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+      box.querySelectorAll('.px-clock, .sp-caption').forEach(function (el) {
+        const q = el.getBoundingClientRect();
+        if (!q.width || !q.height) return;
+        l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom);
+      });
+      if (r < l) {
+        const p = box.querySelector(':scope > #study-clock-panel, :scope > #study-cutoff-view');
+        const q = (p && p.offsetWidth ? p : box).getBoundingClientRect();
+        return { left: q.left, top: q.top, right: q.right, bottom: q.bottom };
+      }
+      return { left: l - 8, top: t - 8, right: r + 8, bottom: b + 8 };
+    }
+
+    // Per-pixel relative luminance of the wallpaper behind the text. null = not measurable now; {tainted} = unreadable.
+    function measure(media, iw, ih) {
+      const lr = layer.getBoundingClientRect();
+      if (!lr.width || !lr.height || !iw || !ih) return null;
+      const rg = textRegion();
+      const scale = Math.max(lr.width / iw, lr.height / ih); // cover, centred (same as the CSS)
+      const ox = (iw - lr.width / scale) / 2, oy = (ih - lr.height / scale) / 2;
+      let sx = ox + (rg.left - lr.left) / scale, sy = oy + (rg.top - lr.top) / scale;
+      let sw = (rg.right - rg.left) / scale, sh = (rg.bottom - rg.top) / scale;
+      if (sx < 0) { sw += sx; sx = 0; }
+      if (sy < 0) { sh += sy; sy = 0; }
+      sw = Math.min(sw, iw - sx); sh = Math.min(sh, ih - sy);
+      if (sw < 1 || sh < 1) return null;
+      const cw = 40, ch = Math.max(6, Math.min(24, Math.round(cw * sh / sw)));
+      try {
+        cv.width = cw; cv.height = ch;
+        cx.drawImage(media, sx, sy, sw, sh, 0, 0, cw, ch);
+        const d = cx.getImageData(0, 0, cw, ch).data;
+        const ys = [];
+        for (let i = 0; i < d.length; i += 4) ys.push(0.2126 * lin(d[i]) + 0.7152 * lin(d[i + 1]) + 0.0722 * lin(d[i + 2]));
+        return { ys: ys };
+      } catch (e) { return { tainted: true }; }
+    }
+
+    // Contrast of one tone against every pixel: worst-10% and median drive the score.
+    function scoreTone(ys, tone, lightText) {
+      const cs = ys.map(function (y) { return lightText ? (tone.L + 0.05) / (y + 0.05) : (y + 0.05) / (tone.L + 0.05); });
+      let low = 0;
+      cs.forEach(function (c) { if (c < 3) low++; });
+      cs.sort(function (a, b) { return a - b; });
+      const p10 = cs[Math.floor(cs.length * 0.1)], med = cs[cs.length >> 1];
+      return { s: 0.7 * p10 + 0.3 * med, p10: p10, low: low / cs.length };
+    }
+
+    function commit(dark, tone, mixed, alpha) {
+      onLight = dark;
+      layout.classList.toggle('study-clock-on-light', dark);
+      layout.classList.toggle('study-clock-mixed', mixed);
+      if (tone) layout.style.setProperty('--study-clock-fg', tone); else layout.style.removeProperty('--study-clock-fg');
+      if (mixed) layout.style.setProperty('--study-shade-a', alpha.toFixed(2)); else layout.style.removeProperty('--study-shade-a');
+    }
+
+    async function sample() {
+      const my = ++token;
+      const src = currentSource();
+      if (!src) { lastKey = 'none'; commit(false, '', false, 0); return; } // no wallpaper: dark sage base, off-white text
+      let media, iw, ih;
+      if (src.video) {
+        if (!video.videoWidth || video.readyState < 2) return; // 'loadeddata' re-triggers us
+        media = video; iw = video.videoWidth; ih = video.videoHeight;
+      } else {
+        media = await loadImage(src.url);
+        if (my !== token || disposed) return; // a newer request superseded this one
+        if (!media) { lastKey = src.key; commit(false, '', true, 0.45); return; } // unreadable: safe light text + shadow
+        iw = media.naturalWidth; ih = media.naturalHeight;
+      }
+      const m = measure(media, iw, ih);
+      if (!m) return;
+      if (m.tainted) { lastKey = src.key; commit(false, '', true, 0.45); return; }
+
+      const force = src.key !== lastKey; // new wallpaper: decide fresh; same wallpaper: hysteresis against flicker
+      const ys = m.ys;
+      const sL = scoreTone(ys, LIGHT[2], true), sD = scoreTone(ys, DARK[2], false);
+      let dark = sD.s > sL.s;
+      if (!force && dark !== onLight) {
+        const ch = dark ? sD.s : sL.s, inc = dark ? sL.s : sD.s;
+        if (ch < inc * 1.12) dark = onLight;
+      }
+      const tones = dark ? DARK : LIGHT;
+      let pick = tones[2], res = dark ? sD : sL;
+      for (let i = 0; i < 2; i++) {
+        const r = scoreTone(ys, tones[i], !dark);
+        if (r.p10 >= 7) { pick = tones[i]; res = r; break; }
+      }
+      const mixed = res.p10 < 4.5 || res.low > 0.12;
+      commit(dark, pick.hex, mixed, Math.max(0.2, Math.min(0.45, 0.2 + (4.5 - res.p10) * 0.08)));
+      lastKey = src.key;
+    }
+
+    // Earliest-wins debounce: a quick wallpaper change is never delayed by a slower resize request.
+    function queue(ms) {
+      const at = performance.now() + ms;
+      if (timer && due <= at) return;
+      clearTimeout(timer);
+      due = at;
+      timer = setTimeout(function () { timer = 0; sample(); }, ms);
+    }
+    function syncVideoLoop() {
+      const on = !!video && video.classList.contains('is-active') && !video.paused && !document.hidden;
+      if (on && !vTimer) vTimer = setInterval(function () { sample(); }, 1200);
+      else if (!on && vTimer) { clearInterval(vTimer); vTimer = 0; }
+    }
+    const onMutate = function () { queue(0); syncVideoLoop(); };
+    const onResize = function () { queue(200); };
+    const onVideoEvt = function (e) { if (e.type === 'loadeddata') queue(0); syncVideoLoop(); };
+    const onVis = function () { syncVideoLoop(); if (!document.hidden) queue(0); };
+
+    const mo = new MutationObserver(onMutate);
+    mo.observe(layer, { attributes: true, attributeFilter: ['style', 'class'] });
+    if (video) {
+      mo.observe(video, { attributes: true, attributeFilter: ['src', 'class', 'style'] });
+      VIDEO_EVENTS.forEach(function (n) { video.addEventListener(n, onVideoEvt); });
+    }
+    let ro = null;
+    if (window.ResizeObserver) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(box);
+      const panel = box.querySelector('#study-clock-panel');
+      if (panel) ro.observe(panel);
+    }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    document.addEventListener('fullscreenchange', onResize);
+    document.addEventListener('webkitfullscreenchange', onResize);
+    document.addEventListener('visibilitychange', onVis);
+
+    clockAdaptTeardown = function () {
+      disposed = true;
+      clearTimeout(timer); clearInterval(vTimer);
+      mo.disconnect();
+      if (ro) ro.disconnect();
+      if (video) VIDEO_EVENTS.forEach(function (n) { video.removeEventListener(n, onVideoEvt); });
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+      document.removeEventListener('fullscreenchange', onResize);
+      document.removeEventListener('webkitfullscreenchange', onResize);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+
     queue(0);
+    syncVideoLoop();
   }
   function toggleStudyFullscreen() {
     if (studyFsBusy) return;
