@@ -152,9 +152,9 @@ const StudyWallpaper = (function () {
     }
     const layout = document.getElementById('study-layout');
     if (layout) {
-            layout.classList.toggle('study-clock-on-dark', lastBrightness === 'light');
-      layout.classList.toggle('study-clock-on-light', lastBrightness === 'dark');
-      if (lastPalette) {
+            // clock colour classes are owned by initClockAdaptiveColor() in study.js
+      // (study-clock-on-light is set by initClockAdaptiveColor() in study.js)
+      if (false && lastPalette) { // wallpaper-tinted palette disabled: clock stays neutral warm off-white / charcoal
         layout.style.setProperty('--study-fg', lastPalette.fg);
         layout.style.setProperty('--study-accent', lastPalette.accent);
         layout.style.setProperty('--study-on-accent', lastPalette.onAccent);
