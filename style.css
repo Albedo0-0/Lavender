@@ -10369,7 +10369,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 #screen-study { padding: var(--space-5); overflow: clip; }
 
 #screen-study #study-layout.study-ws {
-  --study-fg: #f6f2e8;
+    --study-fg: var(--study-clock-fg, #f6f2e8);
   --study-fg-soft: color-mix(in srgb, var(--study-fg) 70%, transparent);
   --study-accent: #d4b08a;
   --study-on-accent: #2e2218;
@@ -10394,17 +10394,17 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   transition: --study-fg 700ms ease, --study-accent 700ms ease;
 
     &.study-clock-on-light {
-    --study-fg: #26221d;
+        --study-fg: var(--study-clock-fg, #26221d);
     --study-accent: #6b4a30;
     --study-on-accent: #fbf7ee;
     --study-glass: rgba(255, 253, 248, 0.16);
     --study-glass-edge: rgba(255, 253, 248, 0.55);
     --study-hover: rgba(38, 34, 29, 0.1);
   }
-  &.study-clock-mixed .px-clock { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)); }
-  &.study-clock-mixed .sp-caption { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28); }
-  &.study-clock-mixed.study-clock-on-light .px-clock { filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.35)); }
-  &.study-clock-mixed.study-clock-on-light .sp-caption { text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35); }
+    &.study-clock-mixed .px-clock { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, var(--study-shade-a, 0.28))); }
+  &.study-clock-mixed .sp-caption { text-shadow: 0 1px 2px rgba(0, 0, 0, var(--study-shade-a, 0.28)); }
+  &.study-clock-mixed.study-clock-on-light .px-clock { filter: drop-shadow(0 1px 2px rgba(255, 255, 255, var(--study-shade-a, 0.35))); }
+  &.study-clock-mixed.study-clock-on-light .sp-caption { text-shadow: 0 1px 2px rgba(255, 255, 255, var(--study-shade-a, 0.35)); }
 
   & .sp-ico { width: 16px; height: 16px; flex: none; }
 
