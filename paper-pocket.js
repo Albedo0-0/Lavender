@@ -38,14 +38,14 @@ const PaperPocket = (function () {
   function ramp(list) { return list.map(rgb); }
 
   // soft warm-white paper, light → deep
-  const PAPER = ramp(['#fefdfa', '#f8f6ef', '#efece2', '#e2ded1', '#cfcabb', '#aaa595']);
+    const PAPER = ramp(['#fffaf0', '#faf3e4', '#f2e8d3', '#e6d7b9', '#d3bf9b', '#b39a74']);
   // quiet grey-sage lining, light → deep
-  const LIN = ramp(['#e4e9e5', '#d5ddd8', '#c2ccc6', '#aab7b0']);
-  const INK = rgb('#3a4547');                     // outline, as in the reference
-  const INK2 = rgb('#7d8a88');                    // softer interior fold line
-  const TEXT = rgb('#74827f');                    // letter lines
-  const WHITE = rgb('#fffefb');
-  const SHADOW = rgb('#2f3a3c');
+    const LIN = ramp(['#dfe8de', '#cddbd0', '#b5c7b9', '#9bb2a1']);
+  const INK = rgb('#6a4a36');                     // warm brown outline, like the tab icons
+  const INK2 = rgb('#a58666');                    // softer interior fold line
+  const TEXT = rgb('#a98a68');                    // letter lines
+  const WHITE = rgb('#fffdf6');
+  const SHADOW = rgb('#3b2a20');
 
   const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
   function bayer(x, y) { return (BAYER[y & 3][x & 3] + 0.5) / 16; }
@@ -220,11 +220,30 @@ const PaperPocket = (function () {
     return toCanvas(b);
   }
 
+    // soften the body's corners (2px radius), matching the rounded tab tiles
+  function roundCorners(c, top, bottom) {
+    const ctx = c.getContext('2d'), id = ctx.getImageData(0, 0, GW, GH), d = id.data;
+    function px(x, y, ink) {
+      const i = (y * GW + x) * 4;
+      if (ink) { d[i] = INK[0]; d[i + 1] = INK[1]; d[i + 2] = INK[2]; d[i + 3] = 255; } else d[i + 3] = 0;
+    }
+    [[BX0, 1], [BX1 - 1, -1]].forEach(function (cx) {
+      [[BY0, 1, top], [BY1 - 1, -1, bottom]].forEach(function (cy) {
+        if (!cy[2]) return;
+        const x = cx[0], sx = cx[1], y = cy[0], sy = cy[1];
+        px(x, y, 0); px(x + sx, y, 0); px(x, y + sy, 0);
+        px(x + sx, y + sy, 1); px(x + 2 * sx, y, 1); px(x, y + 2 * sy, 1);
+      });
+    });
+    ctx.putImageData(id, 0, 0);
+    return c;
+  }
+
   let ART = null;
   function art() {
     if (!ART) ART = {
-      back: drawBack(), paper: drawPaper(), front: drawFront(),
-      flapOut: drawFlapOut(), flapIn: drawFlapIn()
+      back: roundCorners(drawBack(), true, true), paper: drawPaper(), front: roundCorners(drawFront(), false, true),
+      flapOut: roundCorners(drawFlapOut(), true, false), flapIn: roundCorners(drawFlapIn(), true, false)
     };
     return ART;
   }
@@ -246,7 +265,7 @@ const PaperPocket = (function () {
     position: relative;
     width: 80px;                                /* standalone default; the sidebar sets 100% */
     height: auto;
- aspect-ratio: 64 / 23;
+     aspect-ratio: 64 / 19.4;                    /* the art is 54% of the pocket's width, centred */
     container-type: inline-size;
     cursor: pointer;
     pointer-events: auto;
@@ -261,9 +280,9 @@ const PaperPocket = (function () {
   }
   .pp-art {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
- aspect-ratio: 64 / 37.7;                    /* taller than the box: the extra rises above it */
-    perspective: 300cqw;
+        left: 23%; right: 23%; bottom: 0;
+    aspect-ratio: 64 / 58;
+        perspective: 162cqw;
     perspective-origin: 50% 30%;
     filter: drop-shadow(0 0.9cqw 0.8cqw rgba(20, 34, 26, 0.26));
   }
@@ -308,7 +327,7 @@ const PaperPocket = (function () {
     box-sizing: border-box;
     padding: 1.2cqw 1.8cqw;
     background: #fbfaf5;
-    font-size: clamp(5px, 5.4cqw, 12px);
+        font-size: clamp(5px, 3.3cqw, 12px);
     box-shadow: 0 0 0 1px rgba(58, 69, 71, 0.7), 0 1.2cqw 1.6cqw -0.8cqw rgba(30, 40, 38, 0.35);
     transition: transform .3s cubic-bezier(.3, .7, .3, 1), opacity .25s ease;
   }
@@ -413,7 +432,7 @@ const PaperPocket = (function () {
       contentsEl.style.padding = '';
       const note = MiscCore.createEl('div', { text: text });
       note.style.fontFamily = 'var(--font-hand, inherit)';
-      note.style.fontSize = 'clamp(5px, 5.4cqw, 12px)';
+            note.style.fontSize = 'clamp(5px, 3.3cqw, 12px)';
       note.style.lineHeight = '1.1';
       note.style.color = 'var(--color-text, #3a3226)';
       contentsEl.appendChild(note);
