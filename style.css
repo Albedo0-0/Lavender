@@ -9861,17 +9861,19 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
 .cal-views .cal-lens-select:focus-visible { outline: 2px solid var(--dh-focus); outline-offset: 2px; }
 .cal-lens-label { font-size: 12.5px; font-weight: 600; color: var(--dh-ink-soft); }
 .cal-views .cal-lens-select {
-  max-width: 170px;
-  padding: 5px 10px;
+  max-width: 140px;
+  padding: 2px 8px;
   font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dh-ink);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dh-ink-soft);
   opacity: 1;
-  background-color: var(--dh-felt-sunk);
-  border: 1.5px solid #cdbd98;
+  background-color: transparent;
+  border: 1px solid #d4c6a3;
   border-radius: 999px;
+  transition: color 150ms var(--ease-soft), border-color 150ms var(--ease-soft), background-color 150ms var(--ease-soft);
 }
+.cal-views .cal-lens-select:hover { color: var(--dh-ink); border-color: #bfae87; background-color: var(--dh-felt-sunk); }
 
 /* ----- Heatmap legend + empty state ----- */
 .cal-lens-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12.5px; color: var(--dh-ink-soft); }
