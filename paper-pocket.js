@@ -246,7 +246,7 @@ const PaperPocket = (function () {
     position: relative;
     width: 80px;                                /* standalone default; the sidebar sets 100% */
     height: auto;
-    aspect-ratio: 64 / 36;
+ aspect-ratio: 64 / 23;
     container-type: inline-size;
     cursor: pointer;
     pointer-events: auto;
@@ -262,7 +262,7 @@ const PaperPocket = (function () {
   .pp-art {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    aspect-ratio: 64 / 58;                      /* taller than the box: the extra rises above it */
+ aspect-ratio: 64 / 37.7;                    /* taller than the box: the extra rises above it */
     perspective: 300cqw;
     perspective-origin: 50% 30%;
     filter: drop-shadow(0 0.9cqw 0.8cqw rgba(20, 34, 26, 0.26));
