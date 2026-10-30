@@ -53,30 +53,30 @@
       <div id="meter-note"></div>
     </div>
     <span id="header-assistant-slot" aria-hidden="true"></span>
-    <button id="header-search-btn" title="Search">&#128269;</button>
-        <button id="player-music-btn" title="Radio / Music" aria-label="Radio / Music"><svg class="pixel-radio-icon" viewBox="0 0 14 14" width="28" height="28" shape-rendering="crispEdges" aria-hidden="true"><path fill="#3f2f21" d="M10 0h2v1h-2zM8 1h2v1H8zM6 2h2v1H6zM1 3h12v1H1zM0 4h1v9H0zM13 4h1v9h-1zM1 13h12v1H1z"/><path fill="#d9c4a3" d="M1 4h12v9H1z"/><path fill="#566e3a" d="M2 5h5v3H2z"/><path fill="#cfe8b0" d="M3 6h1v1H3z"/><path fill="#7a5c3e" d="M8 5h2v2H8z"/><path fill="#5c4530" d="M2 9h10v3H2z"/><path fill="#a9865a" d="M3 9h1v1H3zM5 9h1v1H5zM7 9h1v1H7zM9 9h1v1H9zM11 9h1v1h-1zM2 10h1v1H2zM4 10h1v1H4zM6 10h1v1H6zM8 10h1v1H8zM10 10h1v1h-1zM3 11h1v1H3zM5 11h1v1H5zM7 11h1v1H7zM9 11h1v1H9zM11 11h1v1h-1z"/></svg></button>
-    <button id="utility-menu-btn" title="Utilities" aria-label="Utilities">&#127800;</button>
+    <button id="header-search-btn" title="Search"><span class="pxi" data-pxi="search" aria-hidden="true"></span></button>
+        <button id="player-music-btn" title="Radio / Music" aria-label="Radio / Music"><span class="pxi" data-pxi="radio" aria-hidden="true"></span></button>
+    <button id="utility-menu-btn" title="Utilities" aria-label="Utilities"><span class="pxi" data-pxi="chrysanthemum" aria-hidden="true"></span></button>
   </div>
 </header>
 
 <div id="utility-drawer" class="utility-drawer-hidden">
   <div class="utility-drawer-group" data-group="study">
-        <button id="global-break-btn" title="Take a break" aria-label="Break">&#9749;</button>
-        <button id="unrecorded-study-icon" title="Unrecorded Study">&#128221;+</button>
+        <button id="global-break-btn" title="Take a break" aria-label="Break"><span class="pxi" data-pxi="coffee" aria-hidden="true"></span></button>
+        <button id="unrecorded-study-icon" title="Unrecorded Study"><span class="pxi" data-pxi="study" aria-hidden="true"></span></button>
   </div>
   <div class="utility-drawer-divider"></div>
 <div class="utility-drawer-group" data-group="personal">
-        <button id="notepad-icon" title="Notepad">&#128221;</button>
-        <button id="paintbrush-icon" title="Cosmetics">&#128396;</button>
-    <button id="gallery-icon" title="Gallery">&#128444;</button>
+        <button id="notepad-icon" title="Notepad"><span class="pxi" data-pxi="notepad" aria-hidden="true"></span></button>
+        <button id="paintbrush-icon" title="Cosmetics"><span class="pxi" data-pxi="brush" aria-hidden="true"></span></button>
+    <button id="gallery-icon" title="Gallery"><span class="pxi" data-pxi="gallery" aria-hidden="true"></span></button>
   </div>
   <div class="utility-drawer-divider"></div>
   <div class="utility-drawer-group" data-group="system">
     
-    <button id="backup-export-btn" title="Export backup">&#128190;</button>
-    <button id="backup-restore-btn" title="Restore backup">&#128257;</button>
-    <button id="settings-icon" title="Settings">&#9881;</button>
-    <button id="fullscreen-btn" title="Fullscreen">&#9974;</button>
+    <button id="backup-export-btn" title="Export backup"><span class="pxi" data-pxi="export" aria-hidden="true"></span></button>
+    <button id="backup-restore-btn" title="Restore backup"><span class="pxi" data-pxi="restore" aria-hidden="true"></span></button>
+    <button id="settings-icon" title="Settings"><span class="pxi" data-pxi="settings" aria-hidden="true"></span></button>
+    <button id="fullscreen-btn" title="Fullscreen"><span class="pxi" data-pxi="fullscreen" aria-hidden="true"></span></button>
   </div>
 </div>
 <input type="file" id="backup-restore-file-input" accept="application/json" style="display:none">
@@ -159,6 +159,303 @@
   <!-- Load order matters: storage -> state -> nav -->
 
   <!-- Load order matters: storage -> state -> nav -->
+<script>
+/* Lavender pixel icons — code-generated (no images, SVG, canvas or emoji).
+   Each icon is a 20x20 ASCII map: one character = one pixel. Edit a character to edit a pixel.
+   KEY: char -> [layer, palette colour]. Layer 'a' = ink/shading (::before), layer 'b' = fills/highlights (::after).
+   Palette lives in style.css (.pxi --pxi-*). Use <span class="pxi" data-pxi="NAME">; size with --s (integer). */
+(function () {
+  var KEY = {
+    '#':['a','ink'], 'o':['a','ink2'], 'P':['a','chry-ink'],
+    'c':['b','cream'], 'C':['b','cream-hi'], 'k':['b','kraft'], 'b':['b','brown'],
+    's':['b','sage'], 'g':['b','sage-mid'], 'S':['b','sage-hi'], 'w':['b','white'],
+    'L':['b','lav'], 'l':['b','lav-hi'], 'r':['b','rose'], 'y':['b','gold'], 'Y':['b','gold-dk'],
+    'D':['b','chry-1'], 'M':['b','chry-2'], 'm':['b','chry-3'], 'H':['b','chry-4']
+  };
+  var ICONS = {
+    chrysanthemum:[
+      '.......PP..PP.......',
+      '....P.PDDPPDDP.P....',
+      '...PDPPDDMMDDPPDP...',
+      '...PDDMMDMMDMMDDP...',
+      '.P.PDDMMHMMHMMDDP.P.',
+      'PDPPMMDMHHHmMDMMPPDP',
+      'PDDDMHHMHHmmMmmMDDDP',
+      '.PPDDHHHHYYYmmmDDPP.',
+      '.PMMMMHHHyyyYmMMMMP.',
+      'PDDMHHHYyyyyYmmmMDDP',
+      'PDDMHHmYyyyYYmmmMDDP',
+      '.PMMMMmYyyYYYmMMMMP.',
+      '.PPDDmmmYYYYmmmDDPP.',
+      'PDDDMmmMmmmmMmmMDDDP',
+      'PDPPMMDMmmmmMDMMPPDP',
+      '.P.PDDMMmMMmMMDDP.P.',
+      '...PDDMMDMMDMMDDP...',
+      '...PDPPDDMMDDPPDP...',
+      '....P.PDDPPDDP.P....',
+      '.......PP..PP.......'
+    ],
+    radio:[
+      '....................',
+      '.................##.',
+      '...............##...',
+      '.............##.....',
+      '...........##.......',
+      '.........##.........',
+      '.##################.',
+      '.#CCCCCCCCCCCCCCCC#.',
+      '.#c###########cccc#.',
+      '.#c#ssssssssS#cbbc#.',
+      '.#c#sSSsssssS#cbbc#.',
+      '.#c#ssssssssS#cccc#.',
+      '.#c###########cccc#.',
+      '.#cccccccccccccccc#.',
+      '.#c##############c#.',
+      '.#c#kokokokokoko#c#.',
+      '.#c#okokokokokok#c#.',
+      '.#c##############c#.',
+      '.#cccccccccccccccc#.',
+      '.##################.'
+    ],
+    search:[
+      '....................',
+      '......#####.........',
+      '....##lllll##.......',
+      '...#lllllllll#......',
+      '..#lllwlllllll#.....',
+      '..#llwllllllll#.....',
+      '.#llwwlllllllll#....',
+      '.#llwllllllllll#....',
+      '.#lllllllllllll#....',
+      '.#lllllllllllll#....',
+      '.#llllllllllLll#....',
+      '..#llllllllLLl#.....',
+      '..#lllllllLLll#.....',
+      '...#lllllllllk#.....',
+      '....##lllll##bk#....',
+      '......#####..#bk#...',
+      '..............#bk#..',
+      '...............#bk#.',
+      '................#b#.',
+      '.................#..'
+    ],
+    coffee:[
+      '....................',
+      '....o....o..........',
+      '...o....o...........',
+      '....o....o..........',
+      '...o....o...........',
+      '..###############...',
+      '..#CCCCCCCCCCCCC#...',
+      '..#ccccccccccccc####',
+      '..#ccccccccccccc#cc#',
+      '..#ccccccccccccc#cc#',
+      '..#ccccccccccccc####',
+      '...#cccccccccccc#...',
+      '....#cccccccccc#....',
+      '.....#kkkkkkkk#.....',
+      '...##############...',
+      '..#kkkkkkkkkkkkkk#..',
+      '...##############...',
+      '....................',
+      '....................',
+      '....................'
+    ],
+    study:[
+      '....................',
+      '..#..#..#..#..#.....',
+      '.#k##k##k##k##k.....',
+      '.#k##k##k##k##k.....',
+      '.##############.....',
+      '.#CCCCCCCCCCCC#.....',
+      '.#cccccccccccc#.....',
+      '.#c############.....',
+      '.#cccccccccccc#.....',
+      '.#c############.....',
+      '.#cccccccccccc#.....',
+      '.#c############.....',
+      '.#cccccccccccc#.....',
+      '.#c########ccc.####.',
+      '.#cccccccccccc#ssSs#',
+      '.#cccccccccccc#ssSs#',
+      '.##############SSSS#',
+      '..............#ssSs#',
+      '...............####.',
+      '....................'
+    ],
+    notepad:[
+      '....................',
+      '..#..#..#..#..#..#..',
+      '.#k##k##k##k##k##k#.',
+      '.#k##k##k##k##k##k#.',
+      '.##################.',
+      '.#CCCCCCCCCCCCCCCC#.',
+      '.#cccccccccccccccc#.',
+      '.#c#############cc#.',
+      '.#cccccccccccccccc#.',
+      '.#c#############cc#.',
+      '.#cccccccccccccccc#.',
+      '.#c#############cc#.',
+      '.#cccccccccccccccc#.',
+      '.#c########cccccc#..',
+      '.#cccccccccccccccc#.',
+      '.#cccccccccccccccc#.',
+      '.##################.',
+      '....................',
+      '....................',
+      '....................'
+    ],
+    brush:[
+      '....................',
+      '...............###..',
+      '..............#kbb#.',
+      '.............#kbb#..',
+      '............#kbb#...',
+      '...........#kbb#....',
+      '..........#kbb#.....',
+      '.........#kbb#......',
+      '........#kbb#.......',
+      '.......#kbb#........',
+      '......#ccC#.........',
+      '.....#ccC#..........',
+      '....#LLC#...........',
+      '...#lLL#............',
+      '..#lLL#.............',
+      '..#lL#..............',
+      '.####...............',
+      '#rrr#...............',
+      '#rrrr#..............',
+      '.####...............'
+    ],
+    gallery:[
+      '....................',
+      '....................',
+      '.##################.',
+      '.#bbbbbbbbbbbbbbbb#.',
+      '.#b##############b#.',
+      '.#b#llllllllllll#b#.',
+      '.#b#lwwlllllyyll#b#.',
+      '.#b#lwllllllyyll#b#.',
+      '.#b#llllSlllllll#b#.',
+      '.#b#lllSSSllllll#b#.',
+      '.#b#llsssssllgll#b#.',
+      '.#b#lsssssssgggl#b#.',
+      '.#b#sssssssggggg#b#.',
+      '.#b#ssssssssssss#b#.',
+      '.#b##############b#.',
+      '.#bbbbbbbbbbbbbbbb#.',
+      '.##################.',
+      '....................',
+      '....................',
+      '....................'
+    ],
+    export:[
+      '....................',
+      '.###############....',
+      '.#kkk#CCCCCCC#kk#...',
+      '.#kkk#CCCCooC#kkk#..',
+      '.#kkk#CCCCooC#kkkk#.',
+      '.#kkk#CCCCooC#kkkk#.',
+      '.#kkk#CCCCCCC#kkkk#.',
+      '.#kkk#########kkkk#.',
+      '.#kkkkkkkkkkkkkkkk#.',
+      '.#kkkkkkkkkkkkkkkk#.',
+      '.#kk############kk#.',
+      '.#kk#CCCCCCCCCC#kk#.',
+      '.#kk#CccccccccC#kk#.',
+      '.#kk#CCCCCCCCCC#kk#.',
+      '.#kk#CccccccccC#kk#.',
+      '.#kk#CCCCCCCCCC#kk#.',
+      '.#kk#CccccccccC#kk#.',
+      '.#kk#CCCCCCCCCC#kk#.',
+      '.##################.',
+      '....................'
+    ],
+    restore:[
+      '....................',
+      '....................',
+      '......########......',
+      '.....#gggggggg#.....',
+      '....#gg######gg#....',
+      '...#gg#......#gg#...',
+      '..####........####..',
+      '...#................',
+      '..#g#...............',
+      '.#ggg#..............',
+      '..............#SSS#.',
+      '...............#S#..',
+      '................#...',
+      '..####........####..',
+      '...#SS#......#SS#...',
+      '....#SS######SS#....',
+      '.....#SSSSSSSS#.....',
+      '......########......',
+      '....................',
+      '....................'
+    ],
+    settings:[
+      '....................',
+      '........####........',
+      '.........##.........',
+      '...##..##ck##..##...',
+      '...#k##ccckkk##k#...',
+      '....#cccckkkkkk#....',
+      '....#ccc####kkk#....',
+      '...#ccc#....#kkk#...',
+      '.#.#cc#......#kk#.#.',
+      '.##cck#......#kkk##.',
+      '.##kkk#......#kkk##.',
+      '.#.#kk#......#kk#.#.',
+      '...#kkk#....#kkk#...',
+      '....#kkk####kkk#....',
+      '....#kkkkkkkkkk#....',
+      '...#k##kkkkkk##k#...',
+      '...##..##kk##..##...',
+      '.........##.........',
+      '........####........',
+      '....................'
+    ],
+    fullscreen:[
+      '....................',
+      '.######......######.',
+      '.#Cccc........cccC#.',
+      '.#c..............c#.',
+      '.#c..............c#.',
+      '.#c..............c#.',
+      '.#................#.',
+      '....................',
+      '.........##.........',
+      '........#LL#........',
+      '........#LL#........',
+      '.........##.........',
+      '....................',
+      '.#................#.',
+      '.#c..............c#.',
+      '.#c..............c#.',
+      '.#c..............c#.',
+      '.#Cccc........cccC#.',
+      '.######......######.',
+      '....................'
+    ]
+  };
+  function paint(el) {
+    var map = ICONS[el.getAttribute('data-pxi')];
+    if (!map) return;
+    var a = [], b = [];
+    for (var y = 0; y < map.length; y++) {
+      for (var x = 0; x < map[y].length; x++) {
+        var k = KEY[map[y].charAt(x)];
+        if (!k) continue;
+        (k[0] === 'a' ? a : b).push(x + 'px ' + y + 'px var(--pxi-' + k[1] + ')');
+      }
+    }
+    el.style.setProperty('--pxi-a', a.join(',') || '0 0 transparent');
+    el.style.setProperty('--pxi-b', b.join(',') || '0 0 transparent');
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.pxi[data-pxi]'), paint);
+  window.LavenderPixelIcons = { paint: paint, icons: ICONS, key: KEY };
+})();
+</script>
 <script src="storage.js"></script>
 <script src="state.js"></script>
   <script src="notify.js"></script>
