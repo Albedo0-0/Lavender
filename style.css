@@ -9068,7 +9068,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
     flex: none;
     width: 100%;
     height: auto;
-    aspect-ratio: 64 / 23;   /* height follows the sidebar width, so the envelope scales with it */
+        aspect-ratio: 64 / 19.4;   /* height follows the sidebar width, so the envelope scales with it */
     margin: auto 0 0;
     transform: none;
     border-radius: 0;
@@ -9250,7 +9250,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
     flex: none;
     width: 100%;
     height: auto;
-    aspect-ratio: 64 / 23;
+        aspect-ratio: 64 / 19.4;
     margin: auto 0 0;
     transform: none;
     border-radius: 0;
