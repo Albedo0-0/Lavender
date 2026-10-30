@@ -5064,9 +5064,6 @@ button.notepad-format-btn.notepad-format-active {
 }
 #player-music-btn:active { transform: translateY(1px); }
 .pixel-radio-icon { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
-/* Custom raster icons: 20x20 pixel art exported at 8x, shown at an exact 20px so art pixels stay whole */
-.lv-icon { display: block; flex: none; width: 20px; height: 20px; image-rendering: pixelated; }
-#utility-menu-btn .lv-icon { image-rendering: auto; } /* charm rotates, so it needs smooth sampling */
 
 /* ==========================================================================
    Phase 6 — Unified digital cassette player
