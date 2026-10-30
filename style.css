@@ -10426,8 +10426,8 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   height: max(560px, calc(100vh - 170px));
   overflow: hidden;
   border-radius: 22px;
-    background: #3f5b4a;
-  box-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.4);
+        background: linear-gradient(150deg, #5d4634 0%, #4e3b2b 55%, #433121 100%);
+  box-shadow: 0 18px 34px -22px rgba(40, 26, 14, 0.5), inset 0 0 0 1px rgba(214, 184, 140, 0.22), inset 0 1px 0 rgba(255, 236, 200, 0.12);
   color: #f6f2e8;
   transition: --study-fg 700ms ease, --study-accent 700ms ease;
 
@@ -10451,7 +10451,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
     min-width: 0; min-height: 0; margin: 0; box-sizing: border-box; border-radius: 22px;
   }
   /* Log, Empty and Tools keep the normal workspace look (never the wallpaper's adaptive colours) */
-  & > :is(#study-log-panel, #study-empty-box, #study-dock) {
+    & > :is(#study-log-panel, #study-empty-box, #study-dock) {
         --study-fg: #f6f2e8;
     --study-fg-soft: rgba(246, 242, 232, 0.7);
     --study-accent: #d4b08a;
@@ -10463,13 +10463,48 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
     border: 1px solid rgba(255, 253, 248, 0.24);
     color: var(--study-fg);
   }
+  /* Study Log — parchment diary page, chocolate ink */
+  & > #study-log-panel {
+    --study-fg: #3e2d20;
+    --study-fg-soft: rgba(62, 45, 32, 0.68);
+    --study-accent: #7a5c3e;
+    --study-on-accent: #fbf6ea;
+    --study-glass-edge: rgba(107, 79, 58, 0.3);
+    --study-hover: rgba(107, 79, 58, 0.09);
+    background: linear-gradient(180deg, #f6ecd8 0%, #eee2c8 100%);
+    border: 1px solid #cdb68f;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 28px rgba(160, 125, 80, 0.14);
+  }
+  /* Plan box — warm cork-chocolate */
+  & > #study-empty-box {
+    --study-fg: #f5ecdb;
+    --study-fg-soft: rgba(245, 236, 219, 0.72);
+    --study-accent: #e3c496;
+    --study-on-accent: #3a2818;
+    --study-glass-edge: rgba(245, 236, 219, 0.3);
+    --study-hover: rgba(245, 236, 219, 0.14);
+    border: 1px solid rgba(214, 184, 140, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255, 236, 200, 0.1);
+  }
+  /* Tools dock — leathery sage */
+  & > #study-dock {
+    --study-fg: #f7f2e4;
+    --study-fg-soft: rgba(247, 242, 228, 0.72);
+    --study-accent: #e6c898;
+    --study-on-accent: #33261a;
+    --study-glass-edge: rgba(240, 236, 214, 0.32);
+    --study-hover: rgba(247, 242, 228, 0.15);
+    background: linear-gradient(170deg, #738b69 0%, #5f7656 100%);
+    border: 1px solid rgba(230, 218, 180, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255, 250, 230, 0.14);
+  }
   & > #study-clock-box {
     grid-column: 1; grid-row: 1;
     position: relative; isolation: isolate; overflow: hidden; container-type: size;
     display: grid; place-items: center;
     padding: clamp(14px, 2vw, 28px);
-        background: #34503f; /* only visible when no wallpaper is set */
-    border: 1px solid rgba(255, 253, 248, 0.24);
+                background: linear-gradient(155deg, #6c8362 0%, #50674a 100%); /* only visible when no wallpaper is set */
+    border: 1px solid rgba(236, 224, 198, 0.34);
     color: var(--study-fg);
   }
   & > #study-log-panel { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; padding: 16px 16px 12px; font-size: 13px; }
@@ -10722,16 +10757,16 @@ body.study-fs-on .candle-ambient-firefly { z-index: 9150 !important; }
 /* ---- Study: plan box (bottom-left) + loaded plan title ---- */
 #screen-study #study-layout.study-ws > #study-empty-box.sp-pb {
   display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
-  background: transparent; border-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(160deg, #7b5b40 0%, #664830 100%); border-color: rgba(214, 184, 140, 0.38);
 }
 .sp-pb-head { display: flex; align-items: center; gap: 8px; flex: none; opacity: 0.45; transition: opacity 180ms ease; }
 .sp-pb:hover .sp-pb-head, .sp-pb:focus-within .sp-pb-head { opacity: 0.95; }
 .sp-pb .sp-pb-select, .sp-pb .sp-pb-date {
   width: auto; padding: 3px 8px; font: inherit; font-size: 11.5px; line-height: 1.4;
   color: var(--study-fg); background: transparent; box-shadow: none;
-  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--study-fg) 28%, transparent); border-radius: 8px;
 }
-.sp-pb .sp-pb-select option { color: #18201b; background: #fffdf8; }
+.sp-pb .sp-pb-select option { color: #3e2d20; background: #f7efde; }
 .sp-pb .sp-pb-select:focus-visible, .sp-pb .sp-pb-date:focus-visible { outline: 2px solid var(--study-accent); outline-offset: 2px; }
 .sp-pb-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .sp-pb-group-h { margin: 8px 0 2px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--study-fg); opacity: 0.42; }
@@ -10743,8 +10778,8 @@ body.study-fs-on .candle-ambient-firefly { z-index: 9150 !important; }
   box-shadow: none; opacity: 0.62; cursor: pointer;
   transition: opacity 140ms ease, background-color 140ms ease;
 }
-.sp-pb .sp-pb-row:hover:not(:disabled) { opacity: 1; background: rgba(255, 255, 255, 0.1); transform: none; box-shadow: none; }
-.sp-pb .sp-pb-row.is-on { opacity: 1; background: rgba(255, 255, 255, 0.14); }
+.sp-pb .sp-pb-row:hover:not(:disabled) { opacity: 1; background: color-mix(in srgb, var(--study-fg) 12%, transparent); transform: none; box-shadow: none; }
+.sp-pb .sp-pb-row.is-on { opacity: 1; background: color-mix(in srgb, var(--study-fg) 18%, transparent); }
 .sp-pb .sp-pb-row:disabled { cursor: default; }
 .sp-pb .sp-pb-row.is-locked { opacity: 0.32; }
 .sp-pb .sp-pb-row:focus-visible { outline: 2px solid var(--study-accent); outline-offset: 1px; }
