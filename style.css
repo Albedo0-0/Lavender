@@ -10791,11 +10791,47 @@ body.study-fs-on .candle-ambient-firefly { z-index: 9150 !important; }
   background: linear-gradient(180deg, #dde4ec 0%, #eceff4 55%, #f6f8fa 100%);
   box-shadow: inset 0 0 0 1px #b4c0ce, inset 0 1px 2px rgba(45, 62, 86, 0.24), 0 1px 0 rgba(255, 255, 255, 0.85);
 }
-#exp-bar-wrap::before {
+#exp-bar-wrap {
+  --lv-stem: #8a5a6c;
+  --lv-deep: #6e4455;
+  --lv-leaf: #c08fa0;
+  --lv-shine: #e6c3cd;
+  --lv-bud:  #f3e3c2;
   border-radius: 999px;
-  clip-path: none;
   background: linear-gradient(180deg, #e6e0d4 0%, #f1ede4 55%, #f8f6f0 100%);
   box-shadow: inset 0 0 0 1px #cdc3b0, inset 0 1px 2px rgba(80, 62, 40, 0.2), 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+/* EXP vine: same construction as the productivity vine, in dusty rose (anchor = #exp-bar-wrap::before;
+   parts: --ex-stem  --ex-body  --ex-hl  --ex-bud  --ex-tA..tD) */
+#exp-bar-wrap::before {
+  content: '';
+  position: absolute; inset: 0 auto auto 100%; z-index: 3;
+  width: 1px; height: 1px;
+  background: none; border-radius: 0; clip-path: none; pointer-events: none;
+  --ex-stem: -21px -1px var(--lv-stem), -20px -1px var(--lv-deep), -19px -1px var(--lv-deep), -18px -1px var(--lv-stem), -17px -2px var(--lv-deep), -16px -2px var(--lv-deep), -15px -2px var(--lv-stem), -14px -2px var(--lv-deep), -13px -1px var(--lv-deep), -12px -1px var(--lv-stem), -11px -1px var(--lv-deep), -10px -1px var(--lv-deep), -9px -1px var(--lv-stem), -8px -1px var(--lv-deep), -7px -1px var(--lv-deep), -6px -1px var(--lv-stem), -5px -1px var(--lv-deep), -4px -1px var(--lv-deep), -3px -1px var(--lv-stem), -2px 0px var(--lv-deep), -1px 0px var(--lv-deep), 0px 1px var(--lv-stem), 0px 2px var(--lv-deep), 0px 3px var(--lv-deep), 0px 4px var(--lv-stem), -1px 5px var(--lv-deep), -2px 6px var(--lv-deep), -3px 6px var(--lv-stem), -4px 6px var(--lv-deep), -5px 6px var(--lv-deep), -6px 6px var(--lv-stem), -7px 6px var(--lv-deep), -8px 6px var(--lv-deep), -9px 6px var(--lv-stem), -10px 7px var(--lv-deep), -10px 8px var(--lv-deep), -9px 9px var(--lv-stem), -8px 9px var(--lv-deep), -8px 8px var(--lv-deep);
+  --ex-body: -15px -3px var(--lv-deep), -14px -3px var(--lv-leaf), -15px -4px var(--lv-leaf), -13px -4px var(--lv-leaf), -14px -5px var(--lv-leaf), -11px -2px var(--lv-deep), -12px -2px var(--lv-leaf), -11px -3px var(--lv-leaf), -13px -3px var(--lv-leaf), -12px -4px var(--lv-leaf), -5px -2px var(--lv-deep), -5px -3px var(--lv-leaf), -4px -3px var(--lv-leaf), -4px -4px var(--lv-leaf), 1px 3px var(--lv-leaf), 1px 4px var(--lv-deep), 2px 4px var(--lv-leaf);
+  --ex-hl: -14px -4px var(--lv-shine), -13px -5px var(--lv-shine), -12px -3px var(--lv-shine), -5px -4px var(--lv-shine), 2px 3px var(--lv-shine);
+  --ex-bud: -2px -2px var(--lv-bud), -1px -2px var(--lv-bud), -2px -3px var(--lv-bud);
+  --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep);
+  --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep);
+  --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep);
+  --ex-tD: 3px 4px var(--lv-deep);
+  box-shadow: var(--ex-stem), var(--ex-body), var(--ex-hl), var(--ex-bud), var(--ex-tA), var(--ex-tB), var(--ex-tC), var(--ex-tD);
+  --ex-amb: exTipA 6.1s steps(1, end) -1.7s infinite, exTipB 5.3s steps(1, end) -3.2s infinite, exTipC 7.3s steps(1, end) -0.6s infinite, exTipD 8.9s steps(1, end) -5s infinite, exShine 11s steps(1, end) -6s infinite;
+  animation: var(--ex-amb);
+}
+@keyframes exTipA { 0%, 58% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); } 58.1%, 68% { --ex-tA: -12px -6px var(--lv-deep), -13px -7px var(--lv-deep); } 68.1%, 100% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); } }
+@keyframes exTipB { 0%, 31% { --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); } 31.1%, 40% { --ex-tB: -13px -5px var(--lv-deep), -14px -5px var(--lv-deep); } 40.1%, 100% { --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); } }
+@keyframes exTipC { 0%, 74% { --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); } 74.1%, 85% { --ex-tC: -4px -6px var(--lv-deep), -5px -6px var(--lv-deep); } 85.1%, 100% { --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); } }
+@keyframes exTipD { 0%, 46% { --ex-tD: 3px 4px var(--lv-deep); } 46.1%, 55% { --ex-tD: 3px 3px var(--lv-deep); } 55.1%, 100% { --ex-tD: 3px 4px var(--lv-deep); } }
+@keyframes exShine { 0%, 40% { --lv-shine: #e6c3cd; } 40.1%, 46% { --lv-shine: #fbeef1; } 46.1%, 100% { --lv-shine: #e6c3cd; } }
+@keyframes exRustle {
+  0% { --ex-tA: -12px -6px var(--lv-deep), -13px -7px var(--lv-deep); --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); --ex-tD: 3px 4px var(--lv-deep); }
+  20% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); --ex-tB: -13px -5px var(--lv-deep), -14px -5px var(--lv-deep); --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); --ex-tD: 3px 4px var(--lv-deep); }
+  40% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); --ex-tC: -4px -6px var(--lv-deep), -5px -6px var(--lv-deep); --ex-tD: 3px 4px var(--lv-deep); }
+  60% { --ex-tA: -12px -6px var(--lv-deep), -13px -7px var(--lv-deep); --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); --ex-tD: 3px 3px var(--lv-deep); }
+  80% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); --ex-tB: -13px -5px var(--lv-deep), -14px -5px var(--lv-deep); --ex-tC: -4px -6px var(--lv-deep), -5px -6px var(--lv-deep); --ex-tD: 3px 4px var(--lv-deep); }
+  100% { --ex-tA: -12px -5px var(--lv-deep), -13px -6px var(--lv-deep); --ex-tB: -13px -4px var(--lv-deep), -14px -4px var(--lv-deep); --ex-tC: -4px -5px var(--lv-deep), -5px -5px var(--lv-deep); --ex-tD: 3px 4px var(--lv-deep); }
 }
 /* Fills: a gentle vertical gradient, fine edge line, lit top row; width glides on every change */
 #productivity-bar-fill, #exp-bar-fill {
@@ -10867,14 +10903,18 @@ body.study-fs-on .candle-ambient-firefly { z-index: 9150 !important; }
 @keyframes lvSettle { 0% { filter: brightness(1.14); } 100% { filter: none; } }
 @keyframes lvSheenOnce { 0% { left: -28px; opacity: 1; } 100% { left: 100%; opacity: 0; } }
 @supports selector(:has(*)) {
-    #top-meter-bar:has(#exp-bar-label b.is-new) #productivity-bar-wrap::before {
+      #top-meter-bar:has(#exp-bar-label b.is-new) #productivity-bar-wrap::before {
     animation: var(--vn-amb), vnRustle .9s steps(1, end), lvGlow 1.1s ease-out;
+  }
+  #top-meter-bar:has(#exp-bar-label b.is-new) #exp-bar-wrap::before {
+    animation: var(--ex-amb), exRustle .9s steps(1, end), lvGlow 1.1s ease-out;
   }
 #productivity-bar-label, #exp-bar-label { text-shadow: 0 1px 0 var(--color-surface), 1px 0 0 var(--color-surface); }
 @media (prefers-reduced-motion: reduce) {
   #productivity-bar-wrap::before, #productivity-bar-wrap.is-bump::before,
   #productivity-bar-fill::after, #productivity-bar-wrap.is-bump #productivity-bar-fill::after,
   #productivity-bar-wrap.is-bump #productivity-bar-fill, #exp-bar-fill { animation: none !important; }
-  #top-meter-bar:has(#exp-bar-label b.is-new) #productivity-bar-wrap::before { animation: none !important; }
+    #top-meter-bar:has(#exp-bar-label b.is-new) #productivity-bar-wrap::before,
+  #exp-bar-wrap::before, #top-meter-bar:has(#exp-bar-label b.is-new) #exp-bar-wrap::before { animation: none !important; }
   #productivity-bar-fill::after { opacity: 0; }
 }
