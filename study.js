@@ -1366,7 +1366,7 @@ function renderFocusMode(active) {
     const gb = TimeEngine.getGlobalBreak();
     if ((gb && gb.active) || TimeEngine.isSessionActive()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
-    if (btn.textContent !== '\u2615') btn.textContent = '\u2615';
+        if (!btn.querySelector('.lv-icon')) btn.textContent = '\u2615';
     btn.disabled = false;
   }
 
