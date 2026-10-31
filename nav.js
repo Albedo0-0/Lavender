@@ -1,7 +1,7 @@
 // nav.js — switches between empty screen placeholders. Loaded after state.js.
 
 const Nav = (function () {
-    const screens = ['dashboard', 'calendar', 'journal', 'library', 'study', 'progress', 'myworld'];
+  const screens = ['dashboard', 'calendar', 'journal', 'library', 'study', 'progress', 'myworld'];
   function switchTo(screenName) {
     const prevScreen = State.get().currentScreen;
     if (typeof MiscSound !== 'undefined' && screenName !== prevScreen) MiscSound.play('uiNav');
@@ -12,7 +12,7 @@ const Nav = (function () {
     });
 
     document.querySelectorAll('.nav-btn').forEach(function (btn) {
-            btn.classList.toggle('active', btn.dataset.screen === screenName);
+      btn.classList.toggle('active', btn.dataset.screen === screenName);
     });
     document.body.classList.toggle('dashboard-open', screenName === 'dashboard');
 
@@ -29,7 +29,7 @@ const Nav = (function () {
     // shared data (e.g. a task completed in Planner shows correctly in Calendar's Date Hub, and vice versa).
     if (screenName === 'calendar' && typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
   
-        if (screenName === 'dashboard' && typeof Dashboard !== 'undefined' && Dashboard.render) Dashboard.render();
+    if (screenName === 'dashboard' && typeof Dashboard !== 'undefined' && Dashboard.render) Dashboard.render();
     if (screenName === 'study' && typeof Study !== 'undefined' && Study.render) Study.render();
     if (screenName === 'journal' && typeof Journal !== 'undefined' && Journal.enterViaNav) Journal.enterViaNav();
     if (screenName === 'progress' && typeof Progress !== 'undefined' && Progress.render) Progress.render();
@@ -69,7 +69,7 @@ if (utilBtn && utilDrawer) {
 }
 
     
-        const startScreen = 'dashboard';
+    const startScreen = 'dashboard';
     switchTo(startScreen);
   }
 
