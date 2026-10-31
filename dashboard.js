@@ -9,7 +9,7 @@ const Dashboard = (function () {
 
   function box(cls, id, label, aria, hasBody) {
     return '<section class="dash-box ' + cls + '" id="' + id + '" aria-label="' + aria + '">' +
-      '<span class="dash-label" aria-hidden="true">' + label + '</span>' +
+      (label ? '<span class="dash-label" aria-hidden="true">' + label + '</span>' : '') +
       (hasBody ? '<div class="dash-body"></div>' : '') +
       '</section>';
   }
@@ -32,7 +32,7 @@ const Dashboard = (function () {
         '</div>' +
       '</div>' +
       '<div class="dash-right">' +
-        box('dash-b7', 'dash-calendar', 'Calendar', 'Calendar and Upcoming', true) +
+        box('dash-b7', 'dash-calendar', '', 'Calendar and Upcoming', true) +
         box('dash-b8', 'dash-tasks', 'Tasks', 'Unified Task Workspace', true) +
       '</div>' +
     '</div>';
@@ -45,6 +45,7 @@ const Dashboard = (function () {
     if (!root.querySelector('.dash')) root.innerHTML = markup();
     const ctx = document.getElementById('nav-context-label');
     if (ctx) ctx.textContent = 'Dashboard';
+    if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
   }
 
   // Binds the existing Lavender plaque once. Adds no attributes, classes or styles to it.
