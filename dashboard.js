@@ -78,7 +78,7 @@ const Dashboard = (function () {
     if (typeof PlanningAgentTasks === 'undefined') return null;
     const t0 = todayStr();
     if (tkView === 'overdue') return { sections: tkByDay(PlanningAgentTasks.getPendingTasks().filter(tkUsable)), empty: 'Nothing overdue.', ctx: function (t) { return 'tray:overdue'; }, when: true };
-    if (tkView === 'unscheduled') return { sections: [{ head: '', tasks: PlanningAgentTasks.getOpenTasks().filter(function (t) { return tkUsable(t) && !t.date; }) }], empty: 'Nothing is waiting for a date.', ctx: function (t) { return 'tray:unscheduled'; }, when: false };
+        if (tkView === 'unscheduled') return { sections: [{ head: '', tasks: PlanningAgentTasks.getOpenTasks().filter(function (t) { return tkUsable(t) && !t.date; }).concat(tkEmptyPlans()) }], empty: 'Nothing is waiting for a date.', ctx: function (t) { return 'tray:unscheduled'; }, when: false };
     if (tkView === 'timeline') return { sections: tkByDay(PlanningAgentTasks.getOpenTasks().filter(function (t) { return tkUsable(t) && t.date && t.date >= t0; })), empty: 'Nothing planned ahead.', ctx: function (t) { return 'day:' + t.date; }, when: true };
     const d = tkView === 'tomorrow' ? shiftDay(t0, 1) : (tkView === 'date' ? (tkDate || t0) : t0);
     let list = PlanningAgentTasks.getTasksForDateRange(d, d).filter(tkUsable);
@@ -91,10 +91,29 @@ const Dashboard = (function () {
     return { sections: [{ head: '', tasks: list }], empty: d === t0 ? 'Nothing planned for today.' : 'Nothing planned for this day.', ctx: function (t) { return 'day:' + d; }, when: true };
   }
 
+    // A subtask's parent is its Plan (a target with isPlan), exactly as the Plan Viewer groups them.
+  function tkParent(t) {
+    if (t.isPlan || !t.targetId || typeof TargetsData === 'undefined') return '';
+    const tg = TargetsData.getTarget(t.targetId);
+    return tg && tg.isPlan ? (tg.title || 'Plan') : '';
+  }
+
+  // Plans with no subtasks have nothing else to stand in for them, so they are listed as themselves
+  // (same rule and same place as the Plan Viewer: its Unscheduled tray).
+  function tkEmptyPlans() {
+    if (typeof TargetsData === 'undefined' || typeof CanonicalTaskStore === 'undefined') return [];
+    PlanningAgentTasks.sync();
+    return TargetsData.getAllTargetsList().filter(function (p) {
+      return p.isPlan && !p.archived && !CanonicalTaskStore.getTasks({ targetId: p.targetId, status: ['pending', 'completed'] }).length;
+    }).map(function (p) { return { id: p.targetId, isPlan: true, title: p.title, subject: p.subject || '', completed: false }; });
+  }
+
   function tkRow(t, ctx, withWhen) {
-    return '<button type="button" class="dtk-row' + (t.completed ? ' dtk-done' : '') + '" data-id="' + esc(t.id) + '" data-open="' + esc(ctx) + '">' +
+    const parent = tkParent(t);
+    return '<button type="button" class="dtk-row' + (t.completed ? ' dtk-done' : '') + '" data-id="' + esc(t.id) + '" data-kind="' + (t.isPlan ? 'plan' : 'task') + '" data-open="' + esc(ctx) + '">' +
       (withWhen ? '<span class="dtk-when">' + esc(timeRange(t) || 'Anytime') + '</span>' : '') +
-      '<span class="dtk-title">' + esc(tkTitle(t)) + '</span>' +
+      '<span class="dtk-main"><span class="dtk-title">' + esc(tkTitle(t)) + '</span>' +
+        (parent ? '<span class="dtk-parent">' + esc(parent) + '</span>' : '') + '</span>' +
       (t.subject ? '<span class="dtk-meta">' + esc(t.subject) + '</span>' : '') +
       '</button>';
   }
@@ -147,18 +166,18 @@ const Dashboard = (function () {
 
   // Opens the existing Plan Viewer on the day (or Overdue / Unscheduled tray) the task belongs to,
   // then expands that task using the viewer's own controls. Nothing is edited from the Dashboard.
-  function openInViewer(id, ctx) {
+    function openInViewer(id, ctx, kind) {
     if (typeof PlanningAgentUI === 'undefined' || !PlanningAgentUI.open) return;
-    const kind = String(ctx).split(':')[0], val = String(ctx).slice(kind.length + 1);
-    PlanningAgentUI.open(kind === 'tray' ? { view: 'today' } : (val === todayStr() ? { view: 'today' } : { view: 'pick', date: val }));
+        const where = String(ctx).split(':')[0], val = String(ctx).slice(where.length + 1);
+    PlanningAgentUI.open(where === 'tray' ? { view: 'today' } : (val === todayStr() ? { view: 'today' } : { view: 'pick', date: val }));
     try {
       const root = document.getElementById('modal-content');
       if (!root) return;
-      if (kind === 'tray') {
+            if (where === 'tray') {
         const tray = root.querySelector('[data-pl="d-tray"][data-val="' + val + '"]');
         if (tray) tray.click();
       }
-      const want = 't:' + id + ':' + (kind === 'tray' ? 'tray' : val);
+      const want = (kind === 'plan' ? 'p:' : 't:') + id + ':' + (where === 'tray' ? 'tray' : val);
       const hit = Array.prototype.filter.call(root.querySelectorAll('[data-pl="d-open"]'), function (b) { return b.dataset.k === want; })[0];
       if (hit) hit.click();
     } catch (err) { /* the viewer is open; expanding the row is best-effort */ }
@@ -181,7 +200,7 @@ const Dashboard = (function () {
     host.dataset.dtkBound = '1';
     host.addEventListener('click', function (e) {
       const row = e.target.closest('.dtk-row');
-      if (row) { openInViewer(row.dataset.id, row.dataset.open); return; }
+            if (row) { openInViewer(row.dataset.id, row.dataset.open, row.dataset.kind); return; }
       const el = e.target.closest('[data-dtk]');
       if (!el) return;
       const act = el.dataset.dtk;
