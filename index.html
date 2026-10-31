@@ -97,7 +97,7 @@
   <button class="nav-btn" data-screen="myworld" data-tip="My World" aria-label="My World">My World</button>
 </nav>
   <main>
-        <section id="screen-dashboard" class="screen" style="display:none"></section>
+    <section id="screen-dashboard" class="screen" style="display:none"></section>
     <section id="screen-calendar" class="screen">
       <div id="calendar-header">
                 <button id="calendar-prev" type="button" aria-label="Previous month">&lsaquo;</button>
@@ -487,10 +487,11 @@
     <script src="calendar.js"></script>
   <script src="calendar-day.js"></script>
   <script src="library.js"></script>
-    <script src="study.js"></script>
-  <script src="dashboard.js"></script>
+  <script src="study-templates-data.js"></script>
   <script src="study-wallpaper.js"></script>
   <script src="study.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="dashboard-calendar.js"></script>
   <script src="gamification-data.js"></script>
   <script src="productivity-data.js"></script>
 
@@ -545,7 +546,7 @@
     Calendar.init();
         Journal.init();
     Library.init();
-        Study.init();
+    Study.init();
     Dashboard.init();
     StudyWallpaper.init();
     Progress.init();
@@ -631,7 +632,7 @@
     });
     // Mobile drawer: close after choosing a screen, on a scrim tap, or on Escape (unless a modal owns it).
     if (nav) nav.addEventListener('click', function (e) {
-            if (isMobile() && e.target.closest('.nav-btn, .nav-brand')) setOpen(false);
+      if (isMobile() && e.target.closest('.nav-btn, .nav-brand')) setOpen(false);
     });
     document.addEventListener('click', function (e) {
       if (isMobile() && e.target === body && body.classList.contains('nav-open')) setOpen(false);
@@ -648,7 +649,7 @@
     });
     function syncLabel() {
       if (!nav || !label) return;
-            var active = nav.querySelector('.nav-btn.active');
+      var active = nav.querySelector('.nav-btn.active');
       if (!active) return; // Dashboard has no nav tab; Dashboard.render sets its label
       label.textContent = active.getAttribute('data-tip') || active.textContent.trim();
     }
