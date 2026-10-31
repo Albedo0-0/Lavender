@@ -12,8 +12,9 @@ const Nav = (function () {
     });
 
     document.querySelectorAll('.nav-btn').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.screen === screenName);
+            btn.classList.toggle('active', btn.dataset.screen === screenName);
     });
+    document.body.classList.toggle('dashboard-open', screenName === 'dashboard');
 
     if (typeof StudyWallpaper !== 'undefined') {
       if (screenName === 'study') StudyWallpaper.resumeVideo(); else StudyWallpaper.pauseVideo();
@@ -68,7 +69,7 @@ if (utilBtn && utilDrawer) {
 }
 
     
-    const startScreen = State.get().currentScreen || 'calendar';
+        const startScreen = 'dashboard';
     switchTo(startScreen);
   }
 
