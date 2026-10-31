@@ -251,3 +251,201 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
 @media (max-width: 860px) {
   #dash-calendar .dcal-list { max-height: 240px; }
 }
+
+/* ==========================================================================
+   Phase 3B — Box 8: Tasks (viewing only) and Box 3: Habits (marking only)
+   ========================================================================== */
+#screen-dashboard :is(.dtk-sel-btn, .dtk-opt, .dtk-nav, .dtk-row, .dhb-mark) {
+  appearance: none;
+  margin: 0;
+  min-height: 0;
+  box-shadow: none;
+  transform: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ----- Tasks ----- */
+#dash-tasks .dash-body { display: flex; flex-direction: column; gap: 8px; overflow: visible; }
+#screen-dashboard .dtk-bar { flex: none; display: flex; align-items: center; gap: 8px; min-width: 0; }
+#screen-dashboard .dtk-sel { position: relative; flex: none; }
+#screen-dashboard .dtk-sel-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  background: var(--dash-cream);
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dtk-sel-btn::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: var(--dash-bw) solid currentColor;
+  border-bottom: var(--dash-bw) solid currentColor;
+  transform: rotate(45deg);
+}
+#screen-dashboard .dtk-sel-btn:hover,
+#screen-dashboard .dtk-open .dtk-sel-btn { background: var(--dash-moss-soft); }
+#screen-dashboard .dtk-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  margin: 0;
+  padding: 3px;
+  list-style: none;
+  background: var(--dash-cream);
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dtk-opt {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+}
+#screen-dashboard .dtk-opt:hover { background: var(--dash-moss-soft); }
+#screen-dashboard .dtk-opt-on,
+#screen-dashboard .dtk-opt-on:hover { background: var(--dash-ink); color: var(--dash-cream); }
+
+#screen-dashboard .dtk-date { display: flex; align-items: center; gap: 4px; min-width: 0; }
+#screen-dashboard .dtk-nav {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dtk-nav:hover { background: var(--dash-moss-soft); }
+#screen-dashboard .dtk-date-input {
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--dash-ink);
+  background: var(--dash-cream);
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+}
+
+#screen-dashboard .dtk-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+#screen-dashboard .dtk-day {
+  padding: 8px 0 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-ink-faint);
+}
+#screen-dashboard .dtk-group:first-child .dtk-day { padding-top: 0; }
+#screen-dashboard .dtk-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 4px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(52, 49, 43, 0.1);
+  border-radius: 0;
+}
+#screen-dashboard .dtk-row:hover { background: var(--dash-moss-soft); }
+#screen-dashboard .dtk-when {
+  flex: 0 0 104px;
+  font-size: 11px;
+  color: var(--dash-ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+#screen-dashboard .dtk-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  color: rgba(52, 49, 43, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dtk-meta {
+  flex: none;
+  max-width: 30%;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--dash-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dtk-done .dtk-title { text-decoration: line-through; color: var(--dash-ink-faint); }
+#screen-dashboard .dtk-empty { margin: 4px 0 0; font-size: 12px; color: var(--dash-ink-faint); }
+
+/* ----- Habits ----- */
+#dash-habits .dash-body { display: flex; overflow: hidden; }
+#screen-dashboard .dhb-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+}
+#screen-dashboard .dhb-slide {
+  flex: 0 0 86%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  scroll-snap-align: start;
+}
+#screen-dashboard .dhb-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dhb-mark {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  white-space: pre;
+  background: linear-gradient(90deg, var(--dash-moss-soft) var(--dhb-fill, 0%), var(--dash-cream) var(--dhb-fill, 0%));
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#screen-dashboard .dhb-mark.dhb-full { background: var(--dash-moss); }
+#screen-dashboard .dhb-hint { font-size: 10px; letter-spacing: 0.04em; color: var(--dash-ink-faint); }
+#screen-dashboard .dhb-empty { margin: 4px 0 0; font-size: 12px; color: var(--dash-ink-faint); }
+
+@media (max-width: 860px) {
+  #dash-tasks .dtk-list { max-height: 260px; }
+}
