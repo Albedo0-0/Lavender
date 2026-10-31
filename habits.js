@@ -346,5 +346,12 @@ const Habits = (function () {
     TimeEngine.subscribe(pollReminders, SUBSCRIBER_ID); // stable id: re-init replaces, never stacks
   }
 
-  return { init: init, open: function () { show(true); } };
+    // mark: the one entry point the Dashboard Habits box uses. It runs this module's own onCell / onCellUndo
+  // (Water, Sleep and HabitData.tap rules included); dir = -1 undoes one step. render() is a no-op when the
+  // Habits modal is closed, so this has no UI side effects of its own.
+  return {
+    init: init,
+    open: function () { show(true); },
+    mark: function (habitId, dateStr, dir) { if (dir < 0) onCellUndo(habitId, dateStr); else onCell(habitId, dateStr); }
+  };
 })();
