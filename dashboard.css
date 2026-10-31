@@ -84,9 +84,9 @@
     grid-template-columns: minmax(0, 68fr) minmax(0, 32fr);
   }
   #screen-dashboard .dash-left {
-        grid-template-rows: minmax(0, 18fr) minmax(0, 24fr) minmax(0, 24fr) minmax(0, 34fr);
+    grid-template-rows: minmax(0, 18fr) minmax(0, 24fr) minmax(0, 24fr) minmax(0, 34fr);
   }
-    #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #screen-dashboard .dash-row-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #screen-dashboard .dash-row-3 { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
   #screen-dashboard .dash-right { grid-template-rows: minmax(0, 56fr) minmax(0, 44fr); }
@@ -97,6 +97,7 @@
   #screen-dashboard .dash-box { min-height: 140px; }
   #screen-dashboard .dash-entity { min-height: 96px; }
 }
+
 /* Lavender plaque in the sidebar: cream "open" state while the Dashboard is showing,
    matching the active tab style. Only colours change; size and typography are untouched. */
 body.dashboard-open #main-nav .nav-brand {
@@ -104,3 +105,149 @@ body.dashboard-open #main-nav .nav-brand {
   color: var(--color-sage-800);
 }
 body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
+
+/* ==========================================================================
+   Phase 3A — Box 7: compact month calendar + upcoming events
+   ========================================================================== */
+#dash-calendar .dash-body { display: flex; flex-direction: column; gap: 10px; }
+#screen-dashboard .dcal { flex: none; }
+#screen-dashboard .dcal button {
+  appearance: none;
+  margin: 0;
+  box-shadow: none;
+  transform: none;
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+#screen-dashboard .dcal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#screen-dashboard .dcal-nav {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dcal-title {
+  min-height: 0;
+  padding: 3px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: var(--dash-bw) solid transparent;
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dcal-nav:hover,
+#screen-dashboard .dcal-title:hover { background: var(--dash-moss-soft); }
+#screen-dashboard .dcal-nav:hover { background: var(--dash-moss-soft); }
+
+#screen-dashboard .dcal-weekdays,
+#screen-dashboard .dcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+#screen-dashboard .dcal-weekdays { margin-bottom: 3px; }
+#screen-dashboard .dcal-weekdays span {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-ink-faint);
+}
+
+#screen-dashboard .dcal-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 0.72;
+  min-height: 0;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: transparent;
+  border: var(--dash-bw) solid transparent;
+  border-radius: var(--dash-radius);
+}
+#screen-dashboard .dcal-blank { pointer-events: none; }
+#screen-dashboard button.dcal-day:hover { background: var(--dash-parchment); border-color: var(--dash-ink-faint); }
+#screen-dashboard .dcal-today { background: var(--dash-moss-soft); border-color: var(--dash-ink); }
+#screen-dashboard button.dcal-sel,
+#screen-dashboard button.dcal-sel:hover { background: var(--dash-ink); border-color: var(--dash-ink); color: var(--dash-cream); }
+/* A day with events: one small square pixel under the number */
+#screen-dashboard .dcal-has::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  background: #6f7d58;
+}
+#screen-dashboard .dcal-sel.dcal-has::after { background: var(--dash-cream); }
+
+#screen-dashboard .dcal-events {
+  flex: 1 1 0;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid rgba(52, 49, 43, 0.18);
+}
+#screen-dashboard .dcal-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+#screen-dashboard .dcal-event {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(52, 49, 43, 0.1);
+}
+#screen-dashboard .dcal-event:last-child { border-bottom: 0; }
+#screen-dashboard .dcal-ev-date {
+  flex: 0 0 96px;
+  font-size: 11px;
+  color: var(--dash-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+#screen-dashboard .dcal-ev-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  color: rgba(52, 49, 43, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dcal-ev-tag {
+  flex: none;
+  max-width: 30%;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--dash-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dcal-empty { margin: 4px 0 0; font-size: 12px; color: var(--dash-ink-faint); }
+
+@media (max-width: 860px) {
+  #dash-calendar .dcal-list { max-height: 240px; }
+}
