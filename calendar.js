@@ -632,6 +632,7 @@ const Calendar = (function () {
   }
 
   function render() {
+    if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.refresh) DashboardCalendar.refresh();
     const grid = document.getElementById('calendar-grid');
     const label = document.getElementById('calendar-month-label');
     if (!grid || !label) return;
@@ -1298,6 +1299,13 @@ const Calendar = (function () {
     render();
   }
 
+  function showMonth(year, month) {
+    viewYear = year;
+    viewMonth = month;
+    viewMode = 'month';
+    render();
+  }
+
   function init() {
     const now = new Date();
     viewYear = now.getFullYear();
@@ -1345,6 +1353,7 @@ const prevBtn = document.getElementById('calendar-prev');
         openPlan: function (opts) { if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open(opts); },
     blocksFor: weekBlocksFor,
     layoutLanes: layoutLanes,
+    showMonth: showMonth,
     getSelectedWeek: function () { return selectedWeekStart; }
   };
 })();
