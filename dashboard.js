@@ -376,7 +376,10 @@ const Dashboard = (function () {
     if (!root.querySelector('.dash')) root.innerHTML = markup();
     const ctx = document.getElementById('nav-context-label');
     if (ctx) ctx.textContent = 'Dashboard';
-    if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
+        if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
+    renderTasks(false);
+    renderHabits();
+    startLive();
   }
 
   // Binds the existing Lavender plaque once. Adds no attributes, classes or styles to it.
