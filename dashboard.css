@@ -377,11 +377,21 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+#screen-dashboard .dtk-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 #screen-dashboard .dtk-title {
-  flex: 1 1 auto;
-  min-width: 0;
+  display: block;
   font-size: 12.5px;
   color: rgba(52, 49, 43, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#screen-dashboard .dtk-parent {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--dash-ink-faint);
+  opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -405,19 +415,23 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  gap: 10px;
+  gap: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
 }
+/* One habit per slide: each slide is exactly as wide as the box, and a swipe stops on the next slide. */
 #screen-dashboard .dhb-slide {
-  flex: 0 0 86%;
+  flex: 0 0 100%;
   min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 8px;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 #screen-dashboard .dhb-title {
   font-size: 14px;
