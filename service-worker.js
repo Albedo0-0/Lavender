@@ -1,6 +1,6 @@
 // service-worker.js — cache-first for app shell, network-only for streams.
 // Bump CACHE_VERSION whenever JS/CSS/HTML changes to force a clean update.
-const CACHE_VERSION = 'lavender-vDay3';
+const CACHE_VERSION = 'lavender-vDay4';
 
 const APP_SHELL = [
   './',
@@ -35,6 +35,7 @@ const APP_SHELL = [
   './study-wallpaper.js',
   './study.js',
   './dashboard.js',
+  './dashboard-calendar.js',
   './gamification-data.js',
   './productivity-data.js',
     './progress-data.js',
