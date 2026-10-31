@@ -1,0 +1,99 @@
+/* dashboard.css — Dashboard shell styling (Phase 1+2). Everything is scoped to #screen-dashboard.
+   Reuses style.css tokens; the page background is the global one (no Dashboard background). */
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&display=swap');
+
+#screen-dashboard {
+  --dash-font: 'Exo 2', var(--font-body), system-ui, sans-serif;
+  --dash-ink: #34312b;
+  --dash-ink-faint: rgba(52, 49, 43, 0.62);
+  --dash-bw: 1.5px;
+  --dash-radius: 5px;
+  --dash-gap: 14px;
+  --dash-cream: var(--color-cream-050);
+  --dash-parchment: var(--color-cream-200);
+  --dash-moss-soft: #dfe5cd;
+  --dash-moss: #9aa782;
+  font-family: var(--dash-font);
+  color: var(--dash-ink);
+}
+#screen-dashboard :is(button, input, select, textarea) { font-family: inherit; }
+
+#screen-dashboard .dash,
+#screen-dashboard .dash-left,
+#screen-dashboard .dash-row,
+#screen-dashboard .dash-right {
+  display: grid;
+  gap: var(--dash-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+#screen-dashboard .dash-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 14px 14px;
+  background: var(--dash-cream);
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+  box-shadow: none;
+}
+#screen-dashboard .dash-entity,
+#screen-dashboard .dash-b5 { background: var(--dash-moss-soft); }
+#screen-dashboard :is(.dash-b2, .dash-b3, .dash-b8) { background: var(--dash-parchment); }
+
+#screen-dashboard .dash-label {
+  flex: none;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-ink-faint);
+  user-select: none;
+}
+#screen-dashboard .dash-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
+/* Pixel accent: a two-row dithered ground line, entity area only (the pond arrives in a later phase) */
+#screen-dashboard .dash-entity { overflow: hidden; }
+#screen-dashboard .dash-entity::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    linear-gradient(90deg, var(--dash-moss) 50%, transparent 50%) 0 0 / 8px 4px repeat-x,
+    linear-gradient(90deg, transparent 50%, var(--dash-moss) 50%) 0 4px / 8px 4px repeat-x;
+}
+
+/* Desktop: entity above the left workspace; right column spans the full height.
+   Bottom edges of Box 5, 6 and 8 align because they close the same grid. */
+@media (min-width: 861px) {
+  #screen-dashboard { padding-top: var(--space-3); }
+  #screen-dashboard .dash {
+    height: calc(100vh - 108px);
+    height: calc(100dvh - 108px);
+    min-height: 600px;
+    grid-template-columns: minmax(0, 68fr) minmax(0, 32fr);
+  }
+  #screen-dashboard .dash-left {
+    grid-template-rows: minmax(0, 14fr) minmax(0, 24fr) minmax(0, 24fr) minmax(0, 38fr);
+  }
+  #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+  #screen-dashboard .dash-row-2 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  #screen-dashboard .dash-row-3 { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  #screen-dashboard .dash-right { grid-template-rows: minmax(0, 46fr) minmax(0, 54fr); }
+}
+
+/* Below the desktop breakpoint: plain stacked flow only; the real mobile layout is a later phase */
+@media (max-width: 860px) {
+  #screen-dashboard .dash-box { min-height: 140px; }
+  #screen-dashboard .dash-entity { min-height: 96px; }
+}
