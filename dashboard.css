@@ -84,12 +84,12 @@
     grid-template-columns: minmax(0, 68fr) minmax(0, 32fr);
   }
   #screen-dashboard .dash-left {
-    grid-template-rows: minmax(0, 14fr) minmax(0, 24fr) minmax(0, 24fr) minmax(0, 38fr);
+        grid-template-rows: minmax(0, 18fr) minmax(0, 24fr) minmax(0, 24fr) minmax(0, 34fr);
   }
-  #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
-  #screen-dashboard .dash-row-2 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+    #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #screen-dashboard .dash-row-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #screen-dashboard .dash-row-3 { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
-  #screen-dashboard .dash-right { grid-template-rows: minmax(0, 46fr) minmax(0, 54fr); }
+  #screen-dashboard .dash-right { grid-template-rows: minmax(0, 56fr) minmax(0, 44fr); }
 }
 
 /* Below the desktop breakpoint: plain stacked flow only; the real mobile layout is a later phase */
