@@ -97,3 +97,10 @@
   #screen-dashboard .dash-box { min-height: 140px; }
   #screen-dashboard .dash-entity { min-height: 96px; }
 }
+/* Lavender plaque in the sidebar: cream "open" state while the Dashboard is showing,
+   matching the active tab style. Only colours change; size and typography are untouched. */
+body.dashboard-open #main-nav .nav-brand {
+  background: var(--color-cream-050);
+  color: var(--color-sage-800);
+}
+body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
