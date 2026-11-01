@@ -242,8 +242,8 @@ const Dashboard = (function () {
   // (Water, Sleep and the generic HabitData.tap). This box only displays today's log and forwards gestures.
   const HAB_LONG_PRESS_MS = 450; // same threshold as habits.js
   let habSig = '';
-  let liveOn = false;
-
+    let liveOn = false;
+  let habIdx = 0;
   function habState(h, log) {
     const c = log ? (log.count || 0) : 0;
     if (h.systemKey === 'sleep') {
@@ -279,6 +279,18 @@ const Dashboard = (function () {
     }).join('~');
   }
 
+    // Same slide mechanism as Daily Reflection: one habit per slide, arrows + dots, no scrollbar.
+  // habIdx is UI selection only; it survives re-renders (marking, live refresh) and is clamped to the habit count.
+  function habApply(host) {
+    const slides = host.querySelectorAll('.dhb-slide');
+    if (!slides.length) return;
+    habIdx = ((habIdx % slides.length) + slides.length) % slides.length;
+    slides.forEach(function (el, i) { el.hidden = i !== habIdx; });
+    host.querySelectorAll('.drf-dot').forEach(function (el) {
+      if (Number(el.dataset.hgo) === habIdx) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+    });
+  }
+
   function renderHabits() {
     const host = document.querySelector('#dash-habits .dash-body');
     if (!host) return;
@@ -286,18 +298,22 @@ const Dashboard = (function () {
     if (typeof HabitData === 'undefined') { host.innerHTML = '<p class="dhb-empty">Habits are unavailable.</p>'; return; }
     const items = habItems();
     habSig = habSignature(items);
-    const prev = host.querySelector('.dhb-track');
-    const keep = prev ? prev.scrollLeft : 0;
+    const nav = items.length > 1
+      ? '<div class="drf-nav" role="group" aria-label="Habit slides">' +
+          '<button type="button" class="drf-arrow" data-hnav="-1" aria-label="Previous habit">\u2039</button>' +
+          items.map(function (it, i) { return '<button type="button" class="drf-dot" data-hgo="' + i + '" aria-label="' + esc(it.h.title) + '"></button>'; }).join('') +
+          '<button type="button" class="drf-arrow" data-hnav="1" aria-label="Next habit">\u203a</button>' +
+        '</div>'
+      : '';
     host.innerHTML = items.length
-      ? '<div class="dhb-track" role="list">' + items.map(function (it) {
+      ? nav + '<div class="dhb-track" role="list">' + items.map(function (it) {
           return '<div class="dhb-slide" role="listitem">' +
             '<span class="dhb-title">' + esc(it.h.title) + '</span>' +
             '<button type="button" class="dhb-mark' + (it.pct >= 100 ? ' dhb-full' : '') + '" data-habit="' + esc(it.h.habitId) + '" data-date="' + it.date + '" style="--dhb-fill:' + it.pct + '%" aria-label="Mark ' + esc(it.h.title) + '">' + esc(it.label) + '</button>' +
             '<span class="dhb-hint">Tap to mark \u00b7 hold to undo</span></div>';
         }).join('') + '</div>'
       : '<p class="dhb-empty">No habits yet.</p>';
-    const track = host.querySelector('.dhb-track');
-    if (track) track.scrollLeft = keep;
+    habApply(host);
   }
 
   function markHabit(habitId, date, dir) {
@@ -312,8 +328,12 @@ const Dashboard = (function () {
     host.dataset.dhbBound = '1';
     let press = null;
     let suppress = false;
-    host.addEventListener('click', function (e) {
+        host.addEventListener('click', function (e) {
       if (suppress) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+      const nv = e.target.closest('[data-hnav]');
+      if (nv) { habIdx += Number(nv.dataset.hnav); habApply(host); return; }
+      const gv = e.target.closest('[data-hgo]');
+      if (gv) { habIdx = Number(gv.dataset.hgo); habApply(host); return; }
       const b = e.target.closest('.dhb-mark');
       if (b && !b.disabled) markHabit(b.dataset.habit, b.dataset.date, 1);
     });
