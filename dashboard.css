@@ -1,6 +1,6 @@
 /* dashboard.css — Dashboard shell styling (Phase 1+2). Everything is scoped to #screen-dashboard.
    Reuses style.css tokens; the page background is the global one (no Dashboard background). */
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&display=swap');
+/* Exo 2 is loaded without blocking this stylesheet: see loadFont() in dashboard.js. */
 
 #screen-dashboard {
   --dash-font: 'Exo 2', var(--font-body), system-ui, sans-serif;
