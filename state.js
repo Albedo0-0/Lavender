@@ -5,7 +5,7 @@ const State = (function () {
   const STORAGE_KEY = 'appState';
 
   const defaultState = {
-    currentScreen: 'calendar',
+    currentScreen: 'dashboard',
     dateHubs: {}, // Feature 1/2B: per-date record { color, note, important, label, studyHours, ... }
     studyStreak: { highScore: 0 }, // Feature 2B: persisted high score; current streak is always derived live
     topics: {}, // Planner: topicId -> { topicId, subject, topicName, tags: [] }
