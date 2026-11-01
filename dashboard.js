@@ -647,11 +647,61 @@ const Dashboard = (function () {
   // One subscriber on TimeEngine's shared heartbeat (stable id, so a re-run replaces rather than stacks).
   // It only compares what is displayed against what is now canonical, so changes made in the Assistant
   // Habits menu (or anywhere else) show up here, and the day rolling over refreshes both boxes.
+  // ---------- Box 4: Daily Reflection (three read-only figures for today) ----------
+  // Study Hours and Questions come from PTPE.value(key, PTPE.today()), the same per-day source Study Analytics reads.
+  // Tasks Completed is PlanningAgentTasks.getCompletedToday(), which filters on each task's real completedAt date
+  // (not its scheduled date). Nothing is stored or recomputed here; a missing record shows as 0.
+  const RF_CHECK_MS = 5000;
+  let rfSig = '';
+  let rfCheckAt = 0;
+
+  function rfNum(key) {
+    try {
+      if (typeof PTPE === 'undefined') return 0;
+      const v = PTPE.value(key, PTPE.today());
+      return typeof v === 'number' && isFinite(v) ? v : 0;
+    } catch (err) {
+      console.warn('Dashboard reflection value failed', key, err);
+      return 0;
+    }
+  }
+
+  function rfFigures() {
+    let hours = '0';
+    let tasks = 0;
+    try { hours = PTPE.fmtHours(rfNum('studyHours')); } catch (err) { console.warn('Dashboard reflection hours failed', err); }
+    try { if (typeof PlanningAgentTasks !== 'undefined') tasks = PlanningAgentTasks.getCompletedToday().length; } catch (err) { console.warn('Dashboard reflection tasks failed', err); }
+    return [
+      { name: 'Study Hours', value: String(hours) },
+      { name: 'Questions Solved', value: String(Math.round(rfNum('questions'))) },
+      { name: 'Tasks Completed', value: String(tasks) }
+    ];
+  }
+
+  function rfSignature(items) {
+    return (typeof PTPE !== 'undefined' && PTPE.today ? PTPE.today() : todayStr()) + '#' + items.map(function (it) { return it.value; }).join('|');
+  }
+
+  function renderReflection() {
+    const host = document.querySelector('#dash-reflection .dash-body');
+    if (!host) return;
+    const items = rfFigures();
+    rfSig = rfSignature(items);
+    host.innerHTML = '<div class="drf-grid">' + items.map(function (it) {
+      return '<div class="drf-item"><span class="drf-value">' + esc(it.value) + '</span><span class="drf-name">' + esc(it.name) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
   function liveTick() {
     const hb = document.querySelector('#dash-habits .dash-body');
     if (hb && hb.offsetParent !== null && typeof HabitData !== 'undefined' && habSignature(habItems()) !== habSig) renderHabits();
     const tb = document.querySelector('#dash-tasks .dash-body');
     if (tb && tb.offsetParent !== null && tkDay && tkDay !== todayStr()) renderTasks(false);
+    const rb = document.querySelector('#dash-reflection .dash-body');
+    if (rb && rb.offsetParent !== null && Date.now() - rfCheckAt >= RF_CHECK_MS) {
+      rfCheckAt = Date.now();
+      if (rfSignature(rfFigures()) !== rfSig) renderReflection();
+    }
     const ab = document.querySelector('#dash-analytics .dash-body');
     if (ab && ab.offsetParent !== null) anTick();
   }
@@ -702,6 +752,7 @@ const Dashboard = (function () {
         if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
     renderTasks(false);
     renderHabits();
+    renderReflection();
     anOpen();
     startLive();
   }
