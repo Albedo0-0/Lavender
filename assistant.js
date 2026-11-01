@@ -296,15 +296,22 @@ const Assistant = (function () {
 
   // ---------- Store (§7.3) ----------
 
-  const WORLD_COST = 1000;
+  // World prices come from each world's own definition (MyWorldContent.get(id).cost).
 
   function storeRowHtml(w) {
     const owned = w.owned || w.cost === 0;
-    return '<div class="assistant-store-item" data-world-id="' + esc(w.id) + '">' +
-      '<span class="assistant-store-item-name">' + esc(w.name) + '</span>' +
-      (owned
-        ? '<span class="tag tag-neutral">Owned</span>'
-        : '<button class="btn-secondary assistant-store-buy" data-world-id="' + esc(w.id) + '">Buy \u2014 ' + WORLD_COST + ' EXP</button>') +
+    const free = w.cost === 0;
+    const states = (owned
+      ? '<span class="tag lvstore-state ' + (free ? 'lvstore-state-owned">Owned' : 'lvstore-state-purchased">Purchased') + '</span>'
+      : '<span class="tag lvstore-state lvstore-state-locked">Not owned</span>') +
+      (w.active ? '<span class="tag lvstore-state lvstore-state-active">Active</span>' : '');
+    return '<div class="assistant-store-item lvstore-card' + (owned ? ' is-owned' : ' is-locked') + (w.active ? ' is-active' : '') + '" data-world-id="' + esc(w.id) + '">' +
+      '<div class="lvstore-preview lvstore-preview-world" data-world-preview-id="' + esc(w.id) + '" role="img" aria-label="' + esc(w.name) + ' scene preview"></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + esc(w.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">World \u00b7 v' + esc(w.version) + '</div>' +
+      '<div class="lvstore-price">' + (free ? 'Free' : esc(w.cost) + ' EXP') + '</div>' +
+      '<div class="lvstore-states">' + states + '</div>' +
+      (owned ? '' : '<div class="lvstore-actions"><button type="button" class="btn-secondary assistant-store-buy lvstore-buy" data-world-id="' + esc(w.id) + '">Buy \u2014 ' + esc(w.cost) + ' EXP</button></div>') +
       '<span class="assistant-store-msg" data-world-id="' + esc(w.id) + '"></span>' +
     '</div>';
   }
@@ -320,13 +327,22 @@ const Assistant = (function () {
   // the existing Store", using the existing Cosmetics/ownership system for unlocked/active) ----------
 
   function packRowHtml(p) {
-    return '<div class="assistant-store-item" data-pack-id="' + esc(p.id) + '">' +
-      '<span class="assistant-store-item-name">' + esc(p.name) + '</span>' +
-      (p.unlocked
-        ? (p.active
-            ? '<span class="tag tag-neutral">Active</span>'
-            : '<button class="btn-secondary assistant-pack-switch" data-pack-id="' + esc(p.id) + '">Switch to this</button>')
-        : '<button class="btn-secondary assistant-pack-buy" data-pack-id="' + esc(p.id) + '">Buy \u2014 ' + p.cost + ' EXP</button>') +
+    const free = p.cost === 0;
+    const states = (p.unlocked
+      ? '<span class="tag lvstore-state ' + (free ? 'lvstore-state-owned">Owned' : 'lvstore-state-purchased">Purchased') + '</span>'
+      : '<span class="tag lvstore-state lvstore-state-locked">Not owned</span>') +
+      (p.active ? '<span class="tag lvstore-state lvstore-state-active">Active</span>' : '');
+    const action = p.unlocked
+      ? (p.active ? '' : '<button type="button" class="btn-secondary assistant-pack-switch lvstore-switch" data-pack-id="' + esc(p.id) + '">Switch to this</button>')
+      : '<button type="button" class="btn-secondary assistant-pack-buy lvstore-buy" data-pack-id="' + esc(p.id) + '">Buy \u2014 ' + esc(p.cost) + ' EXP</button>';
+    return '<div class="assistant-store-item lvstore-card' + (p.unlocked ? ' is-owned' : ' is-locked') + (p.active ? ' is-active' : '') + '" data-pack-id="' + esc(p.id) + '">' +
+      '<div class="lvstore-preview lvstore-preview-companion" role="img" aria-label="' + esc(p.name) + ' preview">' +
+        '<canvas width="160" height="160" data-pack-preview-id="' + esc(p.id) + '"></canvas></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + esc(p.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">Companion</div>' +
+      '<div class="lvstore-price">' + (free ? 'Free' : esc(p.cost) + ' EXP') + '</div>' +
+      '<div class="lvstore-states">' + states + '</div>' +
+      (action ? '<div class="lvstore-actions">' + action + '</div>' : '') +
       '<span class="assistant-store-msg" data-pack-id="' + esc(p.id) + '"></span>' +
     '</div>';
   }
@@ -339,16 +355,29 @@ const Assistant = (function () {
   }
 
   function wireStore() {
+    document.querySelectorAll('[data-store-filter]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        storeFilter = b.getAttribute('data-store-filter') || 'all';
+        applyStoreFilter();
+      });
+    });
+    applyStoreFilter();
     document.querySelectorAll('.assistant-store-buy').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.dataset.worldId;
         const msg = document.querySelector('.assistant-store-msg[data-world-id="' + id + '"]');
+        const worldDef = (typeof MyWorldContent !== 'undefined') ? MyWorldContent.get(id) : null;
+        const worldCost = worldDef ? worldDef.cost : NaN;
+        if (!worldDef || worldDef.type !== 'world' || typeof worldCost !== 'number' || !isFinite(worldCost) || worldCost < 0) {
+          if (msg) msg.textContent = 'This world cannot be bought right now';
+          return;
+        }
         const gam = GamificationData.getGamState();
-        if (gam.totalExp < WORLD_COST) {
+        if (gam.totalExp < worldCost) {
           if (msg) msg.textContent = 'Not enough EXP';
           return;
         }
-        GamificationData.spendExp(WORLD_COST, 'World unlocked: ' + id);
+        GamificationData.spendExp(worldCost, 'World unlocked: ' + id);
         MyWorldContent.grant(id);
         if (typeof Gamification !== 'undefined' && Gamification.renderMeter) Gamification.renderMeter();
         openStore();
@@ -383,17 +412,67 @@ const Assistant = (function () {
     openStore();
   }
 
+  let storeFilter = 'all';
+
+  function storeBalanceHtml() {
+    try {
+      if (typeof GamificationData === 'undefined') return '';
+      return '<span class="lvstore-balance" aria-label="Your EXP balance">' + esc(GamificationData.getGamState().totalExp) + ' EXP</span>';
+    } catch (e) { return ''; }
+  }
+
+  function applyStoreFilter() {
+    document.querySelectorAll('[data-store-cat]').forEach(function (el) {
+      el.hidden = storeFilter !== 'all' && el.getAttribute('data-store-cat') !== storeFilter;
+    });
+    document.querySelectorAll('[data-store-filter]').forEach(function (b) {
+      const on = b.getAttribute('data-store-filter') === storeFilter;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  // Previews are drawn from each pack's own data, looked up by pack id (never by position).
+  function paintStorePreviews() {
+    document.querySelectorAll('[data-world-preview-id]').forEach(function (el) {
+      let r = { ok: false, reason: 'My World engine is not loaded.' };
+      try {
+        if (typeof MyWorld !== 'undefined' && MyWorld.preview) r = MyWorld.preview(el.getAttribute('data-world-preview-id'), el);
+      } catch (err) { r = { ok: false, reason: String(err && err.message || err) }; }
+      if (!r.ok) el.innerHTML = '<span class="lvstore-preview-note">Preview unavailable: ' + esc(r.reason) + '</span>';
+    });
+    document.querySelectorAll('canvas[data-pack-preview-id]').forEach(function (cv) {
+      const pack = (typeof AssistantLVPackData !== 'undefined') ? AssistantLVPackData.get(cv.getAttribute('data-pack-preview-id')) : null;
+      const px = pack && pack.pixel;
+      if (!px || !px.palette) { cv.parentNode.innerHTML = '<span class="lvstore-preview-note">Preview unavailable: pack has no pixel data.</span>'; return; }
+      const rows = (typeof px.render === 'function') ? px.render({}) : (px.idle && px.idle[0]);
+      if (!rows) { cv.parentNode.innerHTML = '<span class="lvstore-preview-note">Preview unavailable: pack has no frame.</span>'; return; }
+      drawPixelFrame(rows, px.palette, cv);
+    });
+  }
+
   function openStore() {
     Modal.open(backBtnHtml() +
-      '<div class="assistant-page assistant-page-plain">' +
-        '<h3 class="section-title">Store</h3>' +
-        '<h4 class="section-title">Worlds</h4>' +
-        '<div class="assistant-store-card">' + storeBodyHtml() + '</div>' +
-        '<h4 class="section-title">Companion Packs</h4>' +
-        '<div class="assistant-store-card">' + assistantPacksBodyHtml() + '</div>' +
-        '<div id="assistant-entity-store"></div>' +
+      '<div class="assistant-page assistant-page-plain lvstore">' +
+        '<div class="lvstore-top"><h3 class="section-title lvstore-brand">LV Pack Store</h3>' + storeBalanceHtml() + '</div>' +
+        '<div class="lvstore-layout">' +
+          '<nav class="lvstore-rail" aria-label="Store categories">' +
+            '<button type="button" class="lvstore-pill" data-store-filter="all">All</button>' +
+            '<button type="button" class="lvstore-pill" data-store-filter="worlds">Worlds</button>' +
+            '<button type="button" class="lvstore-pill" data-store-filter="companions">Companions</button>' +
+            '<button type="button" class="lvstore-pill" data-store-filter="entity">Entities</button>' +
+          '</nav>' +
+          '<div class="lvstore-main">' +
+            '<section class="lvstore-section" data-store-cat="worlds"><h4 class="section-title">Worlds</h4>' +
+              '<div class="assistant-store-card">' + storeBodyHtml() + '</div></section>' +
+            '<section class="lvstore-section" data-store-cat="companions"><h4 class="section-title">Companion Packs</h4>' +
+              '<div class="assistant-store-card">' + assistantPacksBodyHtml() + '</div></section>' +
+            '<div id="assistant-entity-store" class="lvstore-section" data-store-cat="entity"></div>' +
+          '</div>' +
+        '</div>' +
       '</div>');
     wireBack(storeBack ? function () { Modal.close(); storeBack(); } : undefined);
+    paintStorePreviews(); // before the filter hides anything, so every preview area has a size
     wireStore();
     // Dashboard Entity packs: own section, own manager. A failure here must never break the Store above.
     // Never silently omitted: if the Entity scripts did not load, the section says so and why.
@@ -505,15 +584,17 @@ const Assistant = (function () {
   const TAIL_SEQ = [0, 1, 2, 2, 1, 0];
   function rand(a, b) { return a + Math.random() * (b - a); }
 
-  function drawPixelFrame(rows, palette) {
-    if (!pixelCanvasEl) return;
-    const ctx = pixelCanvasEl.getContext('2d');
+  function drawPixelFrame(rows, palette, targetCanvas) {
+    const cv = targetCanvas || pixelCanvasEl;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
     if (!ctx) return;
+    const size = targetCanvas ? targetCanvas.width : PIXEL_CANVAS_SIZE;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, PIXEL_CANVAS_SIZE, PIXEL_CANVAS_SIZE);
+    ctx.clearRect(0, 0, size, size);
     // Each frame may use its own grid (8x8 legacy packs, 20x20 refined cat); the grid always
     // fills the same canvas, so the displayed size never changes.
-    const cell = PIXEL_CANVAS_SIZE / rows.length;
+    const cell = size / rows.length;
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       const y0 = Math.round(r * cell);
