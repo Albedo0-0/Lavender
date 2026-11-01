@@ -374,7 +374,8 @@ const Dashboard = (function () {
   // 'dashboard-live' TimeEngine subscriber (liveTick), throttled, so no timer or subscription is added.
   const AN_DEFAULT = 'studyHours';
   const AN_CHECK_MS = 5000;
-  let anKey = AN_DEFAULT;
+    let anKey = AN_DEFAULT;
+  let anSeen = false;
   let anSel = '';
   let anMenu = false;
   let anModel = null;
@@ -656,11 +657,12 @@ const Dashboard = (function () {
   }
 
   // Every Dashboard visit starts on Study Hours with nothing pinned.
-  function anOpen() {
+    function anOpen() {
     anKey = AN_DEFAULT;
     anSel = '';
     anMenu = false;
-    renderAnalytics(true);
+    renderAnalytics(anSeen);
+    anSeen = true;
   }
 
   // Called from liveTick (TimeEngine heartbeat): redraw only when this week's plotted values or the week itself changed.
