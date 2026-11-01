@@ -178,8 +178,10 @@ self.addEventListener('fetch', function (e) {
   e.respondWith(
     // This version's cache only — never caches.match(), which also searches other versions' caches.
     caches.open(CACHE_VERSION).then(function (cache) {
-      // ignoreSearch: style.css?v=8 and launch URLs like /?source=pwa must still hit the precached file.
-      return cache.match(e.request, { ignoreSearch: true }).then(function (cached) {
+            // Exact match first (all scripts); ignoreSearch only as a fallback so style.css?v=8 and launch URLs like /?source=pwa still hit the precached file.
+      return cache.match(e.request).then(function (exact) {
+        return exact || cache.match(e.request, { ignoreSearch: true });
+      }).then(function (cached) {
         if (cached) return cached;
         return fetch(e.request).then(function (response) {
           if (response && response.status === 200 && response.type === 'basic') {
