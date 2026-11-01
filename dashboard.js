@@ -442,7 +442,7 @@ const Dashboard = (function () {
     return DOW[x.getDay()] + ', ' + x.getDate() + ' ' + MON[x.getMonth()] + ' ' + x.getFullYear();
   }
 
-  function anShow(i) {
+    function anShow(i, valueOnly) {
     const host = document.querySelector('#dash-analytics .dan-plot');
     const tip = host && host.querySelector('.dan-tip');
     if (!tip) return;
@@ -453,9 +453,11 @@ const Dashboard = (function () {
     });
     const md = anModel;
     if (i < 0 || !md || md.vals[i] === null || md.vals[i] === undefined) { tip.hidden = true; return; }
-    tip.innerHTML = '<span class="dan-tip-date">' + esc(anLong(md.dates[i])) + '</span>' +
-      '<strong class="dan-tip-val">' + esc(md.m.fmt(md.vals[i])) + '</strong>' +
-      '<span class="dan-tip-note">' + esc(md.m.note) + '</span>';
+        tip.innerHTML = valueOnly
+      ? '<strong class="dan-tip-val">' + esc(md.m.fmt(md.vals[i])) + '</strong>'
+      : '<span class="dan-tip-date">' + esc(anLong(md.dates[i])) + '</span>' +
+        '<strong class="dan-tip-val">' + esc(md.m.fmt(md.vals[i])) + '</strong>' +
+        '<span class="dan-tip-note">' + esc(md.m.note) + '</span>';
     tip.hidden = false;
     const tw = tip.offsetWidth, th = tip.offsetHeight, x = md.xs[i], y = md.ys[i];
     const left = Math.max(2, Math.min(md.W - tw - 2, x - tw / 2));
@@ -564,7 +566,7 @@ const Dashboard = (function () {
     plot.addEventListener('pointerover', function (e) {
       if (e.pointerType !== 'mouse') return;
       const i = anPtIndex(e);
-      if (i >= 0) anShow(i);
+            if (i >= 0) anShow(i, true);
     });
     plot.addEventListener('pointerout', function (e) {
       if (e.pointerType !== 'mouse' || anPtIndex(e) < 0) return;
