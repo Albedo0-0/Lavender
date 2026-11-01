@@ -5154,7 +5154,7 @@ button.notepad-format-btn.notepad-format-active {
   position: relative;
   box-sizing: border-box;
   padding-right: var(--out);
-  font-family: 'Pixelify Sans', 'VT323', var(--font-body), monospace;
+    font-family: var(--font-body);
   color: #f4ecd8;
   user-select: none;
   -webkit-user-select: none;
@@ -10170,7 +10170,7 @@ svg .ptpe-path { fill: none; stroke: var(--ptpe-c); stroke-width: 2.5; stroke-li
   --dhs-line-soft: rgba(63, 94, 77, 0.28);
   --dhs-lift: 0 2px 0 rgba(63, 94, 77, 0.16), 0 6px 14px -8px rgba(38, 54, 45, 0.28);
   --dhs-font: 'DM Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --dhs-serif: 'Lora', 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --dhs-serif: var(--dhs-font);
 
   width: min(600px, 94vw);
   max-width: 600px;
