@@ -88,7 +88,7 @@
   }
   #screen-dashboard .dash-row-1 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   #screen-dashboard .dash-row-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  #screen-dashboard .dash-row-3 { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  #screen-dashboard .dash-row-3 { grid-template-columns: minmax(0, 1fr); }
   #screen-dashboard .dash-right { grid-template-rows: minmax(0, 56fr) minmax(0, 44fr); }
 }
 
@@ -462,4 +462,84 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
 
 @media (max-width: 860px) {
   #dash-tasks .dtk-list { max-height: 260px; }
+}
+
+/* ==========================================================================
+   Merged Box 5 + 6: Study Analytics (metric selector + current-week line graph)
+   The selector reuses the Tasks dropdown classes (.dtk-sel, .dtk-sel-btn, .dtk-menu, .dtk-opt).
+   ========================================================================== */
+#dash-analytics .dash-body { display: flex; flex-direction: column; overflow: visible; }
+#screen-dashboard .dan { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+#screen-dashboard .dan-bar { flex: none; display: flex; align-items: center; min-width: 0; }
+#screen-dashboard .dan-menu { max-height: 176px; overflow-y: auto; }
+#screen-dashboard .dan-plot { position: relative; flex: 1 1 auto; min-height: 0; }
+#screen-dashboard .dan-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+#screen-dashboard .dan-ax { font: 500 10px var(--dash-font); fill: var(--dash-ink-faint); user-select: none; }
+#screen-dashboard .dan-base { stroke: var(--dash-ink); stroke-opacity: 0.35; stroke-width: 1; }
+#screen-dashboard .dan-line {
+  fill: none;
+  stroke: var(--dash-ink);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#screen-dashboard .dan-pt { cursor: pointer; outline: none; }
+#screen-dashboard .dan-hit { fill: transparent; pointer-events: all; }
+#screen-dashboard .dan-dot { fill: var(--dash-cream); stroke: var(--dash-ink); stroke-width: 1.5; }
+#screen-dashboard .dan-on .dan-dot { fill: var(--dash-moss); }
+#screen-dashboard .dan-pt:focus-visible .dan-dot { stroke-width: 2.75; }
+
+#screen-dashboard .dan-tip {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: min(220px, 92%);
+  padding: 7px 10px 8px;
+  background: var(--dash-parchment);
+  border: var(--dash-bw) solid var(--dash-ink);
+  border-radius: var(--dash-radius);
+  pointer-events: none;
+}
+#screen-dashboard .dan-tip[hidden] { display: none; }
+#screen-dashboard .dan-tip-date { font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dash-ink-faint); }
+#screen-dashboard .dan-tip-val { font-size: 15px; font-weight: 600; line-height: 1.2; }
+#screen-dashboard .dan-tip-note { font-size: 11px; line-height: 1.35; color: var(--dash-ink-faint); }
+
+#screen-dashboard .dan-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12px;
+  color: var(--dash-ink-faint);
+}
+#dash-analytics > .dash-body > .dan-empty { position: static; margin: 4px 0 0; justify-content: flex-start; }
+
+/* Subtle transition when the metric changes: the line draws in, then the points fade in. */
+#screen-dashboard .dan-anim .dan-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: dan-draw 0.45s ease-out forwards; }
+#screen-dashboard .dan-anim .dan-pt { opacity: 0; animation: dan-fade 0.25s ease-out 0.25s forwards; }
+@keyframes dan-draw { to { stroke-dashoffset: 0; } }
+@keyframes dan-fade { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #screen-dashboard .dan-anim .dan-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+  #screen-dashboard .dan-anim .dan-pt { animation: none; opacity: 1; }
+}
+
+@media (max-width: 860px) {
+  #dash-analytics { min-height: 280px; }
+  #screen-dashboard .dan-plot { min-height: 190px; }
 }
