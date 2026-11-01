@@ -421,8 +421,8 @@ const Assistant = (function () {
     } catch (e) { return ''; }
   }
 
-      function applyStoreFilter() {
-    document.querySelectorAll('[data-store-cat]').forEach(function (el) {
+  function applyStoreFilter() {
+        document.querySelectorAll('[data-store-cat]').forEach(function (el) {
       el.hidden = el.getAttribute('data-store-cat') !== storeFilter;
     });
     document.querySelectorAll('[data-store-filter]').forEach(function (b) {
@@ -780,6 +780,7 @@ const Assistant = (function () {
             openPlan: function (opts) { if (typeof PlanningAgent !== 'undefined' && PlanningAgent.open) PlanningAgent.open(opts); },
       openSearch: openSearch,
       openStore: openStoreFrom,
-      refreshPixelEntitySkin: refreshPixelEntitySkin
+      refreshPixelEntitySkin: refreshPixelEntitySkin,
+      paintStorePreviews: paintStorePreviews
     };
 })();
