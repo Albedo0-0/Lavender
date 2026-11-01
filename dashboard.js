@@ -242,8 +242,9 @@ const Dashboard = (function () {
   // (Water, Sleep and the generic HabitData.tap). This box only displays today's log and forwards gestures.
   const HAB_LONG_PRESS_MS = 450; // same threshold as habits.js
   let habSig = '';
-    let liveOn = false;
+  let liveOn = false;
   let habIdx = 0;
+
   function habState(h, log) {
     const c = log ? (log.count || 0) : 0;
     if (h.systemKey === 'sleep') {
@@ -279,7 +280,7 @@ const Dashboard = (function () {
     }).join('~');
   }
 
-    // Same slide mechanism as Daily Reflection: one habit per slide, arrows + dots, no scrollbar.
+  // Same slide mechanism as Daily Reflection: one habit per slide, arrows + dots, no scrollbar.
   // habIdx is UI selection only; it survives re-renders (marking, live refresh) and is clamped to the habit count.
   function habApply(host) {
     const slides = host.querySelectorAll('.dhb-slide');
@@ -328,7 +329,7 @@ const Dashboard = (function () {
     host.dataset.dhbBound = '1';
     let press = null;
     let suppress = false;
-        host.addEventListener('click', function (e) {
+    host.addEventListener('click', function (e) {
       if (suppress) { e.stopImmediatePropagation(); e.preventDefault(); return; }
       const nv = e.target.closest('[data-hnav]');
       if (nv) { habIdx += Number(nv.dataset.hnav); habApply(host); return; }
@@ -667,6 +668,121 @@ const Dashboard = (function () {
   // One subscriber on TimeEngine's shared heartbeat (stable id, so a re-run replaces rather than stacks).
   // It only compares what is displayed against what is now canonical, so changes made in the Assistant
   // Habits menu (or anywhere else) show up here, and the day rolling over refreshes both boxes.
+  // ---------- Box 8, slide 2: Upcoming Alarms (read-only) ----------
+  // A view over Lavender's canonical general alarms (State.get().generalAlarms) that adds no alarm store, scheduler,
+  // timer, notification or listener. Order and times come from GeneralAlarm._next(), the alarm module's own
+  // next-occurrence calculation (recurrence, snooze, one-time dates, 'already rang today'), so recurring alarms show
+  // their real next occurrence. Only enabled alarms with an occurrence still ahead are listed. Rows are not
+  // interactive: nothing here creates, edits, toggles or deletes an alarm. It refreshes on the existing
+  // 'dashboard-live' heartbeat (liveTick). Slide 1 is the untouched Tasks body, which is only hidden, never rebuilt.
+  const AL_LABELS = ['Tasks', 'Alarms'];
+  let alSlide = 0;
+  let alSig = '';
+  let alKeep = 0;
+
+  function alUpcoming(now) {
+    if (typeof GeneralAlarm === 'undefined' || !GeneralAlarm._next || typeof State === 'undefined' || !State.get) return null;
+    const map = (State.get() && State.get().generalAlarms) || {};
+    const minuteStart = Math.floor(now.getTime() / 60000) * 60000;
+    return Object.keys(map).map(function (id) { return { id: id, a: map[id] }; })
+      .filter(function (x) { return x.a && x.a.enabled; })
+      .map(function (x) { x.ms = GeneralAlarm._next(x.a, now); return x; })
+      .filter(function (x) { return x.ms != null && x.ms >= minuteStart; })
+      .sort(function (p, q) { return p.ms - q.ms || (p.id < q.id ? -1 : 1); });
+  }
+
+  function alRel(ms, now) {
+    const mins = Math.max(0, Math.ceil((ms - now.getTime()) / 60000));
+    if (mins < 60) return 'in ' + Math.max(1, mins) + ' min';
+    if (mins < 1440) return 'in ' + Math.floor(mins / 60) + ' h' + (mins % 60 ? ' ' + (mins % 60) + ' min' : '');
+    return '';
+  }
+
+  function alRow(x, now) {
+    const d = new Date(x.ms);
+    const ds = dateStr(d);
+    const today = dateStr(now);
+    const day = ds === today ? 'Today' : (ds === shiftDay(today, 1) ? 'Tomorrow' : DOW[d.getDay()] + ' ' + d.getDate() + ' ' + MON[d.getMonth()]);
+    const type = x.a.recurrence && x.a.recurrence.type;
+    const sub = [day, (type === 'daily' || type === 'weekdays') ? 'Repeats' : '', x.a.snoozedUntil ? 'Snoozed' : ''].filter(Boolean).join(' \u00b7 ');
+    const rel = alRel(x.ms, now);
+    return '<div class="dal-row">' +
+      '<span class="dtk-when dal-when">' + esc(hm12(pad2(d.getHours()) + ':' + pad2(d.getMinutes()), true)) + '</span>' +
+      '<span class="dtk-main"><span class="dtk-title">' + esc(x.a.text || 'Alarm') + '</span><span class="dtk-parent">' + esc(sub) + '</span></span>' +
+      (rel ? '<span class="dtk-meta">' + esc(rel) + '</span>' : '') +
+      '</div>';
+  }
+
+  function alRender(force) {
+    const host = document.querySelector('#dash-tasks .dal-body');
+    if (!host) return;
+    const now = new Date();
+    const list = alUpcoming(now);
+    const sig = list === null ? 'none' : Math.floor(now.getTime() / 60000) + '#' + list.map(function (x) {
+      return [x.id, x.a.text, x.ms, x.a.snoozedUntil ? 1 : 0, x.a.recurrence && x.a.recurrence.type].join('|');
+    }).join('~');
+    if (!force && sig === alSig) return;
+    alSig = sig;
+    const keep = host.scrollTop;
+    host.innerHTML = list === null ? '<p class="dtk-empty">Alarms are unavailable.</p>'
+      : (list.length ? list.map(function (x) { return alRow(x, now); }).join('') : '<p class="dtk-empty">No upcoming alarms.</p>');
+    host.scrollTop = keep;
+  }
+
+  function alApply() {
+    const sec = document.getElementById('dash-tasks');
+    if (!sec) return;
+    const tb = sec.querySelector('.dash-body');
+    const lb = sec.querySelector('.dal-body');
+    if (tb) tb.hidden = alSlide !== 0;
+    if (lb) lb.hidden = alSlide !== 1;
+    sec.querySelectorAll('.drf-dot').forEach(function (el) {
+      if (Number(el.dataset.algo) === alSlide) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+    });
+    const label = sec.querySelector('.dash-label');
+    if (label) label.textContent = AL_LABELS[alSlide];
+  }
+
+  function alGo(i) {
+    const sec = document.getElementById('dash-tasks');
+    const tb = sec && sec.querySelector('.dash-body');
+    const list = tb && tb.querySelector('.dtk-list');
+    if (alSlide === 0 && list) alKeep = list.scrollTop;
+    alSlide = ((i % AL_LABELS.length) + AL_LABELS.length) % AL_LABELS.length;
+    alApply();
+    if (alSlide === 1) { alRender(true); return; }
+    renderTasks(false); // Tasks does not refresh while hidden; bring it up to date. tkView (the dropdown choice) is untouched.
+    const l2 = tb && tb.querySelector('.dtk-list');
+    if (l2) l2.scrollTop = alKeep;
+  }
+
+  // Built once, appended after the Tasks body so Tasks' own '#dash-tasks .dash-body' lookups are unaffected.
+  function alShell() {
+    const sec = document.getElementById('dash-tasks');
+    if (!sec || sec.querySelector('.dal-body')) return;
+    const nav = document.createElement('div');
+    nav.className = 'drf-nav';
+    nav.setAttribute('role', 'group');
+    nav.setAttribute('aria-label', 'Tasks slides');
+    nav.innerHTML =
+      '<button type="button" class="drf-arrow" data-alnav="-1" aria-label="Previous slide">\u2039</button>' +
+      '<button type="button" class="drf-dot" data-algo="0" aria-label="Tasks"></button>' +
+      '<button type="button" class="drf-dot" data-algo="1" aria-label="Upcoming alarms"></button>' +
+      '<button type="button" class="drf-arrow" data-alnav="1" aria-label="Next slide">\u203a</button>';
+    nav.addEventListener('click', function (e) {
+      const n = e.target.closest('[data-alnav]');
+      if (n) { alGo(alSlide + Number(n.dataset.alnav)); return; }
+      const g = e.target.closest('[data-algo]');
+      if (g) alGo(Number(g.dataset.algo));
+    });
+    const body = document.createElement('div');
+    body.className = 'dal-body';
+    body.hidden = true;
+    sec.appendChild(nav);
+    sec.appendChild(body);
+    alSig = '';
+  }
+
   // ---------- Box 4: Daily Reflection (two slides in one fixed box) ----------
   // Slide 1, Daily Summary: three read-only figures for today. Study Hours and Questions come from
   // PTPE.value(key, PTPE.today()), the same per-day source Study Analytics reads. Tasks Completed is
@@ -853,6 +969,8 @@ const Dashboard = (function () {
         if (rfSignature(rfFigures()) !== rfSig) renderReflection();
       }
     }
+    const lb = document.querySelector('#dash-tasks .dal-body');
+    if (lb && lb.offsetParent !== null) alRender(false);
     const ab = document.querySelector('#dash-analytics .dash-body');
     if (ab && ab.offsetParent !== null) anTick();
   }
@@ -902,6 +1020,9 @@ const Dashboard = (function () {
     if (ctx) ctx.textContent = 'Dashboard';
         if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
     renderTasks(false);
+    alSlide = 0; // Tasks is the default slide each time the Dashboard opens
+    alShell();
+    alApply();
     renderHabits();
     rfSlide = 0; // the Daily Summary is the default slide each time the Dashboard opens
     renderReflection();
