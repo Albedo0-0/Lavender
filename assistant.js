@@ -391,9 +391,15 @@ const Assistant = (function () {
         '<div class="assistant-store-card">' + storeBodyHtml() + '</div>' +
         '<h4 class="section-title">Companion Packs</h4>' +
         '<div class="assistant-store-card">' + assistantPacksBodyHtml() + '</div>' +
+        '<div id="assistant-entity-store"></div>' +
       '</div>');
     wireBack(storeBack ? function () { Modal.close(); storeBack(); } : undefined);
     wireStore();
+    // Dashboard Entity packs: own section, own manager. A failure here must never break the Store above.
+    if (typeof EntityLVPackUI !== 'undefined') {
+      try { EntityLVPackUI.mountStoreSection(document.getElementById('assistant-entity-store')); }
+      catch (err) { console.warn('Dashboard Entity store section failed', err); }
+    }
   }
 
 
