@@ -121,13 +121,12 @@ const Settings = (function () {
 
       '<hr class="divider">' +
 
-      (typeof EntityLVPackUI !== 'undefined'
-        ? '</section><section class="settings-section"><h4 class="section-title settings-section-title">Dashboard Entity LV Packs</h4>' +
-          '<div class="form-row"><button id="settings-import-entity-btn" class="btn-secondary">Import Dashboard Entity LV Pack</button>' +
-          '<input type="file" id="settings-import-entity-input" accept=".lvpack,.json,application/json" style="display:none">' +
-          '<div id="settings-import-entity-status" class="micro-label"></div></div>' +
-          '<hr class="divider">'
-        : '') +
+      // Always rendered (never silently omitted) so a missing script is visible instead of the option vanishing.
+      '</section><section class="settings-section"><h4 class="section-title settings-section-title">Dashboard Entity LV Packs</h4>' +
+      '<div class="form-row"><button id="settings-import-entity-btn" class="btn-secondary">Import Dashboard Entity LV Pack</button>' +
+      '<input type="file" id="settings-import-entity-input" accept=".lvpack,.json,application/json" style="display:none">' +
+      '<div id="settings-import-entity-status" class="micro-label"></div></div>' +
+      '<hr class="divider">' +
 
       '</section><section class="settings-section"><h4 class="section-title settings-section-title">Backup</h4>' +
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
@@ -368,14 +367,20 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
     wirePackImport('assistant', 'settings-import-assistant');
 
     // Dashboard Entity packs use their own manager and validator — never wirePackImport / MyWorldContent.
-    if (typeof EntityLVPackUI !== 'undefined') {
+    (function () {
+      const entityBtn = document.getElementById('settings-import-entity-btn');
+      const entityStatus = document.getElementById('settings-import-entity-status');
+      function entityUnavailable(why) {
+        console.warn('Dashboard Entity pack import unavailable:', why);
+        if (entityBtn) entityBtn.addEventListener('click', function () {
+          if (entityStatus) entityStatus.textContent = 'Dashboard Entity packs failed to load (' + why + '). Reload the app, or use Check for updates below.';
+        });
+      }
+      if (typeof EntityLVPackUI === 'undefined' || typeof EntityLVPackData === 'undefined') { entityUnavailable('entity-lvpack-data.js / entity-lvpack-ui.js are not loaded'); return; }
       try {
-        EntityLVPackUI.wireSettingsImport(
-          document.getElementById('settings-import-entity-btn'),
-          document.getElementById('settings-import-entity-input'),
-          document.getElementById('settings-import-entity-status'));
-      } catch (err) { console.warn('Dashboard Entity pack import unavailable', err); }
-    }
+        EntityLVPackUI.wireSettingsImport(entityBtn, document.getElementById('settings-import-entity-input'), entityStatus);
+      } catch (err) { entityUnavailable(String(err && err.message || err)); }
+    })();
 
     document.getElementById('settings-import-input').addEventListener('change', function (e) {
       const file = e.target.files[0];
