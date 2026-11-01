@@ -574,5 +574,58 @@ const Player = (function () {
     }
   }
 
-  return { init: init };
+  // ---- Control surface for the Dashboard's compact player (Daily Reflection, slide 2) ----
+  // Thin delegates to the engine above: the same audio elements, YouTube player and state variables, so the
+  // Dashboard and this modal drive one playback session. No audio element, state, timer or listener is added here.
+  function activeKind() {
+    if (radioPlaying) return 'radio';
+    if (musicPlaying) return 'music';
+    if (playerMode) return playerMode;
+    if (currentTrackId && MusicData.getById(currentTrackId)) return 'music';
+    if (currentStationId) return 'radio';
+    return MusicData.getPlaylist().length ? 'music' : 'idle';
+  }
+
+  function getStatus() {
+    const kind = activeKind();
+    const s = { kind: kind, state: 'idle', title: 'Nothing playing', detail: '', canPlay: false, canSkip: false, canSeek: false, live: false, position: 0, duration: 0 };
+    if (kind === 'radio') {
+      const st = RadioData.getById(currentStationId);
+      s.state = radioPlaying ? 'playing' : (st ? 'paused' : 'idle');
+      s.title = st ? st.name : 'Choose a station';
+      s.detail = 'Radio';
+      s.live = !!st;
+      s.canPlay = !!st;
+    } else if (kind === 'music') {
+      const track = MusicData.getById(currentTrackId);
+      const hasTracks = MusicData.getPlaylist().length > 0;
+      s.state = musicPlaying ? 'playing' : (track ? 'paused' : 'idle');
+      s.title = track ? track.name : (hasTracks ? 'Nothing playing' : 'No tracks yet');
+      s.detail = track ? (track.source === 'youtube' ? 'Music \u00b7 YouTube' : 'Music \u00b7 File') : 'Music';
+      s.canPlay = hasTracks;
+      s.canSkip = hasTracks;
+      let pos = 0, dur = 0;
+      if (track && track.source === 'local' && musicAudioEl) { pos = musicAudioEl.currentTime; dur = musicAudioEl.duration; }
+      else if (track && track.source === 'youtube' && ytPlayer && typeof ytPlayer.getCurrentTime === 'function' && typeof ytPlayer.getDuration === 'function') { pos = ytPlayer.getCurrentTime(); dur = ytPlayer.getDuration(); }
+      if (isFinite(pos) && isFinite(dur) && dur > 0) { s.position = pos; s.duration = dur; s.canSeek = true; }
+    } else {
+      s.detail = 'Open Music or Radio';
+    }
+    return s;
+  }
+
+  // Same behaviour as the modal's play key: pause what is playing, otherwise resume (or start) the current session.
+  function dashToggle() {
+    const kind = activeKind();
+    if (kind === 'radio') {
+      if (radioPlaying) pauseRadio();
+      else if (currentStationId) playStation(currentStationId);
+    } else if (kind === 'music') {
+      togglePlayPause();
+    }
+  }
+
+  function dashSkip(dir) { if (activeKind() === 'music') skipToAdjacent(dir); }
+
+  return { init: init, getStatus: getStatus, toggle: dashToggle, next: function () { dashSkip(1); }, prev: function () { dashSkip(-1); }, seek: seekMusic };
 })();
