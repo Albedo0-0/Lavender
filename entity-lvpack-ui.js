@@ -49,12 +49,21 @@ const EntityLVPackUI = (function () {
   }
 
   function packRow(p) {
-    return '<div class="misc-cosmetic-row misc-entity-pack-row' + (p.active ? ' misc-entity-pack-row-active' : '') + (p.valid ? '' : ' misc-entity-pack-row-locked') + '" data-entity-pack-id="' + esc(p.id) + '">' +
-      '<div>' + esc(p.name) + (p.active ? ' — Active' : '') + '</div>' +
-      '<div class="micro-label">' + esc(meta(p)) + '</div>' +
-      (p.valid ? '' : '<div class="micro-label">Unavailable: ' + esc(p.reason) + '</div>') +
-      (p.valid && !p.active ? '<button type="button" class="btn-secondary" data-entity-act="activate" data-id="' + esc(p.id) + '">Activate</button> ' : '') +
-      (p.source === 'imported' ? '<button type="button" class="btn-secondary" data-entity-act="remove" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">Remove</button>' : '') +
+    const canActivate = p.valid && !p.active;
+    const actions = (canActivate ? '<button type="button" class="btn-secondary lvstore-switch" data-entity-act="activate" data-id="' + esc(p.id) + '">Activate</button>' : '') +
+      (p.source === 'imported' ? '<button type="button" class="btn-secondary" data-entity-act="remove" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">Remove</button>' : '');
+    return '<div class="assistant-store-item lvstore-card is-owned misc-entity-pack-row' + (p.active ? ' is-active misc-entity-pack-row-active' : '') + (p.valid ? '' : ' misc-entity-pack-row-locked') + '" data-entity-pack-id="' + esc(p.id) + '"' +
+      (canActivate ? ' data-entity-act="activate" data-id="' + esc(p.id) + '"' : '') + '>' +
+      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(p.id) + '">' +
+        '<span class="lvstore-preview-note">Preview unavailable: no Dashboard Entity scene renderer is installed in this app.</span></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + esc(p.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">' + esc(meta(p)) + '</div>' +
+      (p.valid ? '' : '<div class="micro-label lvstore-desc">Unavailable: ' + esc(p.reason) + '</div>') +
+      '<div class="lvstore-states">' +
+        '<span class="tag lvstore-state ' + (p.source === 'official' ? 'lvstore-state-purchased">Purchased' : 'lvstore-state-owned">Imported') + '</span>' +
+        (p.active ? '<span class="tag lvstore-state lvstore-state-active">Active</span>' : '') +
+      '</div>' +
+      (actions ? '<div class="lvstore-actions">' + actions + '</div>' : '') +
       '</div>';
   }
 
@@ -66,8 +75,9 @@ const EntityLVPackUI = (function () {
     if (act.status === 'missing' || act.status === 'invalid') {
       html += '<p class="micro-label">Your active Dashboard Entity pack is unavailable (' + esc(act.reason) + '). The default is being used.</p>';
     }
-    html += packs.length ? packs.map(packRow).join('')
-      : '<p class="micro-label">No Dashboard Entity packs yet. Import one in Settings or buy one in the Store.</p>';
+    html += '<div class="assistant-store-card">' + (packs.length
+      ? '<div class="assistant-store-list">' + packs.map(packRow).join('') + '</div>'
+      : '<div class="empty-state">No Dashboard Entity packs yet. Import one in Settings or buy one in the Store.</div>') + '</div>';
     if (act.status !== 'none') html += '<button type="button" class="btn-secondary" data-entity-act="deactivate">Use default</button>';
     return html;
   }
