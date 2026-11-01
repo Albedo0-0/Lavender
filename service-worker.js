@@ -1,7 +1,24 @@
-// service-worker.js — cache-first for app shell, network-only for streams.
-// Bump CACHE_VERSION whenever JS/CSS/HTML changes to force a clean update.
-const CACHE_VERSION = 'lavender-vDay8';
+// service-worker.js — versioned, cache-first app shell with automatic updates.
+//
+// UPDATE LIFECYCLE (native service-worker lifecycle; no page code or user action involved):
+//   1. The browser re-fetches this file on every navigation (and when the app returns to the
+//      foreground, see index.html). A byte-different file installs as a new worker.
+//   2. install: the whole REQUIRED shell is downloaded (bypassing the HTTP cache) into a cache named
+//      after CACHE_VERSION. It is all-or-nothing: if anything fails (offline, 404) install fails, the
+//      new worker is discarded and the current worker + cache keep serving. A half-downloaded
+//      version is never activated, and the browser simply retries on a later update check.
+//   3. Only after a complete download does the worker call skipWaiting() and activate itself.
+//   4. activate: deletes the old lavender-* caches, claims open windows and reloads them once, so
+//      pages that were loaded by the previous version restart on the new one (first installs don't reload).
+// Every request is answered from this version's own cache only (no background refreshing of
+// individual files), so files from two different deployments can never be mixed.
+//
+// REQUIRED: bump CACHE_VERSION on every deploy that changes any file below (this file itself
+// changing is what triggers the update; the new cache name is what keeps versions apart).
+const CACHE_VERSION = 'lavender-vDay9';
+const CACHE_PREFIX = 'lavender-';
 
+// Everything index.html needs to start. If any of these cannot be fetched the update is not installed.
 const APP_SHELL = [
   './',
   './index.html',
@@ -28,7 +45,8 @@ const APP_SHELL = [
   './habits.js',
   './general-alarm.js',
   './journal.js',
-    './calendar.js',
+  './calendar-photos.js',
+  './calendar.js',
   './calendar-day.js',
   './library.js',
   './study-templates-data.js',
@@ -38,13 +56,14 @@ const APP_SHELL = [
   './dashboard-calendar.js',
   './gamification-data.js',
   './productivity-data.js',
-    './progress-data.js',
+  './progress-data.js',
   './ptpe-data.js',
   './progress.js',
   './ptpe-ui.js',
   './assistant-data.js',
   './assistant.js',
   './notepad.js',
+  './gallery.js',
   './radio-data.js',
   './music-data.js',
   './player.js',
@@ -52,30 +71,38 @@ const APP_SHELL = [
   './gamification.js',
   './backup.js',
   './backup-ui.js',
+  './entity-lvpack-data.js',
+  './entity-lvpack-ui.js',
   './settings.js',
   './icon-192.png',
-  './icon-512.png',
   './myworld.css',
+  './gallery.css',
   './dashboard.css',
   './myworld-data.js',
   './myworld-assets.js',
   './myworld-content.js',
+  './myworld-lv1.js',
   './myworld.js',
   './misc-core.js',
   './misc-cosmetics.js',
-  './entity-lvpack-data.js',
-  './entity-lvpack-ui.js',
+  './assistant-lvpacks-data.js',
   './misc-sound.js',
-  './pressed-paper.js',
   './paper-pocket.js',
-  './rain-ambience.js',
-  './sunlight-ambience.js',
   './wish-butterfly.js',
   './firefly.js',
   './ladybug.js',
   './candle-lamp.js',
   './fullscreen.js',
 ];
+
+// Best-effort extras that index.html does not load. A failure here never blocks an update.
+const OPTIONAL = [
+  './icon-512.png',
+  './pressed-paper.js',
+  './rain-ambience.js',
+  './sunlight-ambience.js',
+];
+
 // URLs that must never be served from cache (live streams, YouTube, CDNs)
 function isUncacheable(url) {
   const u = new URL(url);
@@ -91,52 +118,63 @@ function isUncacheable(url) {
   );
 }
 
+// Downloads straight from the network (cache: 'reload' skips the browser's HTTP cache, which could
+// otherwise hand this install the previous deployment's copy of a file).
+function precache(cache, url) {
+  return fetch(new Request(url, { cache: 'reload' })).then(function (res) {
+    if (!res.ok) throw new Error(url + ' -> HTTP ' + res.status);
+    return cache.put(url, res);
+  });
+}
+
 self.addEventListener('install', function (e) {
   e.waitUntil(
-    caches.open(CACHE_VERSION).then(function (cache) {
-      // Cache what exists; ignore 404s for optional files (e.g. targets.js before Feature 5)
-      return Promise.allSettled(
-        APP_SHELL.map(function (url) { return cache.add(url); })
-      );
-    }).then(function () {
-      // Announce this version to every open tab so the UI can show the
-      // incoming update's name without guessing at it.
-      return self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
-    }).then(function (clients) {
-      clients.forEach(function (c) {
-        c.postMessage({ type: 'SW_INSTALLED', version: CACHE_VERSION });
+    caches.has(CACHE_VERSION).then(function (existed) {
+      return caches.open(CACHE_VERSION).then(function (cache) {
+        return Promise.all(APP_SHELL.map(function (url) { return precache(cache, url); }))
+          .then(function () {
+            return Promise.allSettled(OPTIONAL.map(function (url) { return precache(cache, url); }));
+          });
+      }).catch(function (err) {
+        // Failed install: discard the half-built cache (never one that already existed) and fail the
+        // install, so this worker is thrown away and the current worker + cache keep serving.
+        console.error('[Lavender SW] Update not installed; keeping the current version.', err);
+        return (existed ? Promise.resolve() : caches.delete(CACHE_VERSION)).then(function () { throw err; });
       });
+    }).then(function () {
+      // Complete download only: take over without waiting for every tab to close.
+      return self.skipWaiting();
     })
-    // No self.skipWaiting() here: on an update this lets the new worker sit
-    // in the "installed" (waiting) state instead of activating immediately,
-    // so the running app stays on the old version until the user chooses to
-    // update from Settings. On a first install (no existing controller) the
-    // browser activates this worker on its own, so that behavior is unaffected.
   );
 });
 
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(
-        keys.filter(function (k) { return k !== CACHE_VERSION; })
-            .map(function (k) { return caches.delete(k); })
-      );
-    }).then(function () { return self.clients.claim(); })
+      const stale = keys.filter(function (k) { return k.indexOf(CACHE_PREFIX) === 0 && k !== CACHE_VERSION; });
+      return Promise.all(stale.map(function (k) { return caches.delete(k); })).then(function () { return stale.length > 0; });
+    }).then(function (isUpdate) {
+      return self.clients.claim().then(function () { return isUpdate; });
+    }).then(function (isUpdate) {
+      // First install (no older cache existed): the page is already running the latest files.
+      if (!isUpdate) return;
+      // Update: windows opened by the previous version must restart on this one, including pages
+      // whose own code predates this worker. WindowClient.navigate() is rejected while the worker is
+      // still "activating", so the reload is handed to a message event that runs after activation.
+      // Posted once per worker version, so it cannot loop.
+      if (self.registration.active) self.registration.active.postMessage({ type: 'RELOAD_CLIENTS' });
+    })
   );
 });
 
-// Lets a page (Settings > Updates) ask which cache version is currently
-// controlling it. No new caching behavior — just a status query.
+// Sent by this worker to itself (see activate). Pages cannot trigger it.
 self.addEventListener('message', function (e) {
-  if (e.data && e.data.type === 'GET_VERSION' && e.source) {
-    e.source.postMessage({ type: 'VERSION', version: CACHE_VERSION });
-  }
-  // Settings > Updates > "Update now" sends this to move a waiting worker
-  // out of the waiting state and into activation.
-  if (e.data && e.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (!e.data || e.data.type !== 'RELOAD_CLIENTS' || e.source instanceof Client) return;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then(function (wins) {
+      return Promise.all(wins.map(function (w) { return w.navigate(w.url).catch(function () {}); }));
+    })
+  );
 });
 
 self.addEventListener('fetch', function (e) {
@@ -146,19 +184,21 @@ self.addEventListener('fetch', function (e) {
   }
 
   e.respondWith(
-    caches.match(e.request).then(function (cached) {
-      // Stale-while-revalidate: serve cache immediately, refresh in background
-            var networkFetch = fetch(e.request).then(function (response) {
-        if (response && response.status === 200 && response.type !== 'opaque') {
-          var copy = response.clone();
-          caches.open(CACHE_VERSION).then(function (cache) {
-            cache.put(e.request, copy);
-          }).catch(function () {});
-        }
-        return response;
-      }).catch(function () { return null; });
-
-      return cached || networkFetch;
+    // This version's cache only — never caches.match(), which also searches other versions' caches.
+    caches.open(CACHE_VERSION).then(function (cache) {
+      // ignoreSearch: style.css?v=8 and launch URLs like /?source=pwa must still hit the precached file.
+      return cache.match(e.request, { ignoreSearch: true }).then(function (cached) {
+        if (cached) return cached;
+        return fetch(e.request).then(function (response) {
+          if (response && response.status === 200 && response.type === 'basic') {
+            cache.put(e.request, response.clone()).catch(function () {});
+          }
+          return response;
+        }).catch(function () {
+          // Offline and not cached: a navigation still gets the app; anything else is a normal network error.
+          return e.request.mode === 'navigate' ? cache.match('./index.html') : Response.error();
+        });
+      });
     })
   );
 });
