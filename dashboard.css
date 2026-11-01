@@ -751,11 +751,13 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
 }
 
 /* ==========================================================================
-   Mobile (<= 600px): 2 x 3 slide grid.
+   Mobile (<= 600px): one static 2 x 3 screen.
    Tablet (601-860px) and desktop (>= 861px) are not touched by anything below.
    .dash-left / .dash-right / .dash-row become transparent (display: contents) so the six boxes are direct
-   grid items of .dash. .dash is itself the scroller: three rows, each exactly one scroller-height tall,
-   with mandatory scroll snap, so one swipe moves one row. Boxes are centred in their row and share one size.
+   grid items of .dash. .dash is exactly one screen tall (viewport minus --dm-offset) and never scrolls:
+   three equal rows, two equal columns, so all six boxes are identical in size.
+   Only slides INSIDE boxes change (Calendar, Habits, Tasks/Alarms, Reflection/Music). Each slide shows its
+   content without scrolling: lists are clipped to the box instead of scrolling.
    ========================================================================== */
 
 /* Calendar slide switch: mobile only (dashboard-calendar.js builds it for every viewport). */
@@ -768,25 +770,12 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   }
 
   #screen-dashboard .dash {
-    container-type: inline-size;
     height: calc(100vh - var(--dm-offset));
     height: calc(100dvh - var(--dm-offset));
     min-height: 0;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: repeat(3, 100%);
-    gap: 0 var(--dm-gap);
-    align-items: center;
-    overflow-x: hidden;
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
-    scroll-behavior: smooth;
-    overscroll-behavior-y: contain;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  #screen-dashboard .dash::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  @media (prefers-reduced-motion: reduce) {
-    #screen-dashboard .dash { scroll-behavior: auto; }
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: var(--dm-gap);
   }
 
   #screen-dashboard :is(.dash-left, .dash-right, .dash-row) { display: contents; }
@@ -800,15 +789,10 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   #screen-dashboard .dash-b56 { grid-area: 3 / 1; }
   #screen-dashboard .dash-b1 { grid-area: 3 / 2; }
 
-  /* One shared box size. Both boxes of a row are centred, so snapping on the box centre lands on the row start. */
+  /* The grid sizes every box identically; the boxes just fill their cell. */
   #screen-dashboard :is(.dash-box, .dash-entity) {
-    width: 100%;
     min-height: 0;
-    height: min(calc(100% - 28px), 78vw);
-    height: min(calc(100% - 28px), 78cqw);
     padding: 10px 10px 12px;
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
   }
   #screen-dashboard .dash-entity::after { display: none; }
 
@@ -824,30 +808,33 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   #screen-dashboard .drf-nav { top: 6px; right: 8px; gap: 3px; }
   #screen-dashboard .drf-arrow { width: 16px; height: 16px; }
 
-  /* Inner scrollers: no scrollbars, keep their own scrolling inside the box */
-  #screen-dashboard :is(.dtk-list, .dal-body, .dcal-list, .dan-menu) {
+  /* No scrolling inside a slide: lists are clipped to the box. Only the dropdown menus may scroll. */
+  #screen-dashboard :is(.dtk-list, .dal-body, .dcal-list) { overflow: hidden; }
+  #screen-dashboard #dash-calendar .dash-body { overflow: hidden; }
+  #screen-dashboard .dan-menu {
     scrollbar-width: none;
     overscroll-behavior: contain;
   }
-  #screen-dashboard :is(.dtk-list, .dal-body, .dcal-list, .dan-menu)::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  #screen-dashboard .dan-menu::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
   /* ----- Calendar: slide 0 = month view, slide 1 = upcoming events ----- */
   #screen-dashboard #dash-calendar { padding-top: 28px; }
   #screen-dashboard .drf-nav.dcal-slidenav { display: flex; }
   #screen-dashboard #dash-calendar .dash-body[data-cslide="0"] .dcal-events { display: none; }
   #screen-dashboard #dash-calendar .dash-body[data-cslide="1"] .dcal { display: none; }
-  #screen-dashboard .dcal-head { margin-bottom: 6px; gap: 4px; }
+  #screen-dashboard .dcal-head { margin-bottom: 4px; gap: 4px; }
   #screen-dashboard .dcal-nav { width: 22px; height: 22px; font-size: 12px; }
   #screen-dashboard .dcal-title { padding: 2px 4px; font-size: 12.5px; }
   #screen-dashboard .dcal-weekdays,
-  #screen-dashboard .dcal-grid { gap: 2px; }
+  #screen-dashboard .dcal-grid { gap: 1px; }
+  #screen-dashboard .dcal-weekdays { margin-bottom: 2px; }
   #screen-dashboard .dcal-weekdays span { font-size: 0; letter-spacing: 0; }
   #screen-dashboard .dcal-weekdays span::first-letter { font-size: 10px; }
-  #screen-dashboard .dcal-day { aspect-ratio: 1 / 1; font-size: 10.5px; }
-  #screen-dashboard .dcal-has::after { bottom: 2px; }
+  #screen-dashboard .dcal-day { aspect-ratio: 1 / 0.82; font-size: 10.5px; border-width: 1px; }
+  #screen-dashboard .dcal-has::after { bottom: 1px; }
   #screen-dashboard .dcal-events { min-height: 0; padding-top: 0; border-top: 0; }
   #screen-dashboard #dash-calendar .dcal-list { max-height: none; }
-  #screen-dashboard .dcal-event { flex-wrap: wrap; gap: 0 6px; padding: 5px 0; }
+  #screen-dashboard .dcal-event { flex-wrap: wrap; gap: 0 6px; padding: 4px 0; }
   #screen-dashboard .dcal-ev-date { flex: 0 0 100%; font-size: 10px; }
   #screen-dashboard .dcal-ev-title { font-size: 12px; }
   #screen-dashboard .dcal-ev-tag { display: none; }
@@ -863,7 +850,7 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   #screen-dashboard .dtk-sel-btn { padding: 3px 8px; font-size: 12px; }
   #screen-dashboard .dtk-date { flex: 1 1 100%; }
   #screen-dashboard .dtk-date-input { flex: 1 1 auto; }
-  #screen-dashboard .dtk-row { flex-wrap: wrap; gap: 0 6px; padding: 5px 2px; }
+  #screen-dashboard .dtk-row { flex-wrap: wrap; gap: 0 6px; padding: 4px 2px; }
   #screen-dashboard .dtk-when { flex: 0 0 100%; font-size: 10.5px; }
   #screen-dashboard .dal-row .dal-when { flex: 0 0 auto; }
   #screen-dashboard .dtk-title { font-size: 12px; }
