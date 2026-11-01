@@ -647,13 +647,25 @@ const Dashboard = (function () {
   // One subscriber on TimeEngine's shared heartbeat (stable id, so a re-run replaces rather than stacks).
   // It only compares what is displayed against what is now canonical, so changes made in the Assistant
   // Habits menu (or anywhere else) show up here, and the day rolling over refreshes both boxes.
-  // ---------- Box 4: Daily Reflection (three read-only figures for today) ----------
-  // Study Hours and Questions come from PTPE.value(key, PTPE.today()), the same per-day source Study Analytics reads.
-  // Tasks Completed is PlanningAgentTasks.getCompletedToday(), which filters on each task's real completedAt date
-  // (not its scheduled date). Nothing is stored or recomputed here; a missing record shows as 0.
+  // ---------- Box 4: Daily Reflection (two slides in one fixed box) ----------
+  // Slide 1, Daily Summary: three read-only figures for today. Study Hours and Questions come from
+  // PTPE.value(key, PTPE.today()), the same per-day source Study Analytics reads. Tasks Completed is
+  // PlanningAgentTasks.getCompletedToday(), which filters on each task's real completedAt date (not its scheduled
+  // date). Nothing is stored or recomputed here; a missing record shows as 0.
+  // Slide 2, Music Player: a view over the existing Player (player.js). It reads Player.getStatus() and forwards
+  // taps to Player.toggle / prev / next / seek, so it drives the same Radio/Music session as the Player modal. It owns
+  // no audio, playback state, timer or global listener: it refreshes on the existing 'dashboard-live' heartbeat.
+  // Only UI selection (the slide) is held here; Dashboard.render() resets it to the Daily Summary on each open.
   const RF_CHECK_MS = 5000;
+  const RF_LABELS = ['Daily Reflection', 'Music Player'];
+  const RF_ICON_PREV = '<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 2h2v8H2zM10 2v8L4.5 6z"/></svg>';
+  const RF_ICON_NEXT = '<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M8 2h2v8H8zM2 2v8l5.5-4z"/></svg>';
+  const RF_ICON_PLAY = '<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M3 1.5v9L10.5 6z"/></svg>';
+  const RF_ICON_PAUSE = '<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2.5 2H5v8H2.5zM7 2h2.5v8H7z"/></svg>';
   let rfSig = '';
   let rfCheckAt = 0;
+  let rfSlide = 0;
+  let rfPlSig = '';
 
   function rfNum(key) {
     try {
@@ -682,14 +694,130 @@ const Dashboard = (function () {
     return (typeof PTPE !== 'undefined' && PTPE.today ? PTPE.today() : todayStr()) + '#' + items.map(function (it) { return it.value; }).join('|');
   }
 
+  function rfFmtTime(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    return Math.floor(s / 60) + ':' + pad2(s % 60);
+  }
+
+  // Builds the fixed shell once: navigation plus the two slides. Slide contents are filled in place afterwards.
+  function rfShell(host) {
+    if (host.querySelector('.drf-slide')) return;
+    host.innerHTML =
+      '<div class="drf-nav" role="group" aria-label="Reflection slides">' +
+        '<button type="button" class="drf-arrow" data-nav="-1" aria-label="Previous slide">\u2039</button>' +
+        '<button type="button" class="drf-dot" data-go="0" aria-label="Daily Summary"></button>' +
+        '<button type="button" class="drf-dot" data-go="1" aria-label="Music Player"></button>' +
+        '<button type="button" class="drf-arrow" data-nav="1" aria-label="Next slide">\u203a</button>' +
+      '</div>' +
+      '<div class="drf-slide" data-slide="0"></div>' +
+      '<div class="drf-slide" data-slide="1" hidden></div>';
+    rfPlSig = '';
+    rfBind(host);
+  }
+
+  function rfApplySlide() {
+    const host = document.querySelector('#dash-reflection .dash-body');
+    if (!host) return;
+    host.querySelectorAll('.drf-slide').forEach(function (el) { el.hidden = Number(el.dataset.slide) !== rfSlide; });
+    host.querySelectorAll('.drf-dot').forEach(function (el) {
+      if (Number(el.dataset.go) === rfSlide) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+    });
+    const label = document.querySelector('#dash-reflection .dash-label');
+    if (label) label.textContent = RF_LABELS[rfSlide];
+  }
+
+  function rfGo(i) {
+    rfSlide = ((i % RF_LABELS.length) + RF_LABELS.length) % RF_LABELS.length;
+    rfApplySlide();
+    if (rfSlide === 1) rfPlayerTick(true);
+  }
+
+  function rfAct(act) {
+    if (typeof Player === 'undefined') return;
+    try {
+      if (act === 'toggle' && Player.toggle) Player.toggle();
+      else if (act === 'prev' && Player.prev) Player.prev();
+      else if (act === 'next' && Player.next) Player.next();
+    } catch (err) { console.warn('Dashboard player action failed', act, err); }
+    rfPlayerTick(false);
+  }
+
+  function rfBind(host) {
+    host.addEventListener('click', function (e) {
+      const nav = e.target.closest('[data-nav]');
+      if (nav) { rfGo(rfSlide + Number(nav.dataset.nav)); return; }
+      const go = e.target.closest('[data-go]');
+      if (go) { rfGo(Number(go.dataset.go)); return; }
+      const act = e.target.closest('[data-act]');
+      if (act && !act.disabled) rfAct(act.dataset.act);
+    });
+    host.addEventListener('change', function (e) {
+      if (!e.target.classList || !e.target.classList.contains('drf-range')) return;
+      try { if (typeof Player !== 'undefined' && Player.seek) Player.seek(Number(e.target.value)); }
+      catch (err) { console.warn('Dashboard player seek failed', err); }
+    });
+  }
+
+  function rfPlayerHtml(s) {
+    const playing = s.state === 'playing';
+    const stateTxt = playing ? 'Playing' : (s.state === 'paused' ? 'Paused' : 'Stopped');
+    const title = esc(s.title);
+    return '<div class="drf-music" data-state="' + s.state + '">' +
+      '<div class="drf-art" aria-hidden="true"><i></i><i></i></div>' +
+      '<div class="drf-pl">' +
+        '<span class="drf-pl-title" title="' + title + '">' + title + '</span>' +
+        '<span class="drf-pl-sub">' + esc(stateTxt + ' \u00b7 ' + s.detail) + '</span>' +
+        '<div class="drf-pl-ctl">' +
+          (s.canSkip ? '<button type="button" class="drf-key" data-act="prev" aria-label="Previous track">' + RF_ICON_PREV + '</button>' : '') +
+          '<button type="button" class="drf-key drf-key-main' + (playing ? ' drf-key-on' : '') + '" data-act="toggle" aria-label="' + (playing ? 'Pause' : 'Play') + '"' + (s.canPlay ? '' : ' disabled') + '>' + (playing ? RF_ICON_PAUSE : RF_ICON_PLAY) + '</button>' +
+          (s.canSkip ? '<button type="button" class="drf-key" data-act="next" aria-label="Next track">' + RF_ICON_NEXT + '</button>' : '') +
+        '</div>' +
+        (s.canSeek ? '<div class="drf-pl-seek"><input type="range" class="drf-range" min="0" max="' + s.duration + '" value="' + s.position + '" step="1" aria-label="Seek"><span class="drf-pl-time"></span></div>' : '') +
+      '</div></div>';
+  }
+
+  function rfPlayerProgress(s) {
+    const slide = document.querySelector('#dash-reflection .drf-slide[data-slide="1"]');
+    const bar = slide && slide.querySelector('.drf-range');
+    if (!bar || !s.canSeek) return;
+    if (!bar.matches(':active')) { bar.max = s.duration; bar.value = s.position; }
+    const t = slide.querySelector('.drf-pl-time');
+    if (t) t.textContent = rfFmtTime(bar.matches(':active') ? Number(bar.value) : s.position) + ' / ' + rfFmtTime(s.duration);
+  }
+
+  // Cheap, called from liveTick while slide 2 is showing: rebuilds the slide only when what is displayed changes
+  // (track, station, state, available controls), otherwise just moves the progress bar.
+  function rfPlayerTick(force) {
+    const slide = document.querySelector('#dash-reflection .drf-slide[data-slide="1"]');
+    if (!slide) return;
+    if (typeof Player === 'undefined' || !Player.getStatus) {
+      if (force || rfPlSig !== 'none') { rfPlSig = 'none'; slide.innerHTML = '<p class="dhb-empty">Player is unavailable.</p>'; }
+      return;
+    }
+    let s;
+    try { s = Player.getStatus(); }
+    catch (err) { console.warn('Dashboard player status failed', err); return; }
+    const sig = [s.kind, s.state, s.title, s.detail, s.canPlay, s.canSkip, s.canSeek].join('|');
+    if (force || sig !== rfPlSig) {
+      const ae = document.activeElement;
+      const had = ae && slide.contains(ae) && ae.dataset ? ae.dataset.act : null;
+      rfPlSig = sig;
+      slide.innerHTML = rfPlayerHtml(s);
+      if (had) { const b = slide.querySelector('[data-act="' + had + '"]'); if (b && !b.disabled) b.focus(); }
+    }
+    rfPlayerProgress(s);
+  }
+
   function renderReflection() {
     const host = document.querySelector('#dash-reflection .dash-body');
     if (!host) return;
+    rfShell(host);
     const items = rfFigures();
     rfSig = rfSignature(items);
-    host.innerHTML = '<div class="drf-grid">' + items.map(function (it) {
+    host.querySelector('.drf-slide[data-slide="0"]').innerHTML = '<div class="drf-grid">' + items.map(function (it) {
       return '<div class="drf-item"><span class="drf-value">' + esc(it.value) + '</span><span class="drf-name">' + esc(it.name) + '</span></div>';
     }).join('') + '</div>';
+    rfApplySlide();
   }
 
   function liveTick() {
@@ -698,9 +826,12 @@ const Dashboard = (function () {
     const tb = document.querySelector('#dash-tasks .dash-body');
     if (tb && tb.offsetParent !== null && tkDay && tkDay !== todayStr()) renderTasks(false);
     const rb = document.querySelector('#dash-reflection .dash-body');
-    if (rb && rb.offsetParent !== null && Date.now() - rfCheckAt >= RF_CHECK_MS) {
-      rfCheckAt = Date.now();
-      if (rfSignature(rfFigures()) !== rfSig) renderReflection();
+    if (rb && rb.offsetParent !== null) {
+      if (rfSlide === 1) rfPlayerTick(false);
+      if (Date.now() - rfCheckAt >= RF_CHECK_MS) {
+        rfCheckAt = Date.now();
+        if (rfSignature(rfFigures()) !== rfSig) renderReflection();
+      }
     }
     const ab = document.querySelector('#dash-analytics .dash-body');
     if (ab && ab.offsetParent !== null) anTick();
@@ -752,6 +883,7 @@ const Dashboard = (function () {
         if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
     renderTasks(false);
     renderHabits();
+    rfSlide = 0; // the Daily Summary is the default slide each time the Dashboard opens
     renderReflection();
     anOpen();
     startLive();
