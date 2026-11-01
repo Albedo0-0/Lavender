@@ -120,7 +120,15 @@ const Settings = (function () {
       '<span id="settings-import-assistant-status" class="micro-label"></span></div>' +
 
       '<hr class="divider">' +
-      
+
+      (typeof EntityLVPackUI !== 'undefined'
+        ? '</section><section class="settings-section"><h4 class="section-title settings-section-title">Dashboard Entity LV Packs</h4>' +
+          '<div class="form-row"><button id="settings-import-entity-btn" class="btn-secondary">Import Dashboard Entity LV Pack</button>' +
+          '<input type="file" id="settings-import-entity-input" accept=".lvpack,.json,application/json" style="display:none">' +
+          '<div id="settings-import-entity-status" class="micro-label"></div></div>' +
+          '<hr class="divider">'
+        : '') +
+
       '</section><section class="settings-section"><h4 class="section-title settings-section-title">Backup</h4>' +
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
       '<div class="form-row"><label for="settings-import-input">Restore from backup</label>' +
@@ -358,7 +366,17 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
 
     wirePackImport('world', 'settings-import-content');
     wirePackImport('assistant', 'settings-import-assistant');
-    
+
+    // Dashboard Entity packs use their own manager and validator — never wirePackImport / MyWorldContent.
+    if (typeof EntityLVPackUI !== 'undefined') {
+      try {
+        EntityLVPackUI.wireSettingsImport(
+          document.getElementById('settings-import-entity-btn'),
+          document.getElementById('settings-import-entity-input'),
+          document.getElementById('settings-import-entity-status'));
+      } catch (err) { console.warn('Dashboard Entity pack import unavailable', err); }
+    }
+
     document.getElementById('settings-import-input').addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
