@@ -15,7 +15,7 @@
 //
 // REQUIRED: bump CACHE_VERSION on every deploy that changes any file below (this file itself
 // changing is what triggers the update; the new cache name is what keeps versions apart).
-const CACHE_VERSION = 'lavender-vDay9';
+const CACHE_VERSION = 'lavender-vDay10';
 const CACHE_PREFIX = 'lavender-';
 
 // Everything index.html needs to start. If any of these cannot be fetched the update is not installed.
@@ -153,16 +153,8 @@ self.addEventListener('activate', function (e) {
     caches.keys().then(function (keys) {
       const stale = keys.filter(function (k) { return k.indexOf(CACHE_PREFIX) === 0 && k !== CACHE_VERSION; });
       return Promise.all(stale.map(function (k) { return caches.delete(k); })).then(function () { return stale.length > 0; });
-    }).then(function (isUpdate) {
-      return self.clients.claim().then(function () { return isUpdate; });
-    }).then(function (isUpdate) {
-      // First install (no older cache existed): the page is already running the latest files.
-      if (!isUpdate) return;
-      // Update: windows opened by the previous version must restart on this one, including pages
-      // whose own code predates this worker. WindowClient.navigate() is rejected while the worker is
-      // still "activating", so the reload is handed to a message event that runs after activation.
-      // Posted once per worker version, so it cannot loop.
-      if (self.registration.active) self.registration.active.postMessage({ type: 'RELOAD_CLIENTS' });
+        }).then(function () {
+      return self.clients.claim();
     })
   );
 });
