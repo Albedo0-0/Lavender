@@ -1036,23 +1036,8 @@ const Dashboard = (function () {
     startLive();
   }
 
-  // Binds the existing Lavender plaque once. Adds no attributes, classes or styles to it.
-  // Exo 2 used to be pulled in with a CSS @import, which holds back every Dashboard style until Google Fonts answers
-  // (and it cannot be cached by the service worker). Loading it here instead never blocks rendering: the
-  // stylesheet is attached as 'print' and switched to 'all' once it arrives; --dash-font already has system fallbacks.
-  function loadFont() {
-    if (document.getElementById('dash-font-link')) return;
-    const link = document.createElement('link');
-    link.id = 'dash-font-link';
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600&display=swap';
-    link.media = 'print';
-    link.addEventListener('load', function () { link.media = 'all'; });
-    document.head.appendChild(link);
-  }
-
+    // Binds the existing Lavender plaque once. Adds no attributes, classes or styles to it.
   function init() {
-    loadFont();
     if (bound) return;
     const brand = document.querySelector('#main-nav .nav-brand');
     if (!brand) return;
