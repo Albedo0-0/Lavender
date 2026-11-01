@@ -20,27 +20,6 @@ const Settings = (function () {
     });
   }
 
-  // Reads window.LavenderSW (set up by index.html's SW registration) to
-  // reflect update status — a view onto the existing mechanism, not a new one.
-  function renderUpdateStatus() {
-    const statusEl = document.getElementById('settings-update-status');
-    const applyBtn = document.getElementById('settings-apply-update-btn');
-    if (!statusEl) return;
-    if (!('serviceWorker' in navigator) || !window.LavenderSW) {
-      statusEl.textContent = 'Updates unavailable on this device.';
-      return;
-    }
-    if (window.LavenderSW.updateAvailable) {
-      statusEl.innerHTML = window.LavenderSW.pendingVersion
-        ? 'Update available<br>Version ' + esc(window.LavenderSW.pendingVersion) + ' is ready'
-        : 'Update available';
-      if (applyBtn) applyBtn.style.display = '';
-    } else {
-      statusEl.textContent = "You're up to date.";
-      if (applyBtn) applyBtn.style.display = 'none';
-    }
-  }
-
     function toggleRow(id, label, hint, checked) {
     return '<div class="settings-toggle"><div class="settings-toggle-text">' +
       '<label for="' + id + '">' + label + '</label>' +
@@ -135,12 +114,6 @@ const Settings = (function () {
       '<div id="settings-import-status" class="micro-label"></div></div>' +
       '<button id="settings-clear-btn" class="btn-danger">Clear all data</button>' +
 
-            '</section><section class="settings-section"><h4 class="section-title settings-section-title">Updates</h4>' +
-      '<div class="form-row settings-updates-row">' +
-      '<div id="settings-update-status" class="micro-label">You\'re up to date.</div>' +
-      '<button id="settings-check-update-btn" class="btn-secondary">Check for updates</button>' +
-      '<button id="settings-apply-update-btn" class="btn-secondary" style="display:none;">Update now</button>' +
-      '</div>' +
       '</section>' +
       '<p class="micro-label settings-version">Lavender v' + APP_VERSION + '</p>' +
       '<div class="settings-saved-wrap"><div id="settings-saved-chip" class="settings-saved-chip" role="status">Saved to this device</div></div>' +
@@ -370,16 +343,17 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
     (function () {
       const entityBtn = document.getElementById('settings-import-entity-btn');
       const entityStatus = document.getElementById('settings-import-entity-status');
+      // Shown immediately (not only on click) so a load failure is never silent.
       function entityUnavailable(why) {
-        console.warn('Dashboard Entity pack import unavailable:', why);
-        if (entityBtn) entityBtn.addEventListener('click', function () {
-          if (entityStatus) entityStatus.textContent = 'Dashboard Entity packs failed to load (' + why + '). Reload the app, or use Check for updates below.';
-        });
+        console.error('Dashboard Entity pack import unavailable:', why);
+        if (entityBtn) entityBtn.disabled = true;
+        if (entityStatus) entityStatus.textContent = 'Dashboard Entity packs failed to load. ' + why;
       }
-      if (typeof EntityLVPackUI === 'undefined' || typeof EntityLVPackData === 'undefined') { entityUnavailable('entity-lvpack-data.js / entity-lvpack-ui.js are not loaded'); return; }
+      const loadProblem = window.LavenderEntityLoad ? window.LavenderEntityLoad.problem() : 'Entity load check is missing from index.html.';
+      if (loadProblem) { entityUnavailable(loadProblem); return; }
       try {
         EntityLVPackUI.wireSettingsImport(entityBtn, document.getElementById('settings-import-entity-input'), entityStatus);
-      } catch (err) { entityUnavailable(String(err && err.message || err)); }
+      } catch (err) { entityUnavailable('Initialization error: ' + String(err && err.message || err)); }
     })();
 
     document.getElementById('settings-import-input').addEventListener('change', function (e) {
@@ -406,49 +380,6 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       Modal.close();
       location.reload();
     });
-
-    renderUpdateStatus();
-
-    const checkUpdateBtn = document.getElementById('settings-check-update-btn');
-    if (checkUpdateBtn) {
-      checkUpdateBtn.addEventListener('click', function () {
-        const statusEl = document.getElementById('settings-update-status');
-        if (!window.LavenderSW || !window.LavenderSW.registration) {
-          if (statusEl) statusEl.textContent = 'Updates unavailable on this device.';
-          return;
-        }
-        checkUpdateBtn.disabled = true;
-        if (statusEl) statusEl.textContent = 'Checking for updates\u2026';
-        window.LavenderSW.registration.update().then(function () {
-          setTimeout(function () {
-            checkUpdateBtn.disabled = false;
-            renderUpdateStatus();
-          }, 2000);
-        }).catch(function () {
-          checkUpdateBtn.disabled = false;
-          if (statusEl) statusEl.textContent = "Couldn't check for updates.";
-        });
-      });
-    }
-
-    const applyUpdateBtn = document.getElementById('settings-apply-update-btn');
-    if (applyUpdateBtn) {
-      applyUpdateBtn.addEventListener('click', function () {
-        const reg = window.LavenderSW && window.LavenderSW.registration;
-        if (!reg || !reg.waiting) return;
-        applyUpdateBtn.disabled = true;
-        var reloaded = false;
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          if (reloaded) return;
-          reloaded = true;
-          location.reload();
-        });
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      });
-    }
-
-        window.removeEventListener('lavender-update-ready', renderUpdateStatus);
-    window.addEventListener('lavender-update-ready', renderUpdateStatus);
   }
 
   // Read by Assistant (§B.7) for its modal header — cosmetic label only, falls back to "Assistant".
