@@ -396,9 +396,14 @@ const Assistant = (function () {
     wireBack(storeBack ? function () { Modal.close(); storeBack(); } : undefined);
     wireStore();
     // Dashboard Entity packs: own section, own manager. A failure here must never break the Store above.
-    if (typeof EntityLVPackUI !== 'undefined') {
-      try { EntityLVPackUI.mountStoreSection(document.getElementById('assistant-entity-store')); }
-      catch (err) { console.warn('Dashboard Entity store section failed', err); }
+    // Never silently omitted: if the Entity scripts did not load, the section says so.
+    const entityHost = document.getElementById('assistant-entity-store');
+    try {
+      if (typeof EntityLVPackUI === 'undefined') throw new Error('entity-lvpack-ui.js is not loaded');
+      EntityLVPackUI.mountStoreSection(entityHost);
+    } catch (err) {
+      console.warn('Dashboard Entity store section failed', err);
+      if (entityHost) entityHost.innerHTML = '<h4 class="section-title">Dashboard Entity</h4><div class="assistant-store-card"><div class="empty-state">Dashboard Entity packs failed to load. Reload the app.</div></div>';
     }
   }
 
