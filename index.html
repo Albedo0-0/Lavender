@@ -556,10 +556,13 @@
       var entityProblem = window.LavenderEntityLoad.problem();
       if (entityProblem) console.error('[Lavender] Dashboard Entity packs failed to load. ' + entityProblem);
     })();
-     MyWorldContent.restoreImportedPacks().catch(function () {}).then(function () {
+         Promise.resolve().then(function () {
     State.init();
     HabitData.init();
     Nav.init();
+    }).then(function () {
+    return MyWorldContent.restoreImportedPacks().catch(function () {});
+    }).then(function () {
     Modal.init();
     
     Water.init();
