@@ -415,12 +415,9 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  gap: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
+  overflow: hidden;
 }
+#screen-dashboard .dhb-slide[hidden] { display: none; }
 /* One habit per slide: each slide is exactly as wide as the box, and a swipe stops on the next slide. */
 #screen-dashboard .dhb-slide {
   flex: 0 0 100%;
