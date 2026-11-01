@@ -55,63 +55,153 @@ const MiscCosmetics = (function () {
       .filter(function (entry) { return !category || entry.category === category; });
   }
 
-  // Placeholder-only collection view: opens a small panel listing whatever has
-  // been register()ed so far. No Store, no currency, no purchasing here — see
-  // file header. Safe to call once; ignores a second call on the same button.
-  function renderWorldsTab() {
-    if (typeof MyWorldContent === 'undefined') return '<p class="micro-label">Worlds unavailable.</p>';
-    const worlds = MyWorldContent.list('world').filter(function (w) { return w.owned; });
-    if (!worlds.length) return '<p class="micro-label">No worlds owned yet.</p>';
-    return worlds.map(function (w) {
-      return '<div class="misc-cosmetic-row misc-world-row' + (w.active ? ' misc-world-row-active' : '') + '" data-world-id="' + w.id + '">' +
-        w.name + (w.active ? ' \u2014 Active' : '') +
-        '</div>';
-    }).join('');
+  // ---------- LV Pack Cosmetics: the owned-only counterpart of the Store ----------
+  // Same modal, classes, category pills and previews as the Store (previews are painted by the Store's own
+  // Assistant.paintStorePreviews()). Ownership and activation use the existing data modules only
+  // (MyWorldContent, AssistantLVPackData, and EntityLVPackData through EntityLVPackUI); nothing is stored here.
+  let cosFilter = 'worlds';
+
+  function cosEsc(s) {
+    return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; });
   }
 
-  function wireWorldsTab(container) {
-    if (!container) return;
-    container.querySelectorAll('.misc-world-row').forEach(function (row) {
-      row.addEventListener('click', function () {
-        const id = row.dataset.worldId;
-        if (!id || typeof MyWorldContent === 'undefined') return;
-        if (MyWorldContent.getActive('world').id === id) return;
-        if (!MyWorldContent.setActive('world', id)) return;
-        if (typeof MyWorld !== 'undefined' && MyWorld.setContent) MyWorld.setContent(id);
-        container.innerHTML = renderWorldsTab();
-        wireWorldsTab(container);
-      });
+  function cosStates(free, active) {
+    return '<span class="tag lvstore-state ' + (free ? 'lvstore-state-owned">Owned' : 'lvstore-state-purchased">Purchased') + '</span>' +
+      (active ? '<span class="tag lvstore-state lvstore-state-active">Active</span>' : '');
+  }
+
+  function cosAction(active) {
+    return active ? '' : '<div class="lvstore-actions"><button type="button" class="btn-secondary lvstore-switch">Activate</button></div>';
+  }
+
+  function cosWorldCard(w) {
+    return '<div class="assistant-store-item lvstore-card is-owned' + (w.active ? ' is-active' : '') + '" data-cos-kind="world" data-cos-id="' + cosEsc(w.id) + '">' +
+      '<div class="lvstore-preview lvstore-preview-world" data-world-preview-id="' + cosEsc(w.id) + '" role="img" aria-label="' + cosEsc(w.name) + ' scene preview"></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + cosEsc(w.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">World · v' + cosEsc(w.version) + '</div>' +
+      '<div class="lvstore-states">' + cosStates(w.cost === 0, w.active) + '</div>' +
+      cosAction(w.active) +
+    '</div>';
+  }
+
+  function cosPackCard(p) {
+    return '<div class="assistant-store-item lvstore-card is-owned' + (p.active ? ' is-active' : '') + '" data-cos-kind="pack" data-cos-id="' + cosEsc(p.id) + '">' +
+      '<div class="lvstore-preview lvstore-preview-companion" role="img" aria-label="' + cosEsc(p.name) + ' preview">' +
+        '<canvas width="160" height="160" data-pack-preview-id="' + cosEsc(p.id) + '"></canvas></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + cosEsc(p.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">Companion</div>' +
+      '<div class="lvstore-states">' + cosStates(p.cost === 0, p.active) + '</div>' +
+      cosAction(p.active) +
+    '</div>';
+  }
+
+  // Ownership rules are the Store's own: worlds are owned when `owned` or free; packs when `unlocked`.
+  function cosWorldsHtml() {
+    if (typeof MyWorldContent === 'undefined') return '<div class="empty-state">Worlds unavailable.</div>';
+    const worlds = MyWorldContent.list('world').filter(function (w) { return w.owned || w.cost === 0; });
+    if (!worlds.length) return '<div class="empty-state">No worlds owned yet.</div>';
+    return '<div class="assistant-store-list">' + worlds.map(cosWorldCard).join('') + '</div>';
+  }
+
+  function cosPacksHtml() {
+    if (typeof AssistantLVPackData === 'undefined') return '<div class="empty-state">Companion packs unavailable.</div>';
+    const packs = AssistantLVPackData.list().filter(function (p) { return p.unlocked; });
+    if (!packs.length) return '<div class="empty-state">No companion packs owned yet.</div>';
+    return '<div class="assistant-store-list">' + packs.map(cosPackCard).join('') + '</div>';
+  }
+
+  // Existing activation mechanisms only. Returns true when something actually changed.
+  function cosActivate(kind, id) {
+    if (!id) return false;
+    if (kind === 'world') {
+      if (typeof MyWorldContent === 'undefined') return false;
+      if (MyWorldContent.getActive('world').id === id) return false;
+      if (!MyWorldContent.setActive('world', id)) return false;
+      if (typeof MyWorld !== 'undefined' && MyWorld.setContent) MyWorld.setContent(id);
+      return true;
+    }
+    if (kind === 'pack') {
+      if (typeof AssistantLVPackData === 'undefined') return false;
+      if (AssistantLVPackData.getActiveId() === id) return false;
+      if (!AssistantLVPackData.setActive(id)) return false;
+      if (typeof Assistant !== 'undefined' && Assistant.refreshPixelEntitySkin) Assistant.refreshPixelEntitySkin();
+      return true;
+    }
+    return false;
+  }
+
+  // Dashboard Entity packs: handled entirely by EntityLVPackUI / EntityLVPackData (activate, use default, remove).
+  // Never silently skipped: a load or init failure is shown with its reason.
+  function cosMountEntities(host) {
+    if (!host) return;
+    try {
+      const loadProblem = window.LavenderEntityLoad ? window.LavenderEntityLoad.problem() : 'Entity load check is missing from index.html.';
+      if (loadProblem) throw new Error(loadProblem);
+      EntityLVPackUI.mountCosmeticsSection(host);
+    } catch (err) {
+      console.error('Dashboard Entity section unavailable:', err);
+      host.innerHTML = '<h4 class="section-title">Dashboard Entity</h4><div class="assistant-store-card"><div class="empty-state"></div></div>';
+      host.querySelector('.empty-state').textContent = 'Dashboard Entity packs failed to load. ' + String(err && err.message || err);
+    }
+  }
+
+  function cosApplyFilter(main) {
+    main.querySelectorAll('[data-cos-cat]').forEach(function (el) {
+      el.hidden = el.getAttribute('data-cos-cat') !== cosFilter;
+    });
+    document.querySelectorAll('[data-cos-filter]').forEach(function (b) {
+      const on = b.getAttribute('data-cos-filter') === cosFilter;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
 
-  // Assistant LV Packs tab — reads AssistantLVPackData.list() (which itself is just a thin view
-  // onto this same registry's unlocked/active flags, category 'assistant-pack') so switching the
-  // active companion pack is possible directly from Cosmetics, per the "switchable directly from
-  // Cosmetics" requirement, without this file needing to know anything about pixel art.
-  function renderAssistantPacksTab() {
-    if (typeof AssistantLVPackData === 'undefined') return '<p class="micro-label">Companion packs unavailable.</p>';
-    const packs = AssistantLVPackData.list();
-    if (!packs.length) return '<p class="micro-label">No companion packs owned yet.</p>';
-    return packs.map(function (p) {
-      if (!p.unlocked) return '<div class="misc-cosmetic-row misc-assistant-pack-row misc-assistant-pack-row-locked">' + p.name + ' (locked \u2014 ' + p.cost + ' EXP, buy from the Assistant Store)</div>';
-      return '<div class="misc-cosmetic-row misc-assistant-pack-row' + (p.active ? ' misc-assistant-pack-row-active' : '') + '" data-pack-id="' + p.id + '">' +
-        p.name + (p.active ? ' \u2014 Active' : '') +
-      '</div>';
-    }).join('');
+  // Builds all three categories, paints the Store's previews while every section is still visible
+  // (so each preview area has a size, exactly as in the Store), then applies the category filter.
+  function cosBuild(main) {
+    const shown = main.querySelector('[data-cos-cat]:not([hidden]) .assistant-store-list');
+    const keepScroll = shown ? shown.scrollLeft : 0;
+    main.innerHTML =
+      '<section class="lvstore-section" data-cos-cat="worlds"><h4 class="section-title">Worlds</h4>' +
+        '<div class="assistant-store-card">' + cosWorldsHtml() + '</div></section>' +
+      '<section class="lvstore-section" data-cos-cat="companions"><h4 class="section-title">Companion Packs</h4>' +
+        '<div class="assistant-store-card">' + cosPacksHtml() + '</div></section>' +
+      '<div class="lvstore-section" data-cos-cat="entity"></div>';
+    if (typeof Assistant !== 'undefined' && Assistant.paintStorePreviews) Assistant.paintStorePreviews();
+    cosMountEntities(main.querySelector('[data-cos-cat="entity"]'));
+    cosApplyFilter(main);
+    const list = main.querySelector('[data-cos-cat]:not([hidden]) .assistant-store-list');
+    if (list) list.scrollLeft = keepScroll;
   }
 
-  function wireAssistantPacksTab(container) {
-    if (!container) return;
-    container.querySelectorAll('.misc-assistant-pack-row[data-pack-id]').forEach(function (row) {
-      row.addEventListener('click', function () {
-        const id = row.dataset.packId;
-        if (!id || typeof AssistantLVPackData === 'undefined') return;
-        if (AssistantLVPackData.getActiveId() === id) return;
-        if (!AssistantLVPackData.setActive(id)) return;
-        if (typeof Assistant !== 'undefined' && Assistant.refreshPixelEntitySkin) Assistant.refreshPixelEntitySkin();
-        container.innerHTML = renderAssistantPacksTab();
-        wireAssistantPacksTab(container);
+  function openCosmetics() {
+    Modal.open(
+      '<div class="assistant-page assistant-page-plain lvstore">' +
+        '<div class="lvstore-top"><h3 class="section-title lvstore-brand">LV Pack Cosmetics</h3></div>' +
+        '<div class="lvstore-layout">' +
+          '<nav class="lvstore-rail" aria-label="Cosmetics categories">' +
+            '<button type="button" class="lvstore-pill" data-cos-filter="worlds">Worlds</button>' +
+            '<button type="button" class="lvstore-pill" data-cos-filter="companions">Companions</button>' +
+            '<button type="button" class="lvstore-pill" data-cos-filter="entity">Entities</button>' +
+          '</nav>' +
+          '<div class="lvstore-main" id="cos-main"></div>' +
+        '</div>' +
+      '</div>'
+    );
+    const main = document.getElementById('cos-main');
+    if (!main) return;
+    cosBuild(main);
+    document.querySelectorAll('[data-cos-filter]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        cosFilter = b.getAttribute('data-cos-filter') || 'worlds';
+        cosApplyFilter(main);
       });
+    });
+    // Select any owned world / companion pack from its card (or its Activate button).
+    main.addEventListener('click', function (e) {
+      const card = e.target && e.target.closest ? e.target.closest('[data-cos-kind]') : null;
+      if (!card || card.classList.contains('is-active')) return;
+      if (cosActivate(card.getAttribute('data-cos-kind'), card.getAttribute('data-cos-id'))) cosBuild(main);
     });
   }
 
@@ -119,49 +209,7 @@ const MiscCosmetics = (function () {
     if (!button || button.__paintbrushWired) return;
     button.__paintbrushWired = true;
     button.addEventListener('click', function () {
-      // Cosmetics are intentionally empty for now (to be decided later). Assistant LV Packs
-      // live only in the Companions tab, so they must never be listed here.
-      const rows = '<p class="micro-label">Nothing to show yet.</p>';
-      if (typeof Modal !== 'undefined' && Modal.open) {
-        Modal.open(
-          '<div class="modal-header"><h3 class="modal-title">Cosmetics</h3></div>' +
-          '<div class="misc-tabs"><button id="misc-tab-cosmetics" class="btn-secondary">Cosmetics</button>' +
-          '<button id="misc-tab-worlds" class="btn-secondary">Worlds</button>' +
-          '<button id="misc-tab-companion" class="btn-secondary">Companions</button>' +
-          '<button id="misc-tab-entity" class="btn-secondary">Dashboard Entity</button></div>' +
-          '<div id="misc-tab-body">' + rows + '</div>'
-        );
-        const body = document.getElementById('misc-tab-body');
-        const cosmeticsTab = document.getElementById('misc-tab-cosmetics');
-        const worldsTab = document.getElementById('misc-tab-worlds');
-        const companionTab = document.getElementById('misc-tab-companion');
-        if (cosmeticsTab) cosmeticsTab.addEventListener('click', function () { body.innerHTML = rows; });
-        if (worldsTab) worldsTab.addEventListener('click', function () {
-          body.innerHTML = renderWorldsTab();
-          wireWorldsTab(body);
-        });
-        if (companionTab) companionTab.addEventListener('click', function () {
-          body.innerHTML = renderAssistantPacksTab();
-          wireAssistantPacksTab(body);
-        });
-        // Dashboard Entity packs: separate section, handled entirely by EntityLVPackUI / EntityLVPackData.
-        const entityTab = document.getElementById('misc-tab-entity');
-        if (entityTab) entityTab.addEventListener('click', function () {
-          // Never silently skipped: a load or init failure is shown with its reason.
-          const showProblem = function (why) {
-            console.error('Dashboard Entity section unavailable:', why);
-            body.innerHTML = '';
-            const p = document.createElement('p');
-            p.className = 'micro-label';
-            p.textContent = 'Dashboard Entity packs failed to load. ' + why;
-            body.appendChild(p);
-          };
-          const loadProblem = window.LavenderEntityLoad ? window.LavenderEntityLoad.problem() : 'Entity load check is missing from index.html.';
-          if (loadProblem) { showProblem(loadProblem); return; }
-          try { EntityLVPackUI.mountCosmeticsSection(body); }
-          catch (err) { showProblem('Initialization error: ' + String(err && err.message || err)); }
-        });
-      }
+      if (typeof Modal !== 'undefined' && Modal.open) openCosmetics();
     });
   }
 
