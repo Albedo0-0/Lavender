@@ -357,20 +357,11 @@ const Assistant = (function () {
   function wireStore() {
     document.querySelectorAll('[data-store-filter]').forEach(function (b) {
       b.addEventListener('click', function () {
-                                storeFilter = b.getAttribute('data-store-filter') || 'worlds';
-        applyStoreFilter(true);
+                storeFilter = b.getAttribute('data-store-filter') || 'worlds';
+        applyStoreFilter();
       });
     });
     applyStoreFilter();
-    const slideHost = document.querySelector('.lvstore-main');
-    if (slideHost) {
-      slideHost.addEventListener('scroll', function () {
-        const secs = slideHost.querySelectorAll('[data-store-cat]');
-        const i = Math.round(slideHost.scrollLeft / Math.max(1, slideHost.clientWidth));
-        const cat = secs[i] && secs[i].getAttribute('data-store-cat');
-        if (cat && cat !== storeFilter) { storeFilter = cat; applyStoreFilter(); }
-      }, { passive: true });
-    }
     document.querySelectorAll('.assistant-store-buy').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.dataset.worldId;
@@ -430,13 +421,10 @@ const Assistant = (function () {
     } catch (e) { return ''; }
   }
 
-    function applyStoreFilter(animate) {
-    const storeMain = document.querySelector('.lvstore-main');
-    const storeSecs = Array.prototype.slice.call(document.querySelectorAll('[data-store-cat]'));
-    if (storeMain && storeSecs.length) {
-      const storeIdx = Math.max(0, storeSecs.findIndex(function (el) { return el.getAttribute('data-store-cat') === storeFilter; }));
-      storeMain.scrollTo({ left: storeIdx * storeMain.clientWidth, behavior: animate ? 'smooth' : 'auto' });
-    }
+      function applyStoreFilter() {
+    document.querySelectorAll('[data-store-cat]').forEach(function (el) {
+      el.hidden = el.getAttribute('data-store-cat') !== storeFilter;
+    });
     document.querySelectorAll('[data-store-filter]').forEach(function (b) {
       const on = b.getAttribute('data-store-filter') === storeFilter;
       b.classList.toggle('is-active', on);
