@@ -23,8 +23,7 @@ const Nav = (function () {
     const lockBtn = document.getElementById('journal-lock-toggle');
     if (lockBtn) lockBtn.style.display = (screenName === 'journal') ? 'inline-block' : 'none';
 
-    State.set({ currentScreen: screenName });
-
+        if (screenName !== prevScreen) State.set({ currentScreen: screenName });
     // Refresh the screen being switched into so it always reflects the latest
     // shared data (e.g. a task completed in Planner shows correctly in Calendar's Date Hub, and vice versa).
     if (screenName === 'calendar' && typeof Calendar !== 'undefined' && Calendar.isReady && Calendar.isReady() && Calendar.render) Calendar.render();
