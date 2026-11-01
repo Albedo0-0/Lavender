@@ -516,12 +516,29 @@
   
   <script src="backup.js"></script>
   <script src="backup-ui.js"></script>
+  <script>
+    // Dashboard Entity LV Packs: records any failure to fetch/define the two Entity scripts so Settings,
+    // Cosmetics and the Store can show the actual reason instead of a generic "unavailable".
+    window.LavenderEntityLoad = {
+      failed: [],
+      // '' when both interfaces are usable, otherwise a human-readable diagnosis.
+      problem: function () {
+        var undef = [];
+        try { if (typeof EntityLVPackData === 'undefined') undef.push('EntityLVPackData'); } catch (e) { undef.push('EntityLVPackData (script threw while loading)'); }
+        try { if (typeof EntityLVPackUI === 'undefined') undef.push('EntityLVPackUI'); } catch (e) { undef.push('EntityLVPackUI (script threw while loading)'); }
+        if (!this.failed.length && !undef.length) return '';
+        return (this.failed.length ? 'Could not load ' + this.failed.join(', ') + '. ' : '') +
+          (undef.length ? 'Not defined: ' + undef.join(', ') + '. ' : '') +
+          'The files must be named exactly entity-lvpack-data.js and entity-lvpack-ui.js (lowercase L in "lvpack") and sit next to index.html.';
+      }
+    };
+  </script>
+  <script src="entity-lvpack-data.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
+  <script src="entity-lvpack-ui.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
   <script src="settings.js"></script>
   <script src="misc-core.js"></script>
   <script src="misc-cosmetics.js"></script>
   <script src="assistant-lvpacks-data.js"></script>
-  <script src="entity-lvpack-data.js"></script>
-  <script src="entity-lvpack-ui.js"></script>
   <script src="misc-sound.js"></script>
   
   
@@ -535,6 +552,10 @@
   <script src="candle-lamp.js"></script>
   <script src="fullscreen.js"></script>
   <script>
+     (function () {
+      var entityProblem = window.LavenderEntityLoad.problem();
+      if (entityProblem) console.error('[Lavender] Dashboard Entity packs failed to load. ' + entityProblem);
+    })();
      MyWorldContent.restoreImportedPacks().catch(function () {}).then(function () {
     State.init();
     HabitData.init();
@@ -661,28 +682,22 @@
     syncLabel();
   })();
 
+  // Updates are fully automatic and driven by service-worker.js (install -> skipWaiting -> activate ->
+  // one reload). The page only registers the worker. A long-lived tab never navigates, so it also asks
+  // the browser to re-check for a new deployment when the app returns to the foreground.
   if ('serviceWorker' in navigator) {
-  window.LavenderSW = { registration: null, updateAvailable: false, pendingVersion: null };
-  navigator.serviceWorker.addEventListener('message', function (e) {
-    // Posted by a newly installed worker once it's fully cached and waiting.
-    // Receiving it while a controller already exists is the real "update
-    // available" moment — mark it ready and expose its version, never activate.
-    if (e.data && e.data.type === 'SW_INSTALLED' && navigator.serviceWorker.controller) {
-      window.LavenderSW.updateAvailable = true;
-      window.LavenderSW.pendingVersion = e.data.version;
-      window.dispatchEvent(new CustomEvent('lavender-update-ready'));
-    }
-  });
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./service-worker.js')
-      .then(function (reg) {
-        window.LavenderSW.registration = reg;
-      })
-.catch(function (err) {
-        console.warn('Service worker registration failed:', err);
-      });
-  });
-}
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
+        .then(function (reg) {
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') reg.update().catch(function () {});
+          });
+        })
+        .catch(function (err) {
+          console.warn('Service worker registration failed:', err);
+        });
+    });
+  }
   </script>
 </body>
   </html>
