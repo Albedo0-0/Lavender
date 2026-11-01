@@ -507,8 +507,9 @@ const MyWorldContent = (function () {
         if (!db.objectStoreNames.contains(PACK_STORE)) db.createObjectStore(PACK_STORE, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(BEHAVIOUR_STORE)) db.createObjectStore(BEHAVIOUR_STORE, { keyPath: 'lvPackId' });
       };
-      req.onsuccess = function () { resolve(req.result); };
+            req.onsuccess = function () { resolve(req.result); };
       req.onerror = function () { reject(req.error || new Error('indexedDB open failed')); };
+      req.onblocked = function () { reject(new Error('indexedDB open blocked')); };
     });
     return _packDbPromise;
   }
