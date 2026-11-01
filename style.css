@@ -4278,28 +4278,17 @@ button.notepad-format-btn.notepad-format-active {
 .lvstore-pill:hover { background: var(--color-cream-300); }
 .lvstore-pill.is-active { background: var(--color-sage-200); }
 .lvstore { overflow-y: hidden; }
-.lvstore-main {
-  min-width: 0; display: flex; height: min(52vh, 420px);
-  overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch; scrollbar-width: none;
-}
-.lvstore-main::-webkit-scrollbar { display: none; }
-.lvstore-main > [data-store-cat] {
-  flex: 0 0 100%; min-width: 0; height: 100%; box-sizing: border-box;
-  overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
-  scroll-snap-align: start; scroll-snap-stop: always;
-  padding: var(--space-1) var(--space-2) var(--space-5);
-  scrollbar-width: thin;
-}
+.lvstore-main { min-width: 0; }
 .lvstore .lvstore-section { margin-bottom: 0; }
 .lvstore .assistant-store-card { padding: 0; background: none; border: 0; box-shadow: none; transform: none; }
 .lvstore .assistant-store-list {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--space-4);
-  padding: 4px 4px 8px;
+  display: flex; flex-direction: row; flex-wrap: nowrap; gap: var(--space-4);
+  overflow-x: auto; overflow-y: hidden; padding: 4px 4px 12px;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 .lvstore .lvstore-card {
-  min-width: 0;
+  flex: 0 0 190px; scroll-snap-align: start;
   display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px;
   padding: 14px; background: var(--color-cream-050);
 }
