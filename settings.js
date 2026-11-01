@@ -47,8 +47,9 @@ const Settings = (function () {
 
       '<section class="settings-section"><h4 class="section-title settings-section-title">Wallpapers</h4>' +
 
-      '<div class="form-row"><label for="settings-wallpaper-input">Break wallpaper</label>' +
-      '<input type="file" id="settings-wallpaper-input" accept="image/*">' +
+            '<div class="form-row"><label for="settings-wallpaper-input">Break wallpaper</label>' +
+      '<button id="settings-wallpaper-btn" class="btn-secondary">Upload wallpaper</button>' +
+      '<input type="file" id="settings-wallpaper-input" accept="image/*" style="display:none">' +
       (cur.breakWallpaper
         ? '<img id="settings-wallpaper-preview" src="' + cur.breakWallpaper + '" alt="Break wallpaper preview">' +
           '<button id="settings-wallpaper-remove" class="btn-secondary">Remove wallpaper</button>'
@@ -57,8 +58,9 @@ const Settings = (function () {
 
       '<hr class="divider">' +
 
-      '<div class="form-row"><label for="settings-study-wallpaper-input">Study wallpapers</label>' +
-      '<input type="file" id="settings-study-wallpaper-input" accept="image/*,video/mp4,video/webm" multiple>' +
+            '<div class="form-row"><label for="settings-study-wallpaper-input">Study wallpapers</label>' +
+      '<button id="settings-study-wallpaper-btn" class="btn-secondary">Upload wallpapers</button>' +
+      '<input type="file" id="settings-study-wallpaper-input" accept="image/*,video/mp4,video/webm" multiple style="display:none">' +
       '<div id="settings-study-wallpaper-grid" class="settings-wallpaper-grid">' +
       (cur.studyWallpapers || []).map(function (item, i) {
         const isVideo = item && typeof item === 'object' && item.type === 'video';
@@ -78,12 +80,9 @@ const Settings = (function () {
       (((cur.studyWallpaperSlideshow || {}).intervalMin) || 5) + '"> <span class="micro-label">min</span></div>' +
             '</section>' +
 
-      '<section class="settings-section"><h4 class="section-title settings-section-title">Assistant</h4>' +
-      '<div class="form-row"><label for="settings-assistant-name">Assistant name</label>' +
-      '<input type="text" id="settings-assistant-name" value="' + esc(cur.assistantName || '') + '" placeholder="Assistant"></div>' +
+            '<section class="settings-section"><h4 class="section-title settings-section-title">Assistant</h4>' +
 
       '<button id="settings-save-btn">Save</button>' +
-
       '<hr class="divider">' +
 
              '</section><section class="settings-section"><h4 class="section-title settings-section-title">My World LV Packs</h4>' +
@@ -109,8 +108,8 @@ const Settings = (function () {
 
       '</section><section class="settings-section"><h4 class="section-title settings-section-title">Backup</h4>' +
       '<div class="form-row"><button id="settings-export-btn" class="btn-secondary">Export backup</button></div>' +
-      '<div class="form-row"><label for="settings-import-input">Restore from backup</label>' +
-      '<input type="file" id="settings-import-input" accept="application/json">' +
+            '<div class="form-row"><button id="settings-import-btn" class="btn-secondary">Restore from backup</button>' +
+      '<input type="file" id="settings-import-input" accept="application/json" style="display:none">' +
       '<div id="settings-import-status" class="micro-label"></div></div>' +
       '<button id="settings-clear-btn" class="btn-danger">Clear all data</button>' +
 
@@ -181,8 +180,7 @@ const Settings = (function () {
     State.patch('settings', {
       notificationsEnabled: document.getElementById('settings-notifications').checked,
       soundEnabled: document.getElementById('settings-sound').checked,
-      vibrationEnabled: document.getElementById('settings-vibration').checked,
-      assistantName: document.getElementById('settings-assistant-name').value.trim()
+            vibrationEnabled: document.getElementById('settings-vibration').checked
     });
     if (typeof MiscSound !== 'undefined') MiscSound.play('uiSave');
     Modal.close();
@@ -309,8 +307,18 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
       slideshowInterval.addEventListener('change', saveSlideshowSettings);
     }
 
-    document.getElementById('settings-export-btn').addEventListener('click', function () {
+        document.getElementById('settings-export-btn').addEventListener('click', function () {
       Backup.downloadExport();
+    });
+
+    [
+      ['settings-wallpaper-btn', 'settings-wallpaper-input'],
+      ['settings-study-wallpaper-btn', 'settings-study-wallpaper-input'],
+      ['settings-import-btn', 'settings-import-input']
+    ].forEach(function (pair) {
+      const pickBtn = document.getElementById(pair[0]);
+      const pickInput = document.getElementById(pair[1]);
+      if (pickBtn && pickInput) pickBtn.addEventListener('click', function () { pickInput.click(); });
     });
 
      // Both import areas share the one LV Pack importer (MyWorldContent.importPackFile); `kind`
@@ -383,8 +391,8 @@ function _isFs() { return !!(document.fullscreenElement || document.webkitFullsc
   }
 
   // Read by Assistant (§B.7) for its modal header — cosmetic label only, falls back to "Assistant".
-  function assistantLabel() {
-    return settings().assistantName || 'Assistant';
+    function assistantLabel() {
+    return 'Assistant';
   }
 
   function handleIconClick() { open(); }
