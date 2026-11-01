@@ -341,6 +341,307 @@ const Dashboard = (function () {
     host.addEventListener('contextmenu', function (e) { if (e.target.closest('.dhb-mark')) e.preventDefault(); });
   }
 
+  // ---------- Merged Box 5 + 6: Study Analytics (metric selector + current-week line graph) ----------
+  // Read-only view over PTPE. Every value is PTPE.value(key, date): the single per-day interpretation layer that
+  // Progress, the Calendar lenses and the Productivity score already use. Break Balance and Punctuality are not
+  // PTPE metrics, so they are read from ProductivityData.getBreakdown(date).factors (the same factors
+  // PTPE.whyProductivity() reads). Nothing is stored or recomputed here; only UI selection is held.
+  // The week is Monday..today from PTPE.today() (the app's local date); it refreshes on the existing
+  // 'dashboard-live' TimeEngine subscriber (liveTick), throttled, so no timer or subscription is added.
+  const AN_DEFAULT = 'studyHours';
+  const AN_CHECK_MS = 5000;
+  let anKey = AN_DEFAULT;
+  let anSel = '';
+  let anMenu = false;
+  let anModel = null;
+  let anSigLast = '';
+  let anCheckAt = 0;
+  let anDocBound = false;
+
+  function anR1(v) { return Math.round(v * 10) / 10; }
+  function anOutOf(max) { return function (v) { return anR1(v) + ' / ' + max; }; }
+  function anPct(v) { return Math.round(v) + '%'; }
+
+  // lo/hi = fixed scale (hi null = fitted to the week); sum = PTPE treats an all-zero week as "no data"; grow = scale may extend.
+  const AN_METRICS = [
+    { id: 'productivity', label: 'Productivity', key: 'productivity', lo: 0, hi: 10, fmt: anOutOf(10), tick: anR1,
+      note: 'Daily Productivity score out of 10, combining study, planned work, habits, sleep and more.' },
+    { id: 'studyHours', label: 'Study Hours', key: 'studyHours', sum: true, lo: 0, hi: null,
+      fmt: function (v) { return PTPE.fmtHours(v); }, tick: function (v) { return anR1(v) + 'h'; },
+      note: 'Study time recorded that day: timer sessions plus any hours logged in the journal.' },
+    { id: 'questions', label: 'Questions', key: 'questions', sum: true, lo: 0, hi: null,
+      fmt: function (v) { const n = Math.round(v); return n + (n === 1 ? ' question' : ' questions'); }, tick: anR1,
+      note: 'Questions recorded that day: timer sessions plus any logged in the journal.' },
+    { id: 'exp', label: 'EXP', key: 'exp', sum: true, lo: 0, hi: null,
+      fmt: function (v) { return Math.round(v) + ' EXP'; }, tick: anR1,
+      note: 'EXP credited to that day in the EXP ledger.' },
+    { id: 'sleep', label: 'Sleep', key: 'sleep', lo: 0, hi: 12, grow: true,
+      fmt: function (v) { return anR1(v) + ' h'; }, tick: function (v) { return anR1(v) + 'h'; },
+      note: 'Sleep duration recorded for that day.' },
+    { id: 'water', label: 'Water', key: 'water', lo: 0, hi: 10, fmt: anOutOf(10), tick: anR1,
+      note: 'Water intake recorded that day, scored out of 10.' },
+    { id: 'breakBalance', label: 'Break Balance', factor: 'breakBalance', lo: 0, hi: 10, fmt: anOutOf(10), tick: anR1,
+      note: 'Break time against study time: 10 when breaks stay within 30% of study, 0 when they match it. Needs study that day.' },
+    { id: 'mood', label: 'Mood', key: 'mood', lo: 1, hi: 5,
+      fmt: function (v) { return PTPE.METRICS.mood.fmt(v) + ' \u00b7 ' + anR1(v) + ' / 5'; }, tick: anR1,
+      note: 'Mood logged in that day\u2019s journal entry (1 Rough to 5 Great).' },
+    { id: 'punctuality', label: 'Punctuality', factor: 'punctuality', lo: 0, hi: 10, fmt: anOutOf(10), tick: anR1,
+      note: 'How close study sessions started to their scheduled time: 10 on time, 0 when 45+ min late. Day average.' },
+    { id: 'taskCompletion', label: 'Task Completion', key: 'plannerCompletion', lo: 0, hi: 100, fmt: anPct, tick: anPct,
+      note: 'Share of that day\u2019s planned tasks marked complete.' },
+    { id: 'habits', label: 'Habits', key: 'habitCompletion', lo: 0, hi: 100, fmt: anPct, tick: anPct,
+      note: 'Average completion of that day\u2019s habits.' },
+    { id: 'tests', label: 'Test Score', key: 'testScore', lo: 0, hi: 100, fmt: anPct, tick: anPct,
+      note: 'Average score across tests recorded that day.' }
+  ];
+
+  function anMetric() {
+    return AN_METRICS.filter(function (m) { return m.id === anKey; })[0] || AN_METRICS[1];
+  }
+
+  // Monday of the current week through today. Never a future day.
+  function anDates() {
+    const t = PTPE.today();
+    const dow = (new Date(t + 'T00:00:00').getDay() + 6) % 7; // Monday = 0
+    return PTPE.span(shiftDay(t, -dow), t);
+  }
+
+  // null = no record (kept distinct from a real 0); anything PTPE reports is passed through unchanged.
+  function anValue(m, d) {
+    try {
+      let v = null;
+      if (m.factor) {
+        const b = typeof ProductivityData !== 'undefined' && ProductivityData.getBreakdown ? ProductivityData.getBreakdown(d) : null;
+        v = b && b.score !== null && b.factors ? b.factors[m.factor] : null;
+      } else {
+        v = PTPE.value(m.key, d);
+      }
+      return typeof v === 'number' && isFinite(v) ? v : null;
+    } catch (err) {
+      console.warn('Dashboard analytics value failed', m.id, d, err);
+      return null;
+    }
+  }
+
+  function anSig() {
+    const m = anMetric();
+    return m.id + '|' + anDates().map(function (d) { return d + ':' + anValue(m, d); }).join(',');
+  }
+
+  function anNice(v) {
+    if (!(v > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+    const f = v / p;
+    const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    for (let i = 0; i < steps.length; i++) if (f <= steps[i] + 1e-9) return steps[i] * p;
+    return 10 * p;
+  }
+
+  function anLong(d) {
+    const x = new Date(d + 'T00:00:00');
+    return DOW[x.getDay()] + ', ' + x.getDate() + ' ' + MON[x.getMonth()] + ' ' + x.getFullYear();
+  }
+
+  function anShow(i) {
+    const host = document.querySelector('#dash-analytics .dan-plot');
+    const tip = host && host.querySelector('.dan-tip');
+    if (!tip) return;
+    host.querySelectorAll('.dan-pt').forEach(function (g) {
+      const on = Number(g.dataset.i) === i;
+      g.classList.toggle('dan-on', on);
+      g.querySelector('.dan-dot').setAttribute('r', on ? '5' : '3.5');
+    });
+    const md = anModel;
+    if (i < 0 || !md || md.vals[i] === null || md.vals[i] === undefined) { tip.hidden = true; return; }
+    tip.innerHTML = '<span class="dan-tip-date">' + esc(anLong(md.dates[i])) + '</span>' +
+      '<strong class="dan-tip-val">' + esc(md.m.fmt(md.vals[i])) + '</strong>' +
+      '<span class="dan-tip-note">' + esc(md.m.note) + '</span>';
+    tip.hidden = false;
+    const tw = tip.offsetWidth, th = tip.offsetHeight, x = md.xs[i], y = md.ys[i];
+    const left = Math.max(2, Math.min(md.W - tw - 2, x - tw / 2));
+    let top = y - th - 12;
+    if (top < 0) top = Math.min(Math.max(0, md.H - th), y + 12);
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+  }
+
+  function anPinned() { return anModel ? anModel.dates.indexOf(anSel) : -1; }
+
+  // Draws the selected metric for Monday..today. Returns false when the plot has no size yet (hidden screen);
+  // the ResizeObserver / next heartbeat retries.
+  function anDraw(animate) {
+    const host = document.querySelector('#dash-analytics .dan-plot');
+    if (!host) return false;
+    const W = host.clientWidth, H = host.clientHeight;
+    if (W < 60 || H < 50) return false;
+    const m = anMetric(), dates = anDates();
+    const vals = dates.map(function (d) { return anValue(m, d); });
+    const real = vals.filter(function (v) { return v !== null; });
+    anModel = null;
+    host.classList.toggle('dan-anim', !!animate);
+    if (!real.length || (m.sum && !real.some(function (v) { return v > 0; }))) {
+      host.innerHTML = '<p class="dan-empty">Nothing recorded this week yet.</p>';
+      return true;
+    }
+    const PL = 38, PR = 20, PT = 12, PB = 22, iw = W - PL - PR, ih = H - PT - PB;
+    const maxv = Math.max.apply(null, real);
+    const lo = m.lo;
+    let hi = m.hi === null ? anNice(maxv) : m.hi;
+    if (maxv > hi) hi = m.grow ? Math.ceil(maxv) : anNice(maxv);
+    const X = function (i) { return dates.length === 1 ? PL + iw / 2 : PL + i * iw / (dates.length - 1); };
+    const Y = function (v) { return PT + (1 - (v - lo) / (hi - lo)) * ih; };
+    let g = '';
+    [lo, (lo + hi) / 2, hi].forEach(function (t) {
+      g += '<text class="dan-ax" x="' + (PL - 8) + '" y="' + (Y(t) + 3.5).toFixed(1) + '" text-anchor="end">' + esc(m.tick(t)) + '</text>';
+    });
+    g += '<line class="dan-base" x1="' + PL + '" x2="' + (W - PR) + '" y1="' + Y(lo).toFixed(1) + '" y2="' + Y(lo).toFixed(1) + '"/>';
+    dates.forEach(function (d, i) {
+      g += '<text class="dan-ax" x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + DOW[new Date(d + 'T00:00:00').getDay()] + '</text>';
+    });
+    let seg = [];
+    const segs = [];
+    vals.forEach(function (v, i) {
+      if (v === null) { if (seg.length) segs.push(seg); seg = []; } else seg.push(i);
+    });
+    if (seg.length) segs.push(seg);
+    segs.forEach(function (s) {
+      if (s.length < 2) return;
+      g += '<path class="dan-line" pathLength="1" d="' + s.map(function (i, k) { return (k ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(vals[i]).toFixed(1); }).join('') + '"/>';
+    });
+    vals.forEach(function (v, i) {
+      if (v === null) return;
+      const cx = X(i).toFixed(1), cy = Y(v).toFixed(1);
+      g += '<g class="dan-pt" data-i="' + i + '" tabindex="0" role="button" aria-label="' + esc(anLong(dates[i]) + ', ' + m.fmt(v)) + '">' +
+        '<circle class="dan-hit" cx="' + cx + '" cy="' + cy + '" r="16"/>' +
+        '<circle class="dan-dot" cx="' + cx + '" cy="' + cy + '" r="3.5"/></g>';
+    });
+    host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="' + esc(m.label) + ', this week">' + g + '</svg><div class="dan-tip" hidden></div>';
+    anModel = { m: m, dates: dates, vals: vals, W: W, H: H,
+      xs: dates.map(function (d, i) { return X(i); }),
+      ys: vals.map(function (v) { return v === null ? null : Y(v); }) };
+    const keep = anPinned();
+    if (keep >= 0 && vals[keep] !== null) anShow(keep); else anSel = '';
+    return true;
+  }
+
+  function anSync(host) {
+    const m = anMetric(), sel = host.querySelector('.dan-sel');
+    if (!sel) return;
+    sel.classList.toggle('dtk-open', anMenu);
+    const btn = sel.querySelector('.dtk-sel-btn');
+    btn.textContent = m.label;
+    btn.setAttribute('aria-expanded', String(anMenu));
+    sel.querySelector('.dtk-menu').hidden = !anMenu;
+    sel.querySelectorAll('.dtk-opt').forEach(function (o) {
+      const on = o.dataset.id === m.id;
+      o.classList.toggle('dtk-opt-on', on);
+      o.parentNode.setAttribute('aria-selected', String(on));
+    });
+  }
+
+  function anPtIndex(e) {
+    const g = e.target && e.target.closest ? e.target.closest('.dan-pt') : null;
+    return g ? Number(g.dataset.i) : -1;
+  }
+
+  function anBuild(host) {
+    host.innerHTML = '<div class="dan">' +
+      '<div class="dan-bar"><div class="dtk-sel dan-sel">' +
+        '<button type="button" class="dtk-sel-btn" data-an="menu" aria-haspopup="listbox" aria-expanded="false"></button>' +
+        '<ul class="dtk-menu dan-menu" role="listbox" aria-label="Study metric" hidden>' + AN_METRICS.map(function (m) {
+          return '<li role="option" aria-selected="false"><button type="button" class="dtk-opt" data-an="pick" data-id="' + m.id + '">' + esc(m.label) + '</button></li>';
+        }).join('') + '</ul>' +
+      '</div></div>' +
+      '<div class="dan-plot"></div></div>';
+    const plot = host.querySelector('.dan-plot');
+    host.addEventListener('click', function (e) {
+      const b = e.target.closest ? e.target.closest('[data-an]') : null;
+      if (!b) return;
+      if (b.dataset.an === 'menu') { anMenu = !anMenu; anSync(host); }
+      else if (b.dataset.an === 'pick') { anMenu = false; anPick(b.dataset.id); }
+    });
+    // Desktop: hover shows a point's tooltip. Touch and click pin it until another point or the background is tapped.
+    plot.addEventListener('pointerover', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      const i = anPtIndex(e);
+      if (i >= 0) anShow(i);
+    });
+    plot.addEventListener('pointerout', function (e) {
+      if (e.pointerType !== 'mouse' || anPtIndex(e) < 0) return;
+      if (anPtIndex({ target: e.relatedTarget }) >= 0) return;
+      anShow(anPinned());
+    });
+    plot.addEventListener('click', function (e) {
+      const i = anPtIndex(e);
+      if (i >= 0 && anModel) { anSel = anModel.dates[i]; anShow(i); }
+      else { anSel = ''; anShow(-1); }
+    });
+    plot.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const i = anPtIndex(e);
+      if (i >= 0 && anModel) { e.preventDefault(); anSel = anModel.dates[i]; anShow(i); }
+    });
+    plot.addEventListener('focusin', function (e) { const i = anPtIndex(e); if (i >= 0) anShow(i); });
+    plot.addEventListener('focusout', function () { anShow(anPinned()); });
+    if (typeof ResizeObserver !== 'undefined') {
+      let rw = 0, rh = 0;
+      new ResizeObserver(function () {
+        if (plot.clientWidth === rw && plot.clientHeight === rh) return;
+        rw = plot.clientWidth; rh = plot.clientHeight;
+        if (anDraw(false)) anSigLast = anSig();
+      }).observe(plot);
+    }
+    if (!anDocBound) {
+      anDocBound = true;
+      document.addEventListener('click', function (e) {
+        if (!anMenu || (e.target.closest && e.target.closest('#dash-analytics .dan-sel'))) return;
+        const h = document.querySelector('#dash-analytics .dash-body');
+        anMenu = false;
+        if (h) anSync(h);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        const h = document.querySelector('#dash-analytics .dash-body');
+        if (!h || !h.querySelector('.dan')) return;
+        if (anMenu) { anMenu = false; anSync(h); }
+        else if (anSel) { anSel = ''; anShow(-1); }
+      });
+    }
+  }
+
+  function anPick(id) {
+    if (id === anKey) { renderAnalytics(false); return; }
+    anKey = id;
+    anSel = '';
+    renderAnalytics(true);
+  }
+
+  function renderAnalytics(animate) {
+    const host = document.querySelector('#dash-analytics .dash-body');
+    if (!host) return;
+    if (typeof PTPE === 'undefined') { host.innerHTML = '<p class="dan-empty">Analytics are unavailable.</p>'; return; }
+    if (!host.querySelector('.dan')) anBuild(host);
+    anSync(host);
+    anSigLast = '';
+    if (anDraw(animate)) anSigLast = anSig();
+  }
+
+  // Every Dashboard visit starts on Study Hours with nothing pinned.
+  function anOpen() {
+    anKey = AN_DEFAULT;
+    anSel = '';
+    anMenu = false;
+    renderAnalytics(true);
+  }
+
+  // Called from liveTick (TimeEngine heartbeat): redraw only when this week's plotted values or the week itself changed.
+  function anTick() {
+    const now = Date.now();
+    if (now - anCheckAt < AN_CHECK_MS || typeof PTPE === 'undefined') return;
+    anCheckAt = now;
+    if (anSig() !== anSigLast) renderAnalytics(false);
+  }
+
   // One subscriber on TimeEngine's shared heartbeat (stable id, so a re-run replaces rather than stacks).
   // It only compares what is displayed against what is now canonical, so changes made in the Assistant
   // Habits menu (or anywhere else) show up here, and the day rolling over refreshes both boxes.
@@ -349,6 +650,8 @@ const Dashboard = (function () {
     if (hb && hb.offsetParent !== null && typeof HabitData !== 'undefined' && habSignature(habItems()) !== habSig) renderHabits();
     const tb = document.querySelector('#dash-tasks .dash-body');
     if (tb && tb.offsetParent !== null && tkDay && tkDay !== todayStr()) renderTasks(false);
+    const ab = document.querySelector('#dash-analytics .dash-body');
+    if (ab && ab.offsetParent !== null) anTick();
   }
 
   function startLive() {
@@ -377,8 +680,7 @@ const Dashboard = (function () {
           box('dash-b4', 'dash-personal', 'Personal Space', 'Personal Space', true) +
         '</div>' +
         '<div class="dash-row dash-row-3">' +
-          box('dash-b5', 'dash-overview', 'Study Overview', 'Study Overview', true) +
-          box('dash-b6', 'dash-analytics', 'Study Analytics', 'Study Analytics', true) +
+          box('dash-b56', 'dash-analytics', 'Study Analytics', 'Study Analytics', true) +
         '</div>' +
       '</div>' +
       '<div class="dash-right">' +
@@ -398,6 +700,7 @@ const Dashboard = (function () {
         if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
     renderTasks(false);
     renderHabits();
+    anOpen();
     startLive();
   }
 
