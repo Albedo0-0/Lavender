@@ -73,13 +73,18 @@ const EntityLVPackUI = (function () {
   }
 
   function storeRow(o) {
-    return '<div class="assistant-store-item misc-entity-store-row" data-entity-pack-id="' + esc(o.id) + '">' +
-      '<span class="assistant-store-item-name">' + esc(o.name) + '</span>' +
-      '<div class="micro-label">' + esc(['v' + o.version, o.author].filter(Boolean).join(' · ')) + '</div>' +
-      (o.description ? '<div class="micro-label">' + esc(o.description) + '</div>' : '') +
-      '<div class="micro-label">' + esc(o.price) + ' EXP</div>' +
-      (o.owned ? '<div class="micro-label">Owned — activate it in Cosmetics › Dashboard Entity.</div>'
-        : '<button type="button" class="btn-secondary" data-entity-act="buy" data-id="' + esc(o.id) + '">Buy for ' + esc(o.price) + ' EXP</button>') +
+    return '<div class="assistant-store-item misc-entity-store-row lvstore-card' + (o.owned ? ' is-owned' : ' is-locked') + '" data-entity-pack-id="' + esc(o.id) + '">' +
+      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(o.id) + '">' +
+        '<span class="lvstore-preview-note">Preview unavailable: no Dashboard Entity scene renderer is installed in this app.</span></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + esc(o.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">' + esc(['v' + o.version, o.author].filter(Boolean).join(' · ')) + '</div>' +
+      (o.description ? '<div class="micro-label lvstore-desc">' + esc(o.description) + '</div>' : '') +
+      '<div class="lvstore-price">' + (o.price === 0 ? 'Free' : esc(o.price) + ' EXP') + '</div>' +
+      '<div class="lvstore-states">' + (o.owned
+        ? '<span class="tag lvstore-state lvstore-state-purchased">Purchased</span>'
+        : '<span class="tag lvstore-state lvstore-state-locked">Not owned</span>') + '</div>' +
+      (o.owned ? '<div class="micro-label lvstore-meta">Activate it in Cosmetics › Dashboard Entity.</div>'
+        : '<div class="lvstore-actions"><button type="button" class="btn-secondary lvstore-buy" data-entity-act="buy" data-id="' + esc(o.id) + '">Buy for ' + esc(o.price) + ' EXP</button></div>') +
       '</div>';
   }
 
