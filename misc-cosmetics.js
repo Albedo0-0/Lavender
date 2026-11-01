@@ -147,9 +147,19 @@ const MiscCosmetics = (function () {
         // Dashboard Entity packs: separate section, handled entirely by EntityLVPackUI / EntityLVPackData.
         const entityTab = document.getElementById('misc-tab-entity');
         if (entityTab) entityTab.addEventListener('click', function () {
-          if (typeof EntityLVPackUI === 'undefined') { body.innerHTML = '<p class="micro-label">Dashboard Entity packs unavailable.</p>'; return; }
+          // Never silently skipped: a load or init failure is shown with its reason.
+          const showProblem = function (why) {
+            console.error('Dashboard Entity section unavailable:', why);
+            body.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'micro-label';
+            p.textContent = 'Dashboard Entity packs failed to load. ' + why;
+            body.appendChild(p);
+          };
+          const loadProblem = window.LavenderEntityLoad ? window.LavenderEntityLoad.problem() : 'Entity load check is missing from index.html.';
+          if (loadProblem) { showProblem(loadProblem); return; }
           try { EntityLVPackUI.mountCosmeticsSection(body); }
-          catch (err) { console.warn('Dashboard Entity section failed', err); body.innerHTML = '<p class="micro-label">Dashboard Entity packs could not be loaded.</p>'; }
+          catch (err) { showProblem('Initialization error: ' + String(err && err.message || err)); }
         });
       }
     });
