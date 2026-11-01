@@ -357,7 +357,7 @@ const Assistant = (function () {
   function wireStore() {
     document.querySelectorAll('[data-store-filter]').forEach(function (b) {
       b.addEventListener('click', function () {
-        storeFilter = b.getAttribute('data-store-filter') || 'all';
+                storeFilter = b.getAttribute('data-store-filter') || 'worlds';
         applyStoreFilter();
       });
     });
@@ -412,7 +412,7 @@ const Assistant = (function () {
     openStore();
   }
 
-  let storeFilter = 'all';
+    let storeFilter = 'worlds';
 
   function storeBalanceHtml() {
     try {
@@ -422,8 +422,8 @@ const Assistant = (function () {
   }
 
   function applyStoreFilter() {
-    document.querySelectorAll('[data-store-cat]').forEach(function (el) {
-      el.hidden = storeFilter !== 'all' && el.getAttribute('data-store-cat') !== storeFilter;
+        document.querySelectorAll('[data-store-cat]').forEach(function (el) {
+      el.hidden = el.getAttribute('data-store-cat') !== storeFilter;
     });
     document.querySelectorAll('[data-store-filter]').forEach(function (b) {
       const on = b.getAttribute('data-store-filter') === storeFilter;
@@ -457,7 +457,7 @@ const Assistant = (function () {
         '<div class="lvstore-top"><h3 class="section-title lvstore-brand">LV Pack Store</h3>' + storeBalanceHtml() + '</div>' +
         '<div class="lvstore-layout">' +
           '<nav class="lvstore-rail" aria-label="Store categories">' +
-            '<button type="button" class="lvstore-pill" data-store-filter="all">All</button>' +
+            
             '<button type="button" class="lvstore-pill" data-store-filter="worlds">Worlds</button>' +
             '<button type="button" class="lvstore-pill" data-store-filter="companions">Companions</button>' +
             '<button type="button" class="lvstore-pill" data-store-filter="entity">Entities</button>' +
