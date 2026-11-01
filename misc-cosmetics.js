@@ -127,7 +127,8 @@ const MiscCosmetics = (function () {
           '<div class="modal-header"><h3 class="modal-title">Cosmetics</h3></div>' +
           '<div class="misc-tabs"><button id="misc-tab-cosmetics" class="btn-secondary">Cosmetics</button>' +
           '<button id="misc-tab-worlds" class="btn-secondary">Worlds</button>' +
-          '<button id="misc-tab-companion" class="btn-secondary">Companions</button></div>' +
+          '<button id="misc-tab-companion" class="btn-secondary">Companions</button>' +
+          '<button id="misc-tab-entity" class="btn-secondary">Dashboard Entity</button></div>' +
           '<div id="misc-tab-body">' + rows + '</div>'
         );
         const body = document.getElementById('misc-tab-body');
@@ -142,6 +143,13 @@ const MiscCosmetics = (function () {
         if (companionTab) companionTab.addEventListener('click', function () {
           body.innerHTML = renderAssistantPacksTab();
           wireAssistantPacksTab(body);
+        });
+        // Dashboard Entity packs: separate section, handled entirely by EntityLVPackUI / EntityLVPackData.
+        const entityTab = document.getElementById('misc-tab-entity');
+        if (entityTab) entityTab.addEventListener('click', function () {
+          if (typeof EntityLVPackUI === 'undefined') { body.innerHTML = '<p class="micro-label">Dashboard Entity packs unavailable.</p>'; return; }
+          try { EntityLVPackUI.mountCosmeticsSection(body); }
+          catch (err) { console.warn('Dashboard Entity section failed', err); body.innerHTML = '<p class="micro-label">Dashboard Entity packs could not be loaded.</p>'; }
         });
       }
     });
