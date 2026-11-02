@@ -116,27 +116,59 @@ const EntityEnvironment = (function () {
       for (let i = 0; i < n; i++) { const p = drops[i]; p.y += p.vy * dt; if (p.y >= p.end) respawn(p, false); }
     }
 
+        // ---- ripples: thin flattened rings (lit on the far arc, shaded on the near arc), only ever drawn on open water ----
+    function ring(g, f, r, a, hi, sh) {
+      const rx = Math.round(r); if (rx < 1) return;
+      const ry = Math.max(1, Math.round(rx * 0.32)), m = surf.mask;
+      ellipse(rx, ry, function (dx, dy) {
+        const x = f.x + dx, y = f.y + dy;
+        if (x < 0 || y < 0 || x >= SW || y >= SH || !m[y * SW + x]) return;
+        const lit = dy < 0 || (dy === 0 && dx > 0);
+        g.globalAlpha = a * (lit ? 0.5 : 0.34); g.fillStyle = lit ? hi : sh; g.fillRect(x, y, 1, 1);
+      });
+    }
+    function drawFx(g, b, I) {
+      const hi = rgb(214 * b, 232 * b, 236 * b), sh = rgb(6 + 6 * b, 22 + 10 * b, 28 + 12 * b), gain = 0.6 + 0.4 * I;
+      g.globalCompositeOperation = 'source-over';
+      for (let i = 0; i < fx.length; i++) {
+        const f = fx[i], u = (simT - f.t0) / f.life;
+        if (u < 0 || u >= 1) continue;
+        if (f.k === 1) {
+          const a = Math.pow(1 - u, 1.4) * gain;
+          ring(g, f, f.r * (1 - (1 - u) * (1 - u)), a, hi, sh);
+          if (u > 0.22) { const u2 = (u - 0.22) / 0.78; ring(g, f, f.r * 0.58 * (1 - (1 - u2) * (1 - u2)), a * 0.6, hi, sh); }
+          if (u < 0.14) { g.globalAlpha = 0.5 * (1 - u / 0.14) * gain; g.fillStyle = hi; g.fillRect(f.x, f.y, 1, 1); g.fillRect(f.x, f.y - 1, 1, 1); }
+        } else {
+          const rise = Math.round(u * 2);
+          g.globalAlpha = (1 - u) * 0.5 * gain * f.amp; g.fillStyle = hi;
+          g.fillRect(f.x - 1, f.y - 1 - rise, 1, 1); g.fillRect(f.x + 1, f.y - 1 - rise, 1, 1); g.fillRect(f.x, f.y - 2 - rise, 1, 1);
+        }
+      }
+      g.globalAlpha = 1;
+    }
+
     // ---- overlay: runs inside the renderer's redraw, on the renderer's own canvas ----
     function overlay(g) {
       const now = Date.now();
       if (now - lightStamp > 4000 || now < lightStamp) { lightAt(localHours(new Date(now)), L); lightStamp = now; }
-      const I = rainI;
-      // 1) ambient light: multiply (gentle overcast while raining), then screen lift, sky gradient and soft glow
+      const I = rainI, D = dark, lum = (L[0] + L[1] + L[2]) / 3, b = 0.45 + 0.55 * lum;
+      // 1) ambient light. Overcast darkens and cools the whole scene, takes the glow away and greys the sky.
       g.globalCompositeOperation = 'multiply';
-      g.fillStyle = rgb(L[0] * (1 - 0.10 * I) * 255, L[1] * (1 - 0.07 * I) * 255, L[2] * (1 - 0.04 * I) * 255);
+      g.fillStyle = rgb(L[0] * (1 - 0.30 * D) * 255, L[1] * (1 - 0.24 * D) * 255, L[2] * (1 - 0.16 * D) * 255);
       g.fillRect(0, 0, SW, SH);
       g.globalCompositeOperation = 'screen';
       g.fillStyle = rgb(L[3], L[4], L[5]);
       g.fillRect(0, 0, SW, SH);
-      const skyH = Math.round(SH * 0.65), skyA = L[9] * (1 - 0.4 * I);
+      const skyH = Math.round(SH * 0.65), skyA = L[9] * (1 - 0.35 * D), k = 0.6 * D;
       if (skyA > 0.002) {
+        const sr = L[6] + (118 - L[6]) * k, sg2 = L[7] + (136 - L[7]) * k, sb = L[8] + (148 - L[8]) * k;
         const sg = g.createLinearGradient(0, 0, 0, skyH);
-        sg.addColorStop(0, rgba(L[6], L[7], L[8], skyA * 0.45));
-        sg.addColorStop(0.8, rgba(L[6], L[7], L[8], skyA));
-        sg.addColorStop(1, rgba(L[6], L[7], L[8], 0));
+        sg.addColorStop(0, rgba(sr, sg2, sb, skyA * 0.45));
+        sg.addColorStop(0.8, rgba(sr, sg2, sb, skyA));
+        sg.addColorStop(1, rgba(sr, sg2, sb, 0));
         g.fillStyle = sg; g.fillRect(0, 0, SW, skyH);
       }
-      const glowA = L[13] * (1 - 0.5 * I);
+      const glowA = L[13] * (1 - 0.85 * D);
       if (glowA > 0.002) {
         g.save();
         g.translate(SW * 0.69, SH * 0.24); g.scale(1.5, 1);
@@ -147,18 +179,35 @@ const EntityEnvironment = (function () {
         g.fillStyle = rg; g.fillRect(-160, -100, 320, 220);
         g.restore();
       }
-      // 2) rain: thin pale streaks that fade out as they fall (no splashes, no ripples on the water)
+      // 2) a hushed, moody air: colours soften, contrast flattens, edges close in, the water settles to a flat sky-grey tone
+      if (D > 0.01) {
+        g.globalCompositeOperation = 'saturation';
+        if (g.globalCompositeOperation === 'saturation') { g.fillStyle = 'rgba(128,128,128,' + (0.34 * D).toFixed(3) + ')'; g.fillRect(0, 0, SW, SH); }
+        g.globalCompositeOperation = 'source-over';
+        g.fillStyle = rgba(110 * b, 128 * b, 140 * b, 0.07 * D);
+        g.fillRect(0, 0, SW, SH);
+        const vg = g.createRadialGradient(SW * 0.5, SH * 0.48, SH * 0.30, SW * 0.5, SH * 0.48, SW * 0.62);
+        vg.addColorStop(0, 'rgba(8,20,28,0)'); vg.addColorStop(1, 'rgba(8,20,28,' + (0.34 * D).toFixed(3) + ')');
+        g.fillStyle = vg; g.fillRect(0, 0, SW, SH);
+        if (surf) {
+          g.fillStyle = rgba(86 * b, 112 * b, 118 * b, 0.16 * D);
+          if (surf.path) g.fill(surf.path);
+          else for (let i = 0; i < surf.runs.length; i += 3) g.fillRect(surf.runs[i], surf.runs[i + 1], surf.runs[i + 2], 1);
+        }
+      }
+      // 3) the rain meeting the scene: ripples on the water, splashes on the pad, leaves and stone
+      if (fx.length && surf) drawFx(g, b, I);
+      // 4) falling drops: they stop exactly where they land
       const n = active();
       if (n > 0 && drops.length) {
         g.globalCompositeOperation = 'source-over';
-        const lum = (L[0] + L[1] + L[2]) / 3, b = 0.45 + 0.55 * lum;
         g.fillStyle = rgb(196 * b, 214 * b, 226 * b);
         const gain = 0.55 + 0.45 * I;
         for (let i = 0; i < n; i++) {
-          const p = drops[i], fade = Math.max(0, Math.min(1, (p.end - p.y) / 6));
-          if (fade <= 0 || p.y < -p.len) continue;
-          g.globalAlpha = p.a * gain * fade;
-          g.fillRect(p.x, Math.floor(p.y), 1, p.len);
+          const p = drops[i], len = Math.min(p.len, Math.floor(p.end - p.y));
+          if (len <= 0 || p.y < -p.len) continue;
+          g.globalAlpha = p.a * gain;
+          g.fillRect(p.x, Math.floor(p.y), 1, len);
         }
         g.globalAlpha = 1;
       }
@@ -169,9 +218,10 @@ const EntityEnvironment = (function () {
       if (rafId) { api.cancelFrame(rafId); rafId = 0; }
       if (timerId) { api.clearTimeout(timerId); timerId = 0; }
       if (!api.alive()) return;
-      if (rainI > 0 && !hidden()) { rafId = api.requestFrame(frame); return; }
+            if (hidden()) fx.length = 0;
+      else if (busy()) { rafId = api.requestFrame(frame); return; }
       const now = Date.now();
-      let wait = SLOW_TICK_MS;
+            let wait = (cloudV > 0 && cloudV < 1) ? 1000 : SLOW_TICK_MS;
       if (rain.next > now) wait = Math.min(wait, Math.max(250, rain.next - now));
       if (rain.end > now) wait = Math.min(wait, Math.max(250, rain.end - now + 50));
       timerId = api.setTimeout(slow, wait);
