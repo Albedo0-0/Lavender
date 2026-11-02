@@ -52,25 +52,14 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--dash-ink-faint);
-  user-select: none;
+    user-select: none;
 }
+/* The Entity renderer's layer is positioned, so it would paint over the unpositioned label; keep the label above the artwork. */
+#screen-dashboard .dash-entity .dash-label { position: relative; z-index: 1; }
 #screen-dashboard .dash-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 
-/* Pixel accent: a two-row dithered ground line, entity area only (the pond arrives in a later phase) */
+/* Entity area: the Entity renderer's canvas fills the box and is clipped to it. No overlay on top of the scene. */
 #screen-dashboard .dash-entity { overflow: hidden; }
-#screen-dashboard .dash-entity::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 8px;
-  pointer-events: none;
-  opacity: 0.55;
-  background:
-    linear-gradient(90deg, var(--dash-moss) 50%, transparent 50%) 0 0 / 8px 4px repeat-x,
-    linear-gradient(90deg, transparent 50%, var(--dash-moss) 50%) 0 4px / 8px 4px repeat-x;
-}
 
 /* Desktop: entity above the left workspace; right column spans the full height.
    Bottom edges of Box 5, 6 and 8 align because they close the same grid. */
@@ -791,9 +780,8 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   /* The grid sizes every box identically; the boxes just fill their cell. */
   #screen-dashboard :is(.dash-box, .dash-entity) {
     min-height: 0;
-    padding: 10px 10px 12px;
+        padding: 10px 10px 12px;
   }
-  #screen-dashboard .dash-entity::after { display: none; }
 
   #screen-dashboard .dash-label {
     max-width: calc(100% - 62px);
