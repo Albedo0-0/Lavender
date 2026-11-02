@@ -98,16 +98,19 @@ const EntityRenderer = (function () {
     s.g.drawImage(s.envCanvas, 0, 0);
   }
 
-  // Integer scale when the box is larger than the scene, fractional only when it must shrink. Hidden/zero-size
-  // boxes are skipped; the ResizeObserver re-fits when the Dashboard becomes visible.
+    // COVER: the scene always fills the whole box; whatever overflows is cropped evenly around the centre (the layer
+  // centres the canvas and clips it), so the scene's centre is the fixed focal point at every box shape.
+  // Integer scale when the scene must be enlarged (rounded UP so the box is always fully covered); fractional only
+  // when the box is smaller than the scene in both directions. Hidden/zero-size boxes are skipped; the
+  // ResizeObserver re-fits when the Dashboard becomes visible.
   function fit() {
     if (!session || !session.canvas || !host) return;
     const hw = host.clientWidth, hh = host.clientHeight;
     if (!hw || !hh) return;
-    let k = Math.min(hw / session.scene.w, hh / session.scene.h);
-    if (k >= 1) k = Math.floor(k);
-    session.canvas.style.width = Math.max(1, Math.round(session.scene.w * k)) + 'px';
-    session.canvas.style.height = Math.max(1, Math.round(session.scene.h * k)) + 'px';
+    let k = Math.max(hw / session.scene.w, hh / session.scene.h);
+    if (k >= 1) k = Math.ceil(k - 1e-9);
+    session.canvas.style.width = Math.max(1, Math.ceil(session.scene.w * k - 1e-9)) + 'px';
+    session.canvas.style.height = Math.max(1, Math.ceil(session.scene.h * k - 1e-9)) + 'px';
   }
 
   // ---------- the per-session ctx: the only sanctioned way for pack-owned code to hold a resource ----------
@@ -158,7 +161,8 @@ const EntityRenderer = (function () {
     const cv = document.createElement('canvas');
     cv.width = s.scene.w; cv.height = s.scene.h;
     cv.style.display = 'block';
-    cv.style.imageRendering = 'pixelated';
+        cv.style.imageRendering = 'pixelated';
+    cv.style.flex = 'none'; // cover can make the canvas larger than the layer; never let flex shrink (and squash) it
     cv.setAttribute('role', 'img');
     cv.setAttribute('aria-label', String(res.pack.name || 'Dashboard Entity'));
     s.canvas = cv;
