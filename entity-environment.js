@@ -70,14 +70,69 @@ const EntityEnvironment = (function () {
   // ---------------------------------------------------------------------------------------------------
   // One live environment per LV1 session
   // ---------------------------------------------------------------------------------------------------
+    // Midpoint ellipse: calls plot(dx, dy) once for every pixel of an ellipse outline centred on 0,0.
+  function ellipse(rx, ry, plot) {
+    function quad(x, y) { plot(x, y); if (x) plot(-x, y); if (y) { plot(x, -y); if (x) plot(-x, -y); } }
+    let x = 0, y = ry, rx2 = rx * rx, ry2 = ry * ry, dx = 0, dy = 2 * rx2 * y, d1 = ry2 - rx2 * ry + 0.25 * rx2;
+    while (dx < dy) {
+      quad(x, y);
+      if (d1 < 0) { x++; dx += 2 * ry2; d1 += dx + ry2; } else { x++; y--; dx += 2 * ry2; dy -= 2 * rx2; d1 += dx - dy + ry2; }
+    }
+    let d2 = ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2;
+    while (y >= 0) {
+      quad(x, y);
+      if (d2 > 0) { y--; dy -= 2 * rx2; d2 += rx2 - dy; } else { y--; x++; dx += 2 * ry2; dy -= 2 * rx2; d2 += dx - dy + rx2; }
+    }
+  }
+  function smooth(x) { return x * x * (3 - 2 * x); }
+
+  // Reads the pack's own painted layers (read-only) to learn where the open water, the lily pad and the land are, so
+  // rain can land on each correctly. Returns null if anything is missing; rain then simply falls without landing effects.
+  function buildSurface(api) {
+    try {
+      const pack = api.pack, SW = api.scene.w, SH = api.scene.h;
+      const env = (pack.environments || []).filter(function (e) { return e.id === pack.entry.environment; })[0];
+      if (!env) return null;
+      function each(frameId, fn) {
+        env.layers.forEach(function (l) {
+          if (l.frame !== frameId) return;
+          const f = pack.frames[l.frame]; if (!f) return;
+          for (let y = 0; y < f.rows.length; y++) { const row = f.rows[y]; for (let x = 0; x < row.length; x++) if (row.charAt(x) !== '.') fn(l.x + x, l.y + y); }
+        });
+      }
+      function inside(x, y) { return x >= 0 && y >= 0 && x < SW && y < SH; }
+      const mask = new Uint8Array(SW * SH), pad = [], groundTop = new Int16Array(SW).fill(-1);
+      each('f_water', function (x, y) { if (inside(x, y)) mask[y * SW + x] = 1; });
+      ['f_rocks', 'f_pads', 'f_plants'].forEach(function (id) { each(id, function (x, y) { if (inside(x, y)) mask[y * SW + x] = 0; }); });
+      each('f_pads', function (x, y) { if (inside(x, y)) pad.push(x, y); });
+      each('f_ground', function (x, y) { if (inside(x, y) && (groundTop[x] < 0 || y < groundTop[x])) groundTop[x] = y; });
+      const top = new Int16Array(SW).fill(-1), bot = new Int16Array(SW).fill(-1), cols = [], land = [];
+      for (let x = 0; x < SW; x++) {
+        for (let y = 0; y < SH; y++) if (mask[y * SW + x]) { if (top[x] < 0) top[x] = y; bot[x] = y; }
+        if (top[x] >= 0 && bot[x] - top[x] >= 8) cols.push(x); else land.push(x);
+      }
+      if (cols.length < 8) return null;
+      const runs = [];
+      for (let y = 0; y < SH; y++) { let x = 0; while (x < SW) { if (!mask[y * SW + x]) { x++; continue; } const x0 = x; while (x < SW && mask[y * SW + x]) x++; runs.push(x0, y, x - x0); } }
+      let path = null;
+      if (typeof Path2D !== 'undefined') { path = new Path2D(); for (let i = 0; i < runs.length; i += 3) path.rect(runs[i], runs[i + 1], runs[i + 2], 1); }
+      return { mask: mask, top: top, bot: bot, cols: cols, land: land, pad: pad, groundTop: groundTop, runs: runs, path: path };
+    } catch (e) { return null; }
+  }
+
   function start(api) {
     const SW = api.scene.w, SH = api.scene.h;
     const L = new Array(NC).fill(0);
     let lightStamp = -1e9;
     const rain = { start: 0, end: 0, next: 0, p1: 0, p2: 0 };
-    let rainI = 0;                       // current rain intensity 0..1
+        let rainI = 0;                       // current rain intensity 0..1 (drop density)
+    let cloudV = 0;                      // 0..1 overcast build-up and clear-up around each event (slower than the rain itself)
+    let dark = 0;                        // combined overcast strength that drives the lighting and the water tone
+    let simT = 0;                        // seconds of simulated rain time (advances only while frames run)
     const drops = [];
+    const fx = [];                       // live ripples and splashes
     let rafId = 0, timerId = 0, lastDraw = 0, lastStep = 0;
+    const surf = buildSurface(api);      // where water, pad and land are (read from the pack's layers, never modified)
 
     function hidden() { try { return !!document.hidden; } catch (e) { return false; } }
 
@@ -98,22 +153,63 @@ const EntityEnvironment = (function () {
     function evaluate(now) {
       if (now >= rain.next) startEvent(now);   // first activation, or resume after a gap: one event, never a replay
       rainI = intensityAt(now);
+      cloudV = cloudAt(now);
+      dark = cloudV * (0.78 + 0.22 * rainI);
+    }
+    function cloudAt(now) {                    // the sky closes in ahead of the rain and clears slowly afterwards
+      if (now < rain.start) return 0;
+      if (now < rain.end) return smooth(Math.min(1, (now - rain.start) / CLOUD_IN_MS));
+      return smooth(Math.max(0, 1 - (now - rain.end) / CLOUD_OUT_MS));
     }
 
-    // ---- drops ----
+    // ---- drops: each one is aimed at something real (open water, the lily pad, or leaves / stone / ground) ----
+    function pickTarget(p) {
+      const s = surf;
+      if (!s) { p.x = Math.floor(Math.random() * SW); p.end = 46 + Math.random() * (SH - 46); p.kind = 0; return; }
+      if (s.pad.length && Math.random() < 0.035) {
+        const k = Math.floor(Math.random() * (s.pad.length / 2)) * 2;
+        p.x = s.pad[k]; p.end = s.pad[k + 1]; p.kind = 2; return;
+      }
+      if (Math.random() < s.cols.length / SW) {
+        for (let tries = 0; tries < 6; tries++) {
+          const x = s.cols[Math.floor(Math.random() * s.cols.length)];
+          const y = s.top[x] + 2 + Math.floor(Math.random() * Math.max(1, Math.min(WATER_BAND, s.bot[x] - s.top[x] - 3)));
+          if (s.mask[y * SW + x]) { p.x = x; p.end = y; p.kind = 1; return; }
+        }
+      }
+      const x = s.land.length ? s.land[Math.floor(Math.random() * s.land.length)] : Math.floor(Math.random() * SW);
+      const gt = s.groundTop[x] > 36 ? s.groundTop[x] : Math.round(SH * 0.5);
+      p.x = x; p.end = 30 + Math.random() * Math.max(6, gt - 32); p.kind = 0;
+    }
     function respawn(p, fresh) {
-      const d = Math.random();
+      pickTarget(p);
+      const d = Math.max(0, Math.min(1, (p.end - 30) / (SH - 30)));   // lower targets are nearer: longer, faster, brighter
       p.d = d; p.vy = 85 + 70 * d; p.len = 2 + Math.floor(d * 3); p.a = 0.10 + 0.16 * d;
-      p.end = 46 + Math.random() * (SH - 46);
-      p.x = Math.floor(Math.random() * SW);
       p.y = fresh ? Math.random() * p.end : -p.len - Math.random() * 30;
     }
     function ensureDrops() { if (drops.length) return; for (let i = 0; i < MAX_DROPS; i++) { const p = {}; respawn(p, true); drops.push(p); } }
     function active() { return rainI > 0.001 ? Math.min(MAX_DROPS, Math.ceil(MAX_DROPS * rainI)) : 0; }
+    function addFx(kind, x, y, r, amp) {
+      if (fx.length >= MAX_FX) fx.shift();
+      fx.push({ k: kind, x: x, y: y, r: r, amp: amp, t0: simT, life: kind === 1 ? 1.7 + Math.random() * 1.1 : 0.26 });
+    }
+    function landing(p) {
+      if (!surf) return;
+      const y = Math.round(p.end);
+      if (p.kind === 1) {                                              // water: a ripple, wider the nearer it lands
+        const w = Math.max(0, Math.min(1, (p.end - surf.top[p.x]) / WATER_BAND));
+        addFx(1, p.x, y, 2.5 + 6 * w + Math.random() * 1.5, 1);
+      } else addFx(2, p.x, y, 0, p.kind === 2 ? 1 : 0.7);               // pad / leaves / stone: a tiny splash
+    }
+    function busy() { return rainI > 0.001 || fx.length > 0; }
     function step(dt) {
       ensureDrops();
+      simT += dt;
       const n = active();
-      for (let i = 0; i < n; i++) { const p = drops[i]; p.y += p.vy * dt; if (p.y >= p.end) respawn(p, false); }
+      for (let i = 0; i < n; i++) { const p = drops[i]; p.y += p.vy * dt; if (p.y >= p.end) { landing(p); respawn(p, false); } }
+      let k = 0;
+      for (let i = 0; i < fx.length; i++) if (simT < fx[i].t0 + fx[i].life) fx[k++] = fx[i];
+      fx.length = k;
     }
 
         // ---- ripples: thin flattened rings (lit on the far arc, shaded on the near arc), only ever drawn on open water ----
