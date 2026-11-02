@@ -607,7 +607,7 @@ const EntityLV1 = (function () {
   const PADS = [[170, 44], [124, 22], [214, 26], [142, 12]];                                // pad centre x, width
   function groundY(x) {   // soil surface: gentle on land, steepening under the water
     const n = (fbm(x * 0.08, 3, 4) - 0.5) * 3;
-            const y = x <= 80 ? 66 + 14 * Math.pow(x / 80, 1.7)
+                const y = x <= 80 ? 66 + 14 * Math.pow(x / 80, 1.7) + Math.sin(x * 0.21) * 0.9 : SURF + 76 * Math.pow((x - 80) / 34, 1.5);
     return Math.round(y + n);
   }
   function surfY(x) { return SURF + Math.round(Math.sin(x * 0.085) * 0.9 + Math.sin(x * 0.21 + 1.3) * 0.6); }
