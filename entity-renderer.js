@@ -95,7 +95,12 @@ const EntityRenderer = (function () {
   function redraw(s) {
     if (!s.alive || !s.g) return;
     s.g.clearRect(0, 0, s.scene.w, s.scene.h);
-    s.g.drawImage(s.envCanvas, 0, 0);
+        s.g.drawImage(s.envCanvas, 0, 0);
+    if (s.overlay) {
+      try { s.g.save(); s.overlay(s.g, s.scene); }
+      catch (e) { warn('overlay failed', e); s.overlay = null; s.g.restore(); s.g.clearRect(0, 0, s.scene.w, s.scene.h); s.g.drawImage(s.envCanvas, 0, 0); return; }
+      s.g.restore();
+    }
   }
 
     // COVER: the scene always fills the whole box; whatever overflows is cropped evenly around the centre (the layer
@@ -118,7 +123,9 @@ const EntityRenderer = (function () {
     return Object.freeze({
       packId: s.id, pack: s.pack, scene: s.scene, canvas: s.canvas, envCanvas: s.envCanvas, state: s.state,
       alive: function () { return s.alive; },
-      redrawEnvironment: function () { redraw(s); },
+            redrawEnvironment: function () { redraw(s); },
+      // Optional per-session paint step run after the environment is drawn (receives the 2D context and scene size).
+      setOverlay: function (fn) { if (s.alive) s.overlay = (typeof fn === 'function') ? fn : null; },
       setTimeout: function (fn, ms) {
         if (!s.alive) return 0;
         const id = setTimeout(function () { s.timeouts.delete(id); if (s.alive) { try { fn(); } catch (e) { warn('timer callback failed', e); } } }, ms);
@@ -154,7 +161,7 @@ const EntityRenderer = (function () {
     const s = {
       id: res.id, sig: sig, builtin: !!res.builtin, fallback: !!res.fallback, pack: res.pack, alive: true,
       timeouts: new Set(), intervals: new Set(), rafs: new Set(), listeners: [], disposers: [],
-      frameCache: {}, state: {}, canvas: null, g: null, envCanvas: null, scene: null, api: null
+      frameCache: {}, state: {}, canvas: null, g: null, envCanvas: null, scene: null, api: null, overlay: null
     };
     session = s; // registered BEFORE building so endSession() can always clean a half-built session
     composeEnvironment(s);
@@ -188,7 +195,7 @@ const EntityRenderer = (function () {
     if (s.canvas) { if (s.canvas.parentNode) s.canvas.parentNode.removeChild(s.canvas); s.canvas.width = 0; s.canvas.height = 0; }
     if (s.envCanvas) { s.envCanvas.width = 0; s.envCanvas.height = 0; }
     Object.keys(s.frameCache).forEach(function (k) { s.frameCache[k].width = 0; s.frameCache[k].height = 0; });
-    s.frameCache = {}; s.state = null; s.canvas = s.g = s.envCanvas = s.api = s.pack = s.scene = null;
+    s.frameCache = {}; s.overlay = null; s.state = null;s.canvas = s.g = s.envCanvas = s.api = s.pack = s.scene = null;
   }
 
   // ---------- host wiring ----------
