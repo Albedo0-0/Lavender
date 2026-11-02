@@ -527,6 +527,8 @@
         var undef = [];
         try { if (typeof EntityLVPackData === 'undefined') undef.push('EntityLVPackData'); } catch (e) { undef.push('EntityLVPackData (script threw while loading)'); }
         try { if (typeof EntityLVPackUI === 'undefined') undef.push('EntityLVPackUI'); } catch (e) { undef.push('EntityLVPackUI (script threw while loading)'); }
+        try { if (typeof EntityLV1 === 'undefined') undef.push('EntityLV1'); } catch (e) { undef.push('EntityLV1 (script threw while loading)'); }
+        try { if (typeof EntityRenderer === 'undefined') undef.push('EntityRenderer'); } catch (e) { undef.push('EntityRenderer (script threw while loading)'); }
         if (!this.failed.length && !undef.length) return '';
         return (this.failed.length ? 'Could not load ' + this.failed.join(', ') + '. ' : '') +
           (undef.length ? 'Not defined: ' + undef.join(', ') + '. ' : '') +
@@ -536,6 +538,8 @@
   </script>
   <script src="entity-lvpack-data.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
   <script src="entity-lvpack-ui.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
+  <script src="entity-lv1.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
+  <script src="entity-renderer.js" onerror="LavenderEntityLoad.failed.push(this.src)"></script>
   <script src="settings.js"></script>
   <script src="misc-core.js"></script>
   <script src="misc-cosmetics.js"></script>
