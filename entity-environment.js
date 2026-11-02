@@ -183,9 +183,9 @@ const EntityEnvironment = (function () {
       const dt = lastStep ? Math.min(0.1, (now - lastStep) / 1000) : FRAME_MS / 1000;
       lastStep = now; lastDraw = t;
       evaluate(now);
-      if (rainI > 0) step(dt);
+            if (busy()) step(dt);
       api.redrawEnvironment();
-      if (rainI > 0 && !hidden()) rafId = api.requestFrame(frame); else { lastStep = 0; schedule(); }
+            if (busy() && !hidden()) rafId = api.requestFrame(frame); else { lastStep = 0; schedule(); }
     }
     function slow() {
       timerId = 0;
@@ -204,7 +204,7 @@ const EntityEnvironment = (function () {
     api.setOverlay(overlay);
     api.on(document, 'visibilitychange', function () { if (!hidden()) resume(); });
     api.on(window, 'pageshow', resume);
-    api.addDisposer(function () { drops.length = 0; });
+         api.addDisposer(function () { drops.length = 0; fx.length = 0; });
     resume();
   }
 
