@@ -398,11 +398,31 @@ const EntityLVPackData = (function () {
   // ---------- official (purchasable) catalog ----------
   const official = Object.create(null); // id -> { manifest, price }
 
+  // ---------- built-in default (LV1) ----------
+  // Hardcoded by entity-lv1.js. Validated by the same validate() as every other pack, but never written to
+  // settings.entityPacks, so it cannot be imported over, bought, removed or deactivated-away. Its id is reserved.
+  let builtin = null; // { id, manifest }
+  function deepFreeze(o) {
+    if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.freeze(o); Object.keys(o).forEach(function (k) { deepFreeze(o[k]); }); }
+    return o;
+  }
+  function isBuiltinId(id) { return !!builtin && builtin.id === id; }
+  function registerBuiltin(manifest) {
+    if (builtin) return rejected(['the built-in Dashboard Entity pack is already registered.']);
+    const r = validate(manifest);
+    if (!r.ok) { console.warn('[EntityLVPack] built-in pack rejected:', manifest && manifest.id, r.errors); return rejected(r.errors); }
+    if (has(official, manifest.id)) return rejected(['id: "' + manifest.id + '" is already used by an official pack.']);
+    builtin = { id: manifest.id, manifest: deepFreeze(JSON.parse(JSON.stringify(manifest))) };
+    return { ok: true, id: manifest.id };
+  }
+  function getBuiltin() { return builtin ? { id: builtin.id, pack: builtin.manifest } : null; }
+
   function registerOfficial(manifest, price) {
     const r = validate(manifest);
     if (!r.ok) { console.warn('[EntityLVPack] official pack rejected:', manifest && manifest.id, r.errors); return rejected(r.errors); }
     if (!isInt(price, 0, LIMITS.maxPrice)) return rejected(['price must be a whole number of EXP from 0 to ' + LIMITS.maxPrice + '.']);
     if (has(official, manifest.id)) return rejected(['an official pack with id "' + manifest.id + '" is already registered.']);
+    if (isBuiltinId(manifest.id)) return rejected(['id "' + manifest.id + '" is reserved for the built-in pack.']);
     official[manifest.id] = { manifest: JSON.parse(JSON.stringify(manifest)), price: price };
     return { ok: true };
   }
@@ -420,6 +440,7 @@ const EntityLVPackData = (function () {
     if (!parsed.ok) return rejected(parsed.errors);
     const pack = parsed.pack;
     if (has(official, pack.id)) return rejected(['id: "' + pack.id + '" is reserved for an official pack.']);
+    if (isBuiltinId(pack.id)) return rejected(['id: "' + pack.id + '" is reserved for the built-in pack.']);
     if (findInstalled(readStore(), pack.id)) return rejected(['id: a pack with id "' + pack.id + '" is already installed. Remove it first to import a different copy.']);
     const saved = commit(function (next) { next.installed.push({ id: pack.id, installedAt: Date.now(), pack: pack }); });
     if (!saved) return rejected(['Could not save the pack (device storage may be full). Nothing was imported.']);
@@ -483,7 +504,19 @@ const EntityLVPackData = (function () {
     }
   }
 
+  // What the renderer must show. ALWAYS answers with one whole pack: the active imported/official pack when it is
+  // present and passes validation, otherwise the built-in LV1 (none / missing / invalid / unexpected error).
+  // getActive() is deliberately unchanged, so the Cosmetics UI keeps its status messages and "Use default" button.
+  function resolve() {
+    let act;
+    try { act = getActive(); } catch (err) { act = { status: 'invalid', id: null, reason: 'unexpected error while loading the pack' }; }
+    if (act.status === 'ok' && !isBuiltinId(act.id)) return { id: act.id, pack: act.pack, builtin: false, fallback: false, reason: '' };
+    return { id: builtin ? builtin.id : null, pack: builtin ? builtin.manifest : null, builtin: true,
+      fallback: act.status === 'missing' || act.status === 'invalid', reason: act.reason || (builtin ? '' : 'the built-in pack is not loaded') };
+  }
+
   function setActive(id) {
+    if (isBuiltinId(id)) return clearActive(); // activating LV1 == restoring the default
     const st = readStore();
     const pack = lookupPack(st, id);
     if (!pack) return fail('That pack is not installed or owned.');
@@ -546,6 +579,7 @@ const EntityLVPackData = (function () {
     importText: importText, importFile: importFile,
     registerOfficial: registerOfficial, listOfficial: listOfficial, purchase: purchase,
     listAvailable: listAvailable, getActive: getActive, setActive: setActive, clearActive: clearActive,
-    remove: remove, getBalance: getBalance
+    remove: remove, getBalance: getBalance,
+    registerBuiltin: registerBuiltin, getBuiltin: getBuiltin, resolve: resolve
   };
 })();
