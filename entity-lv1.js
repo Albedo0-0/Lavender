@@ -214,12 +214,12 @@ const EntityLV1 = (function () {
       const R = Math.ceil(b.r * 1.2) + 1, bx = Math.round(b.x), by = Math.round(b.y);
       for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
         const X = bx + dx, Y = by + dy;
-        const rr = b.r * (1 + (vnoise(X * 0.55, Y * 0.55, seed + 3) - 0.5) * 0.4), dd = dx * dx + dy * dy;
+        const rr = b.r * (1 + (vnoise(X * 0.55, Y * 0.55, seed + 3) - 0.5) * 0.26), dd = dx * dx + dy * dy;
         if (dd > rr * rr) continue;
         const nd = Math.sqrt(dd) / rr;
-        if (nd > 0.88 && dy > -rr * 0.3 && hash2(X, Y, seed + 5) < 0.3) continue;       // nibbled leaf rim
+        if (nd > 0.88 && dy > -rr * 0.3 && hash2(X, Y, seed + 5) < 0.12) continue;       // nibbled leaf rim
         let s = (dx * 0.55 - dy * 0.9) / rr;                                              // light from the upper right
-        s += (vnoise(X * 0.85, Y * 0.85, seed) - 0.5) * 0.7;                              // leaf-clump variation
+        s += (vnoise(X * 0.5, Y * 0.5, seed) - 0.5) * 0.45;                              // leaf-clump variation
         s += ((cy - Y) / Math.max(1, ry)) * topK;
         let idx = s > 0.62 ? T - 1 : s > 0.28 ? T - 2 : s > -0.08 ? T - 3 : s > -0.45 ? T - 4 : T - 5;
         if (nd > 0.78 && s < 0.02) idx = 0;                                               // shaded rim
@@ -230,8 +230,9 @@ const EntityLV1 = (function () {
         if (at(L, gx, gy) && at(L, gx + 1, gy + 1)) { put(L, gx, gy, tone(Math.max(0, T - 5))); put(L, gx + 1, gy + 1, tone(Math.max(0, T - 5))); }
       }
       const hx = bx + Math.round(b.r * 0.35), hy = by - Math.round(b.r * 0.5);            // crown highlight
-      put(L, hx, hy, tone(T - 1)); put(L, hx - 1, hy, tone(T - 2)); put(L, hx, hy + 1, tone(T - 2));
+            put(L, hx, hy, tone(T - 1)); put(L, hx - 1, hy, tone(T - 2)); put(L, hx, hy + 1, tone(T - 2));
     });
+    despeckle(L, Math.floor(cx - rx - rmax - 2), Math.floor(cy - ry - rmax - 2), Math.ceil(cx + rx + rmax + 2), Math.ceil(cy + ry + rmax + 2));
   }
 
   // A tree trunk: dark left edge, lit right edge, vertical bark ridges and cracks, moss on the shaded side,
@@ -275,7 +276,7 @@ const EntityLV1 = (function () {
         put(L, px, y - t, tones[k]);
         if (bh > 8 && t < bh * 0.35) put(L, px + 1, y - t, tones[Math.max(0, k - 1)]);
       }
-      put(L, bx + Math.round(dir * 3), y - bh, tones[T - 1]);
+            // blade tip is already carried by the top tone of the blade itself
     }
   }
 
@@ -683,7 +684,7 @@ const EntityLV1 = (function () {
       const SURF = 80;                                   // y of the water surface
   const UW  = ramp(['#102a30', '#17363c', '#20444a', '#2c5559', '#3b6a66', '#528379']);   // soil seen through water
   const UWG = ramp(['#2b5b47', '#3a7355', '#4f8c5f']);                                    // underwater green
-  const PADS = [[170, 44], [124, 22], [214, 26], [142, 12]];                                // pad centre x, width
+  const PADS = [[170, 14]];                                // pad centre x, width
   function groundY(x) {   // soil surface: gentle on land, steepening under the water
     const n = (fbm(x * 0.08, 3, 4) - 0.5) * 3;
                 const y = x <= 80 ? 66 + 14 * Math.pow(x / 80, 1.7) + Math.sin(x * 0.21) * 0.9 : SURF + 76 * Math.pow((x - 80) / 34, 1.5);
@@ -794,7 +795,7 @@ const EntityLV1 = (function () {
         const dep = y - gy;
         const n = fbm(x * 0.09, y * 0.12, 17), n2 = fbm(x * 0.16 + 5, y * 0.2, 29), strata = Math.sin(dep * 0.55 + x * 0.035 + n * 3) * 0.5;
         let c;
-        if (!under && dep < cap) c = dep === 0 ? (n > 0.55 ? LEAF[9] : LEAF[8]) : dep === 1 ? (hash2(x, y, 3) < 0.3 ? LEAF[7] : LEAF[6]) : dep === cap - 1 ? LEAF[3] : LEAF[dep === 2 ? 5 : 4];
+        if (!under && dep < cap) c = dep === 0 ? (n > 0.55 ? LEAF[9] : LEAF[8]) : dep === 1 ? (fbm(x * 0.35, 3, 3) > 0.58 ? LEAF[7] : LEAF[6]) : dep === cap - 1 ? LEAF[3] : LEAF[dep === 2 ? 5 : 4];
         else if (!under && dep < cap + drip) c = dep - cap < drip - 1 ? LEAF[3] : LEAF[2];
         else if (under && dep < 2) c = UWG[dep === 0 ? 2 : 1];
         else if (under && dep < 5) c = UW[clamp(qh(3.4 + n * 1.5 + strata * 0.4 - dep * 0.25 - (y - SURF) * 0.012, x, y), 0, 5)];
@@ -819,7 +820,7 @@ const EntityLV1 = (function () {
     }
     [[18, 78, 6, 3], [40, 90, 8, 4], [60, 76, 5, 3], [10, 112, 9, 5], [30, 130, 10, 5], [58, 120, 7, 4], [104, 134, 6, 3], [112, 142, 6, 3]]
       .forEach(function (s, i) { soilStone(s[0] < 81 ? L : B, s[0], s[1], s[2], s[3], 2400 + i); });
-    for (let i = 0; i < 90; i++) {                                                                      // pebbles and sediment glints on the underwater slope
+    for (let i = 0; i < 36; i++) {                                                                  // pebbles and sediment glints on the underwater slope
       const x = 82 + Math.floor(r() * 36), gy = groundY(x), y = gy + 2 + Math.floor(r() * 4);
       if (y > SURF + 2 && y < H) { put(B, x, y, UW[5]); if (r() < 0.5) put(B, x + 1, y, UW[4]); put(B, x, y + 1, UW[2]); }
     }
@@ -843,20 +844,20 @@ const EntityLV1 = (function () {
 
   function sideWater(L, below) {
     const r = rng(2501);
-    const bands = [[13, 1.6, 0.075, 0.6, 86], [26, 2.2, 0.06, 2.1, 98], [39, 2.6, 0.05, 4.0, 110]];   // the long ripple lines
+    const bands = [];   // the long ripple lines
     const shafts = [[118, 7], [150, 8], [190, 9], [236, 8]];
     for (let x = 0; x < W; x++) {
       const sy = surfY(x), gy = groundY(x);
       for (let y = sy; y < Math.min(gy, H); y++) {
         const d = y - sy, gd = gy - y;
-        const c = wcol(d + (fbm(x * 0.04, y * 0.07, 61) - 0.5) * 7), flow = (fbm(x * 0.05, y * 0.42, 83) - 0.5) * 17;
+        const c = wcol(d + (fbm(x * 0.04, y * 0.07, 61) - 0.5) * 7), flow = (fbm(x * 0.05, y * 0.42, 83) - 0.5) * 6;
         c[0] += flow * 0.7; c[1] += flow; c[2] += flow * 0.8;
         let lk = 0;
         for (let s = 0; s < shafts.length; s++) { const xc = shafts[s][0] - 0.45 * d, hw = shafts[s][1] + d * 0.09, dx = Math.abs(x - xc); if (dx < hw) { const q = 1 - dx / hw; lk += q * q * Math.max(0, 1 - d / 95) * (0.55 + 0.9 * fbm(x * 0.05, y * 0.22, 91)); } }
         c[0] += 16 * lk; c[1] += 22 * lk; c[2] += 12 * lk;
         if (gd < 9) { const k = 1 - gd / 9; if (d < 26) { c[0] = lerp(c[0], 98, k * 0.3); c[1] = lerp(c[1], 146, k * 0.3); c[2] = lerp(c[2], 98, k * 0.3); } else { c[0] *= 1 - 0.25 * k; c[1] *= 1 - 0.25 * k; c[2] *= 1 - 0.2 * k; } }
         if (d < 24) {                                                                              // mirrored forest, bank and pads, wobbled sideways, fading with depth
-          const wob = Math.round(Math.sin(y * 1.1 + x * 0.06) * (0.5 + d * 0.07)), src = topOf(below, clamp(x + wob, 0, W - 1), clamp(sy - 1 - Math.round(d * 0.9), 0, H - 1));
+          const wob = 0, src =topOf(below, clamp(x + wob, 0, W - 1), clamp(sy - 1 - Math.round(d * 0.9), 0, H - 1));
           if (src) {
             const p = rgbOf(src), k = Math.pow(1 - d / 24, 0.8) * 0.9;
             c[0] = lerp(c[0], p[0] * 0.72 + 10, k); c[1] = lerp(c[1], p[1] * 0.78 + 16, k); c[2] = lerp(c[2], p[2] * 0.8 + 24, k);
@@ -874,28 +875,28 @@ const EntityLV1 = (function () {
         put(L, x, yb, shade(c, fade < 1 ? 1 : 2)); const c2 = at(L, x, yb + 1); if (c2) put(L, x, yb + 1, shade(c2, -1));
       }
     });
-    for (let n = 0; n < 60; n++) {                                                                  // short ripple dashes on and just under the surface
+    for (let n = 0; n < 0; n++) {                                                                  // short ripple dashes on and just under the surface
       const x = 82 + Math.floor(r() * 170), y = surfY(x) + 1 + Math.floor(r() * 5), len = 3 + Math.floor(r() * 6);
       for (let k = 0; k < len; k++) { const c = at(L, x + k, y); if (c) put(L, x + k, y, shade(c, k === 0 || k === len - 1 ? 1 : 2)); }
     }
     const rw = rng(2550);
-    for (let n = 0; n < 34; n++) {                                                                  // soft streaks of light and shade in the deeper water
+    for (let n = 0; n < 0; n++) {                                                                  // soft streaks of light and shade in the deeper water
       const x = 86 + Math.floor(rw() * 160), y = surfY(x) + 7 + Math.floor(rw() * 48), len = 5 + Math.floor(rw() * 9);
       for (let k = 0; k < len; k++) { const c = at(L, x + k, y); if (c) { put(L, x + k, y, shade(c, k === 0 || k === len - 1 ? 0 : 1)); const c2 = at(L, x + k + 1, y + 1); if (c2 && k < len - 1) put(L, x + k + 1, y + 1, shade(c2, -1)); } }
     }
     for (let x = 81; x < W; x++) {                                                                  // the surface: a bright broken line over a soft second row
       const sy = surfY(x), c = at(L, x, sy); if (!c) continue;
-      put(L, x, sy, vnoise(x * 0.2, 3, 9) > 0.32 ? shade(c, 3) : shade(c, 1));
-      const c1 = at(L, x, sy + 1); if (c1 && vnoise(x * 0.3, 7, 11) > 0.55) put(L, x, sy + 1, shade(c1, 1));
+      put(L, x, sy, shade(c, 2));
+      const c1 = at(L, x, sy + 1); if (c1) put(L, x, sy + 1, shade(c1, 1));
     }
     PADS.forEach(function (p) {                                                                     // shadow under each pad, then rings either side
       const sy = surfY(p[0]), rx = Math.round(p[1] / 2);
       for (let dy = 1; dy <= 3; dy++) for (let dx = -rx + dy; dx <= rx - dy; dx++) { const c = at(L, p[0] + dx, sy + dy); if (c) put(L, p[0] + dx, sy + dy, shade(c, dy === 1 ? -3 : -2)); }
-      for (let k = 2; k < 7; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 1); if (c) put(L, x, sy + 1, shade(c, k % 2 ? 2 : 1)); }
-      for (let k = 4; k < 10; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 2); if (c && k % 3) put(L, x, sy + 2, shade(c, 1)); }
+      for (let k = 2; k < 2; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 1); if (c) put(L, x, sy + 1, shade(c, k % 2 ? 2 : 1)); }
+      for (let k = 4; k < 4; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 2); if (c && k % 3) put(L, x, sy + 2, shade(c, 1)); }
     });
-    for (let x = 70; x < 100; x++) { const sy = surfY(x); if (groundY(x) >= sy && groundY(x) <= sy + 4 && at(L, x, sy)) put(L, x, sy, WSPARK[1]); }   // glints where the bank meets the surface
-    [[160, 5], [196, 6], [232, 4], [136, 8], [114, 6], [214, 9]].forEach(function (g) {
+    for (let x = 70; x < 100; x++) { const sy = surfY(x); if (groundY(x) >= sy && groundY(x) <= sy + 4 && at(L, x, sy)) void 0;}   // glints where the bank meets the surface
+[].forEach(function (g) {
       const y = surfY(g[0]) + g[1];
       if (at(L, g[0], y) && at(L, g[0] + 2, y)) { put(L, g[0], y, WSPARK[0]); put(L, g[0] + 1, y, WSPARK[1]); put(L, g[0] + 2, y, WSPARK[0]); }
     });
@@ -912,7 +913,7 @@ const EntityLV1 = (function () {
         const s = -ndy * 0.5 + ndx * 0.38 + (vnoise(dx * 0.4 + i, dy * 0.9, 7) - 0.5) * 0.35;
         let t = s > 0.55 ? 5 : s > 0.3 ? 4 : s > 0.02 ? 3 : s > -0.3 ? 2 : 1;
         if (e > 0.7) t = dy <= 0 ? Math.min(6, t + 2) : Math.max(1, t - 1);                       // the far rim catches light, the near rim is shaded
-        if (rx >= 9 && e < 0.9 && e > 0.06) {                                                       // radial veins
+        if (rx >= 6 && e < 0.9 && e > 0.06) {                                                       // radial veins
           const a = Math.atan2(ndy, ndx) / 6.2832 * N, fr = a - Math.floor(a);
           if (Math.abs(fr - 0.5) < 0.07) t = Math.max(1, t - 1);
         }
@@ -926,7 +927,7 @@ const EntityLV1 = (function () {
       for (let k = 0; k < Math.max(1, Math.round(rx / 6)); k++) { const dx = Math.round((rd() - 0.5) * rx * 1.2), dy = -Math.round(rd() * ry * 0.5); if (at(L, cx + dx, fy + dy) && !(dx > rx * 0.45)) put(L, cx + dx, fy + dy, PAD[6]); }
     });
     const m = { m: BLOOM_MAUVE, p: BLOOM_PINK, w: BLOOM_WHITE, y: BLOOM_GOLD, d: col('#8f7aa0') };   // one small lily on the big pad
-    stamp(L, 176, surfY(176) - 9, ['...m...', '..dpw..', '.dppwm.', 'dpwywpm', '.ddwmm.'], m);
+    // a single small pad only; no bloom
   }
 
   function reedBlade(L, bx, base, h, dir, r) {
@@ -942,7 +943,7 @@ const EntityLV1 = (function () {
     const fernT = [LEAF[1], LEAF[3], LEAF[4], LEAF[6], LEAF[8]];
     for (let x = 1; x < 90; x += 3 + Math.floor(r() * 4)) {            // grass along the whole bank
       const tall = x > 6 && x < 24;
-      tuft(L, x, groundY(x), (tall ? 14 : 6) + Math.floor(r() * (tall ? 14 : 7)), gt, 2710 + x, tall ? 0.1 : -0.2);
+      tuft(L, x, groundY(x), (tall ? 8 : 5) + Math.floor(r() * (tall ? 5 : 4)), gt, 2710 + x, tall ? 0.1 : -0.2);
     }
     leafMass(L, 38, groundY(38) - 5, 11, 4, bush, 2720, { count: 8, rmin: 3, rmax: 6, top: 0.5 });
     leafMass(L, 58, groundY(58) - 5, 9, 4, bush, 2721, { count: 7, rmin: 3, rmax: 6, top: 0.5 });
@@ -977,7 +978,7 @@ const EntityLV1 = (function () {
   function sideDetails(L) {
     // small natural details on the turf: moss cushions, clover, pebbles, a few toadstools (own rng; nothing above moves)
     const rs = rng(3300);
-    for (let x = 4; x < 78; x += 7 + Math.floor(rs() * 6)) { const k = rs(); if (k < 0.4) cushion(L, x, groundY(x) - 1, 2 + Math.floor(rs() * 2)); else if (k < 0.75) stone(L, x, groundY(x) + 1, 3 + Math.floor(rs() * 3), 2, 3400 + x, k < 0.5); else { put(L, x, groundY(x) - 1, LEAF[5]); put(L, x + 1, groundY(x + 1) - 1, LEAF[7]); put(L, x - 1, groundY(x - 1) - 1, LEAF[6]); put(L, x, groundY(x) - 2, LEAF[8]); } }
+    for (let x = 4; x < 78; x += 7 + Math.floor(rs() * 6)) { const k = rs(); if (k < 0.4) cushion(L, x, groundY(x) - 1, 2 + Math.floor(rs() * 2)); else if (k < 0.75) stone(L, x, groundY(x) + 1, 3 + Math.floor(rs() * 3), 2, 3400 + x, k < 0.5); else { cushion(L, x, groundY(x) - 1, 2); } }
     [[30, 1], [45, 0]].forEach(function (m) { const x = m[0], y = groundY(x) - 1; stamp(L, x, y - 3, ['.cc.', 'cccc', '.ss.', '.ss.'], { c: m[1] ? MUSH_RED : MUSH_CAP, s: MUSH_STEM }); });
   }
 
