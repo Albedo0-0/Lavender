@@ -1026,6 +1026,7 @@ const Dashboard = (function () {
     if (!root.querySelector('.dash')) root.innerHTML = markup();
     const ctx = document.getElementById('nav-context-label');
     if (ctx) ctx.textContent = 'Dashboard';
+    if (typeof EntityRenderer !== 'undefined' && EntityRenderer.mount) EntityRenderer.mount(document.getElementById('dash-entity')); // idempotent; shows the active Entity pack or the built-in LV1
         if (typeof DashboardCalendar !== 'undefined' && DashboardCalendar.render) DashboardCalendar.render();
     renderTasks(false);
     alSlide = 0; // Tasks is the default slide each time the Dashboard opens
