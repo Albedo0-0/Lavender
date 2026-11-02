@@ -11,7 +11,9 @@
 //
 // Lighting is a continuous function of the device's local time (timezone and DST included), smoothly
 // interpolated between keyframes with cubic Hermite curves, so there are no discrete presets or switches.
-// Water is never touched: no ripples, waves, shimmer or splashes. Raindrops fade out as they fall.
+// Rain interacts with the scene instead of sitting on top of it: drops land on the water as soft, flattened ripples
+// (perspective-scaled), tick the lily pad, leaves and stones as tiny splashes, and the whole scene responds (overcast, cooler,
+// darker, softer contrast, calmer water tone). When it is not raining the water is perfectly still.
 const EntityEnvironment = (function () {
   'use strict';
 
@@ -22,7 +24,10 @@ const EntityEnvironment = (function () {
   const RAMP_MS = 45000;                                       // gentle fade-in / fade-out of each event
   const MAX_DROPS = 84;
   const SLOW_TICK_MS = 20000;
-  const FRAME_MS = 40;                                         // ~25 fps while raining
+    const FRAME_MS = 40;                                         // ~25 fps while animating
+  const MAX_FX = 40;                                           // live ripples + splashes
+  const WATER_BAND = 46;                                       // rows below the far shoreline where drops land on the water
+  const CLOUD_IN_MS = 150000, CLOUD_OUT_MS = 240000;           // overcast builds before the rain peaks and lingers after it                                         // ~25 fps while raining
 
   // ---------------------------------------------------------------------------------------------------
   // Lighting keyframes: [hour, [mulR, mulG, mulB, liftR, liftG, liftB, skyR, skyG, skyB, skyA, glowR, glowG, glowB, glowA]]
