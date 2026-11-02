@@ -145,9 +145,9 @@ const AssistantLVPackData = (function () {
   }
 
   // ---------------------------------------------------------------------
-  // Built-in pixel packs — 8x8 grids, '.' = transparent, other chars key into `palette`.
-  // Two `idle` frames (breathing) + one `blink` frame, cycled by assistant.js's own idle
-  // state machine; the pack only supplies art + which named states it defines (Section 9:
+    // Built-in pixel packs — '.' = transparent, other chars key into `palette`. Cat, Puppy and
+  // Capybara are 20x20 and supply `pixel.render(state)`, driven by assistant.js's idle state
+  // machine; the pack only supplies art + which named states it defines (Section 9:
   // engine and skin stay separate — no drag/position/nav logic lives here).
   // ---------------------------------------------------------------------
 
@@ -274,35 +274,250 @@ const AssistantLVPackData = (function () {
     idleBehaviors: ['sit', 'blink', 'breathe', 'ear-twitch', 'tail-sway', 'glance']
   };
 
-  const MOTH_PACK = {
-    id: 'lv-moth', name: 'Pixel Moth', cost: 400,
+    // Pads a row-string with transparent pixels out to the shared 20-column grid.
+  function padRow(str) { while (str.length < 20) str += '.'; return str; }
+
+  // ---- Refined 20x20 puppy (golden pup). Same pipeline as the cat: buildPuppyFrame(state) takes
+  // the engine's richState object ({ blink 0-2, look -1/0/1, earL/earR 0-2, tail 0-2, breath 0/1,
+  // mood }) and returns 20 row-strings. Ears: 1 = flick, 2 = perked. Tail wags with `tail`;
+  // 'happy' shows a panting tongue. Head is stamped at frame row 1 (HT), body at row 13, like the cat.
+  const PUP_TAIL_BASE = [[17, 18], [16, 18], [15, 18]];
+  const PUP_TAIL_TIPS = [
+    [[14, 18], [14, 17], [13, 17], [12, 17]],
+    [[14, 18], [13, 18], [12, 18], [11, 18]],
+    [[14, 18], [13, 18], [13, 19], [12, 19], [11, 19]]
+  ];
+  const PUP_HEAD_ROWS = [
+    '......oooooooo',
+    '....o' + 'lllbbbbbbb' + 'o',
+    '...o' + 'llbbbbbbbbbb' + 'o',
+    '..o' + 'l' + 'b'.repeat(12) + 'd' + 'o',
+    '..o' + 'b'.repeat(13) + 'd' + 'o',
+    '..o' + 'b'.repeat(13) + 'd' + 'o',
+    '..o' + 'b'.repeat(13) + 'd' + 'o',
+    '..o' + 'bbbbb' + 'nnnn' + 'bbbb' + 'd' + 'o',
+    '..o' + 'bbbb' + 'ww' + 'nn' + 'ww' + 'bbb' + 'd' + 'o',
+    '..o' + 'bbb' + 'www' + 'oo' + 'www' + 'bb' + 'd' + 'o',
+    '..o' + 'bbb' + 'w' + 'o' + 'wwww' + 'o' + 'w' + 'bb' + 'd' + 'o',
+    '...o' + 'c' + 'w'.repeat(10) + 'c' + 'o'
+  ].map(padRow);
+  const PUP_BODY_ROWS = [
+    '....o' + 'bbbcwwcbbb' + 'o',
+    '...o' + 'dbbbwwwwbbbd' + 'o',
+    '..o' + 'dbbbwwwwwwbbbd' + 'o',
+    '..o' + 'dbbwwboobwwbbd' + 'o',
+    '..o' + 'dbcwwcoocwwcbd' + 'o',
+    '..' + 'o'.repeat(16)
+  ].map(padRow);
+  // Floppy ear, left side (mirrored for the right). Row 0 sits on head row 2.
+  const PUP_EAR = ['...ooo', '..osso', '.oesso', '.oeeso', '.oeeeo', '.oeeeo', '.oeeeo', '..oeeo', '...ooo'];
+
+  function buildPuppyFrame(s) {
+    s = s || {};
+    const N = 20;
+    const HT = 1; // head grid is in frame coordinates; head row r lives at h[HT + r]
+    const blank = function () {
+      const g = [];
+      for (let r = 0; r < N; r++) { g.push([]); for (let c = 0; c < N; c++) g[r].push('.'); }
+      return g;
+    };
+    const stamp = function (grid, r0, rows) {
+      rows.forEach(function (str, i) {
+        for (let c = 0; c < str.length; c++) if (str[c] !== '.') grid[r0 + i][c] = str[c];
+      });
+    };
+    const g = blank();
+    const h = blank();
+
+    // Tail (drawn first so the body overlaps it)
+    const pts = PUP_TAIL_BASE.concat(PUP_TAIL_TIPS[(s.tail | 0) % 3]);
+    pts.forEach(function (p, i) { g[p[0]][p[1]] = (i === pts.length - 1) ? 'c' : 'b'; });
+    pts.forEach(function (p) {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(function (d) {
+        const r = p[0] + d[0], c = p[1] + d[1];
+        if (r >= 0 && r < N && c >= 0 && c < N && g[r][c] === '.') g[r][c] = 'o';
+      });
+    });
+
+    stamp(g, 13, PUP_BODY_ROWS);
+    stamp(h, HT, PUP_HEAD_ROWS);
+
+    // Floppy ears: 1 = flick (up and out), 2 = perked (lifted higher)
+    const ear = function (state, mirror) {
+      const dr = state === 2 ? -2 : (state === 1 ? -1 : 0);
+      const dc = state === 1 ? -1 : 0;
+      PUP_EAR.forEach(function (str, i) {
+        for (let c = 0; c < str.length; c++) {
+          if (str[c] === '.') continue;
+          const col = c + dc;
+          const r = HT + 2 + i + dr;
+          if (r < 0 || col < 0) continue;
+          h[r][mirror ? N - 1 - col : col] = str[c];
+        }
+      });
+    };
+    ear(s.earL | 0, false);
+    ear(s.earR | 0, true);
+
+    // Eyes: left eye cols 6-8, right eye cols 11-13, head rows 4-6 (3x3, dark with a shine)
+    const look = s.look | 0;
+    const bl = s.blink | 0;
+    [6, 11].forEach(function (x) {
+      const set = function (r, dx, ch) { h[HT + r][x + dx] = ch; };
+      if (s.mood === 'happy') {
+        for (let dx = 0; dx < 3; dx++) set(4, dx, 'b');
+        set(5, 0, 'b'); set(5, 1, 'o'); set(5, 2, 'b');
+        set(6, 0, 'o'); set(6, 1, 'b'); set(6, 2, 'o');
+        return;
+      }
+      if (bl === 2) {
+        for (let dx = 0; dx < 3; dx++) { set(4, dx, 'b'); set(5, dx, 'o'); set(6, dx, 'd'); }
+        return;
+      }
+      for (let r = 4; r <= 6; r++) for (let dx = 0; dx < 3; dx++) set(r, dx, 'n');
+      const shine = look > 0 ? 2 : 0;
+      set(4, shine, 'w');
+      if (look < 0) set(5, 2, 'w'); else if (look > 0) set(5, 0, 'w');
+      if (s.mood === 'perk') set(6, 2 - shine, 'c');
+      if (bl === 1) for (let dx = 0; dx < 3; dx++) set(4, dx, 'b');
+    });
+
+    // Panting tongue when content
+    if (s.mood === 'happy') {
+      h[HT + 10][8] = 'q'; h[HT + 10][9] = 'p'; h[HT + 10][10] = 'p'; h[HT + 10][11] = 'q';
+      h[HT + 11][9] = 'p'; h[HT + 11][10] = 'p';
+    }
+
+    // Head sits on the body; breathing lowers it one pixel
+    const dy = (s.mood === 'perk') ? 0 : (s.breath ? 1 : 0);
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        if (h[r][c] !== '.' && r + dy < N) g[r + dy][c] = h[r][c];
+      }
+    }
+    return g.map(function (row) { return row.join(''); });
+  }
+
+  // ---- Refined 20x20 capybara (side profile, facing left). Same state object as the cat.
+  // Uses: blink, look (eye shifts toward/away from the snout), earL/earR (either flicks the single
+  // ear), breath (head bob), mood 'perk' (ear up, bright eye) and 'happy' (content squint + munching,
+  // driven by `tail`, so it chews only during the happy moment). Head grid is in frame coordinates.
+  const CAPY_HEAD_ROWS = [
+    '...ooooo',
+    '..olllbbo',
+    '.o' + 'llbbbbb' + 'd',
+    'o' + 'nn' + 'bbbbbb' + 'd',
+    'o' + 'nn' + 'bbbbbb' + 'd',
+    'o' + 'mmm' + 'bbbbb' + 'd',
+    'o' + 'mmmm' + 'bbbb' + 'd',
+    '.ooooo'
+  ].map(padRow);
+  const CAPY_BODY_ROWS = [
+    '.........ooooooo',
+    '........o' + 'lllllll' + 'o',
+    '.......o' + 'lllbbbbbb' + 'o',
+    '......o' + 'll' + 'bbbbbbbbb' + 'o',
+    '.....o' + 'l' + 'b'.repeat(10) + 'd' + 'o',
+    '.....o' + 'b'.repeat(11) + 'd' + 'o',
+    '.....o' + 'b'.repeat(11) + 'd' + 'o',
+    '.....o' + 'b'.repeat(10) + 'dd' + 'o',
+    '.....o' + 'b'.repeat(8) + 'dddd' + 'o',
+    '......o' + 'd'.repeat(11) + 'o',
+    '.......obbooooobbo',
+    '.......obdo...odbo',
+    '.......oooo...oooo'
+  ].map(padRow);
+  const CAPY_FLECKS = [[9, 13, 'r'], [10, 15, 'r'], [11, 10, 'r'], [12, 14, 'r'], [13, 9, 'r'], [10, 10, 'l'], [9, 10, 'l']];
+
+  function buildCapyFrame(s) {
+    s = s || {};
+    const N = 20;
+    const blank = function () {
+      const g = [];
+      for (let r = 0; r < N; r++) { g.push([]); for (let c = 0; c < N; c++) g[r].push('.'); }
+      return g;
+    };
+    const stamp = function (grid, r0, rows) {
+      rows.forEach(function (str, i) {
+        for (let c = 0; c < str.length; c++) if (str[c] !== '.') grid[r0 + i][c] = str[c];
+      });
+    };
+    const g = blank();
+    const h = blank();
+
+    stamp(g, 6, CAPY_BODY_ROWS);
+    CAPY_FLECKS.forEach(function (f) { if (g[f[0]][f[1]] !== '.') g[f[0]][f[1]] = f[2]; });
+    stamp(h, 6, CAPY_HEAD_ROWS);
+
+    // Mouth line (lowers a pixel while munching)
+    const chew = (s.mood === 'happy' && (s.tail | 0) > 0) ? 1 : 0;
+    for (let c = 1; c <= 3; c++) h[11 + chew][c] = 'd';
+
+    // Single small ear: 0 = rest, 1 = flick back, 2 = perked
+    const es = Math.max(s.earL | 0, s.earR | 0);
+    const put = function (r, c, ch) { if (r >= 0 && r < N && c >= 0 && c < N) h[r][c] = ch; };
+    if (es === 2) {
+      put(4, 6, 'o'); put(4, 7, 'o');
+      put(5, 5, 'o'); put(5, 6, 'e'); put(5, 7, 'e'); put(5, 8, 'o');
+      put(6, 6, 'e'); put(6, 7, 'e'); put(6, 8, 'o');
+    } else if (es === 1) {
+      put(5, 7, 'o'); put(5, 8, 'o');
+      put(6, 7, 'e'); put(6, 8, 'e'); put(6, 9, 'o');
+    } else {
+      put(5, 6, 'o'); put(5, 7, 'o');
+      put(6, 6, 'e'); put(6, 7, 'e'); put(6, 8, 'o');
+    }
+
+    // Eye (2x2, head rows 8-9). Looking toward the snout shifts it left, away shifts it right.
+    const look = s.look | 0;
+    const bl = s.blink | 0;
+    const ex = 5 + (look < 0 ? -1 : (look > 0 ? 1 : 0));
+    if (s.mood === 'happy') {
+      put(8, ex, 'o'); put(8, ex + 1, 'o'); put(9, ex, 'b'); put(9, ex + 1, 'b');
+    } else if (bl === 2) {
+      put(8, ex, 'b'); put(8, ex + 1, 'b'); put(9, ex, 'o'); put(9, ex + 1, 'o');
+    } else {
+      put(8, ex, 'w'); put(8, ex + 1, 'n'); put(9, ex, 'n'); put(9, ex + 1, 'n');
+      if (s.mood === 'perk') put(9, ex + 1, 'w');
+      if (bl === 1) { put(8, ex, 'b'); put(8, ex + 1, 'b'); }
+    }
+
+    // Head sits on the body; breathing lowers it one pixel
+    const dy = (s.mood === 'perk') ? 0 : (s.breath ? 1 : 0);
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        if (h[r][c] !== '.' && r + dy < N) g[r + dy][c] = h[r][c];
+      }
+    }
+    return g.map(function (row) { return row.join(''); });
+  }
+
+  // Ids 'lv-moth' / 'lv-frog' are kept on purpose so existing ownership/active state carries over.
+  const PUPPY_PACK = {
+    id: 'lv-moth', name: 'Pixel Puppy', cost: 400,
     pixel: {
-      palette: { o: '#3a3226', b: '#c3a97e', w: '#fffdf8', p: '#8a9468' },
-      idle: [
-        ['o.....o.', '.o...o..', 'bbobobbb', 'bbbwwbbb', 'obppppbo', '.obbbbo.', '..o..o..', '.o....o.'],
-        ['o.....o.', '.o...o..', 'obobobbb', 'bbbwwbbb', 'bbppppbo', '.obbbbo.', '..o..o..', '.o....o.']
-      ],
-      blink: ['o.....o.', '.o...o..', 'bbobobbb', 'bbbooobb', 'obppppbo', '.obbbbo.', '..o..o..', '.o....o.']
+      palette: { o: '#34241a', b: '#c8914f', l: '#e2b472', d: '#a06c36', e: '#7c4f27', s: '#9a6634', w: '#f7ecd6', c: '#e3cfa6', n: '#231913', p: '#d9737f', q: '#6b2a2f' },
+      idle: [buildPuppyFrame({})],
+      blink: buildPuppyFrame({ blink: 2 }),
+      render: buildPuppyFrame
     },
-    idleBehaviors: ['perch', 'blink', 'wing-flutter']
+    idleBehaviors: ['sit', 'blink', 'breathe', 'ear-twitch', 'tail-wag', 'glance']
   };
 
-  const FROG_PACK = {
-    id: 'lv-frog', name: 'Pixel Frog', cost: 600,
+  const CAPYBARA_PACK = {
+    id: 'lv-frog', name: 'Pixel Capybara', cost: 600,
     pixel: {
-      palette: { o: '#405228', b: '#8a9468', w: '#eef0e6', p: '#405228' },
-      idle: [
-        ['.o....o.', 'obo..obo', 'obwoowbo', 'obbbbbbo', 'obbbbbbo', 'bbbbbbbb', 'o.bbbb.o', 'o......o'],
-        ['.o....o.', 'obo..obo', 'obwoowbo', 'obbbbbbo', '.obbbbo.', 'bbbbbbbb', 'o.bbbb.o', 'o......o']
-      ],
-      blink: ['.o....o.', 'obo..obo', 'oboooobo', 'obbbbbbo', 'obbbbbbo', 'bbbbbbbb', 'o.bbbb.o', 'o......o']
+      palette: { o: '#3a2a1e', b: '#8d6a45', l: '#a98760', d: '#6e4f32', r: '#7a5836', m: '#c4a77d', n: '#241a14', w: '#f3ece0', e: '#6b4a30' },
+      idle: [buildCapyFrame({})],
+      blink: buildCapyFrame({ blink: 2 }),
+      render: buildCapyFrame
     },
-    idleBehaviors: ['sit', 'blink', 'breathe']
+    idleBehaviors: ['rest', 'blink', 'breathe', 'ear-twitch', 'glance', 'munch']
   };
 
   register(CAT_PACK);
-  register(MOTH_PACK);
-  register(FROG_PACK);
+    register(PUPPY_PACK);
+  register(CAPYBARA_PACK);
 
   return {
     CATEGORY: CATEGORY,
