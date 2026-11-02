@@ -29,7 +29,7 @@
 const EntityLV1 = (function () {
   'use strict';
 
-  const W = 192, H = 108;
+    const W = 256, H = 144;
   const CX = 96, CY = 56, RX = 68, RY = 19.5;   // pond centre and radii
 
   // =====================================================================================================
@@ -596,7 +596,216 @@ const EntityLV1 = (function () {
     return { palettes: palettes, frames: frames, layers: placed };
   }
 
+    // =====================================================================================================
+  // SIDE-VIEW (eye-level) POND — scene 256x144. Land on the left third sloping down into the water; water
+  // fills the rest. The bank continues underwater so the pond is seen in section: surface, ripples, reflections,
+  // lily pads on the surface, the soil slope, weeds and stones below.
+  // =====================================================================================================
+  const SURF = 68;                                   // y of the water surface
+  const UW  = ramp(['#102a30', '#17363c', '#20444a', '#2c5559', '#3b6a66', '#528379']);   // soil seen through water
+  const UWG = ramp(['#2b5b47', '#3a7355', '#4f8c5f']);                                    // underwater green
+  const PADS = [[170, 44], [124, 22], [214, 26], [142, 12]];                                // pad centre x, width
+  function groundY(x) {   // soil surface: gentle on land, steepening under the water
+    const n = (fbm(x * 0.08, 3, 4) - 0.5) * 3;
+    const y = x <= 80 ? 54 + 14 * Math.pow(x / 80, 1.7) + Math.sin(x * 0.21) * 0.9 : SURF + 76 * Math.pow((x - 80) / 34, 1.5);
+    return Math.round(y + n);
+  }
+  function surfY(x) { return SURF + Math.round(Math.sin(x * 0.085) * 0.9 + Math.sin(x * 0.21 + 1.3) * 0.6); }
+
+  function sideBack(L) {
+    const r = rng(2101);
+    for (let y = 0; y <= SURF + 2; y++) for (let x = 0; x < W; x++) {
+      const gx = (x - 176) / 150, gy = (y - 34) / 50, glow = 1 - Math.sqrt(gx * gx + gy * gy);
+      const t = 1.3 + glow * 2.8 + (fbm(x * 0.05, y * 0.08, 3) - 0.5) * 1.6;
+      put(L, x, y, FAR[clamp(quant(t, x, y), 0, 6)]);
+    }
+    for (let i = 0; i < 22; i++) { // far hazy trunks
+      const x = 4 + i * 12 + Math.round((r() - 0.5) * 8), top = 2 + Math.round(r() * 10), w = 2 + (r() < 0.3 ? 1 : 0);
+      for (let y = top; y < SURF - 2; y++) {
+        if (y < top + 12 && bayer(x, y) > (y - top) / 12) continue;
+        for (let k = 0; k < w; k++) put(L, x + k + Math.round(Math.sin(y * 0.2 + i) * 0.6), y, k === 0 ? FAR[2] : FAR[1]);
+      }
+    }
+    const far = [FAR[0], FAR[1], FAR[2], FAR[3], FAR[4]];
+    for (let i = 0; i < 16; i++) leafMass(L, 6 + i * 17 + (r() - 0.5) * 8, 14 + r() * 8, 14, 7, far, 2110 + i, { count: 8, rmin: 4, rmax: 8, top: 0.15 });
+    for (let x = 84; x < W + 10; x += 9) leafMass(L, x, SURF - 8 - r() * 4, 10, 5, far, 2140 + x, { count: 6, rmin: 4, rmax: 7, top: 0.2 }); // far shore line
+    for (let x = 84; x < W; x++) for (let y = SURF - 3; y <= SURF + 1; y++) put(L, x, y, FAR[1 + Math.floor(hash2(x, y, 5) * 2)]); // far bank at the waterline
+  }
+
+  function sideTrees(L) {
+    [[24, 9, -1, 11], [52, 5, 1, 12]].forEach(function (t, i) { trunk(L, t[0], 0, groundY(t[0]) + 1, t[1], t[2], 2200 + i); });
+    const tones = [LEAF[0], LEAF[1], LEAF[3], LEAF[5], LEAF[7]];
+    leafMass(L, 14, 6, 38, 18, tones, 2210, { count: 40, rmin: 4, rmax: 8, top: 0.5 });
+    leafMass(L, 64, -1, 30, 11, tones, 2211, { count: 20, rmin: 4, rmax: 7, top: 0.5 });
+    leafMass(L, 110, -3, 22, 7, tones, 2212, { count: 10, rmin: 4, rmax: 6, top: 0.5 });
+    leafMass(L, 160, -2, 26, 8, tones, 2213, { count: 12, rmin: 4, rmax: 6, top: 0.5 });
+    leafMass(L, 226, 1, 40, 12, tones, 2214, { count: 22, rmin: 4, rmax: 8, top: 0.5 });
+    leafMass(L, 44, 24, 12, 5, tones, 2215, { count: 6, rmin: 3, rmax: 5, top: 0.3 });
+  }
+
+  function soilStone(L, cx, cy, rx, ry, under, seed) {
+    for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
+      const e = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (vnoise(dx * 0.7 + seed, dy * 0.7, seed) - 0.5) * 0.3;
+      if (e > 1 || cy + dy < groundY(cx + dx) + 3) continue;
+      const s = -dx / rx * 0.5 - dy / ry * 0.5 + (vnoise(dx, dy, seed + 1) - 0.5) * 0.4;
+      const t = s > 0.35 ? 4 : s > 0 ? 3 : s > -0.35 ? 2 : 1;
+      put(L, cx + dx, cy + dy, under ? UW[Math.min(5, t + 1)] : STONE[t]);
+    }
+  }
+
+  function sideGround(L) {
+    const r = rng(2301);
+    for (let x = 0; x < W; x++) {
+      const gy = groundY(x); if (gy >= H) continue;
+      const cap = 2 + Math.round(fbm(x * 0.22, 2, 8) * 3);
+      for (let y = gy; y < H; y++) {
+        const dep = y - gy, under = gy > SURF + 1;   // this column's top is under the water: only its skin is tinted, the cut soil below stays earth
+        const n = fbm(x * 0.09, y * 0.12, 17), strata = Math.sin(dep * 0.5 + x * 0.04 + n * 3) * 0.5;
+        let c;
+        if (!under) {
+          if (dep < cap) c = dep === 0 ? (n > 0.5 ? LEAF[8] : LEAF[7]) : dep === 1 ? (hash2(x, y, 3) < 0.3 ? MOSS[3] : LEAF[5]) : LEAF[3];
+          else c = EARTH[clamp(quant(2.4 - dep * 0.03 + n * 1.6 + strata * 0.6, x, y), 0, 3)];
+        } else if (dep < 2) c = UWG[dep === 0 ? 2 : 1];
+        else if (dep < 5) c = UW[clamp(quant(3.4 + n * 1.5 + strata * 0.4 - dep * 0.25 - (y - SURF) * 0.012, x, y), 0, 5)];
+        else c = EARTH[clamp(quant(1.9 - dep * 0.03 + n * 1.5 + strata * 0.5, x, y), 0, 3)];
+        put(L, x, y, c);
+      }
+    }
+    for (let i = 0; i < 7; i++) { // roots hanging in the soil
+      const x0 = 4 + Math.floor(r() * 68), y0 = groundY(x0) + 5, len = 8 + Math.floor(r() * 9);
+      for (let t = 0; t < len; t++) put(L, x0 + Math.round(Math.sin(t * 0.5 + i) * 1.4), y0 + t, t > len - 4 ? BARK[1] : BARK[2]);
+    }
+    [[18, 78, 6, 3, 0], [40, 90, 8, 4, 0], [60, 76, 5, 3, 0], [10, 112, 9, 5, 0], [30, 130, 10, 5, 0], [58, 120, 7, 4, 0],
+     [104, 134, 6, 3, 0], [112, 142, 6, 3, 0]].forEach(function (s, i) { soilStone(L, s[0], s[1], s[2], s[3], !!s[4], 2400 + i); });
+    for (let i = 0; i < 90; i++) { // pebbles and sediment glints on the underwater slope
+      const x = 82 + Math.floor(r() * 36), gy = groundY(x), y = gy + 2 + Math.floor(r() * 4);
+      if (y > SURF + 2 && y < H) { put(L, x, y, UW[5]); if (r() < 0.5) put(L, x + 1, y, UW[4]); }
+    }
+  }
+
+  function sideWater(L, below) {
+    const r = rng(2501);
+    const bands = [[13, 1.6, 0.075, 0.6, 86], [26, 2.2, 0.06, 2.1, 98], [39, 2.6, 0.05, 4.0, 110]]; // the long ripple lines
+    const shafts = [[118, 7], [150, 8], [190, 9], [236, 8]];
+    for (let x = 0; x < W; x++) {
+      const sy = surfY(x), gy = groundY(x);
+      for (let y = sy; y < Math.min(gy, H); y++) {
+        const d = y - sy, gd = gy - y;
+        let v = 6.2 - Math.min(d, 74) * 0.065 + (fbm(x * 0.05, y * 0.09, 61) - 0.5) * 0.7;
+        shafts.forEach(function (s) {
+          const xc = s[0] - 0.45 * d, hw = s[1] + d * 0.09, dx = Math.abs(x - xc);
+          if (dx < hw) v += (1 - dx / hw) * Math.max(0, 1 - d / 95) * 1.5;
+        });
+        if (gd < 6) v += (d < 24 ? 0.7 : -0.6) * (1 - gd / 6);
+        if (d < 22) { // mirrored forest and pads, wobbled sideways, fading with depth
+          const wob = Math.round(Math.sin(y * 1.1 + x * 0.06) * (0.5 + d * 0.07)), src = topOf(below, clamp(x + wob, 0, W - 1), clamp(sy - 1 - Math.round(d * 0.9), 0, H - 1));
+          if (src) v += (0.4 + lum(src) * 9.6 - v) * Math.pow(1 - d / 22, 0.8) * 0.95;
+        }
+        bands.forEach(function (b) {
+          if (x < b[4]) return;
+          const fade = Math.min(1, (x - b[4]) / 16), yb = Math.round(SURF + b[0] + Math.sin(x * b[2] + b[3]) * b[1] * 2.2);
+          if (y === yb) v += 1.9 * fade; else if (y === yb + 1) v -= 0.9 * fade;
+        });
+        if (d === 0) v = (x % 17 < 12) ? 8.4 : 7.2; else if (d === 1 && bayer(x, y) < 0.4) v = Math.max(v, 7);
+        put(L, x, y, WATER[clamp(quant(v, x, y), 0, 9)]);
+      }
+    }
+    for (let n = 0; n < 60; n++) { // short ripple dashes on and just under the surface
+      const x = 82 + Math.floor(r() * 170), y = surfY(x) + 1 + Math.floor(r() * 5), len = 3 + Math.floor(r() * 6);
+      for (let k = 0; k < len; k++) { const c = at(L, x + k, y); if (c) put(L, x + k, y, WATER[clamp(WATER.indexOf(c) + (k === 0 || k === len - 1 ? 1 : 2), 0, 9)]); }
+    }
+    PADS.forEach(function (p) { // little rings either side of each pad
+      const sy = surfY(p[0]);
+      for (let k = 2; k < 7; k++) { put(L, p[0] - p[1] / 2 - k, sy + 1, WATER[k % 2 ? 8 : 7]); put(L, p[0] + p[1] / 2 + k, sy + 1, WATER[k % 2 ? 8 : 7]); }
+    });
+    for (let x = 70; x < 100; x++) { // glints where the bank meets the surface
+      const sy = surfY(x); if (groundY(x) >= sy && groundY(x) <= sy + 4 && at(L, x, sy)) put(L, x, sy, WATER[9]);
+    }
+    [[160, 5], [196, 6], [232, 4], [136, 8], [110, 5]].forEach(function (g) { if (at(L, g[0], surfY(g[0]) + g[1])) { put(L, g[0], surfY(g[0]) + g[1], WATER[9]); put(L, g[0] + 1, surfY(g[0]) + g[1], WATER[8]); } });
+  }
+
+  function sidePads(L) {
+    PADS.forEach(function (p, i) {
+      const cx = p[0], rx = Math.round(p[1] / 2), ry = Math.max(3, Math.round(p[1] / 9)), fy = surfY(cx) - 3;
+      for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
+        const e = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (vnoise(dx * 0.5 + i * 9, dy, 5) - 0.5) * 0.14;
+        if (e > 1 || (dx > rx * 0.45 && Math.abs(dy) <= 0 && dx < rx * 0.95)) continue;
+        let t = dy < -1 ? 4 : dy < 1 ? 3 : 2;
+        if (dx % 6 === 0 && dy >= 0) t = 2;
+        if (dx < -rx * 0.3 && dy < 0 && hash2(dx, dy, i) < 0.5) t = 4;
+        put(L, cx + dx, fy + dy, PAD[t]);
+      }
+      for (let dx = -rx; dx <= rx; dx++) { // the pad's front rim, down to the water
+        const yb = Math.round(ry * Math.sqrt(Math.max(0, 1 - (dx * dx) / (rx * rx))));
+        for (let y = fy + yb + 1; y <= fy + 3; y++) put(L, cx + dx, y, y === fy + 3 ? PAD[0] : PAD[1]);
+      }
+    });
+    const m = { m: BLOOM_MAUVE, p: BLOOM_PINK, w: BLOOM_WHITE, y: BLOOM_GOLD };   // one small lily on the big pad
+    stamp(L, 176, surfY(176) - 9, ['...m...', '..mpm..', '.mpwpm.', 'mpwywpm', '.mmwmm.'], m);
+  }
+
+  function sideRocks(L) {
+    stone(L, 74, groundY(74) + 1, 13, 6, 2601, true); stone(L, 64, groundY(64) + 1, 8, 4, 2602, true); stone(L, 82, groundY(82) + 2, 6, 3, 2603, false);
+  }
+
+  function sidePlants(L) {
+    const r = rng(2701), gt = [LEAF[2], LEAF[4], LEAF[6], LEAF[8]], bush = [LEAF[0], LEAF[1], LEAF[2], LEAF[4], LEAF[6]];
+    const fernT = [LEAF[1], LEAF[3], LEAF[4], LEAF[6], LEAF[8]];
+    for (let x = 1; x < 90; x += 3 + Math.floor(r() * 4)) {            // grass along the whole bank
+      const tall = x > 6 && x < 24;
+      tuft(L, x, groundY(x), (tall ? 14 : 6) + Math.floor(r() * (tall ? 14 : 7)), gt, 2710 + x, tall ? 0.1 : -0.2);
+    }
+    leafMass(L, 38, groundY(38) - 5, 11, 4, bush, 2720, { count: 8, rmin: 3, rmax: 6, top: 0.5 });
+    leafMass(L, 58, groundY(58) - 5, 9, 4, bush, 2721, { count: 7, rmin: 3, rmax: 6, top: 0.5 });
+    [[32, 1, 15], [48, -1, 13], [66, 1, 12]].forEach(function (f, i) { fern(L, f[0], groundY(f[0]), f[2], f[1], fernT, 2730 + i); });
+    const fc = [BLOOM_WHITE, FLOWER_LAV, BLOOM_GOLD, FLOWER_CREAM, FLOWER_BLUE];
+    for (let i = 0; i < 10; i++) { const x = 3 + Math.floor(r() * 66); put(L, x, groundY(x) - 2 - Math.floor(r() * 3), fc[i % fc.length]); }
+    [[80, 5], [86, 4], [91, 3]].forEach(function (c, k) {              // reeds standing in the shallows
+      for (let i = 0; i < c[1]; i++) {
+        const bx = c[0] + Math.round((i - (c[1] - 1) / 2) * 2.3), base = groundY(bx) + 1, h = Math.min(base - SURF, 10) + 14 + Math.floor(r() * 10), dir = (r() - 0.5) * 2;
+        for (let t = 0; t < h; t++) {
+          const y = base - t, px = bx + Math.round(dir * Math.pow(t / h, 2) * 3);
+          put(L, px, y, y > SURF ? UWG[t % 7 < 3 ? 0 : 1] : (t < h * 0.6 ? LEAF[3] : LEAF[5]));
+        }
+        if (i % 2 === 0) { const px = bx + Math.round(dir * Math.pow((h - 6) / h, 2) * 3); for (let t = 0; t < 5; t++) { put(L, px, base - h + 5 - t, t === 0 || t === 4 ? CATTAIL[0] : CATTAIL[1]); if (t > 0 && t < 4) put(L, px + 1, base - h + 5 - t, CATTAIL[2]); } }
+      }
+    });
+    for (let n = 0; n < 9; n++) {                                        // weed strands waving on the underwater slope
+      const x = 104 + Math.floor(r() * 12), base = groundY(x), len = 8 + Math.floor(r() * 9);
+      for (let t = 0; t < len; t++) put(L, x + Math.round(Math.sin(t * 0.45 + n) * 1.6), base - t, UWG[t > len * 0.6 ? 2 : 1]);
+    }
+    PADS.forEach(function (p, i) {                                       // pad stems reaching down
+      const len = 8 + (i % 3) * 5, sy = surfY(p[0]);
+      for (let t = 1; t <= len; t++) put(L, p[0] - 3 + i + Math.round(Math.sin(t * 0.4 + i) * 1.2), sy + t, UWG[t > len - 3 ? 0 : 1]);
+    });
+  }
+
+  function sideShafts(layers) {
+    [[110, 9], [150, 10], [196, 9], [240, 8]].forEach(function (s, k) {
+      for (let y = 0; y < SURF; y++) for (let x = 0; x < W; x++) {
+        const xc = s[0] - 0.3 * y, hw = s[1] + y * 0.06, dx = Math.abs(x - xc);
+        if (dx > hw) continue;
+        const f = (1 - dx / hw) * (1 - y / SURF) * (k === 1 ? 1 : 0.75);
+        if (bayer(x, y) > f * 1.15) continue;
+        for (let i = layers.length - 1; i >= 0; i--) {
+          const c = at(layers[i], x, y);
+          if (c) { if (lighterOf[c] && !(layers[i].name === 'trees' && y < 24)) put(layers[i], x, y, lighterOf[c]); break; }
+        }
+      }
+    });
+  }
+
   function paintPond() {
+    const back = makeLayer('back'), trees = makeLayer('trees'), ground = makeLayer('ground'), water = makeLayer('water'),
+      rocks = makeLayer('rocks'), pads = makeLayer('pads'), plants = makeLayer('plants');
+    sideBack(back); sideTrees(trees); sideGround(ground); sideRocks(rocks); sidePads(pads); sidePlants(plants);
+    sideShafts([back, trees, ground]);
+    sideWater(water, [back, trees, ground, rocks, pads, plants]);
+    return toPack([back, trees, ground, water, rocks, pads, plants]);
+  }
+
+  // (previous top-down painter, no longer used)
+  function paintPondTopDown() {
     const geo = buildGeometry();
     const back = makeLayer('back'), trees = makeLayer('trees'), bank = makeLayer('bank'), water = makeLayer('water'),
       stones = makeLayer('stones'), reeds = makeLayer('reeds'), fg = makeLayer('fg');
