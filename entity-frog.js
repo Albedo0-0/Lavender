@@ -25,13 +25,16 @@ const EntityFrog = (function () {
   const BOUNDS = [480, 570, 630, 780, 900, 1020, 1080, 1140, 1200, 1320];
 
   // ---------------------------------------------------------------- palette
+    // One colour identity for the whole life cycle: a warm olive-gold skin (distinct from the pad's blue-greens and the
+  // teal water) with a cream belly and golden eyes. Dark-brown outline, softened; no black.
   const PAL = {
-    o: '#1b3f27', d: '#2f6a35', g: '#4d9a3f', l: '#73b84b', h: '#a4dc70', y: '#e3bb3d', k: '#10150d', w: '#f6f2d6',
-    m: '#173823', p: '#dde8aa', q: '#b4c685', r: '#df617e', t: '#f38fa5',
-    a: '#27321a', b: '#3f5226', c: '#6a8140', e: '#c9d6a0', v: '#7f9a4a',
+    o: '#443f21', m: '#2b2814', d: '#686a2f', g: '#929041', l: '#bcb25a', h: '#e2d88e', n: '#78763a',   // skin: outline, deepest, shade, mid, light, highlight, spot
+    q: '#dccf9c', p: '#f4ecca',                                                                             // belly: shade, cream
+    y: '#e8b43c', w: '#fff6d6', k: '#1c1b11',                                                               // eye: iris, glint, pupil
+    x: '#744230', r: '#c96a60', t: '#ea978c',                                                               // mouth line, mouth inside, tongue tip
+    a: '#2f2c18', b: '#59552b', c: '#85803a', e: '#bdb274', v: '#8b8a3b',                                   // tadpole and larva tones
     s: '#b9d6da'
   };
-
   // ---------------------------------------------------------------- sprites
   function makeSprite(rows) {
     const runs = [];
@@ -66,10 +69,10 @@ const EntityFrog = (function () {
   function dot(g, x, y, col, a) { g.globalAlpha = a; g.fillStyle = col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
 
   // adult (12 x 10): head 12x7 built from eye pieces, body 12x3
-  const EL = { open: ['..oo.', '.owyo', '.oyko'], lookL: ['..oo.', '.owyo', '.okyo'], lookR: ['..oo.', '.owyo', '.oyko'],
-    up: ['..oo.', '.oyko', '.oyyo'], blink: ['.....', '..ll.', '.oooo'], happy: ['..oo.', '.ollo', '.oddo'] };
-  const ER = { open: ['.oo..', 'oywo.', 'okyo.'], lookL: ['.oo..', 'oywo.', 'okyo.'], lookR: ['.oo..', 'oywo.', 'oyko.'],
-    up: ['.oo..', 'okyo.', 'oyyo.'], blink: ['.....', '.ll..', 'oooo.'], happy: ['.oo..', 'ollo.', 'oddo.'] };
+    const EL = { open: ['.ddd.', 'dwkyd', 'oyyyo'], lookL: ['.ddd.', 'dkwyd', 'oyyyo'], lookR: ['.ddd.', 'dwyyd', 'oyyko'],
+    up: ['.ddd.', 'dkyyd', 'oyyyo'], blink: ['.....', '.ggg.', '.ddd.'], happy: ['.....', '.ddd.', 'dgggd'] };
+  const ER = { open: ['.ddd.', 'dwkyd', 'oyyyo'], lookL: ['.ddd.', 'dkwyd', 'oyyyo'], lookR: ['.ddd.', 'dwyyd', 'oyyko'],
+    up: ['.ddd.', 'dkyyd', 'oyyyo'], blink: ['.....', '.ggg.', '.ddd.'], happy: ['.....', '.ddd.', 'dgggd'] };
   const MID = ['..', '..', 'oo'];
   const headCache = {};
   function headSprite(le, re, mouth, throat) {
@@ -77,34 +80,32 @@ const EntityFrog = (function () {
     if (headCache[key]) return headCache[key];
     const rows = [];
     for (let i = 0; i < 3; i++) rows.push(EL[le][i] + MID[i] + ER[re][i]);
-    rows.push('oglllllllhgo');
-    rows.push('ogllllllllgo');
-    rows.push('ogmllllllmgo');
-    rows.push(mouth === 'open' ? 'ogmrrrrrrmgo' : 'ogdmmmmmmdgo');
-    rows.push(throat ? 'oddgqppqgddo' : 'oddggggggddo');
+        rows.push('oglhllllllgo');                                             // brow: a small sheen on the lit side
+    rows.push('ogxllllllxgo');                                             // mouth corners turned up: a gentle smile
+    rows.push(mouth === 'open' ? 'oggxrrrrxggo' : 'oggxxxxxxggo');
+    rows.push(throat ? 'odgqppppqgdo' : 'odgqqqqqqgdo');                   // cream chin, brighter while the throat pulses
     return (headCache[key] = makeSprite(rows));
   }
-  const BODY = makeSprite(['.odgqppqgdo.', 'odggqppqggdo', 'ollgdppdgllo']);
-  const BODY_AIR = makeSprite(['.odgqppqgdo.', 'odggqppqggdo', '.ol......lo.']);
+    const BODY = makeSprite(['.odgqppqgdo.', 'ogggqppqgggo', 'olhlgppgldgo']);
+  const BODY_AIR = makeSprite(['.odgqppqgdo.', 'ogggqppqgggo', '.ol......lo.']);
 
   // froglet (8 x 6)
   const FEYE = {
-    open: ['.oo..oo.', 'oyk..kyo'], lookL: ['.oo..oo.', 'oky..kyo'], lookR: ['.oo..oo.', 'oyk..yko'],
-    blink: ['........', '.ll..ll.'], happy: ['........', '.oo..oo.']
+        open: ['.dd..dd.', 'dyk..kyd'], lookL: ['.dd..dd.', 'dky..kyd'], lookR: ['.dd..dd.', 'dyk..ykd'],
+    blink: ['........', '.gg..gg.'], happy: ['........', '.dd..dd.']
   };
   const fCache = {};
   function frogletSprite(eye, mouth, air) {
     const key = eye + '|' + mouth + '|' + (air ? 1 : 0);
     if (fCache[key]) return fCache[key];
     const e = FEYE[eye];
-    const rows = [e[0], e[1], eye === 'blink' ? 'oogllgoo' : 'ogllllgo', mouth === 'open' ? 'ogmrrmgo' : 'ogmmmmgo', '.odppdo.',
-      air ? '.ol..lo.' : 'ollddllo'];
+        const rows = [e[0], e[1], eye === 'blink' ? 'oogllgoo' : 'oglhllgo', mouth === 'open' ? 'ogxrrxgo' : 'ogxxxxgo', '.odqqdo.',
+      air ? '.ol..lo.' : 'olhgdllo'];
     return (fCache[key] = makeSprite(rows));
   }
 
   // submerged frog silhouette (9 x 4), facing right
-  const SWIM = makeSprite(['...dggg..', '.ddggggdg', 'dd.dggd.g', 'd.......d']);
-
+    const SWIM = makeSprite(['...dglg..', '.ddgglgyg', 'dd.dggd.g', 'd.......d']);
   // ---------------------------------------------------------------- time
   function minutesOfDay(now) { const d = new Date(now); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60000; }
   function stageAt(m) { let id = 'night'; for (let i = 0; i < STAGES.length; i++) if (m >= STAGES[i][1]) id = STAGES[i][0]; return id; }
@@ -517,11 +518,13 @@ const EntityFrog = (function () {
       for (let i = 0; i < n; i++) {
         if (e.h > 0 && e.h >= HATCH_AT[i]) continue;
         const x = EGX + set[i][0], y = EGY + set[i][1];
-        const nx = (i % 2) ? 1 : 0, ny = (i % 3 === 0) ? 0 : 1;           // the dark nucleus sits a little differently in each egg
-        for (let k = 0; k < 4; k++) {
+                const nx = (i % 2) ? 1 : 0, ny = (i % 3 === 0) ? 0 : 1;           // the dark nucleus sits a little differently in each egg
+        for (let k = 0; k < 4; k++) {                                      // clear jelly: bright rim on the lit side, a cooler shade opposite, a dark nucleus
           const px = k % 2, py = k >> 1;
-          if (px === nx && py === ny) dot(g, x + px, y + py, '#27443c', 0.8 * e.a);
-          else dot(g, x + px, y + py, (px + py === 0 || (px === 0 && py === 0)) ? '#d2ece0' : '#a8d0c2', (px + py === 0 ? 0.46 : 0.26) * e.a);
+          if (px === nx && py === ny) dot(g, x + px, y + py, '#22301f', 0.88 * e.a);
+          else if (px === 1 - nx && py === 1 - ny) dot(g, x + px, y + py, '#8fbdb0', 0.3 * e.a);
+          else if (py === 0) dot(g, x + px, y + py, '#e6f4ec', 0.55 * e.a);
+          else dot(g, x + px, y + py, '#b7dacd', 0.34 * e.a);
         }
       }
     }
@@ -529,12 +532,14 @@ const EntityFrog = (function () {
       const f = t.face, a = t.a;
       for (let i = 1; i <= t.tail; i++) {
         const ty = t.y + 1 + Math.round(Math.sin(t.ph * 0.9 - i * 1.1) * Math.min(1.4, 0.4 + 0.25 * i));
-        dot(g, t.x - f * i + (f > 0 ? 0 : 3), ty, PAL.a, a * (1 - (i - 1) / (t.tail + 1) * 0.5));
+                const tx = t.x - f * i + (f > 0 ? 0 : 3), fade = 1 - (i - 1) / (t.tail + 1) * 0.5;
+        dot(g, tx, ty, i < 3 ? PAL.b : PAL.a, a * fade);
+        if (i < t.tail) dot(g, tx, ty + 1, PAL.c, a * fade * 0.4);                 // a thin translucent tail fin
       }
-      const body = f > 0 ? ['.abc', 'abbe', '.abb'] : ['cba.', 'ebba', 'bba.'];
+      const body = f > 0 ? ['.bbc', 'abkc', '.cee'] : ['cbb.', 'ckba', 'eec.'];     // darker back, golden snout, pale belly, one dark eye
       for (let y = 0; y < 3; y++) for (let x = 0; x < 4; x++) { const c = body[y].charAt(x); if (c !== '.') dot(g, t.x + x, t.y + y, PAL[c], a); }
-      if (t.legs >= 1) { const k = t.ph % 4 < 2 ? 0 : 1; dot(g, f > 0 ? t.x + (k ? 0 : 1) : t.x + 3 - (k ? 0 : 1), t.y + 3, PAL.v, a); dot(g, f > 0 ? t.x - 1 + k : t.x + 4 - k, t.y + 3, PAL.v, a * 0.8); }
-      if (t.legs >= 2) { dot(g, f > 0 ? t.x + 3 : t.x, t.y + 3, PAL.v, a); dot(g, f > 0 ? t.x + 4 : t.x - 1, t.y + 3, PAL.c, a * 0.8); }
+      if (t.legs >= 1) { const k = t.ph % 4 < 2 ? 0 : 1; dot(g, f > 0 ? t.x + (k ? 0 : 1) : t.x + 3 - (k ? 0 : 1), t.y + 3, PAL.c, a); dot(g, f > 0 ? t.x - 1 + k : t.x + 4 - k, t.y + 3, PAL.e, a * 0.85); }
+      if (t.legs >= 2) { dot(g, f > 0 ? t.x + 3 : t.x, t.y + 3, PAL.c, a); dot(g, f > 0 ? t.x + 4 : t.x - 1, t.y + 3, PAL.e, a * 0.85); }
     }
     function drawSit(g, s) {
       const a = s.a == null ? 1 : s.a, p = s.pose || {};
@@ -565,7 +570,7 @@ const EntityFrog = (function () {
     function draw(g) {
       const v = view;
       for (let i = 0; i < v.eggs.length; i++) drawEggs(g, v.eggs[i]);
-      for (let i = 0; i < v.wrig.length; i++) { const w = v.wrig[i]; dot(g, w.x, w.y, PAL.b, w.a); dot(g, w.x + w.w, w.y + 1, PAL.a, w.a); dot(g, w.x, w.y + 2, PAL.b, w.a * 0.8); }
+      for (let i = 0; i < v.wrig.length; i++) { const w = v.wrig[i]; dot(g, w.x, w.y, PAL.c, w.a); dot(g, w.x + w.w, w.y + 1, PAL.b, w.a); dot(g, w.x, w.y + 2, PAL.a, w.a * 0.8); }
       if (v.tad) drawTad(g, v.tad);
             if (v.swim) blit(g, SWIM, v.swim.x, v.swim.y, { flip: v.swim.face < 0, alpha: 0.6 * (v.swim.a == null ? 1 : v.swim.a) });
       for (let i = 0; i < v.rip.length; i++) { const r = v.rip[i]; dot(g, r.x - r.r, r.y, PAL.s, 0.45); dot(g, r.x + r.r, r.y, PAL.s, 0.45); dot(g, r.x - r.r + 1, r.y + 1, PAL.s, 0.25); dot(g, r.x + r.r - 1, r.y + 1, PAL.s, 0.25); }
