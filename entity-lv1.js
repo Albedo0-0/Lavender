@@ -760,16 +760,26 @@ const EntityLV1 = (function () {
       if (h >= 1 && n2 > 0.28) put(mid, x, sy - 3, SAGE3[h > 1 ? 5 : 4]);                          // a second, broken row
       if (h > 1 && n2 > 0.72) put(mid, x, sy - 4, SAGE3[5]);                                       // an occasional lit blade tip
     }
+        // 3) a few hazy trees far behind the shore, for depth: the farthest are the palest and nearly dissolve into the haze
+    function farTree(Lyr, x, h, rx, tones, seed) {
+      const by = surfY(x) - 3, T = tones;
+      for (let y = by; y > by - Math.round(h * 0.5); y--) put(Lyr, x, y, T[0]);                       // a thin trunk, mostly hidden by the crown
+      leafMass(Lyr, x, by - h * 0.62, rx, h * 0.36, T, seed, { count: Math.max(4, Math.round(rx * h / 9)), rmin: 2, rmax: 3.4, top: 0.5 });
+    }
+    const FT2 = [FAR[3], FAR[4], FAR[5], FAR[6]], FT1 = [FAR1[2], FAR1[3], FAR1[4], FAR1[5]];
+    farTree(far2, 106, 19, 6, FT2, 7301); farTree(far2, 178, 22, 8, FT2, 7302); farTree(far2, 232, 16, 6, FT2, 7303);
+    farTree(far1, 121, 13, 5, FT1, 7304); farTree(far1, 196, 14, 6, FT1, 7305); farTree(far1, 247, 12, 5, FT1, 7306);
     despeckle(mid, 84, SURF - 6, W - 1, SURF);
   }
 
-      function sideTrees(L) {
-    // two plain trees beside the pond, rooted at the far shore: one beyond the reeds on the left bank, one at the right
-    // edge, cut off by the frame. Slim trunks, a few forked branches and small, muted leaf clumps; everything stays
-    // above the horizon, clear of the open water and the lilypad.
-    const FOL = [MIDF[1], MIDF[2], MIDF[3], MIDF[4], MIDF[5], LEAF[5], LEAF[6]];
-    function limb(x0, y0, x1, y1, w0, w1, sag) {                                                    // a tapering branch, lit on top
-      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2;
+        function sideTrees(L) {
+    // two trees beside the pond, rooted at the far shore: a slim one on the left bank behind the reeds and a fuller one
+    // at the right edge, cut off by the frame. Trunks fork and branch in every direction, branch tips carry layered leaf
+    // clumps, and the crowns are broken by leaf-sized gaps and loose single leaves. Everything stays above the horizon.
+    const FOL = [MIDF[0], MIDF[1], MIDF[2], MIDF[3], MIDF[4], MIDF[5], LEAF[5], LEAF[6]];
+    const isFol = {}; FOL.forEach(function (c) { isFol[c] = 1; });
+    function limb(x0, y0, x1, y1, w0, w1, sag) {                                                    // a tapering, slightly curved branch, lit on top
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2 + 1;
       for (let k = 0; k <= n; k++) {
         const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t + Math.sin(t * 3.1416) * sag, w = Math.max(1, Math.round(w0 + (w1 - w0) * t));
         for (let j = 0; j < w; j++) put(L, x, y + j - Math.floor(w / 2), BARK[w === 1 ? 2 : j === 0 ? 4 : j === w - 1 ? 1 : 3]);
@@ -778,7 +788,7 @@ const EntityLV1 = (function () {
     function bole(bx, w0, w1, ytop, seed) {                                                         // a trunk from the shore up: shaded left, lit right, ridged, root flare
       const SY = SURF - 1;
       for (let y = ytop; y <= SY; y++) {
-        const f = (SY - y) / Math.max(1, SY - ytop), w = Math.round(w0 + (w1 - w0) * f) + (y > SY - 3 ? 2 : 0);
+        const f = (SY - y) / Math.max(1, SY - ytop), w = Math.round(w0 + (w1 - w0) * f) + (y > SY - 4 ? Math.round((y - SY + 4) * 0.8) : 0);
         const left = Math.round(bx - w / 2 + Math.sin(y * 0.19 + seed) * 0.7 - f * 1.5);
         for (let k = 0; k < w; k++) {
           const ridge = vnoise(k * 1.7 + seed, y * 0.2, seed + 3);
@@ -786,21 +796,39 @@ const EntityLV1 = (function () {
         }
       }
     }
-    function crown(cx, cy, rx, ry, seed, n) { leafMass(L, cx, cy, rx, ry, FOL, seed, { count: n, rmin: 2, rmax: 4, top: 0.45 }); }
+    function clump(cx, cy, rx, ry, seed, n) { leafMass(L, cx, cy, rx, ry, FOL, seed, { count: n, rmin: 2, rmax: 3.6, top: 0.5 }); }
+    function leafEdge(x0, y0, x1, y1, seed) {                                                       // loose single leaves breaking the silhouette, lit on the upper right
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        if (at(L, x, y)) continue;
+        const n = [at(L, x - 1, y), at(L, x + 1, y), at(L, x, y - 1), at(L, x, y + 1)];
+        let c = 0; for (let i = 0; i < 4; i++) if (isFol[n[i]]) c++;
+        if (!c || hash2(x, y, seed) > 0.2) continue;
+        put(L, x, y, FOL[n[1] || n[2] ? (hash2(y, x, seed) > 0.5 ? 6 : 5) : (hash2(y, x, seed) > 0.5 ? 2 : 3)]);
+      }
+    }
+    function grow(r, x, y, ang, len, w, d, seed) {                                                  // a forking branch; its tips carry the foliage
+      const x1 = x + Math.cos(ang) * len, y1 = y + Math.sin(ang) * len;
+      limb(x, y, x1, y1, w, Math.max(1, w - 1), (r() - 0.5) * 3);
+      if (d > 0) {
+        const k = 2 + (r() < 0.4 ? 1 : 0);
+        for (let i = 0; i < k; i++) grow(r, x1, y1, ang + (i - (k - 1) / 2) * (0.6 + r() * 0.5) + (r() - 0.5) * 0.3, len * (0.62 + r() * 0.2), Math.max(1, w - 1), d - 1, seed + i);
+        if (r() < 0.6) { const t = 0.4 + r() * 0.3, sx = x + (x1 - x) * t, sy = y + (y1 - y) * t, sa = ang + (r() < 0.5 ? -1 : 1) * (0.9 + r() * 0.5); limb(sx, sy, sx + Math.cos(sa) * len * 0.5, sy + Math.sin(sa) * len * 0.5, 1, 1, 0); }
+      } else clump(x1, y1, 4 + r() * 3, 3 + r() * 2, seed, 4);
+    }
     // left tree, just behind the reeds
-    bole(94, 6, 4, 58, 11);
-    limb(93, 60, 80, 47, 3, 1, -2);
-    limb(95, 59, 107, 44, 3, 1, -2);
-    limb(94, 58, 93, 32, 3, 1, 1);
-    crown(80, 45, 6, 4, 7101, 5); crown(107, 42, 7, 5, 7102, 6); crown(93, 33, 10, 8, 7103, 12); crown(90, 22, 8, 4, 7104, 5); crown(100, 51, 4, 2, 7105, 3);
-    // right tree, entering from the edge
-    bole(212, 11, 8, 36, 23);
-    limb(209, 58, 176, 52, 4, 1, 3);
-    limb(209, 46, 188, 31, 3, 1, -2);
-    limb(210, 66, 192, 69, 2, 1, 2);
-    crown(182, 49, 7, 3, 7201, 4); crown(196, 50, 8, 4, 7202, 6); crown(190, 29, 9, 4, 7203, 6); crown(203, 25, 9, 6, 7204, 8); crown(212, 14, 9, 6, 7205, 8); crown(197, 68, 5, 2, 7206, 3);
+    const rl = rng(7100);
+    bole(94, 6, 4, 56, 11);
+    grow(rl, 93, 57, -2.35, 14, 3, 2, 7110); grow(rl, 94, 56, -1.57, 18, 3, 2, 7120); grow(rl, 95, 57, -0.8, 15, 3, 2, 7130);
+    clump(93, 30, 15, 11, 7101, 26); clump(80, 42, 8, 5, 7102, 8); clump(107, 40, 9, 6, 7103, 10);
+    leafEdge(70, 12, 120, 54, 7104);
+    // right tree, entering from the edge: branching to both sides, a full crown above
+    const rr = rng(7200);
+    bole(211, 11, 8, 54, 23);
+    grow(rr, 208, 56, -2.55, 16, 4, 2, 7210); grow(rr, 210, 55, -1.95, 20, 4, 2, 7220); grow(rr, 213, 55, -1.2, 20, 4, 2, 7230); grow(rr, 215, 57, -0.55, 16, 3, 2, 7240);
+    grow(rr, 207, 66, -3.0, 16, 3, 1, 7250); grow(rr, 215, 68, -0.25, 12, 2, 1, 7260);
+    clump(200, 27, 24, 15, 7201, 34); clump(180, 38, 9, 5, 7202, 9); clump(218, 22, 12, 9, 7203, 14); clump(170, 52, 7, 3, 7204, 5);
+    leafEdge(160, 4, 255, 64, 7205);
   }
-  
   
 
   // a stone set into the soil: lit upper right, dark outline against the earth, moss on top, lichen
