@@ -264,7 +264,9 @@ const EntityFrog = (function () {
       } else { f.ax = rnd(geo.cx - 46, geo.cx + 46); f.ay = rnd(geo.padY0 - 22, geo.padY0 - 3); }
       f.ax = Math.max(4, Math.min(SW - 4, f.ax)); f.ay = Math.max(6, Math.min(WY - 3, f.ay));
     }
+        function glowFlies() { try { const h = api.state && api.state.entityFireflies; return h ? h.list() : []; } catch (e) { return []; } }   // the pond's fireflies (read-only list)
     function flyPos(f, now) {
+      if (f.ff) return { x: Math.round(f.x), y: Math.round(f.y) };
       const t = (now - f.born) / 1000;
       return { x: Math.round(f.cx + Math.sin(t * 1.9 + f.s1) * 2.2 + Math.sin(t * 0.7 + f.s2) * 1.2),
         y: Math.round(f.cy + Math.sin(t * 2.3 + f.s3) * 1.5) };
@@ -288,10 +290,10 @@ const EntityFrog = (function () {
     }
     function startCatch(now) {
       if (act || anim || now < catchReadyAt || !canCatch()) return;
-      const mo = mouth();
-      for (let i = 0; i < flies.length; i++) {
-        const f = flies[i], p = flyPos(f, now), age = now - f.born;
-        if (f.caught || age < 1100 || age > f.life - 900) continue;
+            const mo = mouth(), pool = flies.concat(glowFlies());
+      for (let i = 0; i < pool.length; i++) {
+        const f = pool[i], p = flyPos(f, now), age = now - f.born;
+        if (f.caught || age < 1100 || age > f.life - 900 || (f.ff && f.vis < 0.6)) continue;
         const dx = p.x - mo.x, dy = p.y - mo.y;
         if (dx * dx + dy * dy <= (mo.reach - 2) * (mo.reach - 2) && dy < 4 && Math.random() < 0.6) {
           act = { kind: 'catch', t0: now, fly: f, tx: 0, ty: 0, launched: false, dx: dx, dy: dy };
@@ -444,7 +446,7 @@ const EntityFrog = (function () {
             pose = { eye: eyesFromDir(side, p.y - mo.y), mouth: 'smile', throat: 0, lean: (t > 200 && Math.abs(side) > 5) ? (side < 0 ? -1 : 1) : 0, bob: t > 320 ? 1 : 0 };
           }
           else if (t < 700) {                                      // strike: a fast tongue out, a brief hold, back in
-            if (!act.launched) { const p = flyPos(f, now), dx = p.x - mo.x, dy = p.y - mo.y; act.launched = true; act.tx = p.x; act.ty = p.y; f.caught = true; f.hold = p; if (dx * dx + dy * dy > mo.reach * mo.reach) { act.miss = true; f.caught = false; } }
+            if (!act.launched) { const p = flyPos(f, now), dx = p.x - mo.x, dy = p.y - mo.y; act.launched = true; act.tx = p.x; act.ty = p.y; f.caught = true; f.hold = p; if (f.ff) f.eatAt = act.t0 + 530; if (dx * dx + dy * dy > mo.reach * mo.reach) { act.miss = true; f.caught = false; } }
             pose = { eye: 'open', mouth: 'open', throat: 0, lean: 0, bob: 0 };
             if (!act.miss) {
                             const k = t < 530 ? smooth((t - 450) / 80) : (t < 580 ? 1 : 1 - smooth((t - 580) / 120));
@@ -490,7 +492,7 @@ const EntityFrog = (function () {
       if (act) {
         const t = now - act.t0;
         if (act.kind === 'click' && t >= 800) act = null;
-        else if (act.kind === 'catch' && t >= 1100) { if (act.fly) { const i = flies.indexOf(act.fly); if (i >= 0 && act.fly.caught) flies.splice(i, 1); else act.fly.caught = false; } catchReadyAt = now + rnd(6000, 14000); act = null; }
+        else if (act.kind === 'catch' && t >= 1100) { if (act.fly) { const i = flies.indexOf(act.fly); if (i >= 0 && act.fly.caught) flies.splice(i, 1); else { if (act.fly.ff && act.fly.caught) act.fly.eaten = true; act.fly.caught = false; } } catchReadyAt = now + rnd(6000, 14000); act = null; }
       }
       if (!act) startCatch(now);
 
