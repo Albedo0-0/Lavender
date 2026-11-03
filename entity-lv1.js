@@ -763,10 +763,11 @@ const EntityLV1 = (function () {
     despeckle(mid, 84, SURF - 6, W - 1, SURF);
   }
 
-    function sideTrees(L) {
-    // one tree growing beside the pond, just beyond the right edge: only a sliver of trunk, two slim branches and a
-    // few small, muted clumps of foliage reach into the frame (high and to the side, clear of the pond and the far shore)
-    const FOL = [LEAF[0], LEAF[1], LEAF[2], LEAF[3], LEAF[4], LEAF[5]];
+      function sideTrees(L) {
+    // two plain trees beside the pond, rooted at the far shore: one beyond the reeds on the left bank, one at the right
+    // edge, cut off by the frame. Slim trunks, a few forked branches and small, muted leaf clumps; everything stays
+    // above the horizon, clear of the open water and the lilypad.
+    const FOL = [MIDF[1], MIDF[2], MIDF[3], MIDF[4], MIDF[5], LEAF[5], LEAF[6]];
     function limb(x0, y0, x1, y1, w0, w1, sag) {                                                    // a tapering branch, lit on top
       const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2;
       for (let k = 0; k <= n; k++) {
@@ -774,21 +775,30 @@ const EntityLV1 = (function () {
         for (let j = 0; j < w; j++) put(L, x, y + j - Math.floor(w / 2), BARK[w === 1 ? 2 : j === 0 ? 4 : j === w - 1 ? 1 : 3]);
       }
     }
-    const SY = SURF - 1, TL = W - 5;                                                                // the trunk's foot, at the far shore
-    for (let y = 26; y <= SY; y++) {                                                                // trunk: shaded left, lit right, mostly out of frame
-      const left = Math.round(TL - (SY - y) * 0.03 - Math.sin(y * 0.17) * 0.6) - (y > SY - 3 ? 1 : 0);
-      for (let x = left; x < W; x++) {
-        const k = x - left, ridge = vnoise(k * 1.7, y * 0.2, 71);
-        put(L, x, y, k === 0 ? BARK[0] : k === 1 ? BARK[1] : k >= 4 ? BARK[4] : ridge > 0.64 ? BARK[3] : ridge < 0.3 ? BARK[1] : BARK[2]);
+    function bole(bx, w0, w1, ytop, seed) {                                                         // a trunk from the shore up: shaded left, lit right, ridged, root flare
+      const SY = SURF - 1;
+      for (let y = ytop; y <= SY; y++) {
+        const f = (SY - y) / Math.max(1, SY - ytop), w = Math.round(w0 + (w1 - w0) * f) + (y > SY - 3 ? 2 : 0);
+        const left = Math.round(bx - w / 2 + Math.sin(y * 0.19 + seed) * 0.7 - f * 1.5);
+        for (let k = 0; k < w; k++) {
+          const ridge = vnoise(k * 1.7 + seed, y * 0.2, seed + 3);
+          put(L, left + k, y, k === 0 ? BARK[0] : k === 1 ? BARK[1] : k >= w - 1 ? BARK[4] : k >= w - 2 && w > 4 ? BARK[3] : ridge > 0.64 ? BARK[3] : ridge < 0.3 ? BARK[1] : BARK[2]);
+        }
       }
     }
-    limb(TL + 1, 36, 218, 22, 3, 1, -3);                                                            // the main branch, rising to the left
-    limb(TL + 1, 53, 230, 49, 2, 1, 2);                                                             // a lower, slimmer branch
-    limb(238, 29, 232, 13, 2, 1, 0);                                                                // a twig off the main branch
-    leafMass(L, 235, 21, 12, 4, FOL, 7001, { count: 5, rmin: 3, rmax: 4, top: 0.4 });
-    leafMass(L, 249, 12, 7, 5, FOL, 7002, { count: 5, rmin: 3, rmax: 5, top: 0.4 });
-    leafMass(L, 222, 22, 5, 2, FOL, 7003, { count: 3, rmin: 2, rmax: 3, top: 0.4 });
-    leafMass(L, 236, 49, 6, 2, FOL, 7004, { count: 3, rmin: 2, rmax: 3, top: 0.4 });
+    function crown(cx, cy, rx, ry, seed, n) { leafMass(L, cx, cy, rx, ry, FOL, seed, { count: n, rmin: 2, rmax: 4, top: 0.45 }); }
+    // left tree, just behind the reeds
+    bole(94, 6, 4, 58, 11);
+    limb(93, 60, 80, 47, 3, 1, -2);
+    limb(95, 59, 107, 44, 3, 1, -2);
+    limb(94, 58, 93, 32, 3, 1, 1);
+    crown(80, 45, 6, 4, 7101, 5); crown(107, 42, 7, 5, 7102, 6); crown(93, 33, 10, 8, 7103, 12); crown(90, 22, 8, 4, 7104, 5); crown(100, 51, 4, 2, 7105, 3);
+    // right tree, entering from the edge
+    bole(212, 11, 8, 36, 23);
+    limb(209, 58, 176, 52, 4, 1, 3);
+    limb(209, 46, 188, 31, 3, 1, -2);
+    limb(210, 66, 192, 69, 2, 1, 2);
+    crown(182, 49, 7, 3, 7201, 4); crown(196, 50, 8, 4, 7202, 6); crown(190, 29, 9, 4, 7203, 6); crown(203, 25, 9, 6, 7204, 8); crown(212, 14, 9, 6, 7205, 8); crown(197, 68, 5, 2, 7206, 3);
   }
   
   
