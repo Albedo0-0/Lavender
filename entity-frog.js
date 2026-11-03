@@ -170,7 +170,7 @@ const EntityFrog = (function () {
     let act = null;            // priority 2 (catch) / 3 (click)
     let eggSwap = null;        // 08:00 egg cross-fade
     let clickNo = 0;
-    let swaying = false, swayStart = 0, musicOn = false, yesSince = 0, lastYes = 0, lastPoll = -1e9;
+        let swaying = false, swayStart = 0, musicOn = false, yesSince = 0, lastYes = 0, lastPoll = -1e9, busyPrev = false;
     let prevPos = -1, posAdvAt = 0;
     let blinkAt = 0, blinkUntil = 0, glanceAt = 0, glanceUntil = 0, glanceDir = 'lookL';
     const flies = []; let nextFlyAt = 0, catchReadyAt = 0, boundaryAt = 0;
@@ -192,7 +192,7 @@ const EntityFrog = (function () {
       else if (next === 'laid') startAnim('lay', now);
       else if (next === 'night' && prev === 'laid') startAnim('depart', now);
     }
-    const ANIM_MS = { climb: 1900, grow: 900, lay: 13600, depart: 1700 };
+        const ANIM_MS = { climb: 1900, grow: 900, lay: 13600, depart: 1810 };       // depart: 560 ms crouch and push-off + 1250 ms leap
     function startAnim(kind, now) {
       if (act && act.kind === 'catch' && act.fly) act.fly.caught = false;     // a lifecycle transition always wins
       act = null;
@@ -302,13 +302,15 @@ const EntityFrog = (function () {
       const pose = { eye: 'open', eyeR: null, mouth: 'smile', throat: 0, lean: 0, bob: 0 };
       if (act && act.kind === 'click') {
         const t = now - act.t0, v = act.v;
-        if (v === 0) {
-          if (t < 120) pose.eye = 'blink'; else if (t < 620) { pose.eye = 'happy'; pose.eyeR = 'open'; pose.lean = 1; } else pose.eye = 'open';
-        } else if (v === 1) {
-          pose.eye = (t < 110 || (t >= 200 && t < 310)) ? 'blink' : 'open';
-          pose.bob = (t >= 100 && t < 320) ? 1 : 0;
-        } else {
-          if (t < 700) { pose.eye = 'happy'; pose.throat = (Math.floor(t / 160) % 2); pose.lean = [-1, 0, 1, 0][Math.floor(t / 175) % 4]; }
+                if (v === 0) {                                         // a friendly wink
+          if (t < 90) pose.eye = 'blink';
+          else if (t < 540) { pose.eye = 'happy'; pose.eyeR = 'open'; pose.lean = (t < 330) ? 1 : 0; pose.bob = (t < 180) ? 1 : 0; }
+          else pose.eye = (t < 620) ? 'blink' : 'open';
+        } else if (v === 1) {                                  // a quick double nod
+          pose.eye = (t < 90 || (t >= 300 && t < 400)) ? 'blink' : 'open';
+          pose.bob = ((t >= 90 && t < 210) || (t >= 330 && t < 450)) ? 1 : 0;
+        } else {                                               // a happy little croak
+          if (t < 700) { pose.eye = 'happy'; pose.throat = (Math.floor(t / 160) % 2); pose.lean = [0, 1, 0, -1][Math.floor(t / 175) % 4]; }
         }
         return pose;
       }
@@ -367,44 +369,65 @@ const EntityFrog = (function () {
           if (a > 0) v.wrig.push({ x: Math.round(x), y: Math.round(y), a: Math.round(a * 20) / 20, w: Math.floor(now / 160 + i) % 2 });
         }
       }
-      if ((stage === 'tadpole' || stage === 'hind' || stage === 'front') && !(anim && anim.kind === 'climb')) v.tad = tadView(now, m, 1);
+            if ((stage === 'tadpole' || stage === 'hind' || stage === 'front') && !(anim && anim.kind === 'climb')) {
+        const sinceHatch = (stage === 'tadpole') ? (m - 630) * 60000 : 1e9;      // first 1.5 s of 10:30: the last wriggler hands over to the tadpole
+        const fade = sinceHatch < 1500 ? smooth(sinceHatch / 1500) : 1;
+        v.tad = tadView(now, m, fade);
+        if (fade < 1) { const tp = tadPos(now); v.wrig.push({ x: tp.x, y: tp.y, a: Math.round((1 - fade) * 20) / 20, w: Math.floor(now / 160) % 2 }); }
+      }
 
       // lifecycle animations (priority 1)
       let sit = null;
       if (anim) {
         const t = now - anim.t0, p = Math.min(1, t / anim.dur);
         if (anim.kind === 'climb') {
-          const tp = tadView(now, m, 1), tp0 = anim.from || (anim.from = { x: tp.x, y: tp.y });
-          const T1 = 1000, T2 = 700;
+                    const tp = tadView(now, m, 1), tp0 = anim.from || (anim.from = { x: tp.x, y: tp.y, face: tp.face });
+          const T1 = 1000, T2 = 700, FD = 140;                    // FD: tadpole and froglet cross-fade at the take-off point
           const sx = geo.padX0 - 1, sy = WY + 2;
-          if (t < T1) { const k = smooth(t / T1); v.tad = { x: Math.round(lerp(tp0.x, sx, k)), y: Math.round(lerp(tp0.y, sy, k)), face: sx >= tp0.x ? 1 : -1, ph: Math.floor(now / 120) % 8, legs: 2, tail: 0, a: 1 }; }
-          else if (t < T1 + T2) { const q = (t - T1) / T2, a = arcPos(q, sx - 3, sy - 2, sitLeftF, sitTopF, 7); sit = { form: 'froglet', x: Math.round(a.x), y: Math.round(a.y), air: true, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
+          if (t < T1 + FD) { const k = smooth(t / T1); v.tad = { x: Math.round(lerp(tp0.x, sx, k)), y: Math.round(lerp(tp0.y, sy, k)), face: t < 250 ? tp0.face : (sx >= tp0.x ? 1 : -1), ph: Math.floor(now / 120) % 8, legs: 2, tail: 0, a: t < T1 ? 1 : 1 - smooth((t - T1) / FD) }; }
+          if (t >= T1 && t < T1 + T2) { const q = (t - T1) / T2, a = arcPos(q, sx - 3, sy - 2, sitLeftF, sitTopF, 7); sit = { form: 'froglet', x: Math.round(a.x), y: Math.round(a.y), air: true, a: smooth((t - T1) / FD), pose: { eye: 'open', mouth: 'smile', lean: 0 } };
             if (q < 0.2) v.rip.push({ x: sx, y: WY, r: 1 + Math.floor(q * 10) }); }
-          else { sit = { form: 'froglet', x: sitLeftF, y: sitTopF, air: false, pose: { eye: (t < T1 + T2 + 150) ? 'blink' : 'open', mouth: 'smile', lean: 0 } }; }
+          else if (t >= T1 + T2) { sit = { form: 'froglet', x: sitLeftF, y: sitTopF, air: false, pose: { eye: (t < T1 + T2 + 150) ? 'blink' : 'open', mouth: 'smile', lean: 0 } }; }
         } else if (anim.kind === 'grow') {
-          const k = smooth((t - 250) / 400);
-          if (t < 250) sit = { form: 'froglet', x: sitLeftF, y: sitTopF, air: false, pose: { eye: 'blink', mouth: 'smile', lean: 0 } };
-          else if (t < 650) { sit = { form: 'adult', x: sitLeftA, y: sitTopA, air: false, a: k, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
-            v.growFrom = { x: sitLeftF, y: sitTopF, a: 1 - k }; }
-          else sit = { form: 'adult', x: sitLeftA, y: sitTopA, air: false, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
+                    // squat, one small hop on the spot; the two forms swap over a very short cross-fade at the top of the hop.
+          // Both share the same centre and feet line, so nothing pops and the forms overlap only for a moment.
+          const hop = (t > 200 && t < 560) ? Math.round(3 * Math.sin(Math.PI * (t - 200) / 360)) : 0;
+          const k = smooth((t - 290) / 170);
+          if (t < 200) sit = { form: 'froglet', x: sitLeftF, y: sitTopF, air: false, pose: { eye: 'open', mouth: 'smile', lean: 0, bob: t > 80 ? 1 : 0 } };
+          else if (t < 560) {
+            if (k > 0) sit = { form: 'adult', x: sitLeftA, y: sitTopA - hop, air: hop > 0, a: k, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
+            if (k < 1) v.growFrom = { x: sitLeftF, y: sitTopF - hop, a: 1 - k, air: hop > 0 };
+          }
+          else sit = { form: 'adult', x: sitLeftA, y: sitTopA, air: false, pose: { eye: t < 700 ? 'blink' : 'open', mouth: 'smile', lean: 0, bob: t < 640 ? 1 : 0 } };
         } else if (anim.kind === 'lay') {
           const wl = geo.padX0 - 8, T0 = 800, T1 = T0 + 1500, T2 = T1 + 9000, T3 = T2 + 1500;
           const eg = EGX - 5;
           if (t < T0) { const q = t / T0, a = arcPos(q, sitLeftA, sitTopA, wl, WY - 6, 8); sit = { form: 'adult', x: Math.round(a.x), y: Math.round(a.y), air: q < 0.9, clip: WY, pose: { eye: 'open', mouth: 'smile', lean: 0 } }; }
-          else if (t < T1) { const q = smooth((t - T0) / 1500); v.swim = { x: Math.round(lerp(wl, eg, q)), y: WY + 3, face: 1 };
+          else if (t < T1) { const q = smooth((t - T0) / 1500); v.swim = { x: Math.round(lerp(wl, eg, q)), y: WY + 3, face: 1, a: Math.min(1, (t - T0) / 300) };
             if (t - T0 < 500) { sit = { form: 'adult', x: wl, y: WY - 6 + Math.min(4, Math.floor((t - T0) / 120)), air: false, clip: WY, a: 1 - (t - T0) / 500, pose: { eye: 'open', mouth: 'smile', lean: 0 } }; } }
           else if (t < T2) { v.swim = { x: eg, y: WY + 5 + (Math.floor((t - T1) / 700) % 2), face: 1 }; }
-          else if (t < T3) { const q = smooth((t - T2) / 1500); v.swim = { x: Math.round(lerp(eg, wl, q)), y: WY + 3, face: -1 };
+          else if (t < T3) { const q = smooth((t - T2) / 1500); v.swim = { x: Math.round(lerp(eg, wl, q)), y: WY + 3, face: -1, a: Math.min(1, (T3 - t) / 400) };
             if (t - T2 > 1000) sit = { form: 'adult', x: wl, y: WY - 2 - Math.min(4, Math.floor((t - T2 - 1000) / 120)), air: false, clip: WY, a: Math.min(1, (t - T2 - 1000) / 500), pose: { eye: 'open', mouth: 'smile', lean: 0 } }; }
           else { const q = (t - T3) / (anim.dur - T3), a = arcPos(q, wl, WY - 6, sitLeftA, sitTopA, 8); sit = { form: 'adult', x: Math.round(a.x), y: Math.round(a.y), air: q < 0.9, clip: q < 0.3 ? WY : null, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
             if (q < 0.2) v.rip.push({ x: wl + 5, y: WY, r: 1 + Math.floor(q * 10) }); }
           if (t >= T0 && t < T0 + 400) v.rip.push({ x: wl + 5, y: WY, r: 1 + Math.floor((t - T0) / 130) });
         } else if (anim.kind === 'depart') {
-          const q = Math.min(1, t / anim.dur), e = q * q * 0.7 + q * 0.3;
-          const P0 = { x: sitLeftA, y: sitTopA }, P1 = { x: sitLeftA + 18, y: sitTopA - 78 }, P2 = { x: sitLeftA + 50, y: -44 };
-          const x = (1 - e) * (1 - e) * P0.x + 2 * (1 - e) * e * P1.x + e * e * P2.x, y = (1 - e) * (1 - e) * P0.y + 2 * (1 - e) * e * P1.y + e * e * P2.y;
-          if (t < 160) sit = { form: 'adult', x: sitLeftA, y: sitTopA + 1, air: false, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
-          else sit = { form: 'adult', x: Math.round(x), y: Math.round(y), air: true, pose: { eye: 'open', mouth: 'smile', lean: 0 } };
+                    // A frog's leap: squat, deeper squat leaning forward, push-off, then one ballistic arc (constant forward speed,
+          // parabolic rise and fall, no easing) that carries the frog past the edge of the pond scene.
+          const TC = 200, TD = 480, TP = 560, TF = ANIM_MS.depart - TP;      // squat · deep squat · push-off · flight
+          const x0 = sitLeftA, y0 = sitTopA, x1 = SW + 14, rise = 44;
+          const pose = { eye: 'open', mouth: 'smile', throat: 0, lean: 0, bob: 0, stretch: 0 };
+          if (t < TP) {
+            let y = y0;
+            if (t < TC) pose.bob = t > 70 ? 1 : 0;
+            else if (t < TD) { pose.bob = 2; pose.lean = 1; pose.eye = 'lookR'; }
+            else { pose.stretch = 1; pose.lean = 2; pose.eye = 'lookR'; y = y0 - 1; }       // legs drive, body extends, feet still on the pad
+            sit = { form: 'adult', x: x0, y: y, air: false, pose: pose };
+          } else {
+            const u = Math.min(1, (t - TP) / TF), up = u < 0.5;
+            pose.eye = 'lookR'; pose.lean = up ? 2 : 1; pose.stretch = up ? 1 : 0;           // extended on the way up, legs gathered for the way down
+            sit = { form: 'adult', x: Math.round(x0 + (x1 - x0) * u), y: Math.round(y0 - 4 * rise * u * (1 - u)) - pose.stretch, air: u < 0.62, pose: pose };
+          }
         }
       } else if (sitStage(stage)) {
         const form = formOf(stage);
@@ -412,15 +435,18 @@ const EntityFrog = (function () {
         // fly-catching (priority 2)
         if (act && act.kind === 'catch') {
           const t = now - act.t0, mo = mouth(), f = act.fly;
-          if (t < 450) { const p = flyPos(f, now); pose = { eye: eyesFromDir(p.x - mo.x, p.y - mo.y), mouth: 'smile', throat: 0, lean: 0, bob: 0 }; }
-          else if (t < 770) {
+                    if (t < 450) {                                           // notice, then focus: eyes lock on, a slight lean and hunch toward the fly
+            const p = flyPos(f, now), side = p.x - mo.x;
+            pose = { eye: eyesFromDir(side, p.y - mo.y), mouth: 'smile', throat: 0, lean: (t > 200 && Math.abs(side) > 5) ? (side < 0 ? -1 : 1) : 0, bob: t > 320 ? 1 : 0 };
+          }
+          else if (t < 700) {                                      // strike: a fast tongue out, a brief hold, back in
             if (!act.launched) { const p = flyPos(f, now), dx = p.x - mo.x, dy = p.y - mo.y; act.launched = true; act.tx = p.x; act.ty = p.y; f.caught = true; f.hold = p; if (dx * dx + dy * dy > mo.reach * mo.reach) { act.miss = true; f.caught = false; } }
             pose = { eye: 'open', mouth: 'open', throat: 0, lean: 0, bob: 0 };
             if (!act.miss) {
-              const k = t < 560 ? smooth((t - 450) / 110) : (t < 630 ? 1 : 1 - smooth((t - 630) / 140));
-              v.tongue = { ox: mo.x, oy: mo.y, tx: Math.round(lerp(mo.x, act.tx, k)), ty: Math.round(lerp(mo.y, act.ty, k)), fly: (t >= 560) };
+                            const k = t < 530 ? smooth((t - 450) / 80) : (t < 580 ? 1 : 1 - smooth((t - 580) / 120));
+              v.tongue = { ox: mo.x, oy: mo.y, tx: Math.round(lerp(mo.x, act.tx, k)), ty: Math.round(lerp(mo.y, act.ty, k)), fly: (t >= 530) };
             }
-          } else if (t < 1100) pose = { eye: (t < 900) ? 'blink' : 'open', mouth: 'smile', throat: (Math.floor((t - 770) / 110) % 2), lean: 0, bob: 0 };
+          } else if (t < 1100) pose = { eye: (t >= 760 && t < 900) ? 'blink' : 'open', mouth: 'smile', throat: (Math.floor((t - 700) / 110) % 2), lean: 0, bob: 0 };
         }
         sit = { form: form, x: form === 'froglet' ? sitLeftF : sitLeftA, y: form === 'froglet' ? sitTopF : sitTopA, air: false, pose: pose };
       }
@@ -451,8 +477,10 @@ const EntityFrog = (function () {
 
       pollMusic(now, false);
       if (anim && now - anim.t0 >= anim.dur) { anim = null; if (stage === 'night') { /* departed: nothing is drawn */ } }
-      if (!sitStage(stage) && !anim) { swaying = false; if (act) act = null; }
+            if (!sitStage(stage) && !anim) { swaying = false; if (act) act = null; }
+      else if (musicOn && !swaying && !anim && !act) { swaying = true; swayStart = now; }   // music already playing when the frog appears or an action ends
       if (swaying && !musicOn && swayStep(now) % 2 === 0) swaying = false;   // settle at the centre pose, never mid-lean
+      const busyNow = !!(anim || act); if (busyPrev && !busyNow && swaying) swayStart = now; busyPrev = busyNow;   // sway resumes from the centre pose
 
       updateFlies(now, dt);
       if (act) {
@@ -479,7 +507,7 @@ const EntityFrog = (function () {
     function busy() { return !!(anim || act || flies.length); }
     function wakeIn(now) { return Math.max(30, wakeAt - now); }
     function resume(now) {
-      lastUpdate = 0; anim = null; act = null; eggSwap = null; flies.length = 0; swaying = false; musicOn = false; yesSince = 0; prevPos = -1; stage = null;
+            lastUpdate = 0; anim = null; act = null; eggSwap = null; flies.length = 0; swaying = false; musicOn = false; yesSince = 0; prevPos = -1; stage = null; busyPrev = false;
       boundaryAt = 0; nextFlyAt = now + rnd(20000, 60000); catchReadyAt = now + 4000; blinkAt = now + rnd(2000, 5000); glanceAt = now + rnd(6000, 12000); lastKey = '';
     }
 
@@ -515,11 +543,13 @@ const EntityFrog = (function () {
         const eye = p.eye === 'up' ? 'open' : (p.eye || 'open');
         const spr = frogletSprite(eye, p.mouth || 'smile', s.air);
         o.shear = [p.lean || 0, p.lean || 0, p.lean || 0, p.lean || 0, 0, 0];
-        blit(g, spr, s.x, s.y + (p.bob || 0), o);
+                blit(g, spr, s.x, s.y + Math.min(1, p.bob || 0), o);
       } else {
         const le = p.eye || 'open', re = p.eyeR || le;
         o.shear = [p.lean || 0, 0, 0];
-        blit(g, s.air ? BODY_AIR : BODY, s.x, s.y + 7, o);
+                const bodySpr = s.air ? BODY_AIR : BODY;
+        if (p.stretch) blit(g, bodySpr, s.x, s.y + 8, o);                 // push-off stretch: the lower body is drawn once more, one row lower
+        blit(g, bodySpr, s.x, s.y + 7, o);
         const oh = { alpha: a, clip: o.clip, shear: p.lean || 0 };
         blit(g, headSprite(le, re, p.mouth || 'smile', p.throat ? 1 : 0), s.x, s.y + (p.bob || 0), oh);
       }
@@ -537,9 +567,9 @@ const EntityFrog = (function () {
       for (let i = 0; i < v.eggs.length; i++) drawEggs(g, v.eggs[i]);
       for (let i = 0; i < v.wrig.length; i++) { const w = v.wrig[i]; dot(g, w.x, w.y, PAL.b, w.a); dot(g, w.x + w.w, w.y + 1, PAL.a, w.a); dot(g, w.x, w.y + 2, PAL.b, w.a * 0.8); }
       if (v.tad) drawTad(g, v.tad);
-      if (v.swim) blit(g, SWIM, v.swim.x, v.swim.y, { flip: v.swim.face < 0, alpha: 0.6 });
+            if (v.swim) blit(g, SWIM, v.swim.x, v.swim.y, { flip: v.swim.face < 0, alpha: 0.6 * (v.swim.a == null ? 1 : v.swim.a) });
       for (let i = 0; i < v.rip.length; i++) { const r = v.rip[i]; dot(g, r.x - r.r, r.y, PAL.s, 0.45); dot(g, r.x + r.r, r.y, PAL.s, 0.45); dot(g, r.x - r.r + 1, r.y + 1, PAL.s, 0.25); dot(g, r.x + r.r - 1, r.y + 1, PAL.s, 0.25); }
-      if (v.growFrom) blit(g, frogletSprite('open', 'smile', false), v.growFrom.x, v.growFrom.y, { alpha: v.growFrom.a });
+            if (v.growFrom) blit(g, frogletSprite('open', 'smile', !!v.growFrom.air), v.growFrom.x, v.growFrom.y, { alpha: v.growFrom.a });
       if (v.sit) drawSit(g, v.sit);
       if (v.tongue) { const t = v.tongue; line(g, Math.round(t.ox), Math.round(t.oy), t.tx, t.ty, PAL.r, 1); dot(g, t.tx, t.ty, PAL.t, 1); if (t.fly) { dot(g, t.tx, t.ty - 1, '#1b1f16', 1); } }
       for (let i = 0; i < v.flies.length; i++) drawFly(g, v.flies[i]);
