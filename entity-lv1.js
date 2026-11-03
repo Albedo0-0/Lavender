@@ -108,7 +108,13 @@ const EntityLV1 = (function () {
   const WDEEP = ramp(['#091a2c', '#0d2438', '#122f46', '#193c54', '#224b61']);                                    // deep water
   const WGREEN = ramp(['#12281f', '#1a3a2a', '#244d34', '#30613c', '#3f7845', '#559254', '#72ab63', '#95c47a']);   // reflected foliage
   const WSPARK = ramp(['#dff0c6', '#f3f9dc']);
-  const DEW = col('#e6f4d0'), MUSH_RED = col('#b9736a');
+    const DEW = col('#e6f4d0'), MUSH_RED = col('#b9736a');
+  // --- open garden: muted sage ramps (dark -> light). Pale and cool in the distance, deeper and clearer near the water.
+  const SAGE1 = ramp(['#8ea78c', '#9bb396', '#a8bfa1', '#b8cfb0', '#c8dcbf']);                                  // farthest rolling lawn
+  const SAGE2 = ramp(['#56755a', '#648466', '#739473', '#82a280', '#93b28f', '#a5c19f']);                        // far hedges and lawn
+  const SAGE3 = ramp(['#3b5139', '#476043', '#546f50', '#628060', '#729070', '#84a27c', '#98b48c']);             // mid lawn terrace
+  const SAGE4 = ramp(['#1f3322', '#2a4430', '#365639', '#436646', '#527852', '#648f5f', '#7aa371']);             // low shrubs and the shore lip
+  const PEBBLE = ramp(['#5d6a62', '#6e7b70', '#808d7e', '#939f8d', '#a6b19c', '#bac3ac']);                       // quiet garden stones
 
   // =====================================================================================================
   // Layers: a layer is a grid of colour ids (0 = transparent)
@@ -703,58 +709,123 @@ const EntityLV1 = (function () {
     }
   }
 
-  function sideBack(back, far2, far1, mid) {
-    const r = rng(2101);
-    // 1) mist and light: one smooth glow, soft banks of haze, no halftone grain
-    for (let y = 0; y <= SURF + 2; y++) for (let x = 0; x < W; x++) {
-      const mist = clamp((y - (SURF - 24)) / 24, 0, 1) * (x > 80 ? 1 : 0.4);
-      const t = 1.0 + glowAt(x, y) * 4.4 + mist * 0.9 + (fbm(x * 0.05, y * 0.08, 3) - 0.5) * 1.5 + (fbm(x * 0.015, y * 0.2, 19) - 0.5) * 0.9;
-      put(back, x, y, HAZE[clamp(qh(t, x, y), 0, 7)]);
-    }
-    despeckle(back, 0, 0, W - 1, SURF + 2);
-    // 2) the farthest forest: a pale ridge of crowns and ghost trunks
-    const r2 = rng(2150), f2 = [FAR2[0], FAR2[1], FAR2[2], FAR2[2], FAR2[3]];
-    for (let x = 3; x < W; x += 5 + Math.floor(r2() * 5)) {
-      const top = 12 + Math.floor(r2() * 12), bot = SURF - 5 - Math.floor(r2() * 4), dx = x + Math.round(r2() * 2 - 1);
-      for (let y = top; y < bot; y++) { put(far2, dx, y, FAR2[1]); put(far2, dx + 1, y, FAR2[2]); }
-    }
-    for (let i = 0; i < 24; i++) leafMass(far2, 2 + i * 11 + (r2() - 0.5) * 6, 20 + r2() * 9, 10, 5, f2, 2160 + i, { count: 6, rmin: 3, rmax: 6, top: 0.15 });
-    liftByGlow(far2, 1.6);
-    // 3) the hazy trunks and crowns (same positions as ever), now with lit right edges and mist at their feet
-    const farT = [FAR1[0], FAR1[1], FAR1[2], FAR1[3], FAR1[4]];
-    for (let i = 0; i < 22; i++) {
-      const x = 4 + i * 12 + Math.round((r() - 0.5) * 8), top = 2 + Math.round(r() * 10), w = 2 + (r() < 0.3 ? 1 : 0);
-      for (let y = top; y < SURF - 2; y++) {
-        const sx = x + Math.round(Math.sin(y * 0.2 + i) * 0.6), mistUp = y > SURF - 12 ? (y > SURF - 6 ? 2 : 1) : 0;
-        for (let k = 0; k < w; k++) { const bk = hash2(sx + k, y >> 1, 9) < 0.18 ? -1 : 0; put(far1, sx + k, y, shade(k === w - 1 ? FAR1[3] : k === 0 ? FAR1[0] : FAR1[1], mistUp + bk)); }
+    // =====================================================================================================
+  // Open garden background: layered sage lawns, trimmed hedges, low shrubs and a few quiet stones. Depth comes
+  // from the layers themselves: pale and soft far away, deeper and crisper toward the water. Light is upper right.
+  // =====================================================================================================
+  function gRidge(x, base, amp, k) {
+    return Math.round(base + Math.sin(x * 0.043 + k) * amp + Math.sin(x * 0.097 + k * 2.3) * amp * 0.45 + Math.sin(x * 0.017 + k * 0.7) * amp * 0.6);
+  }
+  // a rolling lawn strip: lit crest, flat body tones in clean contour bands, deeper toward the foot; slopes facing the light are a tone brighter
+  function gTerrain(L, tones, top, bottom) {
+    const T = tones.length;
+    for (let x = 0; x < W; x++) {
+      const t0 = top(x), lit = top(x + 1) > t0, shaded = top(x + 1) < t0;
+      for (let y = t0; y <= bottom; y++) {
+        const d = y - t0;
+        const t = d === 0 ? (shaded ? T - 2 : T - 1) : d === 1 ? (lit ? T - 1 : T - 2) : d < 8 ? T - 3 : d < 15 ? T - 4 : T - 5;
+        put(L, x, y, tones[clamp(t, 0, T - 1)]);
       }
     }
-    for (let i = 0; i < 16; i++) leafMass(far1, 6 + i * 17 + (r() - 0.5) * 8, 14 + r() * 8, 14, 7, farT, 2110 + i, { count: 8, rmin: 4, rmax: 8, top: 0.15 });
-    for (let x = 84; x < W + 10; x += 9) leafMass(far1, x, SURF - 8 - r() * 4, 10, 5, farT, 2140 + x, { count: 6, rmin: 4, rmax: 7, top: 0.2 });   // far shore line
-    liftByGlow(far1, 1.5);
-    // 4) mid-distance undergrowth: a darker, saturated row along the far bank and a low hedge behind the near bank
-    const rm = rng(2180), mt = [MIDF[0], MIDF[1], MIDF[2], MIDF[3], MIDF[4]];
-    for (let x = 84; x < W; x++) for (let y = SURF - 2; y <= SURF + 1; y++) put(mid, x, y, y === SURF + 1 ? MIDF[0] : MIDF[1 + (hash2(x, y, 5) > 0.7 ? 1 : 0)]);
-    for (let x = 85; x < W + 6; x += 7 + Math.floor(rm() * 5)) leafMass(mid, x, SURF - 3 - rm() * 2, 6 + rm() * 3, 3, mt, 3000 + x, { count: 5, rmin: 3, rmax: 5, top: 0.35 });
-    for (let x = 85; x < W - 4; x += 9 + Math.floor(rm() * 6)) {                                    // grass blades breaking the far bank line
-      const h = 3 + Math.floor(rm() * 4), d = rm() < 0.5 ? -1 : 1;
-      for (let t = 0; t < h; t++) put(mid, x + (t > h - 3 ? d : 0), SURF - 4 - t, MIDF[t < 2 ? 2 : 4]);
+  }
+  // a low, rounded shrub: lit upper right, shaded left and base, a bright rim and a few clipped-leaf gaps
+  function gMound(L, cx, by, rx, ry, tones, seed) {
+    const T = tones.length;
+    for (let dy = -ry; dy <= 0; dy++) for (let dx = -rx; dx <= rx; dx++) {
+      const ex = dx / (rx + 0.4), ey = dy / (ry + 0.4), e = ex * ex + ey * ey;
+      if (e > 1) continue;
+      const s = ex * 0.5 - ey * 0.7 - 0.2 + (vnoise(dx * 0.45 + seed, dy * 0.6, seed) - 0.5) * 0.3;
+      let t = s > 0.62 ? T - 1 : s > 0.32 ? T - 2 : s > 0.02 ? T - 3 : s > -0.3 ? T - 4 : T - 5;
+      if (e > 0.78 && ex < -0.1) t = Math.min(t, T - 4);
+      if (e > 0.78 && ey < -0.5 && ex > -0.2) t = T - 1;
+      if (dy === 0) t = T - 5;
+      put(L, cx + dx, by + dy, tones[clamp(t, 0, T - 1)]);
     }
-    [[98, 2, 10], [133, 3, 8], [168, 2, 12], [203, 3, 9], [238, 2, 11]].forEach(function (t, i) {      // slim, hazy mid-distance trunks
-      for (let y = t[2]; y < SURF - 3; y++) { const sx = t[0] + Math.round(Math.sin(y * 0.11 + i) * 0.7), up = y > SURF - 16 ? (y > SURF - 8 ? 2 : 1) : 0; for (let k = 0; k < t[1]; k++) put(mid, sx + k, y, shade(k === t[1] - 1 ? FAR1[2] : FAR1[0], up)); }
+    for (let k = 0; k < 2; k++) {
+      const gx = cx + Math.round((hash2(seed, k, 3) - 0.5) * rx * 1.1), gy = by - 1 - Math.round(hash2(k, seed, 4) * ry * 0.6);
+      if (at(L, gx, gy) && at(L, gx + 1, gy)) { put(L, gx, gy, tones[clamp(T - 4, 0, T - 1)]); put(L, gx + 1, gy, tones[clamp(T - 4, 0, T - 1)]); }
+    }
+  }
+  // a clipped hedge row following the lawn crest: squared body, tapered ends, lit top, shaded foot
+  function gHedgeRow(L, x0, x1, top, h, tones) {
+    const T = tones.length, n = x1 - x0;
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + i, cap = Math.min(i, n - i), inset = cap === 0 ? 2 : cap === 1 ? 1 : 0, ty = top(x);
+      for (let j = inset; j < h; j++) {
+        const t = j === inset ? T - 1 : j === inset + 1 ? T - 2 : j < h - 2 ? T - 3 : T - 4;
+        put(L, x, ty + j, tones[clamp(t, 0, T - 1)]);
+      }
+    }
+  }
+  // a neatly mown lawn patch: tapered ends, a lit rim, evenly alternating mowing stripes, a shaded foot
+  function gLawn(L, x0, w, top, h, tones, stripe) {
+    const T = tones.length;
+    for (let i = 0; i < w; i++) {
+      const edge = Math.min(i, w - 1 - i), inset = edge === 0 ? 2 : edge < 3 ? 1 : 0;
+      for (let j = inset; j < h; j++) {
+        const t = j === inset ? T - 1 : j === h - 1 ? T - 4 : ((Math.floor((x0 + i) / stripe) & 1) ? T - 2 : T - 3);
+        put(L, x0 + i, top + j, tones[clamp(t, 0, T - 1)]);
+      }
+    }
+  }
+  // a smooth garden stone resting on the lawn: lit top and right, shaded left and base, soft contact shadow
+  function gStone(L, cx, by, rx, ry, seed) {
+    for (let dy = -ry; dy <= 0; dy++) for (let dx = -rx; dx <= rx; dx++) {
+      const ex = dx / (rx + 0.4), ey = dy / (ry + 0.4), e = ex * ex + ey * ey + (vnoise(dx * 0.6 + seed, dy * 0.8, seed) - 0.5) * 0.2;
+      if (e > 1) continue;
+      const s = ex * 0.45 - ey * 0.6 - 0.15 + (vnoise(dx * 0.5 + seed, dy * 0.7, seed + 1) - 0.5) * 0.3;
+      let t = s > 0.55 ? 4 : s > 0.3 ? 3 : s > 0.02 ? 2 : s > -0.28 ? 1 : 0;
+      if (e > 0.76 && ey < -0.4 && ex > -0.3) t = 5;
+      if (dy === 0) t = Math.min(t, 1);
+      put(L, cx + dx, by + dy, PEBBLE[t]);
+    }
+    for (let dx = -rx + 1; dx < rx; dx++) if (at(L, cx + dx, by)) put(L, cx + dx, by + 1, SAGE4[0]);
+  }
+
+  function sideBack(back, far2, far1, mid) {
+    const r = rng(2101), rm = rng(2180);
+    // 1) the sky and its haze: one open, airy glow with soft flat bands of mist (no halftone grain)
+    for (let y = 0; y <= SURF + 2; y++) for (let x = 0; x < W; x++) {
+      const t = 1.7 + clamp(y / 46, 0, 1) * 2.9 + glowAt(x, y) * 1.5 + (fbm(x * 0.02, y * 0.09, 3) - 0.5) * 0.7 + (fbm(x * 0.012, y * 0.22, 19) - 0.5) * 0.4;
+      put(back, x, y, HAZE[clamp(Math.floor(t), 0, 7)]);
+    }
+    despeckle(back, 0, 0, W - 1, SURF + 2);
+    // 2) the farthest lawn: a pale, soft ridge with a few distant shrub mounds
+    gTerrain(far2, SAGE1, function (x) { return gRidge(x, 40, 3, 1.1); }, SURF + 1);
+    for (let x = 9; x < W; x += 16 + Math.floor(r() * 10)) gMound(far2, x, gRidge(x, 40, 3, 1.1) + 2, 3 + Math.floor(r() * 3), 2 + Math.floor(r() * 2), SAGE1, 2160 + x);
+    [[18, 42], [116, 140], [198, 226]].forEach(function (h) { gHedgeRow(far2, h[0], h[1], function (x) { return gRidge(x, 40, 3, 1.1) - 1; }, 5, SAGE1); });
+    // 3) the far garden: a second ridge with trimmed hedge blocks and a few rounded shrubs
+    gTerrain(far1, SAGE2, function (x) { return gRidge(x, 53, 3, 2.4); }, SURF + 1);
+    [[3, 36], [90, 128], [146, 174], [194, 238]].forEach(function (h) {
+      gHedgeRow(far1, h[0], h[1], function (x) { return gRidge(x, 53, 3, 2.4) - 2; }, 8, SAGE2.slice(0, 5));
     });
-    for (let i = 0; i < 7; i++) { const x = 6 + i * 12 + Math.floor(rm() * 5); leafMass(mid, x, groundY(x) - 7 - rm() * 3, 8, 3.5, mt, 3100 + i, { count: 6, rmin: 3, rmax: 5, top: 0.4 }); }
+    [[66, 6, 4], [136, 6, 4], [184, 6, 4], [248, 6, 4]].forEach(function (m, i) {
+      gMound(far1, m[0], gRidge(m[0], 53, 3, 2.4) + 5, m[1], m[2], SAGE2, 2110 + i);
+    });
+    // 4) the near lawn terrace: neatly mown patches, low shrubs, a quiet stone, and the lip along the far shore
+    gTerrain(mid, SAGE3.slice(0, 6), function (x) { return gRidge(x, 65, 2.2, 3.9); }, SURF + 1);
+    [[20, 30], [94, 34], [146, 30], [200, 40]].forEach(function (p) {
+      gLawn(mid, p[0], p[1], gRidge(p[0] + (p[1] >> 1), 65, 2.2, 3.9) + 3, 6, SAGE3, 4);
+    });
+    [[8, 6, 4], [22, 8, 5], [44, 7, 4], [60, 8, 5], [76, 7, 4]].forEach(function (m, i) {    // low shrubs on the left bank, resting on the turf
+      gMound(mid, m[0], groundY(m[0]) - 1, m[1], m[2], SAGE4, 3100 + i);
+    });
+    [[92, 5, 3], [127, 6, 4], [180, 5, 3], [233, 6, 4]].forEach(function (m, i) {
+      gMound(mid, m[0], gRidge(m[0], 65, 2.2, 3.9) + 9, m[1], m[2], SAGE4, 3150 + i);
+    });
+    gStone(mid, 148, gRidge(148, 65, 2.2, 3.9) + 10, 3, 2, 3201);
+    gStone(mid, 233, gRidge(233, 65, 2.2, 3.9) + 11, 4, 2, 3202);
+    for (let x = 84; x < W; x++) for (let y = SURF - 2; y <= SURF + 1; y++) put(mid, x, y, y === SURF + 1 ? SAGE4[0] : y === SURF ? SAGE4[1] : y === SURF - 1 ? SAGE4[2] : SAGE4[3]);
+    for (let x = 90; x < W - 4; x += 15 + Math.floor(rm() * 9)) tuft(mid, x, SURF - 3, 4, [SAGE4[3], SAGE4[4], SAGE4[5], SAGE4[6]], 3300 + x, 0);
   }
 
   function sideTrees(L) {
-    [[24, 9, -1, 11], [52, 5, 1, 12]].forEach(function (t, i) { trunk(L, t[0], 0, groundY(t[0]) + 1, t[1], t[2], 2200 + i); });
-    const tones = [LEAF[0], LEAF[1], LEAF[2], LEAF[4], LEAF[6], LEAF[7]];
-    leafMass(L, 14, 6, 38, 18, tones, 2210, { count: 40, rmin: 4, rmax: 8, top: 0.5 });
-    leafMass(L, 64, -1, 30, 11, tones, 2211, { count: 20, rmin: 4, rmax: 7, top: 0.5 });
-    leafMass(L, 110, -3, 22, 7, tones, 2212, { count: 10, rmin: 4, rmax: 6, top: 0.5 });
-    leafMass(L, 160, -2, 26, 8, tones, 2213, { count: 12, rmin: 4, rmax: 6, top: 0.5 });
-    leafMass(L, 226, 1, 40, 12, tones, 2214, { count: 22, rmin: 4, rmax: 8, top: 0.5 });
-    leafMass(L, 44, 24, 12, 5, tones, 2215, { count: 6, rmin: 3, rmax: 5, top: 0.3 });
+    // the nearest garden layer, sitting on the far shore: sparse, low shrubs and two quiet stones
+    [[104, 8, 4], [142, 9, 5], [196, 8, 4], [238, 7, 4]].forEach(function (m, i) {
+      gMound(L, m[0], SURF - 1, m[1], m[2], SAGE4, 2210 + i);
+    });
+    gStone(L, 124, SURF - 1, 5, 3, 2221);
+    gStone(L, 216, SURF - 1, 4, 2, 2222);
   }
 
   // a stone set into the soil: lit upper right, dark outline against the earth, moss on top, lichen
@@ -1001,7 +1072,7 @@ const EntityLV1 = (function () {
     const back = makeLayer('back'), far = makeLayer('far'), farther = makeLayer('farther'), mid = makeLayer('mid'), trees = makeLayer('trees'),
       ground = makeLayer('ground'), bed = makeLayer('bed'), water = makeLayer('water'), rocks = makeLayer('rocks'), pads = makeLayer('pads'), plants = makeLayer('plants');
     sideBack(back, farther, far, mid); sideTrees(trees); sideGround(ground, bed); sideRocks(rocks); sideDetails(rocks); sidePads(pads); sidePlants(plants);
-    sideShafts([back, farther, far, mid, trees, ground, plants]);
+        sideShafts([farther, far, mid, trees, ground, plants]);
     sideWater(water, [back, farther, far, mid, trees, ground, bed, rocks, pads, plants]);
     return toPack([back, farther, far, mid, trees, ground, bed, water, rocks, pads, plants]);
   }
