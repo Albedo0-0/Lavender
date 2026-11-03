@@ -34,8 +34,8 @@ const EntityFrog = (function () {
     x: '#744230', r: '#c96a60', t: '#ea978c',                                                               // mouth line, mouth inside, tongue tip
     a: '#2f2c18', b: '#59552b', c: '#85803a', e: '#bdb274', v: '#8b8a3b',                                   // tadpole and larva tones
         s: '#b9d6da',
-    O: '#3a2518', D: '#5a3a24', S: '#7d5130', M: '#a8733f', L: '#c4915a', H: '#deb882',                     // adult skin: outline, deep, shade, mid, light, highlight
-    Q: '#dec99b', P: '#f6ecd2', X: '#5d3322', Z: '#8a5236'                                                  // adult belly shade, cream; mouth line, soft mouth corner
+        O: '#14210f', D: '#2c4f22', S: '#46772f', M: '#78a83e', L: '#9cc95a', H: '#b6ee86', G: '#fcc93e',       // adult: outline and pupil, deep, shade, mid, light, cheek blush; eye gold
+    Q: '#d7cbd0', P: '#fffdeb'                                                                              // adult belly: soft lavender shade, cream                                                  // adult belly shade, cream; mouth line, soft mouth corner
   };
   // ---------------------------------------------------------------- sprites
   function makeSprite(rows) {
@@ -70,27 +70,27 @@ const EntityFrog = (function () {
   }
   function dot(g, x, y, col, a) { g.globalAlpha = a; g.fillStyle = col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
 
-  // adult (12 x 10): head 12x7 built from small eye pieces set inside the head outline, body 12x3
-  const EL = { open: ['SSS', 'ykw', 'SyS'], lookL: ['SSS', 'kyw', 'SyS'], lookR: ['SSS', 'wyk', 'SyS'],
-    up: ['SkS', 'ywy', 'SyS'], blink: ['MMM', 'SSS', 'MMM'], happy: ['MSM', 'SMS', 'MMM'] };
-  const ER = { open: ['SSS', 'ykw', 'SyS'], lookL: ['SSS', 'kyw', 'SyS'], lookR: ['SSS', 'wyk', 'SyS'],
-    up: ['SkS', 'ywy', 'SyS'], blink: ['MMM', 'SSS', 'MMM'], happy: ['MSM', 'SMS', 'MMM'] };
-  const MID = ['LL', 'MM', 'MM'];
-  const EDGE_L = ['.O', 'OL', 'OM'], EDGE_R = ['O.', 'MO', 'MO'];
+    // adult (12 x 10): head 12x7 built from small eye pieces set inside the head outline, body 12x3
+  const EL = { open: ['GGM', 'OOG', 'OGM'], lookL: ['GGM', 'OGG', 'OGM'], lookR: ['GGM', 'GOO', 'GOM'],
+    up: ['OOM', 'OGG', 'GGM'], blink: ['MMM', 'DDD', 'MMM'], happy: ['MDM', 'DMD', 'MMM'] };
+  const ER = { open: ['MGG', 'GOO', 'MGO'], lookL: ['MGG', 'OOG', 'MOG'], lookR: ['MGG', 'GGO', 'MGO'],
+    up: ['MOO', 'GGO', 'MGG'], blink: ['MMM', 'DDD', 'MMM'], happy: ['MDM', 'DMD', 'MMM'] };
+  const MID = ['OO', 'MM', 'MM'];
+  const EDGE_L = ['.O', '.O', '.O'], EDGE_R = ['O.', 'O.', 'O.'];
   const headCache = {};
   function headSprite(le, re, mouth, throat) {
     const key = le + '|' + re + '|' + mouth + '|' + throat;
     if (headCache[key]) return headCache[key];
     const rows = [];
-        rows.push('..OOOOOOOO..');                                             // rounded crown, eyes sit inside the silhouette
+            rows.push('..OOO..OOO..');                                             // low eye brows over a dipped crown
     for (let i = 0; i < 3; i++) rows.push(EDGE_L[i] + EL[le][i] + MID[i] + ER[re][i] + EDGE_R[i]);
-    rows.push('OMLZMMMMZMSO');                                             // cheeks, with two soft mouth corners
-    rows.push(mouth === 'open' ? 'OMMXrrrrXMMO' : 'OMMMXXXXMMMO');         // small, quiet mouth (row 5 stays the tongue origin)
-    rows.push(throat ? 'OSMQPPPPQMSO' : 'OSMQQQQQQMSO');                   // cream chin, brighter while the throat pulses
+    rows.push('OHMSMMMMSMHO');                                             // cheeks with a soft blush and two small smile corners
+    rows.push(mouth === 'open' ? 'OMMDrrrrDMMO' : 'OMMMDDDDMMMO');         // small gentle smile (row 5 stays the tongue origin)
+    rows.push(throat ? 'OSPPPPPPPPSO' : 'OSQPPPPPPQSO');                   // cream chest, brighter while the throat pulses
     return (headCache[key] = makeSprite(rows));
   }
-  const BODY = makeSprite(['.OSMQPPQMSO.', 'OSMMQPPQMMSO', 'OLHSMQQMSHLO']);
-  const BODY_AIR = makeSprite(['.OSMQPPQMSO.', 'OSMMQPPQMMSO', '.OL......LO.']);
+  const BODY = makeSprite(['.OSQPPPPQSO.', 'OSMQPPPPQMSO', 'OLLSPPPPSLLO']);
+  const BODY_AIR = makeSprite(['.OSQPPPPQSO.', 'OSMQPPPPQMSO', '.OL......LO.']);
 
   // froglet (8 x 6)
   const FEYE = {
