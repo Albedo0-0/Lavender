@@ -33,7 +33,9 @@ const EntityFrog = (function () {
     y: '#e8b43c', w: '#fff6d6', k: '#1c1b11',                                                               // eye: iris, glint, pupil
     x: '#744230', r: '#c96a60', t: '#ea978c',                                                               // mouth line, mouth inside, tongue tip
     a: '#2f2c18', b: '#59552b', c: '#85803a', e: '#bdb274', v: '#8b8a3b',                                   // tadpole and larva tones
-    s: '#b9d6da'
+        s: '#b9d6da',
+    O: '#3a2518', D: '#5a3a24', S: '#7d5130', M: '#a8733f', L: '#c4915a', H: '#deb882',                     // adult skin: outline, deep, shade, mid, light, highlight
+    Q: '#dec99b', P: '#f6ecd2', X: '#5d3322', Z: '#8a5236'                                                  // adult belly shade, cream; mouth line, soft mouth corner
   };
   // ---------------------------------------------------------------- sprites
   function makeSprite(rows) {
@@ -68,26 +70,27 @@ const EntityFrog = (function () {
   }
   function dot(g, x, y, col, a) { g.globalAlpha = a; g.fillStyle = col; g.fillRect(x, y, 1, 1); g.globalAlpha = 1; }
 
-  // adult (12 x 10): head 12x7 built from eye pieces, body 12x3
-    const EL = { open: ['.ddd.', 'dwkyd', 'oyyyo'], lookL: ['.ddd.', 'dkwyd', 'oyyyo'], lookR: ['.ddd.', 'dwyyd', 'oyyko'],
-    up: ['.ddd.', 'dkyyd', 'oyyyo'], blink: ['.....', '.ggg.', '.ddd.'], happy: ['.....', '.ddd.', 'dgggd'] };
-  const ER = { open: ['.ddd.', 'dwkyd', 'oyyyo'], lookL: ['.ddd.', 'dkwyd', 'oyyyo'], lookR: ['.ddd.', 'dwyyd', 'oyyko'],
-    up: ['.ddd.', 'dkyyd', 'oyyyo'], blink: ['.....', '.ggg.', '.ddd.'], happy: ['.....', '.ddd.', 'dgggd'] };
-  const MID = ['..', '..', 'oo'];
+  // adult (12 x 10): head 12x7 built from small eye pieces set inside the head outline, body 12x3
+  const EL = { open: ['SSS', 'ykw', 'SyS'], lookL: ['SSS', 'kyw', 'SyS'], lookR: ['SSS', 'wyk', 'SyS'],
+    up: ['SkS', 'ywy', 'SyS'], blink: ['MMM', 'SSS', 'MMM'], happy: ['MSM', 'SMS', 'MMM'] };
+  const ER = { open: ['SSS', 'ykw', 'SyS'], lookL: ['SSS', 'kyw', 'SyS'], lookR: ['SSS', 'wyk', 'SyS'],
+    up: ['SkS', 'ywy', 'SyS'], blink: ['MMM', 'SSS', 'MMM'], happy: ['MSM', 'SMS', 'MMM'] };
+  const MID = ['LL', 'MM', 'MM'];
+  const EDGE_L = ['.O', 'OL', 'OM'], EDGE_R = ['O.', 'MO', 'MO'];
   const headCache = {};
   function headSprite(le, re, mouth, throat) {
     const key = le + '|' + re + '|' + mouth + '|' + throat;
     if (headCache[key]) return headCache[key];
     const rows = [];
-    for (let i = 0; i < 3; i++) rows.push(EL[le][i] + MID[i] + ER[re][i]);
-        rows.push('oglhllllllgo');                                             // brow: a small sheen on the lit side
-    rows.push('ogxllllllxgo');                                             // mouth corners turned up: a gentle smile
-    rows.push(mouth === 'open' ? 'oggxrrrrxggo' : 'oggxxxxxxggo');
-    rows.push(throat ? 'odgqppppqgdo' : 'odgqqqqqqgdo');                   // cream chin, brighter while the throat pulses
+        rows.push('..OOOOOOOO..');                                             // rounded crown, eyes sit inside the silhouette
+    for (let i = 0; i < 3; i++) rows.push(EDGE_L[i] + EL[le][i] + MID[i] + ER[re][i] + EDGE_R[i]);
+    rows.push('OMLZMMMMZMSO');                                             // cheeks, with two soft mouth corners
+    rows.push(mouth === 'open' ? 'OMMXrrrrXMMO' : 'OMMMXXXXMMMO');         // small, quiet mouth (row 5 stays the tongue origin)
+    rows.push(throat ? 'OSMQPPPPQMSO' : 'OSMQQQQQQMSO');                   // cream chin, brighter while the throat pulses
     return (headCache[key] = makeSprite(rows));
   }
-    const BODY = makeSprite(['.odgqppqgdo.', 'ogggqppqgggo', 'olhlgppgldgo']);
-  const BODY_AIR = makeSprite(['.odgqppqgdo.', 'ogggqppqgggo', '.ol......lo.']);
+  const BODY = makeSprite(['.OSMQPPQMSO.', 'OSMMQPPQMMSO', 'OLHSMQQMSHLO']);
+  const BODY_AIR = makeSprite(['.OSMQPPQMSO.', 'OSMMQPPQMMSO', '.OL......LO.']);
 
   // froglet (8 x 6)
   const FEYE = {
@@ -105,7 +108,7 @@ const EntityFrog = (function () {
   }
 
   // submerged frog silhouette (9 x 4), facing right
-    const SWIM = makeSprite(['...dglg..', '.ddgglgyg', 'dd.dggd.g', 'd.......d']);
+      const SWIM = makeSprite(['...SMLM..', '.SSMMLMyM', 'SS.SMMS.M', 'S.......S']);
   // ---------------------------------------------------------------- time
   function minutesOfDay(now) { const d = new Date(now); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60 + d.getMilliseconds() / 60000; }
   function stageAt(m) { let id = 'night'; for (let i = 0; i < STAGES.length; i++) if (m >= STAGES[i][1]) id = STAGES[i][0]; return id; }
