@@ -690,7 +690,8 @@ const EntityLV1 = (function () {
       const SURF = 80;                                   // y of the water surface
   const UW  = ramp(['#102a30', '#17363c', '#20444a', '#2c5559', '#3b6a66', '#528379']);   // soil seen through water
   const UWG = ramp(['#2b5b47', '#3a7355', '#4f8c5f']);                                    // underwater green
-  const PADS = [[170, 14]];                                // pad centre x, width
+    const PADS = [[144, 14, 106]];                           // pad centre x, width, waterline y (open water, mid-depth)
+  function padSY(p) { return p.length > 2 ? p[2] : surfY(p[0]); }   // y of the water line the pad floats on                                // pad centre x, width
   function groundY(x) {   // soil surface: gentle on land, steepening under the water
     const n = (fbm(x * 0.08, 3, 4) - 0.5) * 3;
                 const y = x <= 80 ? 66 + 14 * Math.pow(x / 80, 1.7) + Math.sin(x * 0.21) * 0.9 : SURF + 76 * Math.pow((x - 80) / 34, 1.5);
@@ -749,34 +750,45 @@ const EntityLV1 = (function () {
       put(back, x, y, HAZE[clamp(Math.floor(t), 0, 7)]);
     }
     despeckle(back, 0, 0, W - 1, SURF + 2);
-    // 2) the farthest edge of the garden: a faint, pale line of lawn right on the horizon
-    for (let x = 82; x < W; x++) {
-      const o = hash2(x >> 4, 1, 7) < 0.35 ? 1 : 0;
-      for (let y = SURF - 8 + o; y <= SURF - 7; y++) put(far2, x, y, y === SURF - 8 + o ? SAGE1[4] : SAGE1[3]);
+        // 2) the far shore: one very thin, low strip of natural grass at water level (a dark lip, a single mid-tone row,
+    //    and a few quiet blades); nothing rises above it and nothing lies behind it but the haze
+    for (let x = 84; x < W; x++) {
+      const sy = surfY(x), n = vnoise(x * 0.16, 3, 61), n2 = vnoise(x * 0.5, 9, 63);
+      const h = n > 0.62 ? 2 : n > 0.3 ? 1 : 0;                                                    // organic: long low runs, a few slightly taller
+      put(mid, x, sy - 1, SAGE4[2]);                                                               // dark lip at the water
+      put(mid, x, sy - 2, n2 > 0.55 ? SAGE3[4] : SAGE3[3]);                                        // the grass itself, one row
+      if (h >= 1 && n2 > 0.28) put(mid, x, sy - 3, SAGE3[h > 1 ? 5 : 4]);                          // a second, broken row
+      if (h > 1 && n2 > 0.72) put(mid, x, sy - 4, SAGE3[5]);                                       // an occasional lit blade tip
     }
-    // 3) a slightly deeper, still hazy band of lawn just in front of it
-    for (let x = 82; x < W; x++) { put(far1, x, SURF - 6, SAGE2[4]); put(far1, x, SURF - 5, SAGE2[3]); }
-    // 4) the trimmed grass strip along the far end of the pond: lit clipped edge, even mowing stripes, a dark lip at the water
-    for (let x = 82; x < W; x++) {
-      const st = (Math.floor(x / 5) & 1) ? 4 : 3;
-      put(mid, x, SURF - 4, SAGE3[5]);
-      put(mid, x, SURF - 3, SAGE3[st]);
-      put(mid, x, SURF - 2, SAGE3[st]);
-      put(mid, x, SURF - 1, SAGE3[st - 1]);
-      put(mid, x, SURF, SAGE4[2]);
-      put(mid, x, SURF + 1, SAGE4[0]);
-    }
-    for (let x = 90; x < W - 4; x += 17 + Math.floor(rm() * 9)) { put(mid, x, SURF - 5, SAGE3[4]); put(mid, x + 1, SURF - 5, SAGE3[5]); put(mid, x + 1, SURF - 6, SAGE3[5]); }   // a few blades breaking the clipped edge
+    despeckle(mid, 84, SURF - 6, W - 1, SURF);
   }
 
-  function sideTrees(L) {
-    // sparse, low shrubs and a few quiet stones resting on the strip
-    [[108, 5, 2], [148, 6, 3], [196, 5, 2], [238, 5, 2]].forEach(function (m, i) {
-      gMound(L, m[0], SURF - 2, m[1], m[2], SAGE4, 2210 + i);
-    });
-    gStone(L, 128, SURF - 2, 3, 1, 2221);
-    gStone(L, 220, SURF - 2, 4, 2, 2222);
-    gStone(L, 96, SURF - 2, 2, 1, 2223);
+    function sideTrees(L) {
+    // one tree growing beside the pond, just beyond the right edge: only a sliver of trunk, two slim branches and a
+    // few small, muted clumps of foliage reach into the frame (high and to the side, clear of the pond and the far shore)
+    const FOL = [LEAF[0], LEAF[1], LEAF[2], LEAF[3], LEAF[4], LEAF[5]];
+    function limb(x0, y0, x1, y1, w0, w1, sag) {                                                    // a tapering branch, lit on top
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2;
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t + Math.sin(t * 3.1416) * sag, w = Math.max(1, Math.round(w0 + (w1 - w0) * t));
+        for (let j = 0; j < w; j++) put(L, x, y + j - Math.floor(w / 2), BARK[w === 1 ? 2 : j === 0 ? 4 : j === w - 1 ? 1 : 3]);
+      }
+    }
+    const SY = SURF - 1, TL = W - 5;                                                                // the trunk's foot, at the far shore
+    for (let y = 26; y <= SY; y++) {                                                                // trunk: shaded left, lit right, mostly out of frame
+      const left = Math.round(TL - (SY - y) * 0.03 - Math.sin(y * 0.17) * 0.6) - (y > SY - 3 ? 1 : 0);
+      for (let x = left; x < W; x++) {
+        const k = x - left, ridge = vnoise(k * 1.7, y * 0.2, 71);
+        put(L, x, y, k === 0 ? BARK[0] : k === 1 ? BARK[1] : k >= 4 ? BARK[4] : ridge > 0.64 ? BARK[3] : ridge < 0.3 ? BARK[1] : BARK[2]);
+      }
+    }
+    limb(TL + 1, 36, 218, 22, 3, 1, -3);                                                            // the main branch, rising to the left
+    limb(TL + 1, 53, 230, 49, 2, 1, 2);                                                             // a lower, slimmer branch
+    limb(238, 29, 232, 13, 2, 1, 0);                                                                // a twig off the main branch
+    leafMass(L, 235, 21, 12, 4, FOL, 7001, { count: 5, rmin: 3, rmax: 4, top: 0.4 });
+    leafMass(L, 249, 12, 7, 5, FOL, 7002, { count: 5, rmin: 3, rmax: 5, top: 0.4 });
+    leafMass(L, 222, 22, 5, 2, FOL, 7003, { count: 3, rmin: 2, rmax: 3, top: 0.4 });
+    leafMass(L, 236, 49, 6, 2, FOL, 7004, { count: 3, rmin: 2, rmax: 3, top: 0.4 });
   }
   
   
@@ -914,7 +926,7 @@ const EntityLV1 = (function () {
       const c1 = at(L, x, sy + 1); if (c1) put(L, x, sy + 1, shade(c1, 1));
     }
     PADS.forEach(function (p) {                                                                     // shadow under each pad, then rings either side
-      const sy = surfY(p[0]), rx = Math.round(p[1] / 2);
+            const sy = padSY(p), rx = Math.round(p[1] / 2);
       for (let dy = 1; dy <= 3; dy++) for (let dx = -rx + dy; dx <= rx - dy; dx++) { const c = at(L, p[0] + dx, sy + dy); if (c) put(L, p[0] + dx, sy + dy, shade(c, dy === 1 ? -3 : -2)); }
       for (let k = 2; k < 2; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 1); if (c) put(L, x, sy + 1, shade(c, k % 2 ? 2 : 1)); }
       for (let k = 4; k < 4; k++) for (let sgn = -1; sgn <= 1; sgn += 2) { const x = p[0] + sgn * (rx + k), c = at(L, x, sy + 2); if (c && k % 3) put(L, x, sy + 2, shade(c, 1)); }
@@ -929,7 +941,7 @@ const EntityLV1 = (function () {
   function sidePads(L) {
     const N = 7;
     PADS.forEach(function (p, i) {
-      const cx = p[0], rx = Math.round(p[1] / 2), ry = Math.max(3, Math.round(p[1] / 9)), fy = surfY(cx) - 3;
+            const cx = p[0], rx = Math.round(p[1] / 2), ry = Math.max(3, Math.round(p[1] / 9)), fy = padSY(p) - 3;
       for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
         const e = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (vnoise(dx * 0.5 + i * 9, dy, 5) - 0.5) * 0.14;
         if (e > 1 || (dx > rx * 0.45 && Math.abs(dy) <= 0 && dx < rx * 0.95)) continue;
@@ -993,8 +1005,8 @@ const EntityLV1 = (function () {
       const x = 104 + Math.floor(r() * 12), base = groundY(x), len = 8 + Math.floor(r() * 9);
       for (let t = 0; t < len; t++) { const px = x + Math.round(Math.sin(t * 0.45 + n) * 1.6); put(L, px, base - t, UWG[t > len * 0.6 ? 2 : 1]); if (t % 3 === 1 && t < len - 2) put(L, px + 1, base - t, UWG[0]); }
     }
-    PADS.forEach(function (p, i) {                                       // pad stems reaching down
-      const len = 8 + (i % 3) * 5, sy = surfY(p[0]);
+            PADS.forEach(function (p, i) {                                       // pad stems reaching down
+      const len = 8 + (i % 3) * 5, sy = padSY(p);
       for (let t = 1; t <= len; t++) put(L, p[0] - 3 + i + Math.round(Math.sin(t * 0.4 + i) * 1.2), sy + t, UWG[t > len - 3 ? 0 : 1]);
     });
   }
