@@ -26,7 +26,7 @@ const EntityEnvironment = (function () {
   const SLOW_TICK_MS = 20000;
     const FRAME_MS = 40;                                         // ~25 fps while animating
     // Fireflies: small, warm and unhurried. They are about from 19:00 until first light and are re-seeded without end.
-  const FF_FROM_H = 19, FF_UNTIL_H = 5.5, FF_MAX = 6;
+    const FF_FROM_H = 19, FF_UNTIL_H = 5.5, FF_MAX = 16;
   const FF_ZONES = [                                           // fractions of the scene; z = depth (0 far .. 1 near); w = share of new fireflies
     { w: 0.26, x0: 0.62, x1: 0.97, y0: 0.20, y1: 0.50, z0: 0.15, z1: 0.75 },   // beneath the right-side tree
     { w: 0.30, x0: 0.36, x1: 0.97, y0: 0.44, y1: 0.55, z0: 0.05, z1: 0.45 },   // along the far shoreline
@@ -422,12 +422,24 @@ const EntityEnvironment = (function () {
 
     // Fireflies. The frog reads this same list (api.state.entityFireflies) through its own catch system.
     const ff = [];
-    let ffNextAt = 0, ffTarget = 5, ffRetargetAt = 0, ffLast = 0;
+        let ffNextAt = 0, ffTarget = 12, ffRetargetAt = 0, ffLast = 0;
     function ffZone(f) { const Z = f.Z; return { x0: Z.x0 * SW, x1: Z.x1 * SW, y0: Z.y0 * SH, y1: Z.y1 * SH }; }
+        function ffCrowd(x, y, self) {                                         // true when another firefly is already close to this spot
+      const d = SW * 0.06, d2 = d * d;
+      for (let i = 0; i < ff.length; i++) {
+        const o = ff[i]; if (o === self || o.eaten) continue;
+        const dx = x - o.x, dy = (y - o.y) * 2;
+        if (dx * dx + dy * dy < d2) return true;
+      }
+      return false;
+    }
     function ffAnchor(f, now) {
       const z = ffZone(f);
-      f.ax = Math.max(z.x0, Math.min(z.x1, f.bx + rnd(-30, 30)));
-      f.ay = Math.max(z.y0, Math.min(z.y1, f.by + rnd(-9, 9)));
+      for (let n = 0; n < 4; n++) {                                        // a few tries to drift somewhere uncrowded
+        f.ax = Math.max(z.x0, Math.min(z.x1, f.bx + rnd(-30, 30)));
+        f.ay = Math.max(z.y0, Math.min(z.y1, f.by + rnd(-9, 9)));
+        if (!ffCrowd(f.ax, f.ay, f)) break;
+      }
       f.reAt = now + rnd(4500, 10000);
     }
     function ffPlace(f, now) {
@@ -442,7 +454,10 @@ const EntityEnvironment = (function () {
         s1: rnd(0, 6.28), s2: rnd(0, 6.28), s3: rnd(0, 6.28), s4: rnd(0, 6.28), w1: rnd(1.7, 2.7), w2: rnd(0.3, 0.55), w3: rnd(0.16, 0.3),
         bx: 0, by: 0, ax: 0, ay: 0, reAt: 0, x: 0, y: 0, vis: 0, glow: 0, caught: false, eaten: false, eatAt: 0 };
       const z = ffZone(f);
-      f.bx = rnd(z.x0, z.x1); f.by = rnd(z.y0, z.y1);
+            for (let n = 0; n < 8; n++) {                                        // start away from the others; later tries are accepted if the zone is full
+        f.bx = rnd(z.x0, z.x1); f.by = rnd(z.y0, z.y1);
+        if (!ffCrowd(f.bx, f.by, f)) break;
+      }
       ffAnchor(f, now); ffPlace(f, now); ff.push(f);
     }
     function ffStep(now) {
@@ -467,11 +482,11 @@ const EntityEnvironment = (function () {
         f.vis = smooth(fin) * smooth(fout) * smooth(gap);
         f.glow = 0.34 + 0.66 * Math.pow(p, 1.5) * (0.6 + 0.4 * q);                                               // gentle, irregular pulse
       }
-      if (now >= ffRetargetAt) { ffTarget = Math.random() < 0.12 ? 4 : (Math.random() < 0.5 ? 6 : 5); ffRetargetAt = now + rnd(50000, 140000); }
+            if (now >= ffRetargetAt) { ffTarget = Math.random() < 0.15 ? 10 : (Math.random() < 0.5 ? 13 : 12); ffRetargetAt = now + rnd(50000, 140000); }
       const want = Math.min(FF_MAX, Math.ceil(ffTarget * win - 0.001));
       if (win > 0.05 && dark < 0.5 && live < want && ff.length < FF_MAX && now >= ffNextAt) {
         ffSpawn(now);
-        ffNextAt = now + (Math.random() < 0.3 ? rnd(900, 2400) : rnd(3200, 11000));
+                ffNextAt = now + (live < want - 3 ? rnd(500, 1400) : (Math.random() < 0.45 ? rnd(800, 2200) : rnd(2000, 5200)));
       }
       return ff.length > 0;
     }
@@ -484,12 +499,25 @@ const EntityEnvironment = (function () {
         if (f.eaten || (f.caught && f.eatAt && now >= f.eatAt)) continue;  // eaten: no light is left behind
         const a = f.vis * f.glow * nk * veil; if (a < 0.02) continue;
         const x = Math.round(f.x), y = Math.round(f.y);
-        if (x < 0 || y < 0 || x >= SW || y >= SH) continue;
-        if (f.z > 0.3) {                                                   // a faint warm halo, only on the nearer ones
+                if (x < 0 || y < 0 || x >= SW || y >= SH) continue;
+        {                                                                  // soft warm pool of light: brightest at the firefly, easing out into the scenery
+          const tt = now / 1000;
+          const br = 0.88 + 0.12 * Math.sin(tt * f.w2 * 2.3 + f.s4 * 1.9) + 0.06 * Math.sin(tt * f.w1 * 0.7 + f.s2);   // slow, irregular swell
+          const r = SH * (0.05 + 0.035 * f.z) * br, ga = a * (0.16 + 0.10 * f.z);
+          const rg = g.createRadialGradient(x, y, 0, x, y, r);
+          rg.addColorStop(0, 'rgba(255,214,120,' + ga.toFixed(3) + ')');
+          rg.addColorStop(0.2, 'rgba(255,196,92,' + (ga * 0.62).toFixed(3) + ')');
+          rg.addColorStop(0.5, 'rgba(255,180,70,' + (ga * 0.2).toFixed(3) + ')');
+          rg.addColorStop(0.78, 'rgba(255,170,60,' + (ga * 0.055).toFixed(3) + ')');
+          rg.addColorStop(1, 'rgba(255,170,60,0)');
+          g.globalAlpha = 1; g.fillStyle = rg;
+          g.fillRect(x - Math.ceil(r), y - Math.ceil(r), Math.ceil(r) * 2 + 1, Math.ceil(r) * 2 + 1);
+        }
+        if (f.z > 0.3) {                                                   // a faint warm halo, only on the nearer ones                                                   // a faint warm halo, only on the nearer ones
           g.fillStyle = 'rgb(255,186,64)'; g.globalAlpha = a * (0.07 + 0.11 * f.z);
           g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1); g.fillRect(x, y - 1, 1, 1); g.fillRect(x, y + 1, 1, 1);
         }
-        g.fillStyle = 'rgb(255,236,170)'; g.globalAlpha = Math.min(0.92, a * (0.55 + 0.4 * f.z));
+                g.fillStyle = 'rgb(255,242,182)'; g.globalAlpha = Math.min(0.95, a * (0.68 + 0.4 * f.z));
         g.fillRect(x, y, 1, 1);
       }
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
