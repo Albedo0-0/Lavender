@@ -709,26 +709,11 @@ const EntityLV1 = (function () {
     }
   }
 
-    // =====================================================================================================
-  // Open garden background: layered sage lawns, trimmed hedges, low shrubs and a few quiet stones. Depth comes
-  // from the layers themselves: pale and soft far away, deeper and crisper toward the water. Light is upper right.
+      // =====================================================================================================
+  // Open garden shoreline, seen from water level. The horizon sits just above the water: the far end of the pond
+  // ends in a thin, low strip of neatly trimmed grass (no hills, no tall trees), with a few quiet details on it.
   // =====================================================================================================
-  function gRidge(x, base, amp, k) {
-    return Math.round(base + Math.sin(x * 0.043 + k) * amp + Math.sin(x * 0.097 + k * 2.3) * amp * 0.45 + Math.sin(x * 0.017 + k * 0.7) * amp * 0.6);
-  }
-  // a rolling lawn strip: lit crest, flat body tones in clean contour bands, deeper toward the foot; slopes facing the light are a tone brighter
-  function gTerrain(L, tones, top, bottom) {
-    const T = tones.length;
-    for (let x = 0; x < W; x++) {
-      const t0 = top(x), lit = top(x + 1) > t0, shaded = top(x + 1) < t0;
-      for (let y = t0; y <= bottom; y++) {
-        const d = y - t0;
-        const t = d === 0 ? (shaded ? T - 2 : T - 1) : d === 1 ? (lit ? T - 1 : T - 2) : d < 8 ? T - 3 : d < 15 ? T - 4 : T - 5;
-        put(L, x, y, tones[clamp(t, 0, T - 1)]);
-      }
-    }
-  }
-  // a low, rounded shrub: lit upper right, shaded left and base, a bright rim and a few clipped-leaf gaps
+  // a low, rounded shrub: lit upper right, shaded left and base, a bright rim
   function gMound(L, cx, by, rx, ry, tones, seed) {
     const T = tones.length;
     for (let dy = -ry; dy <= 0; dy++) for (let dx = -rx; dx <= rx; dx++) {
@@ -740,32 +725,6 @@ const EntityLV1 = (function () {
       if (e > 0.78 && ey < -0.5 && ex > -0.2) t = T - 1;
       if (dy === 0) t = T - 5;
       put(L, cx + dx, by + dy, tones[clamp(t, 0, T - 1)]);
-    }
-    for (let k = 0; k < 2; k++) {
-      const gx = cx + Math.round((hash2(seed, k, 3) - 0.5) * rx * 1.1), gy = by - 1 - Math.round(hash2(k, seed, 4) * ry * 0.6);
-      if (at(L, gx, gy) && at(L, gx + 1, gy)) { put(L, gx, gy, tones[clamp(T - 4, 0, T - 1)]); put(L, gx + 1, gy, tones[clamp(T - 4, 0, T - 1)]); }
-    }
-  }
-  // a clipped hedge row following the lawn crest: squared body, tapered ends, lit top, shaded foot
-  function gHedgeRow(L, x0, x1, top, h, tones) {
-    const T = tones.length, n = x1 - x0;
-    for (let i = 0; i <= n; i++) {
-      const x = x0 + i, cap = Math.min(i, n - i), inset = cap === 0 ? 2 : cap === 1 ? 1 : 0, ty = top(x);
-      for (let j = inset; j < h; j++) {
-        const t = j === inset ? T - 1 : j === inset + 1 ? T - 2 : j < h - 2 ? T - 3 : T - 4;
-        put(L, x, ty + j, tones[clamp(t, 0, T - 1)]);
-      }
-    }
-  }
-  // a neatly mown lawn patch: tapered ends, a lit rim, evenly alternating mowing stripes, a shaded foot
-  function gLawn(L, x0, w, top, h, tones, stripe) {
-    const T = tones.length;
-    for (let i = 0; i < w; i++) {
-      const edge = Math.min(i, w - 1 - i), inset = edge === 0 ? 2 : edge < 3 ? 1 : 0;
-      for (let j = inset; j < h; j++) {
-        const t = j === inset ? T - 1 : j === h - 1 ? T - 4 : ((Math.floor((x0 + i) / stripe) & 1) ? T - 2 : T - 3);
-        put(L, x0 + i, top + j, tones[clamp(t, 0, T - 1)]);
-      }
     }
   }
   // a smooth garden stone resting on the lawn: lit top and right, shaded left and base, soft contact shadow
@@ -783,50 +742,44 @@ const EntityLV1 = (function () {
   }
 
   function sideBack(back, far2, far1, mid) {
-    const r = rng(2101), rm = rng(2180);
-    // 1) the sky and its haze: one open, airy glow with soft flat bands of mist (no halftone grain)
+    const rm = rng(2180);
+    // 1) the sky: an open, airy haze that is palest right at the low horizon, with the glow upper right (flat bands, no grain)
     for (let y = 0; y <= SURF + 2; y++) for (let x = 0; x < W; x++) {
-      const t = 1.7 + clamp(y / 46, 0, 1) * 2.9 + glowAt(x, y) * 1.5 + (fbm(x * 0.02, y * 0.09, 3) - 0.5) * 0.7 + (fbm(x * 0.012, y * 0.22, 19) - 0.5) * 0.4;
+      const t = 1.8 + clamp(y / (SURF - 10), 0, 1) * 3.3 + glowAt(x, y) * 1.3 + (fbm(x * 0.02, y * 0.09, 3) - 0.5) * 0.7 + (fbm(x * 0.012, y * 0.22, 19) - 0.5) * 0.4;
       put(back, x, y, HAZE[clamp(Math.floor(t), 0, 7)]);
     }
     despeckle(back, 0, 0, W - 1, SURF + 2);
-    // 2) the farthest lawn: a pale, soft ridge with a few distant shrub mounds
-    gTerrain(far2, SAGE1, function (x) { return gRidge(x, 40, 3, 1.1); }, SURF + 1);
-    for (let x = 9; x < W; x += 16 + Math.floor(r() * 10)) gMound(far2, x, gRidge(x, 40, 3, 1.1) + 2, 3 + Math.floor(r() * 3), 2 + Math.floor(r() * 2), SAGE1, 2160 + x);
-    [[18, 42], [116, 140], [198, 226]].forEach(function (h) { gHedgeRow(far2, h[0], h[1], function (x) { return gRidge(x, 40, 3, 1.1) - 1; }, 5, SAGE1); });
-    // 3) the far garden: a second ridge with trimmed hedge blocks and a few rounded shrubs
-    gTerrain(far1, SAGE2, function (x) { return gRidge(x, 53, 3, 2.4); }, SURF + 1);
-    [[3, 36], [90, 128], [146, 174], [194, 238]].forEach(function (h) {
-      gHedgeRow(far1, h[0], h[1], function (x) { return gRidge(x, 53, 3, 2.4) - 2; }, 8, SAGE2.slice(0, 5));
-    });
-    [[66, 6, 4], [136, 6, 4], [184, 6, 4], [248, 6, 4]].forEach(function (m, i) {
-      gMound(far1, m[0], gRidge(m[0], 53, 3, 2.4) + 5, m[1], m[2], SAGE2, 2110 + i);
-    });
-    // 4) the near lawn terrace: neatly mown patches, low shrubs, a quiet stone, and the lip along the far shore
-    gTerrain(mid, SAGE3.slice(0, 6), function (x) { return gRidge(x, 65, 2.2, 3.9); }, SURF + 1);
-    [[20, 30], [94, 34], [146, 30], [200, 40]].forEach(function (p) {
-      gLawn(mid, p[0], p[1], gRidge(p[0] + (p[1] >> 1), 65, 2.2, 3.9) + 3, 6, SAGE3, 4);
-    });
-    [[8, 6, 4], [22, 8, 5], [44, 7, 4], [60, 8, 5], [76, 7, 4]].forEach(function (m, i) {    // low shrubs on the left bank, resting on the turf
-      gMound(mid, m[0], groundY(m[0]) - 1, m[1], m[2], SAGE4, 3100 + i);
-    });
-    [[92, 5, 3], [127, 6, 4], [180, 5, 3], [233, 6, 4]].forEach(function (m, i) {
-      gMound(mid, m[0], gRidge(m[0], 65, 2.2, 3.9) + 9, m[1], m[2], SAGE4, 3150 + i);
-    });
-    gStone(mid, 148, gRidge(148, 65, 2.2, 3.9) + 10, 3, 2, 3201);
-    gStone(mid, 233, gRidge(233, 65, 2.2, 3.9) + 11, 4, 2, 3202);
-    for (let x = 84; x < W; x++) for (let y = SURF - 2; y <= SURF + 1; y++) put(mid, x, y, y === SURF + 1 ? SAGE4[0] : y === SURF ? SAGE4[1] : y === SURF - 1 ? SAGE4[2] : SAGE4[3]);
-    for (let x = 90; x < W - 4; x += 15 + Math.floor(rm() * 9)) tuft(mid, x, SURF - 3, 4, [SAGE4[3], SAGE4[4], SAGE4[5], SAGE4[6]], 3300 + x, 0);
+    // 2) the farthest edge of the garden: a faint, pale line of lawn right on the horizon
+    for (let x = 82; x < W; x++) {
+      const o = hash2(x >> 4, 1, 7) < 0.35 ? 1 : 0;
+      for (let y = SURF - 8 + o; y <= SURF - 7; y++) put(far2, x, y, y === SURF - 8 + o ? SAGE1[4] : SAGE1[3]);
+    }
+    // 3) a slightly deeper, still hazy band of lawn just in front of it
+    for (let x = 82; x < W; x++) { put(far1, x, SURF - 6, SAGE2[4]); put(far1, x, SURF - 5, SAGE2[3]); }
+    // 4) the trimmed grass strip along the far end of the pond: lit clipped edge, even mowing stripes, a dark lip at the water
+    for (let x = 82; x < W; x++) {
+      const st = (Math.floor(x / 5) & 1) ? 4 : 3;
+      put(mid, x, SURF - 4, SAGE3[5]);
+      put(mid, x, SURF - 3, SAGE3[st]);
+      put(mid, x, SURF - 2, SAGE3[st]);
+      put(mid, x, SURF - 1, SAGE3[st - 1]);
+      put(mid, x, SURF, SAGE4[2]);
+      put(mid, x, SURF + 1, SAGE4[0]);
+    }
+    for (let x = 90; x < W - 4; x += 17 + Math.floor(rm() * 9)) { put(mid, x, SURF - 5, SAGE3[4]); put(mid, x + 1, SURF - 5, SAGE3[5]); put(mid, x + 1, SURF - 6, SAGE3[5]); }   // a few blades breaking the clipped edge
   }
 
   function sideTrees(L) {
-    // the nearest garden layer, sitting on the far shore: sparse, low shrubs and two quiet stones
-    [[104, 8, 4], [142, 9, 5], [196, 8, 4], [238, 7, 4]].forEach(function (m, i) {
-      gMound(L, m[0], SURF - 1, m[1], m[2], SAGE4, 2210 + i);
+    // sparse, low shrubs and a few quiet stones resting on the strip
+    [[108, 5, 2], [148, 6, 3], [196, 5, 2], [238, 5, 2]].forEach(function (m, i) {
+      gMound(L, m[0], SURF - 2, m[1], m[2], SAGE4, 2210 + i);
     });
-    gStone(L, 124, SURF - 1, 5, 3, 2221);
-    gStone(L, 216, SURF - 1, 4, 2, 2222);
+    gStone(L, 128, SURF - 2, 3, 1, 2221);
+    gStone(L, 220, SURF - 2, 4, 2, 2222);
+    gStone(L, 96, SURF - 2, 2, 1, 2223);
   }
+  
+  
 
   // a stone set into the soil: lit upper right, dark outline against the earth, moss on top, lichen
   function soilStone(L, cx, cy, rx, ry, seed) {
