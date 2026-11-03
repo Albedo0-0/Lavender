@@ -136,7 +136,9 @@ const EntityEnvironment = (function () {
     let simT = 0;                        // seconds of simulated rain time (advances only while frames run)
     const drops = [];
     const fx = [];                       // live ripples and splashes
-    let rafId = 0, timerId = 0, lastDraw = 0, lastStep = 0;
+        let rafId = 0, timerId = 0, lastDraw = 0, lastStep = 0;
+    const actors = [];                   // LV1-only actors (the frog) that ride this one clock, scheduler and redraw
+    let actorDirty = false, lastSlowDraw = 0;
     const surf = buildSurface(api);      // where water, pad and land are (read from the pack's layers, never modified)
 
     function hidden() { try { return !!document.hidden; } catch (e) { return false; } }
@@ -159,7 +161,8 @@ const EntityEnvironment = (function () {
       if (now >= rain.next) startEvent(now);   // first activation, or resume after a gap: one event, never a replay
       rainI = intensityAt(now);
       cloudV = cloudAt(now);
-      dark = cloudV * (0.78 + 0.22 * rainI);
+            dark = cloudV * (0.78 + 0.22 * rainI);
+      for (let i = 0; i < actors.length; i++) { try { if (actors[i].update(now)) actorDirty = true; } catch (e) { /* an actor can never stop the scene */ } }
     }
     function cloudAt(now) {                    // the sky closes in ahead of the rain and clears slowly afterwards
       if (now < rain.start) return 0;
@@ -206,7 +209,9 @@ const EntityEnvironment = (function () {
         addFx(1, p.x, y, 2.5 + 6 * w + Math.random() * 1.5, 1);
       } else addFx(2, p.x, y, 0, p.kind === 2 ? 1 : 0.7);               // pad / leaves / stone: a tiny splash
     }
-    function busy() { return rainI > 0.001 || fx.length > 0; }
+        function rainBusy() { return rainI > 0.001 || fx.length > 0; }
+    function actorBusy() { for (let i = 0; i < actors.length; i++) { try { if (actors[i].busy()) return true; } catch (e) { /* ignore */ } } return false; }
+    function busy() { return rainBusy() || actorBusy(); }
     function step(dt) {
       ensureDrops();
       simT += dt;
@@ -253,6 +258,8 @@ const EntityEnvironment = (function () {
       const now = Date.now();
       if (now - lightStamp > 4000 || now < lightStamp) { lightAt(localHours(new Date(now)), L); lightStamp = now; }
       const I = rainI, D = dark, lum = (L[0] + L[1] + L[2]) / 3, b = 0.45 + 0.55 * lum;
+            // 0) actors (the frog) are painted first, so the light below is applied to them like to everything else
+      for (let i = 0; i < actors.length; i++) { g.save(); try { actors[i].draw(g); } catch (e) { /* an actor can never stop the scene */ } g.restore(); }
       // 1) ambient light. Overcast darkens and cools the whole scene, takes the glow away and greys the sky.
       g.globalCompositeOperation = 'multiply';
       g.fillStyle = rgb(L[0] * (1 - 0.30 * D) * 255, L[1] * (1 - 0.24 * D) * 255, L[2] * (1 - 0.16 * D) * 255);
@@ -324,7 +331,8 @@ const EntityEnvironment = (function () {
       const now = Date.now();
             let wait = (cloudV > 0 && cloudV < 1) ? 1000 : SLOW_TICK_MS;
       if (rain.next > now) wait = Math.min(wait, Math.max(250, rain.next - now));
-      if (rain.end > now) wait = Math.min(wait, Math.max(250, rain.end - now + 50));
+            if (rain.end > now) wait = Math.min(wait, Math.max(250, rain.end - now + 50));
+      if (!hidden()) for (let i = 0; i < actors.length; i++) { try { wait = Math.min(wait, actors[i].wakeIn(now)); } catch (e) { /* ignore */ } }
       timerId = api.setTimeout(slow, wait);
     }
     function frame(t) {
@@ -334,25 +342,38 @@ const EntityEnvironment = (function () {
       const dt = lastStep ? Math.min(0.1, (now - lastStep) / 1000) : FRAME_MS / 1000;
       lastStep = now; lastDraw = t;
       evaluate(now);
-            if (busy()) step(dt);
+            if (rainBusy()) step(dt);
       api.redrawEnvironment();
             if (busy() && !hidden()) rafId = api.requestFrame(frame); else { lastStep = 0; schedule(); }
     }
-    function slow() {
+        function slow() {
       timerId = 0;
+      const now = Date.now();
+      evaluate(now);
+      if (actorDirty || now - lastSlowDraw >= 900) { actorDirty = false; lastSlowDraw = now; api.redrawEnvironment(); }
+      schedule();
+    }
+    function wake() {                        // an actor (click, music change) asks for an immediate look
+      if (!api.alive()) return;
       evaluate(Date.now());
+      actorDirty = false; lastSlowDraw = Date.now();
       api.redrawEnvironment();
       schedule();
     }
     function resume() {
       if (!api.alive()) return;
-      lightStamp = -1e9; lastStep = 0;
+            lightStamp = -1e9; lastStep = 0;
+      for (let i = 0; i < actors.length; i++) { try { actors[i].resume(Date.now()); } catch (e) { /* ignore */ } }
       evaluate(Date.now());
       api.redrawEnvironment();
       schedule();
     }
 
-    api.setOverlay(overlay);
+        api.setOverlay(overlay);
+    api.state.entityEnvironment = {
+      addActor: function (actor) { actors.push(actor); wake(); return function () { const i = actors.indexOf(actor); if (i >= 0) actors.splice(i, 1); }; },
+      wake: wake
+    };
     api.on(document, 'visibilitychange', function () { if (!hidden()) resume(); });
     api.on(window, 'pageshow', resume);
          api.addDisposer(function () { drops.length = 0; fx.length = 0; });
