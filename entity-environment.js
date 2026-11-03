@@ -25,6 +25,15 @@ const EntityEnvironment = (function () {
   const MAX_DROPS = 84;
   const SLOW_TICK_MS = 20000;
     const FRAME_MS = 40;                                         // ~25 fps while animating
+    // Fireflies: small, warm and unhurried. They are about from 19:00 until first light and are re-seeded without end.
+  const FF_FROM_H = 19, FF_UNTIL_H = 5.5, FF_MAX = 6;
+  const FF_ZONES = [                                           // fractions of the scene; z = depth (0 far .. 1 near); w = share of new fireflies
+    { w: 0.26, x0: 0.62, x1: 0.97, y0: 0.20, y1: 0.50, z0: 0.15, z1: 0.75 },   // beneath the right-side tree
+    { w: 0.30, x0: 0.36, x1: 0.97, y0: 0.44, y1: 0.55, z0: 0.05, z1: 0.45 },   // along the far shoreline
+    { w: 0.28, x0: 0.42, x1: 0.68, y0: 0.47, y1: 0.66, z0: 0.50, z1: 0.95 },   // across the pond, near the lily pad
+    { w: 0.16, x0: 0.38, x1: 0.88, y0: 0.56, y1: 0.72, z0: 0.40, z1: 0.90 }    // low over open water
+  ];
+  const SWAY_TREE_X = 0.58;                                    // foliage right of this fraction of the scene belongs to the right-side tree
   const MAX_FX = 40;                                           // live ripples + splashes
   const WATER_BAND = 46;                                       // rows below the far shoreline where drops land on the water
   const CLOUD_IN_MS = 150000, CLOUD_OUT_MS = 240000;           // overcast builds before the rain peaks and lingers after it                                         // ~25 fps while raining
@@ -91,6 +100,14 @@ const EntityEnvironment = (function () {
   }
   function smooth(x) { return x * x * (3 - 2 * x); }
 
+  function cl01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function ffWindow(h) {                                       // 0..1: how open the firefly hours are (in from 19:00, out toward first light)
+    if (h >= FF_FROM_H) return cl01((h - FF_FROM_H) / 0.5);
+    if (h < FF_UNTIL_H) return cl01((FF_UNTIL_H - h) / 0.8);
+    return 0;
+  }
+
   // Reads the pack's own painted layers (read-only) to learn where the open water, the lily pad and the land are, so
   // rain can land on each correctly. Returns null if anything is missing; rain then simply falls without landing effects.
   function buildSurface(api) {
@@ -122,6 +139,51 @@ const EntityEnvironment = (function () {
       let path = null;
       if (typeof Path2D !== 'undefined') { path = new Path2D(); for (let i = 0; i < runs.length; i += 3) path.rect(runs[i], runs[i + 1], runs[i + 2], 1); }
       return { mask: mask, top: top, bot: bot, cols: cols, land: land, pad: pad, groundTop: groundTop, runs: runs, path: path };
+    } catch (e) { return null; }
+  }
+
+  // Reads the pack's painted layers (read-only) to find the right-side tree's leaves and the distant shore grass, and
+  // turns them into thin clip bands. The overlay slides the artwork one pixel sideways inside a band now and then.
+  function buildSway(api) {
+    try {
+      if (typeof Path2D === 'undefined') return null;
+      const pack = api.pack, SW = api.scene.w;
+      const env = (pack.environments || []).filter(function (e) { return e.id === pack.entry.environment; })[0];
+      if (!env) return null;
+      const bands = [], byKey = {};
+      function bandFor(key, ph, rate, amp) {
+        let b = byKey[key];
+        if (!b) { b = byKey[key] = { path: new Path2D(), ph: ph, rate: rate, amp: amp, s: 0 }; bands.push(b); }
+        return b;
+      }
+      function leaves(frameId, x0, fn) {
+        env.layers.forEach(function (l) {
+          if (l.frame !== frameId) return;
+          const f = pack.frames[l.frame]; if (!f) return;
+          const pal = pack.palettes[f.palette], leaf = {};
+          Object.keys(pal).forEach(function (ch) {
+            let h = String(pal[ch]).slice(1); if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+            leaf[ch] = parseInt(h.slice(2, 4), 16) > parseInt(h.slice(0, 2), 16) + 8;      // green-dominant colours are foliage; bark and soil are not
+          });
+          for (let y = 0; y < f.rows.length; y++) {
+            const row = f.rows[y]; let x = 0;
+            while (x < row.length) {
+              if (!leaf[row.charAt(x)] || l.x + x < x0) { x++; continue; }
+              const s = x; while (x < row.length && leaf[row.charAt(x)]) x++;
+              fn(l.x + s, l.y + y, x - s);
+            }
+          }
+        });
+      }
+      leaves('f_trees', Math.round(SW * SWAY_TREE_X), function (x, y, n) {
+        const k = Math.floor(y / 6);
+        bandFor('t' + k, k * 0.62, 0.46 + (k % 3) * 0.06, 0.74).path.rect(x - 1, y, n + 2, 1);
+      });
+      leaves('f_mid', 84, function (x, y, n) {
+        const k = Math.floor(x / 20);
+        bandFor('g' + k, k * 1.3, 0.7 + (k % 3) * 0.08, 0.7).path.rect(x - 1, y, n + 2, 1);
+      });
+      return bands.length ? bands : null;
     } catch (e) { return null; }
   }
 
@@ -163,6 +225,7 @@ const EntityEnvironment = (function () {
       cloudV = cloudAt(now);
             dark = cloudV * (0.78 + 0.22 * rainI);
       for (let i = 0; i < actors.length; i++) { try { if (actors[i].update(now)) actorDirty = true; } catch (e) { /* an actor can never stop the scene */ } }
+      try { if (ffStep(now)) actorDirty = true; if (swayStep(now)) actorDirty = true; } catch (e) { /* ambience can never stop the scene */ }
     }
     function cloudAt(now) {                    // the sky closes in ahead of the rain and clears slowly afterwards
       if (now < rain.start) return 0;
@@ -258,7 +321,8 @@ const EntityEnvironment = (function () {
       const now = Date.now();
       if (now - lightStamp > 4000 || now < lightStamp) { lightAt(localHours(new Date(now)), L); lightStamp = now; }
       const I = rainI, D = dark, lum = (L[0] + L[1] + L[2]) / 3, b = 0.45 + 0.55 * lum;
-            // 0) actors (the frog) are painted first, so the light below is applied to them like to everything else
+            drawSway(g);                                                        // foliage and distant grass: a barely-there one-pixel sway
+      // 0) actors (the frog) are painted first, so the light below is applied to them like to everything else
       for (let i = 0; i < actors.length; i++) { g.save(); try { actors[i].draw(g); } catch (e) { /* an actor can never stop the scene */ } g.restore(); }
       // 1) ambient light. Overcast darkens and cools the whole scene, takes the glow away and greys the sky.
       g.globalCompositeOperation = 'multiply';
@@ -287,6 +351,19 @@ const EntityEnvironment = (function () {
         g.fillStyle = rg; g.fillRect(-160, -100, 320, 220);
         g.restore();
       }
+      // 1b) night: the water and the far shore lift very slightly, so the pond stays readable with no visible light source
+      const nt = cl01((0.70 - lum) / 0.14) * (1 - 0.8 * D);
+      if (nt > 0.01) {
+        g.globalCompositeOperation = 'screen';
+        if (surf) {
+          g.fillStyle = rgba(70, 118, 134, 0.04 * nt);
+          if (surf.path) g.fill(surf.path);
+          else for (let i = 0; i < surf.runs.length; i += 3) g.fillRect(surf.runs[i], surf.runs[i + 1], surf.runs[i + 2], 1);
+        }
+        const hy0 = Math.round(SH * 0.34), hy1 = Math.round(SH * 0.58), hg = g.createLinearGradient(0, hy0, 0, hy1);
+        hg.addColorStop(0, rgba(96, 140, 150, 0)); hg.addColorStop(0.65, rgba(96, 140, 150, 0.035 * nt)); hg.addColorStop(1, rgba(96, 140, 150, 0));
+        g.fillStyle = hg; g.fillRect(0, hy0, SW, hy1 - hy0);
+      }
       // 2) a hushed, moody air: colours soften, contrast flattens, edges close in, the water settles to a flat sky-grey tone
       if (D > 0.01) {
         g.globalCompositeOperation = 'saturation';
@@ -303,7 +380,8 @@ const EntityEnvironment = (function () {
           else for (let i = 0; i < surf.runs.length; i += 3) g.fillRect(surf.runs[i], surf.runs[i + 1], surf.runs[i + 2], 1);
         }
       }
-      // 3) the rain meeting the scene: ripples on the water, splashes on the pad, leaves and stone
+      drawFireflies(g, now, 0.55 + 0.45 * cl01((0.80 - lum) / 0.20));   // their own light: painted after the ambient light, never dimmed by it
+      // 3) the rain meeting the scene: ripples on the water
       if (fx.length && surf) drawFx(g, b, I);
       // 4) falling drops: they stop exactly where they land
       const n = active();
@@ -321,6 +399,102 @@ const EntityEnvironment = (function () {
       }
     }
 
+    // ---- ambience: barely-there sway in the right-side tree and the distant grass, and the fireflies ----
+    const sway = buildSway(api);
+    let swayKey = '';
+    function swayStep(now) {                       // true when any band has moved since the last look
+      if (!sway) return false;
+      const t = now / 1000; let key = '';
+      for (let i = 0; i < sway.length; i++) {
+        const b = sway[i], s = Math.round(b.amp * Math.sin(t * b.rate + b.ph) * (0.75 + 0.25 * Math.sin(t * 0.09 + 1)));
+        b.s = s; key += s + ',';
+      }
+      if (key === swayKey) return false;
+      swayKey = key; return true;
+    }
+    function drawSway(g) {                         // drawn first, so the frog and the light sit on top of it; the water is never touched
+      if (!sway) return;
+      for (let i = 0; i < sway.length; i++) {
+        const b = sway[i]; if (!b.s) continue;
+        g.save(); g.clip(b.path); g.drawImage(api.envCanvas, b.s, 0); g.restore();
+      }
+    }
+
+    // Fireflies. The frog reads this same list (api.state.entityFireflies) through its own catch system.
+    const ff = [];
+    let ffNextAt = 0, ffTarget = 5, ffRetargetAt = 0, ffLast = 0;
+    function ffZone(f) { const Z = f.Z; return { x0: Z.x0 * SW, x1: Z.x1 * SW, y0: Z.y0 * SH, y1: Z.y1 * SH }; }
+    function ffAnchor(f, now) {
+      const z = ffZone(f);
+      f.ax = Math.max(z.x0, Math.min(z.x1, f.bx + rnd(-30, 30)));
+      f.ay = Math.max(z.y0, Math.min(z.y1, f.by + rnd(-9, 9)));
+      f.reAt = now + rnd(4500, 10000);
+    }
+    function ffPlace(f, now) {
+      const t = now / 1000, k = 0.6 + 0.6 * f.z;                           // nearer ones wander a touch wider
+      f.x = f.bx + (Math.sin(t * 0.9 + f.s1) * 1.4 + Math.sin(t * 0.37 + f.s2) * 2.2) * k;
+      f.y = f.by + (Math.sin(t * 1.1 + f.s3) * 0.8 + Math.sin(t * 0.43 + f.s4) * 1.4) * k;
+    }
+    function ffSpawn(now) {
+      const r = Math.random(); let Z = FF_ZONES[FF_ZONES.length - 1], acc = 0;
+      for (let i = 0; i < FF_ZONES.length; i++) { acc += FF_ZONES[i].w; if (r < acc) { Z = FF_ZONES[i]; break; } }
+      const f = { ff: true, Z: Z, born: now, life: rnd(20000, 46000), fi: rnd(2200, 3800), fo: rnd(2800, 4600), z: rnd(Z.z0, Z.z1),
+        s1: rnd(0, 6.28), s2: rnd(0, 6.28), s3: rnd(0, 6.28), s4: rnd(0, 6.28), w1: rnd(1.7, 2.7), w2: rnd(0.3, 0.55), w3: rnd(0.16, 0.3),
+        bx: 0, by: 0, ax: 0, ay: 0, reAt: 0, x: 0, y: 0, vis: 0, glow: 0, caught: false, eaten: false, eatAt: 0 };
+      const z = ffZone(f);
+      f.bx = rnd(z.x0, z.x1); f.by = rnd(z.y0, z.y1);
+      ffAnchor(f, now); ffPlace(f, now); ff.push(f);
+    }
+    function ffStep(now) {
+      const dt = ffLast ? Math.min(0.25, Math.max(0, (now - ffLast) / 1000)) : 0, t = now / 1000;
+      ffLast = now;
+      const win = ffWindow(localHours(new Date(now)));
+      let live = 0;
+      for (let i = ff.length - 1; i >= 0; i--) {
+        const f = ff[i], age = now - f.born;
+        if (f.eaten || (f.caught && f.eatAt && now >= f.eatAt) || age >= f.life) { ff.splice(i, 1); continue; }   // eaten: gone with its light
+        if (win <= 0.05 && f.life > age + f.fo + 600) f.life = age + f.fo + 600;                                   // first light: let them drift out
+        if (!f.caught) {                                                                                           // a caught firefly holds still for the tongue
+          if (now >= f.reAt) ffAnchor(f, now);
+          const k = Math.min(1, dt * 0.2);
+          f.bx += (f.ax - f.bx) * k; f.by += (f.ay - f.by) * k;
+          ffPlace(f, now);
+          if (age < f.life - f.fo) live++;
+        }
+        const fin = cl01(age / f.fi), fout = cl01((f.life - age) / f.fo);
+        const p = 0.5 + 0.5 * Math.sin(t * f.w1 + f.s1 * 1.7), q = 0.5 + 0.5 * Math.sin(t * f.w2 + f.s2 * 1.3);
+        const gap = cl01((Math.sin(t * f.w3 + f.s3 * 2.1) + 0.8) / 0.55);                                        // now and then it fades out and back in
+        f.vis = smooth(fin) * smooth(fout) * smooth(gap);
+        f.glow = 0.34 + 0.66 * Math.pow(p, 1.5) * (0.6 + 0.4 * q);                                               // gentle, irregular pulse
+      }
+      if (now >= ffRetargetAt) { ffTarget = Math.random() < 0.12 ? 4 : (Math.random() < 0.5 ? 6 : 5); ffRetargetAt = now + rnd(50000, 140000); }
+      const want = Math.min(FF_MAX, Math.ceil(ffTarget * win - 0.001));
+      if (win > 0.05 && dark < 0.5 && live < want && ff.length < FF_MAX && now >= ffNextAt) {
+        ffSpawn(now);
+        ffNextAt = now + (Math.random() < 0.3 ? rnd(900, 2400) : rnd(3200, 11000));
+      }
+      return ff.length > 0;
+    }
+    function drawFireflies(g, now, nk) {
+      if (!ff.length) return;
+      const veil = 1 - 0.85 * dark;                                        // rain and overcast hush them
+      g.globalCompositeOperation = 'screen';
+      for (let i = 0; i < ff.length; i++) {
+        const f = ff[i];
+        if (f.eaten || (f.caught && f.eatAt && now >= f.eatAt)) continue;  // eaten: no light is left behind
+        const a = f.vis * f.glow * nk * veil; if (a < 0.02) continue;
+        const x = Math.round(f.x), y = Math.round(f.y);
+        if (x < 0 || y < 0 || x >= SW || y >= SH) continue;
+        if (f.z > 0.3) {                                                   // a faint warm halo, only on the nearer ones
+          g.fillStyle = 'rgb(255,186,64)'; g.globalAlpha = a * (0.07 + 0.11 * f.z);
+          g.fillRect(x - 1, y, 1, 1); g.fillRect(x + 1, y, 1, 1); g.fillRect(x, y - 1, 1, 1); g.fillRect(x, y + 1, 1, 1);
+        }
+        g.fillStyle = 'rgb(255,236,170)'; g.globalAlpha = Math.min(0.92, a * (0.55 + 0.4 * f.z));
+        g.fillRect(x, y, 1, 1);
+      }
+      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    }
+
     // ---- the single scheduler ----
     function schedule() {
       if (rafId) { api.cancelFrame(rafId); rafId = 0; }
@@ -333,6 +507,11 @@ const EntityEnvironment = (function () {
       if (rain.next > now) wait = Math.min(wait, Math.max(250, rain.next - now));
             if (rain.end > now) wait = Math.min(wait, Math.max(250, rain.end - now + 50));
       if (!hidden()) for (let i = 0; i < actors.length; i++) { try { wait = Math.min(wait, actors[i].wakeIn(now)); } catch (e) { /* ignore */ } }
+      if (!hidden()) {                                                    // ambience: fireflies about ten times a second, foliage twice
+        if (ff.length) wait = Math.min(wait, 100);
+        else if (ffWindow(localHours(new Date(now))) > 0.05) wait = Math.min(wait, Math.max(500, ffNextAt - now));
+        if (sway) wait = Math.min(wait, 500);
+      }
       timerId = api.setTimeout(slow, wait);
     }
     function frame(t) {
@@ -374,9 +553,10 @@ const EntityEnvironment = (function () {
       addActor: function (actor) { actors.push(actor); wake(); return function () { const i = actors.indexOf(actor); if (i >= 0) actors.splice(i, 1); }; },
       wake: wake
     };
+    api.state.entityFireflies = { list: function () { return ff; } };    // read by the frog's existing catch system
     api.on(document, 'visibilitychange', function () { if (!hidden()) resume(); });
     api.on(window, 'pageshow', resume);
-         api.addDisposer(function () { drops.length = 0; fx.length = 0; });
+         api.addDisposer(function () { drops.length = 0; fx.length = 0; ff.length = 0; });
     resume();
   }
 
