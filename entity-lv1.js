@@ -690,7 +690,7 @@ const EntityLV1 = (function () {
       const SURF = 80;                                   // y of the water surface
   const UW  = ramp(['#102a30', '#17363c', '#20444a', '#2c5559', '#3b6a66', '#528379']);   // soil seen through water
   const UWG = ramp(['#2b5b47', '#3a7355', '#4f8c5f']);                                    // underwater green
-    const PADS = [[144, 14, 106]];                           // pad centre x, width, waterline y (open water, mid-depth)
+      const PADS = [[144, 14, 96]];                            // pad centre x, width, waterline y (open water, mid-depth)                           // pad centre x, width, waterline y (open water, mid-depth)
   function padSY(p) { return p.length > 2 ? p[2] : surfY(p[0]); }   // y of the water line the pad floats on                                // pad centre x, width
   function groundY(x) {   // soil surface: gentle on land, steepening under the water
     const n = (fbm(x * 0.08, 3, 4) - 0.5) * 3;
