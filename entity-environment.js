@@ -482,7 +482,7 @@ const EntityEnvironment = (function () {
         f.vis = smooth(fin) * smooth(fout) * smooth(gap);
                 f.glow = 0.55 + 0.45 * Math.pow(p, 1.3) * (0.6 + 0.4 * q);                                               // gentle, irregular pulse
       }
-                  if (now >= ffRetargetAt) { ffTarget = Math.random() < 0.15 ? 14 : (Math.random() < 0.5 ? 17 : 16); ffRetargetAt = now + rnd(50000, 140000); }
+                        if (now >= ffRetargetAt) { ffTarget = Math.random() < 0.15 ? 9 : (Math.random() < 0.5 ? 11 : 10); ffRetargetAt = now + rnd(50000, 140000); }
       const want = Math.min(FF_MAX, Math.ceil(ffTarget * win - 0.001));
       if (win > 0.05 && dark < 0.5 && live < want && ff.length < FF_MAX && now >= ffNextAt) {
         ffSpawn(now);
