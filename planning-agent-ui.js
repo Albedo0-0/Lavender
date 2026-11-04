@@ -2295,11 +2295,11 @@ const PlanningAgentUI = (function () {
 
   function freshState(o) {
     return { from: o.from || '', date: o.date || '', subject: o.subject || '', topicId: o.topicId || '', title: o.title || '', tags: [], subs: [],
-      pop: '', popErr: '', cal: '', err: '', msg: '', done: null, editId: '' };
+            pop: '', popErr: '', cal: '', err: '', msg: '', done: null, editId: '', rev: false };
   }
 
     function blankSub(date) {
-    return { uid: ++subUid, title: '', date: date || '', start: '', end: '', note: '', tags: [], subject: '', topicId: '', open: false, err: '', isNew: true };
+        return { uid: ++subUid, title: '', date: date || '', start: '', end: '', note: '', tags: [], subject: '', topicId: '', open: false, err: '', isNew: true, rev: false };
   }
 
   function holderOf(who) {
@@ -2660,6 +2660,24 @@ const PlanningAgentUI = (function () {
     '</div>';
   }
 
+      // Revision checkbox, Plan Builder only. who: 'p' (the Task) or a subtask uid.
+  function planRevBlocked() {
+    if (!state.editId) return '';
+    const st = PlanningAgent.revisionCycleState('plan', state.editId);
+    return st.available && !st.on ? (st.blocked || '') : '';
+  }
+
+  function builderRevHtml(who) {
+    const h = who === 'p' ? state : holderOf(who);
+    if (!h) return '';
+    const on = !!h.rev, blocked = who === 'p' ? planRevBlocked() : '';
+    const tip = blocked || 'Revision cycle: creates R1 to R6 on days 1, 2, 5, 10, 17 and 30. Unchecking never removes existing revisions.';
+    return '<span class="pl-rev-wrap" style="display:inline-flex;align-items:center;gap:6px;flex:none">' +
+      '<button type="button" class="pl-rev' + (on ? ' is-on' : '') + '" role="checkbox" aria-checked="' + on + '"' + (blocked ? ' aria-disabled="true"' : '') +
+      ' data-pl="b-rev" data-key="rev:' + esc(who) + '" title="' + esc(tip) + '" aria-label="Revision cycle"><span aria-hidden="true"></span></button>' +
+      '<span class="pl-label" style="margin:0">Revision</span></span>';
+  }
+
     function subHtml(s, i) {
     const u = String(s.uid);
     const fresh = s.isNew;
@@ -2667,6 +2685,7 @@ const PlanningAgentUI = (function () {
     return '<div class="pl-sub' + (s.open ? ' is-open' : '') + (fresh ? ' is-new' : '') + '">' +
       '<div class="pl-sub-row"><span class="pl-num" aria-hidden="true">' + (i + 1) + '</span>' +
         '<input type="text" class="pl-input" id="pl-st-' + u + '" data-f="s-title" data-u="' + u + '" maxlength="120" placeholder="Subtask title" aria-label="Subtask ' + (i + 1) + ' title" value="' + esc(s.title) + '">' +
+                        (state.rev ? '' : builderRevHtml(u)) +
                 '<button type="button" class="pl-rm" data-pl="rm-sub" data-u="' + u + '" aria-label="Remove subtask ' + (i + 1) + '"><span aria-hidden="true">&minus;</span></button>' +
         '<button type="button" class="pl-more" data-pl="toggle" data-u="' + u + '" aria-expanded="' + s.open + '" aria-label="' + (s.open ? 'Hide' : 'Show') + ' details for subtask ' + (i + 1) + '"><span class="pl-caret" aria-hidden="true"></span></button></div>' +
       (s.open ? detailsHtml(s) : summaryHtml(s)) +
@@ -2768,14 +2787,7 @@ const PlanningAgentUI = (function () {
     return !!s.parent && subs.some(function (x) { return x.key === s.parent; });
   }
 
-  function revBoxHtml(kind, id, title) {
-    const st = PlanningAgent.revisionCycleState(kind, id);
-    if (!st.available) return '';
-    const tip = st.on ? 'Revision cycle on (R1 to R6). Turning it off keeps the revisions.'
-      : (st.blocked || 'Start a revision cycle: R1 today, then days 2, 5, 10, 17 and 30');
-    return '<button type="button" class="pl-rev' + (st.on ? ' is-on' : '') + '" role="checkbox" aria-checked="' + st.on + '"' + (st.blocked ? ' aria-disabled="true"' : '') +
-      ' data-pl="d-rev" data-kind="' + kind + '" data-id="' + esc(id) + '" title="' + esc(tip) + '" aria-label="Revision cycle: ' + esc(title) + '"><span aria-hidden="true"></span></button>';
-  }
+  
 
   function revMsgHtml(id) {
     const m = dash && dash.revMsg;
@@ -2906,7 +2918,7 @@ const PlanningAgentUI = (function () {
     const nest = Array.isArray(kids) && !!t.key;
     const noSlot = !t.start && !t.done && !!revOf(t.key);
     return '<li class="pl-subi ' + (t.done ? 'is-done' : 'is-todo') + '">' +
-      '<div class="pl-item-row">' + checkHtml(t) + (nest ? revBoxHtml('sub', t.key, t.title) : '') +
+            '<div class="pl-item-row">' + checkHtml(t) +
         '<div class="pl-item-main pl-static"><div class="pl-item-text">' +
           '<span class="pl-item-title">' + esc(t.title) + '</span>' +
           '<span class="pl-item-meta">' + esc(whenText(t, false)) + (isOverdue(t) ? ' <span class="pl-badge is-over">Overdue</span>' : '') +
@@ -2931,7 +2943,7 @@ const PlanningAgentUI = (function () {
       : (st === 'part' ? 'In progress \u00b7 ' + done + ' of ' + total
         : (total ? 'Not started \u00b7 ' + total + (total === 1 ? ' subtask' : ' subtasks') : 'No subtasks yet'));
     return '<li class="pl-item pl-plan is-' + st + (open ? ' is-expanded' : '') + '">' +
-      '<div class="pl-item-row">' + planCheckHtml(tg.targetId, st, tg.title || 'Plan') + revBoxHtml('plan', tg.targetId, tg.title || 'Plan') +
+            '<div class="pl-item-row">' + planCheckHtml(tg.targetId, st, tg.title || 'Plan') +
         '<button type="button" class="pl-item-main" data-pl="d-open" data-k="' + esc(k) + '" aria-expanded="' + open + '">' +
           '<span class="pl-item-text">' +
             '<span class="pl-item-title">' + esc(tg.title || 'Plan') + countHtml(done, total) + '</span>' +
@@ -3162,7 +3174,8 @@ const PlanningAgentUI = (function () {
     if (!tg) return;
     state = freshState({ from: dash ? dash.from : '', subject: tg.subject, topicId: tg.planTopicId, title: tg.title });
     state.editId = targetId;
-    state.tags = (tg.tagIds || []).slice();
+        state.tags = (tg.tagIds || []).slice();
+    state.rev = !!PlanningAgent.revisionCycleState('plan', targetId).on;
     if (addSub) state.subs.push(blankSub(''));
     screen = 'compose'; toTop = true;
     render(false, addSub ? '#pl-st-' + state.subs[0].uid : '#pl-title');
@@ -3190,7 +3203,8 @@ const PlanningAgentUI = (function () {
       const n = state.done.count, edited = state.done.edited;
       return '<div class="plan-agent pl">' + head +
         '<div class="plan-agent-done"><p class="plan-agent-done-title">' + (edited ? 'Plan updated.' : 'Plan created.') + '</p>' +
-          '<p class="plan-agent-muted">\u201c' + esc(state.done.title) + '\u201d' + (n ? (edited ? ' now has ' + n + ' new ' : ' with ' + n + ' ') + (n === 1 ? 'subtask.' : 'subtasks.') : '.') + '</p>' +
+                    '<p class="plan-agent-muted">\u201c' + esc(state.done.title) + '\u201d' + (n ? (edited ? ' now has ' + n + ' new ' : ' with ' + n + ' ') + (n === 1 ? 'subtask.' : 'subtasks.') : '.') + '</p>' +
+          (state.done.warn ? '<p class="pl-err" role="alert">' + esc(state.done.warn) + '</p>' : '') +
           '<div class="plan-agent-actions plan-agent-actions-center">' +
             '<button type="button" class="btn btn-secondary" data-pl="again">Plan something else</button>' +
             '<button type="button" class="btn btn-primary" data-pl="d-home">View plans</button>' +
@@ -3206,7 +3220,10 @@ const PlanningAgentUI = (function () {
           '<div class="pl-cell"><span class="pl-label">Topic <em>optional</em></span>' + topicChooser('p', state, state.subject, '') + '</div>' +
         '</div>' +
         '<label class="pl-label" for="pl-title">Plan</label>' +
-        '<input type="text" id="pl-title" class="pl-input pl-title" data-f="title" maxlength="120" placeholder="What are you planning?" value="' + esc(state.title) + '"' + (state.err ? ' aria-invalid="true"' : '') + '>' +
+                '<div style="display:flex;align-items:center;gap:10px">' +
+          '<input type="text" id="pl-title" class="pl-input pl-title" data-f="title" maxlength="120" placeholder="What are you planning?" style="flex:1;min-width:0" value="' + esc(state.title) + '"' + (state.err ? ' aria-invalid="true"' : '') + '>' +
+          builderRevHtml('p') +
+        '</div>' +
         (state.err ? '<p class="pl-err" role="alert">' + esc(state.err) + '</p>' : '') +
         '<span class="pl-label">Tags <em>optional</em></span>' + tagsChooser('p', state) +
       '</div>' +
@@ -3291,16 +3308,7 @@ const PlanningAgentUI = (function () {
         render(false, '[data-pl="d-plan-toggle"][data-id="' + pid + '"]');
         return;
       }
-      case 'd-rev': {
-        const kind = el.dataset.kind, id = el.dataset.id;
-        const res = PlanningAgent.setRevisionCycle(kind, id, el.getAttribute('aria-checked') !== 'true');
-        dash.revMsg = !res.ok ? { id: id, text: res.error || 'Could not change the revision cycle.' }
-          : (res.unscheduled ? { id: id, info: true, text: res.unscheduled + (res.unscheduled === 1 ? ' revision has' : ' revisions have') + ' no free slot on its date and stays unscheduled there.' } : null);
-        if (res.ok && res.made && kind === 'sub') dash.open['r:' + id] = true;
-        refreshViews();
-        render(false, '[data-pl="d-rev"][data-id="' + id + '"]');
-        return;
-      }
+      
       case 'd-edit': TaskManagerUI.open({ taskId: el.dataset.id, backToDash: true }); return;
       case 'd-edit-plan': editPlan(el.dataset.id, false); return;
       case 'd-add-sub': editPlan(el.dataset.id, true); return;
@@ -3352,6 +3360,12 @@ const PlanningAgentUI = (function () {
         state.subs = state.subs.filter(function (s) { return String(s.uid) !== el.dataset.u; });
         state.pop = '';
         render(false, '[data-pl="add-sub"]');
+        return;
+      }
+            case 'b-rev': {
+        if (who === 'p' && planRevBlocked()) return;
+        if (holder) holder.rev = !holder.rev;
+        render(false, '[data-key="rev:' + who + '"]');
         return;
       }
       case 'add-sub': {
@@ -3510,7 +3524,7 @@ const PlanningAgentUI = (function () {
       TargetsData.updateTarget(target.targetId, fields);
     }
 
-    const made = [];
+            const made = [], cyc = [];
     for (let i = 0; i < subs.length; i++) {
       const s = subs[i];
       const res = PlanningAgent.createTask({
@@ -3528,7 +3542,8 @@ const PlanningAgentUI = (function () {
         return;
       }
       const key = res.task.taskId, patch = {}, subject = state.subject || s.subject;
-      made.push(key);
+                    made.push(key);
+      if (s.rev) cyc.push(key);
       if (!s.date) patch.date = null;   // createTask defaults to today; an unscheduled subtask stays undated
       if (subject) patch.subject = subject;
       const topicId = state.topicId || s.topicId, tp = topicId ? PlanData.getAllTopics()[topicId] : null;
@@ -3541,9 +3556,22 @@ const PlanningAgentUI = (function () {
       TargetsData.updateTarget(base.targetId, { title: title, dateKey: first, startDate: first, endDate: last, subject: state.subject, planTopicId: state.topicId || null, tagIds: state.tags.slice() });
     }
 
+        let warn = '';
+    function runRev(kind, id, on) {
+      const r = PlanningAgent.setRevisionCycle(kind, id, on);
+      if (!r.ok && !warn) warn = r.error || 'Could not change the revision cycle.';
+    }
+    const planOn = base ? !!PlanningAgent.revisionCycleState('plan', base.targetId).on : false;
+    if (state.rev) {
+      if (!planOn) runRev('plan', target.targetId, true);
+    } else {
+      if (planOn) runRev('plan', base.targetId, false);
+      cyc.forEach(function (k) { runRev('sub', k, true); });
+    }
+
     if (typeof MiscSound !== 'undefined') MiscSound.play('uiSuccess');
     refreshViews();
-    state.done = { title: title, count: made.length, edited: !!base };
+    state.done = { title: title, count: made.length, edited: !!base, warn: warn };
     render(false);
   }
 
