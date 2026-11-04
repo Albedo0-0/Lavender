@@ -15,7 +15,7 @@
 //
 // REQUIRED: bump CACHE_VERSION on every deploy that changes any file below (this file itself
 // changing is what triggers the update; the new cache name is what keeps versions apart).
-const CACHE_VERSION = 'lavender-vDay10';
+const CACHE_VERSION = 'lavender-vDay11';
 const CACHE_PREFIX = 'lavender-';
 
 // Everything index.html needs to start. If any of these cannot be fetched the update is not installed.
