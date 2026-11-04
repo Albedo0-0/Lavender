@@ -1,0 +1,934 @@
+// timeengine.js — unified Time Engine. Single source of truth for ALL timing/session state:
+// timetable session times, running session, breaks, pauses, start/stop prompts, 3-min timeout,
+// 5-min auto-breaks, alarm timing, relative schedule shifting, session records.
+// Depends on: State, PlannerData. Must load AFTER planner-data.js and BEFORE study.js.
+//
+// Persisted state:
+//   State.get().timeEngine        -> header/control state (see defaultEngine())
+//   State.get().sessionRecords    -> { sessionId: SessionRecord }
+//   State.get().timeEngineBreaks  -> [ { id, date, type: 'auto'|'global'|'manual', durationMs, startedAt } ]
+//
+// SessionRecord:
+//   taskId is null for a standalone Stopwatch/Timer record (see recordStandaloneStudy) —
+//   those carry a `source: 'stopwatch'|'timer'` tag instead and are created already 'completed'.
+//   { sessionId, taskId, date,
+//     plannedStart, plannedEnd,      // 'HH:MM' as originally scheduled in Planner
+//     adjustedStart, adjustedEnd,    // 'HH:MM' current, shifts with breaks/pauses
+//     actualStart, actualEnd,        // timestamps (ms) or null
+//     state: 'scheduled'|'active'|'paused'|'completed'|'rescheduled'|'stale'|'skipped',
+//     studyMs, breakMs,              // accumulated (finalized) durations
+//     activeSince, pausedSince,      // timestamps (ms) or null — live deltas computed from these
+//     endPromptFired, createdAt,
+//     questionsSolved }              // optional int — only set on completion for revision/theory/questions tasks
+
+const TimeEngine = (function () {
+  const START_BREAK_MS = 10 * 60 * 1000;   // "Need a break" default at a start prompt
+  const END_BREAK_MS = 10 * 60 * 1000;     // "Need a break" default at an end/stop prompt
+  const PROMPT_TIMEOUT_MS = 3 * 60 * 1000; // 3-minute unanswered timeout
+  const AUTO_BREAK_MS = 5 * 60 * 1000;     // automatic break length when a prompt times out
+  const RETENTION_DAYS = 14;               // days of full-detail sessionRecords/timeEngineBreaks kept before rollup
+
+
+  // Canonical single-heartbeat subscriber registry (Feature 11). id -> fn. Modules should call
+  // subscribe(fn, id) with a stable id so re-init/reopen/re-render replaces the callback in
+  // place instead of accumulating duplicate listeners that would double-fire on every tick.
+  const subscriberRegistry = {};
+  let anonCounter = 0;
+
+  // Feature 12 — single authoritative date-rollover signal. id -> fn(fromDateStr, toDateStr).
+  // Fires exactly once per REAL calendar-date change (never once per tick), from ensureDate()
+  // below — the one place in the app that already detects "the date changed" via timestamp
+  // comparison (not a tick count, so it survives a throttled/backgrounded tab or a sleeping
+  // device just as safely as the heartbeat itself). If the app was closed across more than one
+  // midnight, this still fires exactly once, but carries the true fromDateStr (whatever
+  // State.get().timeEngine.date last was) alongside the true current toDateStr — a listener
+  // that needs to walk every missed day in between (not just "yesterday") has both endpoints
+  // and can reconcile the whole gap itself, rather than this signal silently only ever
+  // assuming a one-day jump.
+  const rolloverRegistry = {};
+  let anonRolloverCounter = 0;
+
+  function onRollover(fn, id) {
+    if (typeof fn !== 'function') return function () {};
+    const key = id || ('anonRollover_' + (++anonRolloverCounter));
+    if (!id) {
+      console.warn('TimeEngine.onRollover called without an id \u2014 subscription will not be de-duplicated on re-init. Pass a stable id (e.g. "gamification", "streak").');
+    }
+    rolloverRegistry[key] = fn;
+    return function unsubscribeRollover() { delete rolloverRegistry[key]; };
+  }
+
+  function unsubscribeRollover(id) { if (id) delete rolloverRegistry[id]; }
+
+  function getRolloverSubscriberIds() { return Object.keys(rolloverRegistry); }
+
+  // Idempotent by construction: only ever called from ensureDate() at the exact moment
+  // engine.date !== today, right before ensureDate() persists the new date via
+  // setEngine(defaultEngine(today)) — so a given (from, to) pair can only ever notify rollover
+  // subscribers once, even under re-entrant ticks.
+  function notifyRollover(fromDateStr, toDateStr) {
+    Object.keys(rolloverRegistry).forEach(function (key) {
+      try { rolloverRegistry[key](fromDateStr, toDateStr); }
+      catch (e) { console.warn('TimeEngine rollover subscriber "' + key + '" threw \u2014 other rollover subscribers still ran.', e); }
+    });
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function todayStr() {
+    const t = new Date();
+    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  }
+  function timeStrToMs(dateStr, hhmm) { return new Date(dateStr + 'T' + hhmm + ':00').getTime(); }
+  function hhmmFromMs(ms) { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function genId(prefix) { return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
+
+  // ---------- defensive time helpers (bug fix) ----------
+  // Corrupt/invalid timestamps (missing, non-numeric, negative, from a device clock that jumped)
+  // must never leak into a NaN, a negative duration, or a huge study total. Every place that used
+  // to do "Math.max(0, Date.now() - someTimestamp)" by hand should go through safeElapsed instead;
+  // every place that trusted a stored duration (studyMs/breakMs/etc) should go through safeMs.
+  const MAX_SESSION_MS = 24 * 60 * 60 * 1000; // sanity cap — no single elapsed span can exceed this
+
+  function safeMs(v) {
+    const n = Number(v);
+    return (isFinite(n) && n > 0) ? n : 0;
+  }
+
+  function safeElapsed(sinceMs, nowMs) {
+    const since = Number(sinceMs);
+    const now = Number(nowMs);
+    if (!isFinite(since) || since <= 0 || !isFinite(now)) return 0;
+    const elapsed = now - since;
+    if (!isFinite(elapsed) || elapsed < 0) return 0;
+    return elapsed > MAX_SESSION_MS ? MAX_SESSION_MS : elapsed;
+  }
+
+  // ---------- persistence helpers ----------
+
+  function defaultEngine(dateStr) {
+    return { date: dateStr || todayStr(), activeSessionId: null, shiftMs: 0, prompt: null, globalBreak: null, manualBreakUntil: null };
+  }
+  function getEngine() { return State.get().timeEngine || defaultEngine(); }
+  function setEngine(partial) { State.set({ timeEngine: Object.assign({}, getEngine(), partial) }); }
+
+  function getRecords() { return State.get().sessionRecords || {}; }
+  function setRecords(records) { State.set({ sessionRecords: records }); }
+  function upsertRecord(rec) { const r = Object.assign({}, getRecords()); r[rec.sessionId] = rec; setRecords(r); }
+  function updateRecord(sessionId, partial) {
+    const r = Object.assign({}, getRecords());
+    if (!r[sessionId]) return;
+    r[sessionId] = Object.assign({}, r[sessionId], partial);
+    setRecords(r);
+  }
+  function getRecord(sessionId) { return getRecords()[sessionId] || null; }
+  function getRecordsForDate(dateStr) {
+    const r = getRecords();
+    return Object.keys(r).map(function (id) { return r[id]; }).filter(function (rec) { return rec.date === dateStr; });
+  }
+
+  function pushBreak(dateStr, type, durationMs, note) {
+    const list = (State.get().timeEngineBreaks || []).slice();
+    const id = genId('brk');
+    list.push({ id: id, date: dateStr, type: type, durationMs: durationMs, startedAt: Date.now(), note: note || '' });
+    State.set({ timeEngineBreaks: list });
+    return id;
+  }
+
+  function adjustBreakDuration(id, deltaMs) {
+    const list = (State.get().timeEngineBreaks || []).slice();
+    const idx = list.findIndex(function (b) { return b.id === id; });
+    if (idx === -1) return;
+    list[idx] = Object.assign({}, list[idx], { durationMs: Math.max(0, list[idx].durationMs + deltaMs) });
+    State.set({ timeEngineBreaks: list });
+  }
+
+  // ---------- retention: roll old daily detail into summaries, then prune (approved approach) ----------
+
+  function getSummaries() { return State.get().dailySummaries || {}; }
+  function setSummaries(summaries) { State.set({ dailySummaries: summaries }); }
+  function getDailySummary(dateStr) { return getSummaries()[dateStr] || null; }
+
+  function daysAgo(dateStr, refDateStr) {
+    const a = new Date(dateStr + 'T00:00:00').getTime();
+    const b = new Date(refDateStr + 'T00:00:00').getTime();
+    return Math.round((b - a) / 86400000);
+  }
+
+  function summarizeDate(dateStr) {
+    const recs = getRecordsForDate(dateStr);
+        let studyMs = 0, breakMs = 0, questionsSolved = 0;
+    // PTPE: keep per-topic study/questions in the rollup so Tag/Subject progress survives the 14-day window.
+    const topicMs = {}, topicQ = {}, taskMap = State.get().tasks || {};
+    recs.forEach(function (rec) {
+      const ms = liveStudyMs(rec), q = Number(rec.questionsSolved) || 0;
+      studyMs += ms; breakMs += liveBreakMs(rec); questionsSolved += q;
+      const t = (rec.taskId || rec.topicTaskId) ? taskMap[rec.taskId || rec.topicTaskId] : null;
+      if (t && t.topicId) { topicMs[t.topicId] = (topicMs[t.topicId] || 0) + ms; topicQ[t.topicId] = (topicQ[t.topicId] || 0) + q; }
+    });
+    (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === dateStr; }).forEach(function (b) { breakMs += b.durationMs; });
+    return {
+      date: dateStr,
+      studyMs: studyMs,
+      breakMs: breakMs,
+      questionsSolved: questionsSolved,
+            tasksTotal: recs.length,
+      tasksCompleted: recs.filter(function (r) { return r.state === 'completed'; }).length,
+      topicMs: topicMs,
+      topicQ: topicQ
+    };
+  }
+
+  // Rolls any sessionRecords/timeEngineBreaks older than RETENTION_DAYS into dailySummaries,
+  // then drops the raw entries for those dates. Runs once per day (from ensureDate's rollover),
+  // scans all dates each time so it also catches any backlog.
+  function pruneOldRecords(today) {
+    const records = getRecords();
+    const breaks = State.get().timeEngineBreaks || [];
+    const staleDates = {};
+    Object.keys(records).forEach(function (id) {
+      if (daysAgo(records[id].date, today) > RETENTION_DAYS) staleDates[records[id].date] = true;
+    });
+    breaks.forEach(function (b) { if (daysAgo(b.date, today) > RETENTION_DAYS) staleDates[b.date] = true; });
+    const staleList = Object.keys(staleDates);
+    if (!staleList.length) return;
+
+    const summaries = Object.assign({}, getSummaries());
+    staleList.forEach(function (d) { summaries[d] = summarizeDate(d); });
+
+    const keptRecords = {};
+    Object.keys(records).forEach(function (id) { if (!staleDates[records[id].date]) keptRecords[id] = records[id]; });
+    const keptBreaks = breaks.filter(function (b) { return !staleDates[b.date]; });
+
+    setSummaries(summaries);
+    setRecords(keptRecords);
+    State.set({ timeEngineBreaks: keptBreaks });
+  }
+
+  // ---------- rollover ----------
+
+  // A session still running or paused at local midnight is NOT ended: it keeps its sessionId and
+  // state and carries on into the new day. Time it already accrued before midnight is banked onto
+  // the date(s) it belongs to (see splitActiveAcrossMidnight); the record itself moves to today.
+  function ensureDate() {
+    const today = todayStr();
+    const engine = getEngine();
+    if (engine.date === today) return;
+    const active = engine.activeSessionId ? getRecord(engine.activeSessionId) : null;
+    const carry = !!(active && !active.actualEnd && (active.state === 'active' || active.state === 'paused'));
+    if (carry) {
+      splitActiveAcrossMidnight(active, today);
+    } else if (active && !active.actualEnd) {
+      // Defensive only: an open record in some other state is finalized as stale, as before.
+      updateRecord(active.sessionId, { state: 'stale', actualEnd: Date.now(), studyMs: safeMs(active.studyMs), breakMs: safeMs(active.breakMs), activeSince: null, pausedSince: null });
+    }
+    pruneOldRecords(today);
+    // Feature 12 — fire the authoritative rollover signal AFTER the engine's own date is reset,
+    // carrying the true previous date (never today, even under re-entrancy).
+    const fromDateStr = engine.date;
+    const nextEngine = defaultEngine(today);
+    if (carry) {
+      nextEngine.activeSessionId = engine.activeSessionId;
+      nextEngine.manualBreakUntil = engine.manualBreakUntil || null;
+      nextEngine.globalBreak = engine.globalBreak ? Object.assign({}, engine.globalBreak, { rolled: true }) : null; // rolled: its schedule shift belonged to the previous day
+      nextEngine.prompt = (engine.prompt && engine.prompt.sessionId === engine.activeSessionId) ? engine.prompt : null;
+    }
+    setEngine(nextEngine);
+    notifyRollover(fromDateStr, today);
+  }
+
+  // Banks everything the live session accrued BEFORE the midnight that starts `today` onto the
+  // dates it belongs to, as taskless completed records (same ledger as standalone study), then moves
+  // the live record to today. The record keeps its sessionId, state, activeSince and pausedSince;
+  // carriedStudyMs / carriedBreakMs remember how much is already banked, and liveStudyMs /
+  // liveBreakMs subtract it, so no time is lost and none is counted twice.
+  function splitActiveAcrossMidnight(rec, today) {
+    if (!rec.date || rec.date >= today) return;
+    const boundary = new Date(today + 'T00:00:00').getTime();
+    const carriedS = safeMs(rec.carriedStudyMs), carriedB = safeMs(rec.carriedBreakMs);
+    const studyAt = safeMs(rec.studyMs) + (rec.state === 'active' ? safeElapsed(rec.activeSince, boundary) : 0);
+    const breakAt = safeMs(rec.breakMs) + (rec.state === 'paused' ? safeElapsed(rec.pausedSince, boundary) : 0);
+    const alloc = {};
+    // Fill the days before midnight from the latest backwards (a day holds at most 24h); anything
+    // left over lands on the record's own date.
+    function bank(key, amount) {
+      let left = amount;
+      for (let i = 1; i <= 400 && left > 0; i++) {
+        const dayStart = new Date(new Date(boundary).getFullYear(), new Date(boundary).getMonth(), new Date(boundary).getDate() - i);
+        const ds = dayStart.getFullYear() + '-' + pad(dayStart.getMonth() + 1) + '-' + pad(dayStart.getDate());
+        const room = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1).getTime() - dayStart.getTime();
+        const onOwnDate = ds <= rec.date;
+        const take = onOwnDate ? left : Math.min(left, room);
+        const k = onOwnDate ? rec.date : ds;
+        alloc[k] = alloc[k] || { study: 0, brk: 0 };
+        alloc[k][key] += take;
+        left -= take;
+        if (onOwnDate) break;
+      }
+    }
+    bank('study', Math.max(0, studyAt - carriedS));
+    bank('brk', Math.max(0, breakAt - carriedB));
+    const now = Date.now();
+    Object.keys(alloc).forEach(function (d) {
+      const a = alloc[d];
+      if (!(a.study > 0) && !(a.brk > 0)) return;
+      const p = d.split('-');
+      const dayEnd = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + 1).getTime();
+      upsertRecord({
+        sessionId: genId('sess'), taskId: null, date: d,
+        plannedStart: null, plannedEnd: null, adjustedStart: null, adjustedEnd: null,
+        actualStart: Math.max(0, dayEnd - a.study), actualEnd: dayEnd,
+        state: 'completed', studyMs: a.study, breakMs: a.brk,
+        activeSince: null, pausedSince: null, endPromptFired: false,
+        source: 'rollover', topicTaskId: rec.taskId || null, createdAt: now
+      });
+      if (a.study > 0 && rec.taskId) {
+        const tk = (PlannerData.getAllTasks() || {})[rec.taskId];
+        pushLog(d, 'Study session (' + (tk ? (tk.taskType === 'custom' ? tk.title : tk.topicName) : 'Task') + ')', a.study, 'hr');
+      }
+    });
+    updateRecord(rec.sessionId, { date: today, carriedStudyMs: studyAt, carriedBreakMs: breakAt });
+  }
+
+  // ---------- session creation ----------
+
+  function findOpenRecordForTask(taskId, dateStr) {
+    return getRecordsForDate(dateStr).find(function (r) {
+      return r.taskId === taskId && r.state !== 'rescheduled' && r.state !== 'completed' && r.state !== 'stale' && r.state !== 'skipped';
+    }) || null;
+  }
+
+  // Bug fix: unlike findOpenRecordForTask (which exists purely to answer "is there an open
+  // session to resume / avoid duplicating," and correctly excludes completed/rescheduled/stale),
+  // callers that need "what happened to this task's session" — study.js's alarm-list status,
+  // Itinerary's orchestrator (Section 17) checking for a finished study item — were wrongly
+  // pointed at findOpenRecordForTask via the public getRecordForTask alias, so a completed
+  // session was never found. Returns any record for the task, preferring a still-live one
+  // (not stale/rescheduled) over a stale/rescheduled one if somehow both exist.
+  function findRecordForTask(taskId, dateStr) {
+    const recs = getRecordsForDate(dateStr).filter(function (r) { return r.taskId === taskId; });
+    if (!recs.length) return null;
+    const live = recs.find(function (r) { return r.state !== 'rescheduled' && r.state !== 'stale' && r.state !== 'skipped'; });
+    return live || recs[recs.length - 1];
+  }
+
+  function syncSessionsForToday() {
+    const today = todayStr();
+    const tasks = PlannerData.getTasksForDate(today).filter(function (t) { return t.startTime && t.stopTime && !t.completed; });
+    const engine = getEngine();
+    tasks.forEach(function (task) {
+      if (findOpenRecordForTask(task.taskId, today)) return;
+      // Skipped from Itinerary: don't re-create/re-prompt a session for a task whose slot is still scheduled today.
+      if (getRecordsForDate(today).some(function (r) { return r.taskId === task.taskId && r.state === 'skipped'; })) return;
+      const rec = {
+        sessionId: genId('sess'),
+        taskId: task.taskId,
+        date: today,
+        plannedStart: task.startTime,
+        plannedEnd: task.stopTime,
+        adjustedStart: hhmmFromMs(timeStrToMs(today, task.startTime) + (engine.shiftMs || 0)),
+        adjustedEnd: hhmmFromMs(timeStrToMs(today, task.stopTime) + (engine.shiftMs || 0)),
+        actualStart: null,
+        actualEnd: null,
+        state: 'scheduled',
+        studyMs: 0,
+        breakMs: 0,
+        activeSince: null,
+        pausedSince: null,
+        endPromptFired: false,
+        createdAt: Date.now()
+      };
+      upsertRecord(rec);
+    });
+  }
+
+  // ---------- shifting (Global Break / need-break / need-more-time) ----------
+
+  // Recomputes adjustedStart/adjustedEnd for every not-yet-started session today from its
+  // ORIGINAL planned time + the engine's total cumulative shift. Composing shifts this way
+  // (instead of stacking deltas) keeps relative gaps intact and avoids overlaps/drift.
+  function applyShift(deltaMs) {
+    const engine = getEngine();
+    const newShift = (engine.shiftMs || 0) + deltaMs;
+    setEngine({ shiftMs: newShift });
+    const today = todayStr();
+    getRecordsForDate(today).forEach(function (rec) {
+      if (rec.state !== 'scheduled') return;
+      updateRecord(rec.sessionId, {
+        adjustedStart: hhmmFromMs(timeStrToMs(today, rec.plannedStart) + newShift),
+        adjustedEnd: hhmmFromMs(timeStrToMs(today, rec.plannedEnd) + newShift)
+      });
+    });
+  }
+
+  // Extends the CURRENTLY ACTIVE session's own adjustedEnd (a break/extension taken mid-session)
+  // and separately shifts every other still-scheduled session by the same amount.
+  function extendActiveAndShift(deltaMs) {
+    const active = getActiveSession();
+    if (active) {
+      const baseEndMs = active.adjustedEndAt || timeStrToMs(active.date, active.adjustedEnd);
+      const newEndMs = baseEndMs + deltaMs;
+      updateRecord(active.sessionId, {
+        adjustedEnd: hhmmFromMs(newEndMs),
+        adjustedEndAt: newEndMs,
+        endPromptFired: false
+      });
+    }
+    applyShift(deltaMs);
+  }
+
+  // Extends ONE record's own adjustedEnd only — no shifting of other sessions. Used when the
+  // rest of the day was already shifted separately (Global Break start/Add Time), so only the
+  // paused session's own remaining time needs correcting on resume.
+  function extendRecordEnd(sessionId, deltaMs) {
+    const rec = getRecord(sessionId);
+    if (!rec) return;
+    const baseEndMs = rec.adjustedEndAt || timeStrToMs(rec.date, rec.adjustedEnd);
+    const newEndMs = baseEndMs + deltaMs;
+    updateRecord(sessionId, { adjustedEnd: hhmmFromMs(newEndMs), adjustedEndAt: newEndMs, endPromptFired: false });
+  }
+
+  // ---------- pause/resume primitives (no shifting side-effects — callers decide shifting) ----------
+
+  function pauseSessionInternal(sessionId) {
+    const rec = getRecord(sessionId);
+    if (!rec || rec.state !== 'active') return;
+    const studyMs = safeMs(rec.studyMs) + safeElapsed(rec.activeSince, Date.now());
+    updateRecord(sessionId, { state: 'paused', studyMs: studyMs, activeSince: null, pausedSince: Date.now() });
+  }
+
+  function resumeSessionInternal(sessionId) {
+    const rec = getRecord(sessionId);
+    if (!rec || rec.state !== 'paused') return;
+    const breakMs = safeMs(rec.breakMs) + safeElapsed(rec.pausedSince, Date.now());
+    updateRecord(sessionId, { state: 'active', breakMs: breakMs, activeSince: Date.now(), pausedSince: null });
+  }
+
+  // ---------- public actions ----------
+
+  function getActiveSession() {
+    const engine = getEngine();
+    return engine.activeSessionId ? getRecord(engine.activeSessionId) : null;
+  }
+
+  function isSessionActive() { return !!getEngine().activeSessionId; }
+
+  function getPrompt() { return getEngine().prompt; }
+
+  function getUpcomingSession() {
+    const today = todayStr();
+    const candidates = getRecordsForDate(today).filter(function (r) { return r.state === 'scheduled'; });
+    candidates.sort(function (a, b) { return a.adjustedStart < b.adjustedStart ? -1 : 1; });
+    return candidates[0] || null;
+  }
+
+  function beginActiveSession(sessionId) {
+    const rec = getRecord(sessionId);
+    if (!rec) return;
+    const now = Date.now();
+    // Anchor this session's own end to the ACTUAL start time + its originally planned duration,
+    // not to the original wall-clock stop time. Whatever caused the late start (an explicit break,
+    // a slow tap on "Started", anything) the person still gets the full duration they planned for —
+    // e.g. a 10:00-11:00 task started at 10:10 now ends at 11:10, not 11:00.
+    const durationMs = safeMs(timeStrToMs(rec.date, rec.plannedEnd) - timeStrToMs(rec.date, rec.plannedStart));
+    updateRecord(sessionId, {
+      state: 'active',
+      actualStart: now,
+      activeSince: now,
+      studyMs: 0,
+      breakMs: 0,
+      adjustedStart: hhmmFromMs(now),
+      adjustedEnd: hhmmFromMs(now + Math.max(0, durationMs)),
+      adjustedStartAt: now,
+      adjustedEndAt: now + Math.max(0, durationMs)
+    });
+    setEngine({ activeSessionId: sessionId, prompt: null });
+  }
+  // "Started" chosen at a START prompt (or Study's "Start Now" shortcut, or Planner's "Start in Study").
+  function startTaskSession(taskId) {
+    if (isSessionActive()) return;
+    if (isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before starting a study session.'); return; }
+    syncSessionsForToday();
+    let rec = findOpenRecordForTask(taskId, todayStr());
+    if (!rec) return; // task has no valid slot today
+    beginActiveSession(rec.sessionId);
+    if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('study');
+    notify();
+  }
+
+  function isManualClockActive() {
+    const c = State.get().studyClock;
+    return !!(c && (c.running || (c.elapsedMs || 0) > 0 || c.awaitingDecision));
+  }
+
+  // Resolve whichever prompt (start or end) is currently showing.
+  function resolvePrompt(choice, minutes, questionsSolved) {
+    const engine = getEngine();
+    const prompt = engine.prompt;
+    if (!prompt) return;
+
+    if (prompt.kind === 'start') {
+      if (choice === 'start') {
+        if (isManualClockActive()) { alert('Finish or reset your Stopwatch/Timer before starting a study session.'); return; }
+        beginActiveSession(prompt.sessionId);
+        if (typeof Nav !== 'undefined' && Nav.switchTo) Nav.switchTo('study');
+      } else if (choice === 'break') {
+        applyShift(START_BREAK_MS);
+        pushBreak(todayStr(), 'manual', START_BREAK_MS);
+        setEngine({ prompt: null });
+      } else if (choice === 'time') {
+        applyShift(Math.max(1, minutes || 1) * 60 * 1000);
+        setEngine({ prompt: null });
+      }
+    } else if (prompt.kind === 'end') {
+      if (choice === 'complete') { // "Completed" — wrap-up is done: stop the clock and record actual time
+        completeActive(questionsSolved);
+        return; // completeActive() already clears prompt/activeSessionId and notifies
+      } else if (choice === 'break') {
+        extendActiveAndShift(END_BREAK_MS);
+        const active = getActiveSession();
+        if (active) {
+          pauseSessionInternal(active.sessionId);
+          setEngine({ prompt: null, manualBreakUntil: Date.now() + END_BREAK_MS });
+        } else {
+          setEngine({ prompt: null });
+        }
+      } else if (choice === 'time') {
+        extendActiveAndShift(Math.max(1, minutes || 1) * 60 * 1000);
+        setEngine({ prompt: null });
+      }
+    }
+    notify();
+  }
+
+  function pauseActive() {
+    const active = getActiveSession();
+    if (!active) return;
+    pauseSessionInternal(active.sessionId);
+    notify();
+  }
+
+  function resumeActive() {
+    const active = getActiveSession();
+    if (!active || active.state !== 'paused') return;
+    const pauseDur = safeElapsed(active.pausedSince, Date.now());
+    resumeSessionInternal(active.sessionId);
+    // Extend the session's own adjustedEnd by however long the pause actually lasted (not just
+    // a fixed default like the prompt-driven breaks), and shift the rest of the day the same amount —
+    // otherwise a manual mid-session pause would silently shorten the remaining study time.
+    extendActiveAndShift(pauseDur);
+    notify();
+  }
+
+  function completeActive(questionsSolved) {
+    const active = getActiveSession();
+    if (!active) return;
+    const studyMs = safeMs(active.studyMs) + (active.state === 'active' ? safeElapsed(active.activeSince, Date.now()) : 0);
+    const patch = { state: 'completed', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null };
+    if (questionsSolved !== undefined && questionsSolved !== null) patch.questionsSolved = questionsSolved;
+    updateRecord(active.sessionId, patch);
+    const task = PlannerData.getAllTasks()[active.taskId];
+    if (task && !task.completed) {
+      if (typeof PlanningAgent !== 'undefined') {
+        PlanningAgent.toggleComplete(active.taskId);
+      } else {
+        PlannerData.toggleComplete(active.taskId);
+      }
+    }
+    const label = 'Study session (' + (task ? (task.taskType === 'custom' ? task.title : task.topicName) : 'Task') + ')';
+    pushLog(active.date, label, Math.max(0, studyMs - safeMs(active.carriedStudyMs)), 'hr'); // only the part not already banked to earlier dates
+    setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
+    notify();
+  }
+
+  // Ends the running/paused session for taskId WITHOUT completing the task (Itinerary Skip / Remove).
+  function skipActive(taskId) {
+    const active = getActiveSession();
+    if (!active || active.taskId !== taskId) return false;
+    const studyMs = safeMs(active.studyMs) + (active.state === 'active' ? safeElapsed(active.activeSince, Date.now()) : 0);
+    let breakMs = safeMs(active.breakMs);
+    if (active.state === 'paused') breakMs += safeElapsed(active.pausedSince, Date.now());
+    updateRecord(active.sessionId, { state: 'skipped', actualEnd: Date.now(), studyMs: studyMs, breakMs: breakMs, activeSince: null, pausedSince: null });
+    setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
+    notify();
+    return true;
+  }
+  
+  // "Do it later" — works on the active session's task OR any scheduled task for today.
+  // Returns true on success, false if the task's slot would overlap an existing slot on the
+  // target date (nothing is touched in that case — caller should tell the user and let them
+  // pick a different date/time instead of silently creating an overlapping schedule).
+  function doItLater(taskId, newDateStr, newStartTime, newStopTime) {
+    const today = todayStr();
+    const rec = findOpenRecordForTask(taskId, today);
+    const task = PlannerData.getAllTasks()[taskId];
+    if (!task) return false;
+    const startTime = newStartTime || task.startTime;
+    const stopTime = newStopTime || task.stopTime;
+    if (!PlannerData.isValidSlot(startTime, stopTime)) return false;
+    if (PlannerData.hasSlotConflict(newDateStr, startTime, stopTime, taskId)) return false;
+    const engine = getEngine();
+    if (rec && engine.activeSessionId === rec.sessionId) {
+      const studyMs = safeMs(rec.studyMs) + (rec.state === 'active' ? safeElapsed(rec.activeSince, Date.now()) : 0);
+      updateRecord(rec.sessionId, { state: 'rescheduled', actualEnd: Date.now(), studyMs: studyMs, activeSince: null, pausedSince: null });
+      setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
+    } else if (rec) {
+      updateRecord(rec.sessionId, { state: 'rescheduled' });
+      if (engine.prompt && engine.prompt.sessionId === rec.sessionId) setEngine({ prompt: null });
+    }
+    PlannerData.rescheduleTask(taskId, newDateStr, startTime, stopTime);
+    notify();
+    return true;
+  }
+  
+  function startGlobalBreak(minutes, note) {
+    const engine = getEngine();
+    if (engine.globalBreak && engine.globalBreak.active) return false;
+    const breakMs = Math.max(1, minutes || 1) * 60 * 1000;
+    const active = getActiveSession();
+    let pausedActiveSession = false;
+    if (active && active.state === 'active') { pauseSessionInternal(active.sessionId); pausedActiveSession = true; }
+    // an open prompt's timeout clock is pushed back so it doesn't unfairly expire mid-break.
+    const promptNow = getEngine().prompt;
+    const shiftedPrompt = promptNow && !promptNow.autoBreakActive
+      ? Object.assign({}, promptNow, { deadline: promptNow.deadline + breakMs })
+      : promptNow;
+    applyShift(breakMs);
+    // Only log a standalone break entry when there's no paused session to track it instead —
+    // if we just paused the active session, its own breakMs (finalized on resume) already
+    // covers this time in getDayStats, and pushBreak here would double-count it.
+    const breakId = pausedActiveSession ? null : pushBreak(todayStr(), 'global', breakMs, note || '');
+    setEngine({ prompt: shiftedPrompt, globalBreak: { active: true, resumeAt: Date.now() + breakMs, startedAt: Date.now(), pausedActiveSession: pausedActiveSession, breakId: breakId, plannedMs: breakMs } });
+    notify();
+    return true;
+  }
+
+  // §2.1 — extra duration mid-break: shifts later sessions same as the initial break did, and
+  // keeps the break's own logged duration in sync.
+  function addGlobalBreakTime(minutes) {
+    const engine = getEngine();
+    const gb = engine.globalBreak;
+    if (!gb || !gb.active) return false;
+    const extraMs = Math.max(1, minutes || 1) * 60 * 1000;
+    if (!gb.rolled) applyShift(extraMs);
+    if (gb.breakId) adjustBreakDuration(gb.breakId, extraMs);
+    setEngine({ globalBreak: Object.assign({}, gb, { resumeAt: gb.resumeAt + extraMs, plannedMs: (gb.plannedMs || 0) + extraMs }) });
+    notify();
+    return true;
+  }
+
+  // §2.2 — ends immediately: un-shifts the unused planned time and corrects the logged/implicit
+  // break duration down to what was actually taken, instead of the originally chosen amount.
+  function endGlobalBreak() {
+    const engine = getEngine();
+    const gb = engine.globalBreak;
+    if (!gb || !gb.active) return false;
+    const now = Date.now();
+    const actualMs = safeElapsed(gb.startedAt, now);
+    const unusedMs = Math.max(0, safeMs(gb.resumeAt) - now);
+    if (unusedMs > 0 && !gb.rolled) applyShift(-unusedMs);
+    if (gb.pausedActiveSession) {
+      const active = getRecord(engine.activeSessionId);
+      if (active && active.pausedSince) extendRecordEnd(active.sessionId, safeElapsed(active.pausedSince, now));
+      resumeSessionInternal(engine.activeSessionId);
+    } else if (gb.breakId) {
+      adjustBreakDuration(gb.breakId, actualMs - (gb.plannedMs || 0));
+    }
+    setEngine({ globalBreak: null });
+    notify();
+    return true;
+  }
+
+  // §2.4 — unrecorded break: retroactive entry for break time taken outside the app. Same
+  // timeEngineBreaks source as live breaks (feeds the same stats); no live countdown, no
+  // schedule shift, since the time already passed.
+  function logUnrecordedBreak(minutes, note) {
+    const ms = Math.max(1, minutes || 1) * 60 * 1000;
+    pushBreak(todayStr(), 'unrecorded', ms, note || '');
+    notify();
+}
+
+  function getGlobalBreak() { return getEngine().globalBreak; }
+
+  // The canonical read of today's cumulative schedule shift (TimeEngine is the single owner).
+  function getShiftMs() { return getEngine().shiftMs || 0; }
+
+  // ---------- tick (single heartbeat for the whole app) ----------
+
+  function processGlobalBreak() {
+    const engine = getEngine();
+    const gb = engine.globalBreak;
+    if (!gb || !gb.active) return;
+    if (Date.now() < gb.resumeAt) return;
+    if (gb.pausedActiveSession) {
+      const active = getRecord(engine.activeSessionId);
+      if (active && active.pausedSince) extendRecordEnd(active.sessionId, safeElapsed(active.pausedSince, Date.now()));
+      resumeSessionInternal(engine.activeSessionId);
+    }
+    setEngine({ globalBreak: null });
+  }
+
+  function processPrompt() {
+    const engine = getEngine();
+    const prompt = engine.prompt;
+    if (!prompt) return;
+    const now = Date.now();
+    if (prompt.autoBreakActive) {
+      if (now >= prompt.autoBreakResumeAt) {
+        if (prompt.autoPaused) resumeSessionInternal(prompt.sessionId);
+        setEngine({ prompt: Object.assign({}, prompt, { autoBreakActive: false, autoPaused: false, fireAt: now, deadline: now + PROMPT_TIMEOUT_MS }) });
+      }
+      return;
+    }
+    if (now < prompt.deadline) return;
+    // unanswered for 3 minutes -> automatic 5-minute break, then re-ask.
+    let autoPaused = false;
+    if (prompt.kind === 'end') {
+      const active = getActiveSession();
+      if (active && active.sessionId === prompt.sessionId && active.state === 'active') { pauseSessionInternal(active.sessionId); autoPaused = true; }
+      extendActiveAndShift(AUTO_BREAK_MS);
+      // No pushBreak here: the paused session's own breakMs (finalized on resume, below) already
+      // accounts for this time in getDayStats — an extra pushBreak would double-count it.
+    } else {
+      applyShift(AUTO_BREAK_MS);
+      pushBreak(todayStr(), 'auto', AUTO_BREAK_MS);
+    }
+    setEngine({ prompt: Object.assign({}, prompt, { autoBreakActive: true, autoPaused: autoPaused, autoBreakResumeAt: now + AUTO_BREAK_MS, autoBreakCount: (prompt.autoBreakCount || 0) + 1 }) });
+  }
+
+  function processManualBreak() {
+    const engine = getEngine();
+    if (!engine.manualBreakUntil) return;
+    if (Date.now() < engine.manualBreakUntil) return;
+    const active = getActiveSession();
+    if (active && active.state === 'paused') resumeSessionInternal(active.sessionId);
+    setEngine({ manualBreakUntil: null });
+  }
+
+  function detectDue() {
+    const engine = getEngine();
+    if (engine.prompt) return;
+    if (engine.globalBreak && engine.globalBreak.active) return;
+    const now = Date.now();
+    const today = todayStr();
+
+    const active = getActiveSession();
+    if (active) {
+      if (active.state === 'active' && !active.endPromptFired) {
+        const stopMs = active.adjustedEndAt || timeStrToMs(today, active.adjustedEnd);
+        if (now >= stopMs) {
+          updateRecord(active.sessionId, { endPromptFired: true });
+          setEngine({ prompt: { sessionId: active.sessionId, taskId: active.taskId, kind: 'end', fireAt: now, deadline: now + PROMPT_TIMEOUT_MS, autoBreakActive: false, autoBreakCount: 0 } });
+        }
+      }
+      return; // only one focus session at a time — no start prompts while one is running/paused
+    }
+
+    const next = getUpcomingSession();
+    if (!next) return;
+    const startMs = timeStrToMs(today, next.adjustedStart);
+    if (now >= startMs) {
+      setEngine({ prompt: { sessionId: next.sessionId, taskId: next.taskId, kind: 'start', fireAt: now, deadline: now + PROMPT_TIMEOUT_MS, autoBreakActive: false, autoBreakCount: 0 } });
+    }
+  }
+
+  function tick() {
+    ensureDate();
+    syncSessionsForToday();
+    processGlobalBreak();
+    processManualBreak();
+    processPrompt();
+    detectDue();
+    notify();
+  }
+
+  // ---------- read-only helpers for UI / Progress ----------
+
+  // Per-record time attributed to the record's OWN date: whatever a midnight rollover already banked onto
+  // earlier dates (carriedStudyMs / carriedBreakMs) is excluded, so day totals never double count.
+  function liveStudyMs(rec) { return Math.max(0, safeMs(rec.studyMs) + (rec.state === 'active' ? safeElapsed(rec.activeSince, Date.now()) : 0) - safeMs(rec.carriedStudyMs)); }
+  function liveBreakMs(rec) { return Math.max(0, safeMs(rec.breakMs) + (rec.state === 'paused' ? safeElapsed(rec.pausedSince, Date.now()) : 0) - safeMs(rec.carriedBreakMs)); }
+  function getClockDisplayMs() {
+    const active = getActiveSession();
+    return active ? liveStudyMs(active) + safeMs(active.carriedStudyMs) : 0; // the session clock shows the whole session
+  }
+
+  // Every date the engine has study data for, whether still-detailed (sessionRecords) or
+  // already rolled into a dailySummary. Lets Progress merge with Journal per-day without
+  // Progress needing to know anything about the retention/rollup split.
+  function getAllTrackedDates() {
+    const dates = {};
+    const records = getRecords();
+    Object.keys(records).forEach(function (id) { dates[records[id].date] = true; });
+    const summaries = getSummaries();
+    Object.keys(summaries).forEach(function (d) { dates[d] = true; });
+    return Object.keys(dates);
+  }
+
+  // ---------- unified standalone recording (Stopwatch / Timer, §4/§11) ----------
+  // Records a finished block of untracked study time (from the standalone clock) as its own
+  // completed, taskless session record — the SAME sessionRecords store scheduled Study sessions
+  // use, so Progress/getDayStats/streaks all see one unified actual-study-time ledger instead of
+  // a second, parallel source of truth. Callers (study.js) are responsible for calling this
+  // exactly once per stopwatch/timer run (see the clock's own 'recorded' guard).
+  function recordStandaloneStudy(ms, source) {
+    if (!ms || ms <= 0) return null;
+    ensureDate();
+    const now = Date.now();
+    // A run that crosses local midnight is split at midnight: each local date gets exactly its own
+    // share, so no time is lost or counted twice. (safeElapsed caps one run at 24h, so at most 2 dates.)
+    let segStart = now - ms, lastId = null;
+    while (segStart < now) {
+      const sd = new Date(segStart);
+      const nextMidnight = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate() + 1).getTime();
+      const segEnd = Math.min(nextMidnight, now);
+      const rec = {
+        sessionId: genId('sess'),
+        taskId: null,
+        date: sd.getFullYear() + '-' + pad(sd.getMonth() + 1) + '-' + pad(sd.getDate()),
+        plannedStart: null,
+        plannedEnd: null,
+        adjustedStart: null,
+        adjustedEnd: null,
+        actualStart: segStart,
+        actualEnd: segEnd,
+        state: 'completed',
+        studyMs: segEnd - segStart,
+        breakMs: 0,
+        activeSince: null,
+        pausedSince: null,
+        endPromptFired: false,
+        source: source || 'standalone',
+        createdAt: now
+      };
+      upsertRecord(rec);
+      lastId = rec.sessionId;
+      segStart = segEnd;
+    }
+    notify();
+    return lastId;
+  }
+
+  // ---------- chronological "what was studied where" log (Study tab, temporary bottom-left panel) ----------
+  function pushLog(dateStr, label, ms, kind) {
+    if (!ms || ms <= 0) return;
+    const logs = State.get().studyLog || {};
+    const day = logs[dateStr] || [];
+    const updated = day.concat([{ label: label, ms: ms, kind: kind || 'min', at: Date.now() }]);
+    State.set({ studyLog: Object.assign({}, logs, { [dateStr]: updated }) });
+  }
+  function getLogForDate(dateStr) {
+    const logs = State.get().studyLog || {};
+    return logs[dateStr || todayStr()] || [];
+  }
+
+  function getDayStats(dateStr) {
+    const d = dateStr || todayStr();
+    const recs = getRecordsForDate(d);
+    if (!recs.length) {
+      const summary = getDailySummary(d);
+      if (summary) return { studyMs: summary.studyMs, breakMs: summary.breakMs };
+    }
+    let studyMs = 0, breakMs = 0;
+    recs.forEach(function (rec) { studyMs += liveStudyMs(rec); breakMs += liveBreakMs(rec); });
+    (State.get().timeEngineBreaks || []).filter(function (b) { return b.date === d; }).forEach(function (b) { breakMs += b.durationMs; });
+    return { studyMs: studyMs, breakMs: breakMs };
+  }
+
+// Sum of questionsSolved across this date's session records (1.2) — the session-specific
+  // half of Progress's per-day question total (1.3); Journal's own number is the other half.
+  function getQuestionsForDate(dateStr) {
+    const d = dateStr || todayStr();
+    const recs = getRecordsForDate(d);
+    if (!recs.length) {
+      const summary = getDailySummary(d);
+      return (summary && summary.questionsSolved) || 0;
+    }
+    let total = 0;
+    recs.forEach(function (rec) { total += Number(rec.questionsSolved) || 0; });
+    return total;
+  }
+
+  // ---------- subscriptions ----------
+  // Single heartbeat contract: any module needing periodic updates goes through subscribe(fn, id)
+  // instead of its own setInterval/poll(). A per-subscriber try/catch means one subscriber
+  // throwing never stops the tick or blocks other subscribers.
+
+  function subscribe(fn, id) {
+    if (typeof fn !== 'function') return function () {};
+    const key = id || ('anon_' + (++anonCounter));
+    if (!id) {
+      console.warn('TimeEngine.subscribe called without an id \u2014 subscription will not be de-duplicated on re-init. Pass a stable id (e.g. \"study\", \"planning-agent-alarms\", \"gamification\", \"water\").');
+    }
+    subscriberRegistry[key] = fn;
+    return function unsubscribe() { delete subscriberRegistry[key]; };
+  }
+
+  function unsubscribe(id) { if (id) delete subscriberRegistry[id]; }
+
+  function getSubscriberIds() { return Object.keys(subscriberRegistry); }
+
+  function notify() {
+    Object.keys(subscriberRegistry).forEach(function (key) {
+      try { subscriberRegistry[key](); }
+      catch (e) { console.warn('TimeEngine subscriber "' + key + '" threw during tick \u2014 other subscribers still ran.', e); }
+    });
+  }
+
+  let tickHandle = null;
+  function init() {
+    ensureDate();
+    syncSessionsForToday();
+    if (!tickHandle) tickHandle = setInterval(tick, 1000);
+  }
+
+  function getBreaksForDate(dateStr) {
+    return (State.get().timeEngineBreaks || []).filter(function(b){ return b.date === (dateStr || todayStr()); });
+}
+  
+  return {
+    init: init,
+    subscribe: subscribe,
+    unsubscribe: unsubscribe,
+    getSubscriberIds: getSubscriberIds,
+    onRollover: onRollover,
+    unsubscribeRollover: unsubscribeRollover,
+    getRolloverSubscriberIds: getRolloverSubscriberIds,
+    isSessionActive: isSessionActive,
+    getActiveSession: getActiveSession,
+    getPrompt: getPrompt,
+    getUpcomingSession: getUpcomingSession,
+    getGlobalBreak: getGlobalBreak,
+    startTaskSession: startTaskSession,
+    resolvePrompt: resolvePrompt,
+    pauseActive: pauseActive,
+    resumeActive: resumeActive,
+    completeActive: completeActive,
+    skipActive: skipActive,
+    doItLater: doItLater,
+    // Schedule-shift API: TimeEngine is the sole owner of today's cumulative shift.
+    applyShift: applyShift,
+    getShiftMs: getShiftMs,
+    startGlobalBreak: startGlobalBreak,
+    addGlobalBreakTime: addGlobalBreakTime,
+    endGlobalBreak: endGlobalBreak,
+    logUnrecordedBreak: logUnrecordedBreak,
+    getClockDisplayMs: getClockDisplayMs,
+    getDayStats: getDayStats,
+    getQuestionsForDate: getQuestionsForDate,
+    getRecord: getRecord,
+    getRecordForTask: findRecordForTask,
+    getRecordsForDate: getRecordsForDate,
+    getDailySummary: getDailySummary,
+    getAllDailySummaries: getSummaries,
+    getAllTrackedDates: getAllTrackedDates,
+    getLiveStudyMs: liveStudyMs,
+    isPastCutoff: function () { return false; }, // compatibility only: there is no cutoff any more
+    recordStandaloneStudy: recordStandaloneStudy,
+    isManualClockActive: isManualClockActive,
+    pushLog: pushLog,
+    getLogForDate: getLogForDate,
+    safeElapsed: safeElapsed,
+    safeMs: safeMs,
+    getBreaksForDate: getBreaksForDate
+  };
+})();
