@@ -5631,9 +5631,17 @@ const PlanningAgentTasks = (function () {
   }
 
   // Single completion path for every view. Legacy-mapped tasks go through PlanData so EXP awards stay correct.
-  function toggleTask(id) {
+    function toggleTask(id) {
     if (typeof PlanData !== 'undefined' && PlanData.getTask(id)) {
       PlanningAgent.toggleComplete(id);
+      // Checking a subtask also checks the revisions under it (unchecking leaves them as they are).
+      const parentRec = PlanData.getTask(id);
+      if (parentRec && parentRec.completed && parentRec.revisionCycle && Array.isArray(parentRec.revisionCycle.ids)) {
+        parentRec.revisionCycle.ids.forEach(function (rid) {
+          const rev = rid ? PlanData.getTask(rid) : null;
+          if (rev && !rev.archived && !rev.completed) PlanningAgent.toggleComplete(rid);
+        });
+      }
       sync();
       return { ok: true };
     }
