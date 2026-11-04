@@ -1,4 +1,4 @@
-// planning-agent-ui.js — Centralized Planning Agent: User-Facing Interface
+// planning-agent-ui.js — Centralised Planning Agent: User-Facing Interface
 // The ONE user-facing planning interface for all of Lavender: every "plan new work" action opens this.
 // Deterministic reasoning without AI/LLM network dependencies.
 // Self-contained: PlanningAgentData and PlanningAgent are defined in this file (Phase 7).
