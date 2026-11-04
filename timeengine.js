@@ -313,7 +313,7 @@ const TimeEngine = (function () {
 
   function syncSessionsForToday() {
     const today = todayStr();
-    const tasks = PlannerData.getTasksForDate(today).filter(function (t) { return t.startTime && t.stopTime && !t.completed; });
+        const tasks = PlannerData.getTasksForDate(today).filter(function (t) { return t.startTime && t.stopTime && !t.completed && !isRevisionTask(t.taskId); });
     const engine = getEngine();
     tasks.forEach(function (task) {
       if (findOpenRecordForTask(task.taskId, today)) return;
@@ -414,10 +414,16 @@ const TimeEngine = (function () {
 
         function getPrompt() { return getEngine().prompt; }
 
+    function isRevisionTask(taskId) {
+    try {
+      return typeof PlanningAgent !== 'undefined' && typeof PlanningAgent.isRevisionEntry === 'function' && !!PlanningAgent.isRevisionEntry(taskId);
+    } catch (e) { return false; }
+  }
+
   function getUpcomingPromptableSession() {
     const today = todayStr();
     const list = getRecordsForDate(today)
-      .filter(function (r) { return r.state === 'scheduled'; })
+      .filter(function (r) { return r.state === 'scheduled' && !isRevisionTask(r.taskId); })
       .sort(function (a, b) {
         return timeStrToMs(today, a.adjustedStart) - timeStrToMs(today, b.adjustedStart);
       });
@@ -670,10 +676,11 @@ const TimeEngine = (function () {
     setEngine({ globalBreak: null });
   }
 
-  function processPrompt() {
+    function processPrompt() {
     const engine = getEngine();
     const prompt = engine.prompt;
     if (!prompt) return;
+    if (prompt.kind === 'start' && isRevisionTask(prompt.taskId)) { setEngine({ prompt: null }); return; }
     const now = Date.now();
     if (prompt.autoBreakActive) {
       if (now >= prompt.autoBreakResumeAt) {
