@@ -899,7 +899,7 @@ const TimeEngine = (function () {
     isSessionActive: isSessionActive,
     getActiveSession: getActiveSession,
     getPrompt: getPrompt,
-    getUpcomingSession: getUpcomingSession,
+        getUpcomingSession: getUpcomingPromptableSession,
     getGlobalBreak: getGlobalBreak,
     startTaskSession: startTaskSession,
     resolvePrompt: resolvePrompt,
