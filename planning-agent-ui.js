@@ -2926,8 +2926,8 @@ const PlanningAgentUI = (function () {
     const subs = planSubs(tg.targetId), total = subs.length, done = subs.filter(function (s) { return s.done; }).length;
     const kidsOf = {};
     subs.forEach(function (s) { if (hasParent(s, subs)) (kidsOf[s.parent] = kidsOf[s.parent] || []).push(s); });
-    const pending = subs.filter(function (s) {
-      return !hasParent(s, subs) && (!s.done || (kidsOf[s.key] || []).some(function (x) { return !x.done; }));
+        const pending = subs.filter(function (s) {
+      return !hasParent(s, subs);
     });
     const st = total && done === total ? 'done' : (done ? 'part' : 'open');
     const k = 'p:' + tg.targetId + ':' + gk, open = !!dash.open[k];
@@ -2996,10 +2996,21 @@ const PlanningAgentUI = (function () {
         : '<div class="pl-item-main pl-static"><span class="pl-item-text"><span class="pl-item-title">' + esc(e.title) + '</span></span></div>') +
       actsHtml('plan', e.targetId, e.title) + '</div>' +
       (dash.confirm === 'plan:' + e.targetId ? confirmHtml('plan', e.targetId) : '') +
-      (open ? '<div class="pl-details"><ul class="pl-subl">' + e.subs.map(function (s) {
-        return '<li class="pl-subi is-done"><div class="pl-item-row">' + checkHtml(s) +
-          '<div class="pl-item-main pl-static"><span class="pl-item-text"><span class="pl-item-title">' + esc(s.title) + '</span></span></div></div></li>';
-      }).join('') + '</ul></div>' : '') + '</li>';
+            (open ? '<div class="pl-details"><ul class="pl-subl">' + (function () {
+        const keys = {}, kids = {}, top = [];
+        e.subs.forEach(function (s) { if (s.key) keys[s.key] = true; });
+        e.subs.forEach(function (s) {
+          if (s.parent && keys[s.parent] && s.parent !== s.key) (kids[s.parent] = kids[s.parent] || []).push(s);
+          else top.push(s);
+        });
+        function line(s) {
+          const ch = s.key ? (kids[s.key] || []) : [];
+          return '<li class="pl-subi is-done"><div class="pl-item-row">' + checkHtml(s) +
+            '<div class="pl-item-main pl-static"><span class="pl-item-text"><span class="pl-item-title">' + esc(s.title) + '</span></span></div></div>' +
+            (ch.length ? '<ul class="pl-subl pl-revl">' + ch.map(line).join('') + '</ul>' : '') + '</li>';
+        }
+        return top.map(line).join('');
+      })() + '</ul></div>' : '') + '</li>';
   }
 
   function historyHtml() {
@@ -5556,8 +5567,9 @@ const PlanningAgentTasks = (function () {
     const targets = (typeof TargetsData !== 'undefined') ? TargetsData.getAllTargets() : {};
     const rows = CanonicalTaskStore.getTasks({ status: ['pending', 'completed'] }).map(function (t) {
       const key = legacyKey(t.id), lt = key ? legacy[key] : null;
-      return {
-        id: t.id, done: t.status === 'completed', at: t.completedAt || 0, targetId: t.targetId || '', type: t.type,
+            return {
+        id: t.id, key: key || '', parent: (lt && lt.subtargetId) || t.subtaskId || '',
+        done: t.status === 'completed', at: t.completedAt || 0, targetId: t.targetId || '', type: t.type,
         title: (lt && lt.title) || t.title || (lt && lt.topicName) || 'Task',
         topicId: t.topicId || '', subject: (lt && lt.subject) || t.subjectId || '', hidden: !!(lt && lt.archived)
       };
