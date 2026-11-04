@@ -412,10 +412,17 @@ const TimeEngine = (function () {
 
   function isSessionActive() { return !!getEngine().activeSessionId; }
 
-  function getPrompt() { return getEngine().prompt; }
+        function getPrompt() { return getEngine().prompt; }
 
-      const next = getUpcomingPromptableSession();
-    if (!next) return;
+  function getUpcomingPromptableSession() {
+    const today = todayStr();
+    const list = getRecordsForDate(today)
+      .filter(function (r) { return r.state === 'scheduled'; })
+      .sort(function (a, b) {
+        return timeStrToMs(today, a.adjustedStart) - timeStrToMs(today, b.adjustedStart);
+      });
+    return list[0] || null;
+  }
 
   function beginActiveSession(sessionId) {
     const rec = getRecord(sessionId);
@@ -719,7 +726,7 @@ const TimeEngine = (function () {
       return; // only one focus session at a time — no start prompts while one is running/paused
     }
 
-        const next = getUpcomingPromptableSession();
+            const next = getUpcomingPromptableSession();
     if (!next) return;
     const startMs = timeStrToMs(today, next.adjustedStart);
     if (now >= startMs) {
