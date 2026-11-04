@@ -1060,9 +1060,7 @@ const PlanData = (function () {
   function getSuggestedTasksForDate(dateStr) {
     return {
       pending: getPendingTasks(),
-      dueRevisions: getTasksForDate(dateStr).filter(function (t) {
-        return t.taskType === 'revision' && !t.completed;
-      })
+            dueRevisions: []
     };
   }
   
@@ -1313,10 +1311,7 @@ const PlanningAgentData = (function () {
       return t.date && t.date < today && !t.completed && !t.archived;
     });
 
-    const dueRevisionsToday = tasksList.filter(function (t) {
-      return t.date === today && t.taskType === 'revision' && !t.completed && !t.archived;
-    });
-
+        const dueRevisionsToday = [];
     const rawTargets = (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargets === 'function')
       ? TargetsData.getAllTargets()
       : (typeof TargetsData !== 'undefined' && typeof TargetsData.getAllTargetsList === 'function'
@@ -1528,10 +1523,7 @@ const PlanningAgentData = (function () {
     const tasksList = Object.keys(allTasks).map(function (k) { return allTasks[k]; });
 
     // 1. Revision tasks due on targetDate that have no slot
-    const dueRevisions = tasksList.filter(function (t) {
-      return t.date === targetDate && t.taskType === 'revision' && !t.completed && !t.archived && (!t.startTime || !t.stopTime);
-    });
-
+        const dueRevisions = [];
     // 2. Pending incomplete tasks from earlier dates
     const pendingTasks = tasksList.filter(function (t) {
       return t.date && t.date < targetDate && !t.completed && !t.archived;
@@ -1539,7 +1531,7 @@ const PlanningAgentData = (function () {
 
     // 3. Unslotted tasks already scheduled on targetDate
     const unslottedToday = tasksList.filter(function (t) {
-      return t.date === targetDate && t.taskType !== 'revision' && !t.completed && !t.archived && (!t.startTime || !t.stopTime);
+            return t.date === targetDate && !t.completed && !t.archived && (!t.startTime || !t.stopTime);
     });
 
     // Determine task duration with adaptive multiplier
@@ -5347,7 +5339,8 @@ const AlarmEngine = (function () {
 
     const fired = [];
     CanonicalTaskStore.getTasks({ status: 'pending', scheduled: 'timed' }).forEach(function (t) {
-      if (!t.alarm || !t.alarm.enabled || t.alarm.notified) return;
+            if (!t.alarm || !t.alarm.enabled || t.alarm.notified) return;
+      if (typeof PlanningAgentTasks !== 'undefined' && PlanningAgentTasks.isRevisionEntry(t.id)) return;
       const fireAt = fireAtMs(t);
       if (isNaN(fireAt) || now < Math.floor(fireAt / 60000) * 60000) return;
       const res = CanonicalTaskStore.updateTask(t.id, { alarm: Object.assign({}, t.alarm, { notified: true }) });
@@ -5662,7 +5655,11 @@ const PlanningAgentTasks = (function () {
     getHistory: getHistory,
     getCompletedToday: getCompletedToday,
     getRevisionIndex: getRevisionIndex,
-    getRevisionEntries: getRevisionEntries,
+        getRevisionEntries: getRevisionEntries,
+    isRevisionEntry: function (id) {
+      const key = legacyKey(id) || String(id);
+      return !!getRevisionIndex()[key];
+    },
     toggleTask: toggleTask
   };
 })();
@@ -5702,7 +5699,8 @@ if (typeof window !== 'undefined') {
     PA.getAlarmsForDate = PlanningAgentTasks.getAlarmsForDate;
     PA.toggleTask = PlanningAgentTasks.toggleTask;
     PA.getRevisionIndex = PlanningAgentTasks.getRevisionIndex;
-    PA.getRevisionEntries = PlanningAgentTasks.getRevisionEntries;
+        PA.getRevisionEntries = PlanningAgentTasks.getRevisionEntries;
+    PA.isRevisionEntry = PlanningAgentTasks.isRevisionEntry;
 
     // Live refresh: any task change re-renders the open views (debounced), no page reload needed.
     let viewRefreshTimer = null;
