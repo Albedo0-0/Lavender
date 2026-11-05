@@ -54,8 +54,7 @@ const EntityLVPackUI = (function () {
       (p.source === 'imported' ? '<button type="button" class="btn-secondary" data-entity-act="remove" data-id="' + esc(p.id) + '" data-name="' + esc(p.name) + '">Remove</button>' : '');
     return '<div class="assistant-store-item lvstore-card is-owned misc-entity-pack-row' + (p.active ? ' is-active misc-entity-pack-row-active' : '') + (p.valid ? '' : ' misc-entity-pack-row-locked') + '" data-entity-pack-id="' + esc(p.id) + '"' +
       (canActivate ? ' data-entity-act="activate" data-id="' + esc(p.id) + '"' : '') + '>' +
-      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(p.id) + '">' +
-        '<span class="lvstore-preview-note">Preview unavailable: no Dashboard Entity scene renderer is installed in this app.</span></div>' +
+      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(p.id) + '" role="img" aria-label="' + esc(p.name) + ' preview"></div>' +
       '<span class="assistant-store-item-name lvstore-name">' + esc(p.name) + '</span>' +
       '<div class="micro-label lvstore-meta">' + esc(meta(p)) + '</div>' +
       (p.valid ? '' : '<div class="micro-label lvstore-desc">Unavailable: ' + esc(p.reason) + '</div>') +
@@ -67,6 +66,23 @@ const EntityLVPackUI = (function () {
       '</div>';
   }
 
+  // The built-in default (LV1) is a normal pack to the previewer; it is never bought, imported or removed.
+  function defaultRow(mode) {
+    const D = data(), b = D && D.getBuiltin ? D.getBuiltin() : null;
+    if (!b) return '';
+    const on = !!(D.resolve && D.resolve().builtin);
+    const cosm = mode === 'cosmetics';
+    return '<div class="assistant-store-item lvstore-card is-owned' + (cosm && on ? ' is-active misc-entity-pack-row-active' : '') + '" data-entity-pack-id="' + esc(b.id) + '"' +
+      (cosm && !on ? ' data-entity-act="deactivate"' : '') + '>' +
+      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(b.id) + '" role="img" aria-label="' + esc(b.pack.name) + ' preview"></div>' +
+      '<span class="assistant-store-item-name lvstore-name">' + esc(b.pack.name) + '</span>' +
+      '<div class="micro-label lvstore-meta">' + esc(['Built-in', b.pack.version ? 'v' + b.pack.version : '', b.pack.author || ''].filter(Boolean).join(' · ')) + '</div>' +
+      '<div class="lvstore-states"><span class="tag lvstore-state lvstore-state-owned">Included</span>' +
+        (cosm && on ? '<span class="tag lvstore-state lvstore-state-active">Active</span>' : '') + '</div>' +
+      (cosm && !on ? '<div class="lvstore-actions"><button type="button" class="btn-secondary lvstore-switch" data-entity-act="deactivate">Activate</button></div>' : '') +
+      '</div>';
+  }
+
   function cosmeticsHtml(msg) {
     const D = data();
     if (!D) return '<p class="micro-label">Dashboard Entity packs unavailable.</p>';
@@ -75,8 +91,8 @@ const EntityLVPackUI = (function () {
     if (act.status === 'missing' || act.status === 'invalid') {
       html += '<p class="micro-label">Your active Dashboard Entity pack is unavailable (' + esc(act.reason) + '). The default is being used.</p>';
     }
-    html += '<div class="assistant-store-card">' + (packs.length
-      ? '<div class="assistant-store-list">' + packs.map(packRow).join('') + '</div>'
+    html += '<div class="assistant-store-card">' + (packs.length || defaultRow('cosmetics')
+      ? '<div class="assistant-store-list">' + defaultRow('cosmetics') + packs.map(packRow).join('') + '</div>'
       : '<div class="empty-state">No Dashboard Entity packs yet. Import one in Settings or buy one in the Store.</div>') + '</div>';
     if (act.status !== 'none') html += '<button type="button" class="btn-secondary" data-entity-act="deactivate">Use default</button>';
     return html;
@@ -84,8 +100,7 @@ const EntityLVPackUI = (function () {
 
   function storeRow(o) {
     return '<div class="assistant-store-item misc-entity-store-row lvstore-card' + (o.owned ? ' is-owned' : ' is-locked') + '" data-entity-pack-id="' + esc(o.id) + '">' +
-      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(o.id) + '">' +
-        '<span class="lvstore-preview-note">Preview unavailable: no Dashboard Entity scene renderer is installed in this app.</span></div>' +
+      '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(o.id) + '" role="img" aria-label="' + esc(o.name) + ' preview"></div>' +
       '<span class="assistant-store-item-name lvstore-name">' + esc(o.name) + '</span>' +
       '<div class="micro-label lvstore-meta">' + esc(['v' + o.version, o.author].filter(Boolean).join(' · ')) + '</div>' +
       (o.description ? '<div class="micro-label lvstore-desc">' + esc(o.description) + '</div>' : '') +
@@ -105,12 +120,39 @@ const EntityLVPackUI = (function () {
     return '<h4 class="section-title">Dashboard Entity</h4>' +
       '<p class="micro-label">Your EXP: ' + esc(D.getBalance()) + '</p>' + msgHtml(msg) +
       '<div class="assistant-store-card">' +
-      (list.length ? '<div class="assistant-store-list">' + list.map(storeRow).join('') + '</div>' : '<div class="empty-state">No official Dashboard Entity packs are available yet.</div>') +
+      (list.length || defaultRow('store') ? '<div class="assistant-store-list">' + defaultRow('store') + list.map(storeRow).join('') + '</div>' : '<div class="empty-state">No official Dashboard Entity packs are available yet.</div>') +
       '</div>';
+  }
+
+  // ---------- previews ----------
+  // One rule for every pack, official or imported: paint the pack's own entry environment (its frames and layers, via
+  // EntityRenderer.paintPreview). No per-pack art, no extra stored assets. A pack that is invalid, has no renderable
+  // scene, or renders while the renderer is missing shows a plain "No preview" note instead.
+  function previewNote(el, text) {
+    el.innerHTML = '<span class="lvstore-preview-note">' + esc(text) + '</span>';
+  }
+  function paintPreviews(container) {
+    const D = data();
+    container.querySelectorAll('[data-entity-preview-id]').forEach(function (el) {
+      el.textContent = '';
+      let r = { ok: false };
+      try {
+        const pack = D && D.getManifest ? D.getManifest(el.getAttribute('data-entity-preview-id')) : null;
+        const valid = pack && D.validate(pack).ok;
+        if (valid && typeof EntityRenderer !== 'undefined' && EntityRenderer.paintPreview) {
+          const cv = document.createElement('canvas');
+          const b = D.getBuiltin && D.getBuiltin();
+          r = EntityRenderer.paintPreview(pack, cv, { id: el.getAttribute('data-entity-preview-id'), builtin: !!(b && b.id === el.getAttribute('data-entity-preview-id')) });
+          if (r.ok) el.appendChild(cv);
+        }
+      } catch (err) { r = { ok: false }; }
+      if (!r.ok) previewNote(el, 'No preview');
+    });
   }
 
   function render(container, msg) {
     container.innerHTML = container.__entityMode === 'store' ? storeHtml(msg) : cosmeticsHtml(msg);
+    paintPreviews(container);
   }
 
   function onClick(e) {
