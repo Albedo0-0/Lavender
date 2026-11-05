@@ -999,7 +999,7 @@ const Dashboard = (function () {
   function markup() {
     return '<div class="dash">' +
       '<div class="dash-left">' +
-        box('dash-entity', 'dash-entity', 'Entity', 'Entity area', false) +
+        box('dash-entity', 'dash-entity', '', 'Dashboard scene', false) +
         '<div class="dash-row dash-row-1">' +
           box('dash-b1', 'dash-reflection', 'Daily Reflection', 'Daily Reflection', true) +
           box('dash-b2', 'dash-custom', 'Custom Content', 'Custom Content', true) +
