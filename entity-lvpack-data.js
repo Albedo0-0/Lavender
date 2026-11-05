@@ -540,6 +540,14 @@ const EntityLVPackData = (function () {
     }) ? { ok: true } : fail('Could not save the change.');
   }
 
+  // Read-only manifest lookup for display (previews): installed, official (owned or not) or the built-in. Callers must not mutate it.
+  function getManifest(id) {
+    if (isBuiltinId(id)) return builtin.manifest;
+    const imp = findInstalled(readStore(), id);
+    if (imp && isObj(imp.pack)) return imp.pack;
+    return has(official, id) ? official[id].manifest : null;
+  }
+
   function getBalance() {
     try { return GamificationData.getGamState().totalExp; } catch (e) { return 0; }
   }
@@ -579,7 +587,7 @@ const EntityLVPackData = (function () {
     importText: importText, importFile: importFile,
     registerOfficial: registerOfficial, listOfficial: listOfficial, purchase: purchase,
     listAvailable: listAvailable, getActive: getActive, setActive: setActive, clearActive: clearActive,
-    remove: remove, getBalance: getBalance,
+    remove: remove, getBalance: getBalance, getManifest: getManifest,
     registerBuiltin: registerBuiltin, getBuiltin: getBuiltin, resolve: resolve
   };
 })();
