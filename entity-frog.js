@@ -619,7 +619,21 @@ const EntityFrog = (function () {
     start(api, host);
   }
 
+  // Preview (Store / Cosmetics): the built-in pond with the adult frog sitting on the lily pad, drawn with the same sprites
+  // and the same pad geometry as the live frog. Static: no clock, no stage logic, nothing kept.
+  function previewHook(g, pack, info) {
+    if (!info || info.id !== LV1_ID || !info.builtin) return;
+    const geo = readGeometry({ pack: pack });
+    if (!geo) return;
+    const x = Math.round(geo.cx) - 6, y = (geo.padY1 - 2) - 9;
+    blit(g, BODY, x, y + 7, { shear: [0, 0, 0] });
+    blit(g, headSprite('open', 'open', 'smile', 0), x, y, { shear: 0 });
+  }
+
   let registered = false;
+  try {
+    if (typeof EntityRenderer !== 'undefined' && EntityRenderer && typeof EntityRenderer.registerPreviewHook === 'function') EntityRenderer.registerPreviewHook(previewHook);
+  } catch (e) { /* previews simply omit the frog */ }
   try {
     if (typeof EntityRenderer !== 'undefined' && EntityRenderer && typeof EntityRenderer.registerSessionHook === 'function') {
       registered = EntityRenderer.registerSessionHook(hook) === true;
