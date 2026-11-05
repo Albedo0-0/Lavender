@@ -38,6 +38,7 @@ const EntityRenderer = (function () {
   let resizeBound = false;
   let lastError = '';
   const hooks = [];
+  const previewHooks = [];  // optional extra static paint for a preview (e.g. an actor of the built-in pack)
 
   function warn(msg, err) { try { console.warn(LOG + msg, err || ''); } catch (e) { /* no console */ } }
   function data() { return typeof EntityLVPackData !== 'undefined' ? EntityLVPackData : null; }
@@ -171,7 +172,7 @@ const EntityRenderer = (function () {
         cv.style.imageRendering = 'pixelated';
     cv.style.flex = 'none'; // cover can make the canvas larger than the layer; never let flex shrink (and squash) it
     cv.setAttribute('role', 'img');
-    cv.setAttribute('aria-label', String(res.pack.name || 'Dashboard Entity'));
+    cv.setAttribute('aria-label', String(res.pack.name || 'Dashboard scene'));
     s.canvas = cv;
     s.g = cv.getContext('2d');
     s.g.imageSmoothingEnabled = false;
@@ -257,6 +258,31 @@ const EntityRenderer = (function () {
 
   function teardown() { endSession(); detachInfra(); host = null; }
 
+  // Static preview of any validated pack: paints the pack's entry environment (the same frames/layers the live scene uses)
+  // onto `cv` at the scene's native size. Draws nothing live and holds nothing afterwards (no session, timers or cache).
+  // Returns { ok:true } or { ok:false, reason }. The caller's CSS crops/scales the canvas (object-fit: cover).
+  function paintPreview(pack, cv, info) {
+    if (!pack || !cv) return { ok: false, reason: 'no pack' };
+    const s = { pack: pack, frameCache: {}, envCanvas: null, scene: null };
+    try {
+      composeEnvironment(s);
+      cv.width = s.scene.w; cv.height = s.scene.h;
+      const g = cv.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, s.scene.w, s.scene.h);
+      g.drawImage(s.envCanvas, 0, 0);
+      previewHooks.slice().forEach(function (h) { try { g.save(); h(g, pack, info || {}); } catch (e) { warn('preview hook failed', e); } finally { g.restore(); } });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: String(e && e.message || e) };
+    } finally {
+      Object.keys(s.frameCache).forEach(function (k) { s.frameCache[k].width = 0; s.frameCache[k].height = 0; });
+      if (s.envCanvas) { s.envCanvas.width = 0; s.envCanvas.height = 0; }
+    }
+  }
+
+  function registerPreviewHook(fn) { if (typeof fn !== 'function') return false; previewHooks.push(fn); return true; }
+
   function registerSessionHook(fn) { if (typeof fn !== 'function') return false; hooks.push(fn); return true; }
 
   function getState() {
@@ -268,5 +294,5 @@ const EntityRenderer = (function () {
     };
   }
 
-  return { mount: mount, refresh: refresh, teardown: teardown, registerSessionHook: registerSessionHook, getState: getState };
+  return { mount: mount, refresh: refresh, teardown: teardown, paintPreview: paintPreview, registerPreviewHook: registerPreviewHook, registerSessionHook: registerSessionHook, getState: getState };
 })();
