@@ -32,7 +32,7 @@ const EntityLVPackUI = (function () {
       D.importFile(file).then(function (r) {
         if (!statusEl) return;
         statusEl.innerHTML = r.ok
-          ? 'Imported “' + esc(r.name) + '” v' + esc(r.version) + '. Activate it in Cosmetics › Dashboard Entity.'
+          ? 'Imported “' + esc(r.name) + '” v' + esc(r.version) + (r.forSale ? '. Find it in the Store to buy it; it appears in Cosmetics once bought.' : '. Activate it in Cosmetics › Dashboard Entity.')
           : 'Rejected — nothing was imported.' + reasonList(r.errors);
       }).catch(function () {
         if (statusEl) statusEl.textContent = 'Rejected — nothing was imported (unexpected error).';
@@ -102,25 +102,26 @@ const EntityLVPackUI = (function () {
     return '<div class="assistant-store-item misc-entity-store-row lvstore-card' + (o.owned ? ' is-owned' : ' is-locked') + '" data-entity-pack-id="' + esc(o.id) + '">' +
       '<div class="lvstore-preview lvstore-preview-entity" data-entity-preview-id="' + esc(o.id) + '" role="img" aria-label="' + esc(o.name) + ' preview"></div>' +
       '<span class="assistant-store-item-name lvstore-name">' + esc(o.name) + '</span>' +
-      '<div class="micro-label lvstore-meta">' + esc(['v' + o.version, o.author].filter(Boolean).join(' · ')) + '</div>' +
+      '<div class="micro-label lvstore-meta">' + esc([o.source === 'imported' ? 'Imported' : '', 'v' + o.version, o.author].filter(Boolean).join(' · ')) + '</div>' +
       (o.description ? '<div class="micro-label lvstore-desc">' + esc(o.description) + '</div>' : '') +
       '<div class="lvstore-price">' + (o.price === 0 ? 'Free' : esc(o.price) + ' EXP') + '</div>' +
       '<div class="lvstore-states">' + (o.owned
         ? '<span class="tag lvstore-state lvstore-state-purchased">Purchased</span>'
         : '<span class="tag lvstore-state lvstore-state-locked">Not owned</span>') + '</div>' +
       (o.owned ? '<div class="micro-label lvstore-meta">Activate it in Cosmetics › Dashboard Entity.</div>'
-        : '<div class="lvstore-actions"><button type="button" class="btn-secondary lvstore-buy" data-entity-act="buy" data-id="' + esc(o.id) + '">Buy for ' + esc(o.price) + ' EXP</button></div>') +
+        : '<div class="lvstore-actions"><button type="button" class="btn-secondary lvstore-buy" data-entity-act="buy" data-id="' + esc(o.id) + '">' + (o.price === 0 ? 'Get it' : 'Buy for ' + esc(o.price) + ' EXP') + '</button>' +
+          (o.source === 'imported' ? '<button type="button" class="btn-secondary" data-entity-act="remove" data-id="' + esc(o.id) + '" data-name="' + esc(o.name) + '">Remove</button>' : '') + '</div>') +
       '</div>';
   }
 
   function storeHtml(msg) {
     const D = data();
     if (!D) return '<p class="micro-label">Dashboard Entity packs unavailable.</p>';
-    const list = D.listOfficial();
+    const list = D.listStore ? D.listStore() : D.listOfficial();
     return '<h4 class="section-title">Dashboard Entity</h4>' +
       '<p class="micro-label">Your EXP: ' + esc(D.getBalance()) + '</p>' + msgHtml(msg) +
       '<div class="assistant-store-card">' +
-      (list.length || defaultRow('store') ? '<div class="assistant-store-list">' + defaultRow('store') + list.map(storeRow).join('') + '</div>' : '<div class="empty-state">No official Dashboard Entity packs are available yet.</div>') +
+      (list.length || defaultRow('store') ? '<div class="assistant-store-list">' + defaultRow('store') + list.map(storeRow).join('') + '</div>' : '<div class="empty-state">No Dashboard Entity packs are available yet.</div>') +
       '</div>';
   }
 
