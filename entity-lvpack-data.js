@@ -6,7 +6,9 @@
 // Depends on (call time only): State (get / patch), GamificationData (getGamState / spendExp).
 //
 // STORAGE: State.get().settings.entityPacks = { v, installed: [{id, installedAt, pack}],
-//   owned: [{id, at, price}], activeId }. Arrays (not id-keyed objects) so State.patch can replace
+//   owned: [{id, at, price, imported?}], activeId }. An installed entry saved with forSale:true is a Store listing
+//   (imported, not yet bought): it only becomes usable in Cosmetics once its id is in `owned`. Entries without the flag
+//   (imported before the Store-first rule) stay usable as before. Arrays (not id-keyed objects) so State.patch can replace
 //   them wholesale. Nothing outside the `entityPacks` key is ever written.
 //
 // ENTITY LV PACK SPECIFICATION v1 (manifestVersion 1, engineVersion 1)
@@ -14,7 +16,8 @@
 // fields reject the pack, and no field can carry code, URLs, images or app-state access.
 //   format "lv-pack", category "dashboard-entity", manifestVersion 1, engineVersion 1
 //   id       lowercase letters/digits/. _ -, 3-64 chars (unique; "official" ids are reserved)
-//   name, author (1-60 chars), version "x.y.z", description (optional, <= 300)
+//   name, author (1-60 chars), version "x.y.z", description (optional, <= 300),
+//   price (optional, whole EXP 0-100000; used when the pack is listed in the Store after import; default 0)
 //   palettes   { <id>: { "<one char>": "#rrggbb", ... } }          "." is always transparent
 //   frames     { <id>: { size:{w,h}, palette:<paletteId>, rows:[ "ascii pixel row", ... ] } }
 //   animations { <id>: { frames:[<frameId>...], frameMs:50-10000, loop?:bool } }
@@ -262,7 +265,8 @@ const EntityLVPackData = (function () {
 
     scan(pack, '', 0, bad);
     checkKeys(pack, ['format', 'category', 'manifestVersion', 'engineVersion', 'id', 'name', 'version', 'author',
-      'palettes', 'frames', 'animations', 'behaviors', 'entities', 'environments', 'entry'], ['description'], 'pack', bad);
+      'palettes', 'frames', 'animations', 'behaviors', 'entities', 'environments', 'entry'], ['description', 'price'], 'pack', bad);
+    if (has(pack, 'price') && !isInt(pack.price, 0, LIMITS.maxPrice)) bad('price', 'must be a whole number of EXP from 0 to ' + LIMITS.maxPrice + '.');
 
     if (typeof pack.id !== 'string' || !PACK_ID_RE.test(pack.id)) bad('id', 'must be 3-64 characters: lowercase letters, digits, "." "_" "-", starting with a letter or digit.');
     if (typeof pack.name !== 'string' || !pack.name.trim() || pack.name.length > LIMITS.maxName) bad('name', 'must be text of 1 to ' + LIMITS.maxName + ' characters.');
@@ -427,9 +431,12 @@ const EntityLVPackData = (function () {
     return { ok: true };
   }
 
+  // An imported pack listed for sale (forSale) is usable only once bought; older imports have no flag and stay usable.
+  function isUsable(st, entry) { return !entry.forSale || isOwnedIn(st, entry.id); }
+
   function lookupPack(st, id) {
     const imp = findInstalled(st, id);
-    if (imp) return imp.pack;
+    if (imp) return isUsable(st, imp) ? imp.pack : null;
     if (isOwnedIn(st, id) && has(official, id)) return official[id].manifest;
     return null;
   }
@@ -442,9 +449,10 @@ const EntityLVPackData = (function () {
     if (has(official, pack.id)) return rejected(['id: "' + pack.id + '" is reserved for an official pack.']);
     if (isBuiltinId(pack.id)) return rejected(['id: "' + pack.id + '" is reserved for the built-in pack.']);
     if (findInstalled(readStore(), pack.id)) return rejected(['id: a pack with id "' + pack.id + '" is already installed. Remove it first to import a different copy.']);
-    const saved = commit(function (next) { next.installed.push({ id: pack.id, installedAt: Date.now(), pack: pack }); });
+    const owned = isOwnedIn(readStore(), pack.id); // re-importing a pack that was already bought needs no second purchase
+    const saved = commit(function (next) { next.installed.push({ id: pack.id, installedAt: Date.now(), pack: pack, forSale: true }); });
     if (!saved) return rejected(['Could not save the pack (device storage may be full). Nothing was imported.']);
-    return { ok: true, id: pack.id, name: pack.name, version: pack.version };
+    return { ok: true, id: pack.id, name: pack.name, version: pack.version, forSale: !owned };
   }
 
   function importFile(file) {
@@ -466,12 +474,14 @@ const EntityLVPackData = (function () {
   function listAvailable() {
     const st = readStore(), out = [];
     st.installed.forEach(function (e) {
+      if (!isUsable(st, e)) return;
       const r = validate(e.pack);
       const p = isObj(e.pack) ? e.pack : {};
       out.push({ id: e.id, name: typeof p.name === 'string' ? p.name : e.id, version: p.version, author: p.author, description: p.description,
         source: 'imported', active: st.activeId === e.id, valid: r.ok, reason: r.ok ? '' : r.errors[0] });
     });
     st.owned.forEach(function (o) {
+      if (o.imported) return; // bought imported packs are listed from `installed` above
       const off = has(official, o.id) ? official[o.id] : null;
       const r = off ? validate(off.manifest) : null;
       out.push({ id: o.id, name: off ? off.manifest.name : o.id, version: off && off.manifest.version, author: off && off.manifest.author,
@@ -488,6 +498,18 @@ const EntityLVPackData = (function () {
       return { id: id, name: m.name, version: m.version, author: m.author, description: m.description,
         price: official[id].price, owned: isOwnedIn(st, id) };
     });
+  }
+
+  // Store catalogue: official packs plus imported packs waiting to be bought (or already bought). Read-only.
+  function listStore() {
+    const st = readStore(), out = listOfficial().map(function (o) { o.source = 'official'; return o; });
+    st.installed.forEach(function (e) {
+      if (!e.forSale || !isObj(e.pack) || !validate(e.pack).ok) return;
+      const m = e.pack;
+      out.push({ id: e.id, name: m.name, version: m.version, author: m.author, description: m.description,
+        price: has(m, 'price') ? m.price : 0, owned: isOwnedIn(st, e.id), source: 'imported' });
+    });
+    return out;
   }
 
   function getActive() {
@@ -555,18 +577,20 @@ const EntityLVPackData = (function () {
   // Ownership is recorded first and rolled back if the existing EXP economy refuses the charge,
   // so a failed purchase never leaves a free pack, and a failed save never charges EXP.
   function purchase(id) {
-    const off = has(official, id) ? official[id] : null;
-    if (!off) return fail('That pack is not for sale.');
     const st = readStore();
+    const entry = findInstalled(st, id);
+    const imported = !!(entry && entry.forSale && isObj(entry.pack) && validate(entry.pack).ok);
+    const off = has(official, id) ? official[id] : (imported ? { manifest: entry.pack, price: has(entry.pack, 'price') ? entry.pack.price : 0 } : null);
+    if (!off) return fail('That pack is not for sale.');
     if (isOwnedIn(st, id)) return fail('You already own this pack.');
-    if (findInstalled(st, id)) return fail('You already have an imported pack with this id. Remove it first.');
+    if (entry && !imported) return fail('You already have an imported pack with this id. Remove it first.');
     if (typeof GamificationData === 'undefined' || typeof GamificationData.spendExp !== 'function') return fail('The Store is unavailable right now.');
     const have = getBalance();
     if (have < off.price) return fail('Not enough EXP (needs ' + off.price + ', you have ' + have + ').');
-    const saved = commit(function (next) { next.owned.push({ id: id, at: Date.now(), price: off.price }); });
+    const saved = commit(function (next) { next.owned.push(imported ? { id: id, at: Date.now(), price: off.price, imported: true } : { id: id, at: Date.now(), price: off.price }); });
     if (!saved) return fail('Could not save your purchase. You were not charged.');
-    let paid = false;
-    try { paid = GamificationData.spendExp(off.price, 'Dashboard Entity pack: ' + off.manifest.name); } catch (e) { paid = false; }
+    let paid = off.price === 0; // a free pack needs no charge
+    if (!paid) try { paid = GamificationData.spendExp(off.price, 'Dashboard Entity pack: ' + off.manifest.name); } catch (e) { paid = false; }
     if (!paid) {
       commit(function (next) { next.owned = next.owned.filter(function (o) { return o.id !== id; }); });
       return fail('Not enough EXP (needs ' + off.price + ').');
@@ -585,7 +609,7 @@ const EntityLVPackData = (function () {
     registerBehaviorType: function (n, fn) { return registerType(BEHAVIOR_TYPES, n, fn); },
     validate: validate, parseText: parseText,
     importText: importText, importFile: importFile,
-    registerOfficial: registerOfficial, listOfficial: listOfficial, purchase: purchase,
+    registerOfficial: registerOfficial, listOfficial: listOfficial, listStore: listStore, purchase: purchase,
     listAvailable: listAvailable, getActive: getActive, setActive: setActive, clearActive: clearActive,
     remove: remove, getBalance: getBalance, getManifest: getManifest,
     registerBuiltin: registerBuiltin, getBuiltin: getBuiltin, resolve: resolve
