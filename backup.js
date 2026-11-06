@@ -20,7 +20,9 @@
 // it is exported/merged through MyWorldData/MyWorldContent under the same rules: live wins on
 // conflict, backup-only records are added, live-only records are preserved.
 const Backup = (function () {
-  const SCHEMA_VERSION = 2;
+  // v3: ZIP package (backup.json + manifest.json + media/), adds canonicalTasks and providers. v1/v2 (plain JSON,
+  // media inline as data URLs or absent) restore unchanged: every v3 field is optional on restore.
+  const SCHEMA_VERSION = 3;
 
   // Mirrors state.js's defaultState.studyClock exactly — the canonical "idle" shape.
   const DEFAULT_IDLE_STUDY_CLOCK = {
@@ -107,8 +109,20 @@ const Backup = (function () {
       gallery: buildGallery(),
       dailySummaries: s.dailySummaries,
       planningHistory: s.planningHistory || {},
+      canonicalTasks: buildCanonicalTasks(),
+      extras: {
+        calendarPhotos: s.calendarPhotos || {}, // dateStr -> media id (the image itself is in the media store provider)
+        itineraryTemplates: s.itineraryTemplates || {},
+        dailyItinerarySummaries: s.dailyItinerarySummaries || {}
+      },
       settings: s.settings
     };
+  }
+
+  // The planner's canonical task store lives in its own localStorage key, outside State. Null if unavailable.
+  function buildCanonicalTasks() {
+    if (typeof CanonicalTaskStore === 'undefined' || typeof CanonicalTaskStore.exportBackup !== 'function') return null;
+    try { return CanonicalTaskStore.exportBackup(); } catch (e) { return null; }
   }
 
   // My World lives outside State — read it through its own modules. Null if they aren't loaded.
@@ -132,18 +146,429 @@ const Backup = (function () {
     return JSON.stringify(build(), null, 2);
   }
 
+  // ---------------------------------------------------------------------
+  // MEDIA + ZIP PACKAGING
+  // Any base64 data-URL string (>= MEDIA_MIN_CHARS) or image/audio/video Blob anywhere in the exported object
+  // tree is moved out of the JSON into media/<id>.<ext> inside the ZIP and replaced by { "$media": id }.
+  // Restore reverses this before any module sees the data, so media-backed features (Gallery today, anything
+  // that stores data URLs tomorrow) need no media handling of their own. manifest.json maps every file to its
+  // id, MIME type, size, CRC-32 and the JSON paths (e.g. gallery.photos.<photoId>.src) that reference it.
+  // Files are STORED (not deflated): photos are already compressed. Reading accepts deflated ZIPs too.
+  // ---------------------------------------------------------------------
+
+  const BACKUP_FORMAT = 'lavender-backup';
+  const MEDIA_MIN_CHARS = 1024;
+  const MEDIA_MIME_RE = /^(image|audio|video)\/[\w.+-]+$/i;
+  const DATA_URL_RE = /^data:([\w.+-]+\/[\w.+-]+);base64,/i;
+  const MEDIA_EXT = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+    'image/avif': 'avif', 'image/heic': 'heic', 'image/bmp': 'bmp'
+  };
+  const EXT_MIME = {};
+  Object.keys(MEDIA_EXT).forEach(function (m) { EXT_MIME[MEDIA_EXT[m]] = m; });
+  const QUOTA_MSG = 'There is not enough storage space on this device to restore this backup. Free up space and try again.';
+
+  // Optional extra stores outside State (e.g. journal photos). Contract:
+  //   { key, collect(): Promise<json|null>, restore(payload): Promise<{ok}>, undo?(result), clear?() }
+  // collect() may return data containing data URLs/Blobs; restore() receives them re-hydrated and must be
+  // all-or-nothing (return { ok:false, quota? } on failure).
+  const providers = [];
+  function registerProvider(p) {
+    if (!p || typeof p.key !== 'string' || typeof p.collect !== 'function' || typeof p.restore !== 'function') return false;
+    for (let i = providers.length - 1; i >= 0; i--) if (providers[i].key === p.key) providers.splice(i, 1);
+    providers.push(p);
+    return true;
+  }
+
+  // Journal photos and calendar photos: blobs in the shared IndexedDB 'media' store (Storage.getDB()), referenced
+  // by id from State (journalEntries[date].photos, calendarPhotos[date]). Only records still referenced after the
+  // merge are restored; an id already on this device is never overwritten (live wins).
+  function mediaStoreOp(mode, fn) {
+    if (typeof Storage === 'undefined' || typeof Storage.getDB !== 'function') return Promise.reject(new Error('Media storage unavailable'));
+    return Storage.getDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction('media', mode);
+        const req = fn(tx.objectStore('media'));
+        tx.oncomplete = function () { resolve(req ? req.result : undefined); };
+        tx.onerror = tx.onabort = function () { reject(tx.error || new Error('Write failed')); };
+      });
+    });
+  }
+
+  function wantedMediaIds(s) {
+    const w = {};
+    Object.keys(s.journalEntries || {}).forEach(function (d) {
+      const e = s.journalEntries[d];
+      if (e && Array.isArray(e.photos)) e.photos.forEach(function (id) { if (typeof id === 'string') w[id] = true; });
+    });
+    Object.keys(s.calendarPhotos || {}).forEach(function (d) {
+      if (typeof s.calendarPhotos[d] === 'string') w[s.calendarPhotos[d]] = true;
+    });
+    return w;
+  }
+
+  providers.push({
+    key: 'mediaStore',
+    label: 'Journal and calendar photos',
+    always: true, // also run for older backups, so unresolved photo references are reported
+    collect: function () {
+      return mediaStoreOp('readonly', function (st) { return st.getAll(); }).then(function (recs) {
+        const out = [];
+        (recs || []).forEach(function (r) {
+          if (!r || typeof r.id !== 'string' || !(r.blob instanceof Blob)) return;
+          const t = String(r.blob.type || r.type || '').toLowerCase();
+          const rec = Object.assign({}, r);
+          // Bytes are never altered; a missing/odd MIME label is normalised so the file can be packaged.
+          rec.blob = MEDIA_MIME_RE.test(t) ? (r.blob.type === t ? r.blob : new Blob([r.blob], { type: t })) : new Blob([r.blob], { type: 'image/jpeg' });
+          out.push(rec);
+        });
+        return { records: out };
+      });
+    },
+    restore: async function (payload, ctx) {
+      const recs = payload && Array.isArray(payload.records) ? payload.records : [];
+      const have = {};
+      (await mediaStoreOp('readonly', function (st) { return st.getAllKeys(); }) || []).forEach(function (k) { have[k] = true; });
+      const incoming = {};
+      recs.forEach(function (r) {
+        if (isPlainObject(r) && typeof r.id === 'string' && r.blob instanceof Blob && ctx.wanted[r.id]) incoming[r.id] = r;
+      });
+      const toAdd = Object.keys(incoming).filter(function (id) { return !have[id]; });
+      if (toAdd.length) {
+        await mediaStoreOp('readwrite', function (st) { toAdd.forEach(function (id) { st.put(incoming[id]); }); return null; });
+      }
+      const present = Object.keys(have).filter(function (id) { return ctx.wanted[id]; }).concat(toAdd);
+      const presentSet = {};
+      present.forEach(function (id) { presentSet[id] = true; });
+      const missing = Object.keys(ctx.wanted).filter(function (id) { return !presentSet[id]; }).length;
+      return { ok: true, added: toAdd, present: present, missing: missing };
+    },
+    undo: function (r) {
+      if (!r || !r.added || !r.added.length) return true;
+      return mediaStoreOp('readwrite', function (st) { r.added.forEach(function (id) { st.delete(id); }); return null; })
+        .then(function () { return true; }, function () { return false; });
+    },
+    clear: function () { return mediaStoreOp('readwrite', function (st) { return st.clear(); }); }
+  });
+
+  // State.replace() swallows a failed localStorage write, so confirm what was persisted matches memory.
+  function persistedMatches() {
+    try {
+      if (typeof Storage === 'undefined' || typeof Storage.load !== 'function') return true;
+      return JSON.stringify(Storage.load('appState')) === JSON.stringify(State.get());
+    } catch (e) { return false; }
+  }
+
+  function isQuotaError(e) {
+    return /quota|storage full|no space/i.test(String(e && (e.name + ' ' + e.message)));
+  }
+
+  function base64ToBytes(b64) {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function bytesToDataUrl(bytes, mime) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return 'data:' + mime + ';base64,' + btoa(bin);
+  }
+
+  const CRC_TABLE = (function () {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(u8) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  // ---- extraction (export) ----
+
+  function newMediaCtx() {
+    return { items: [], byString: new Map(), byBlob: new Map(), path: [], warnings: [] };
+  }
+
+  function addMediaItem(ctx, mime, as, payload) {
+    const item = { id: 'm' + String(ctx.items.length + 1).padStart(5, '0'), mime: mime, as: as, refs: [], bytes: payload.bytes || null, blob: payload.blob || null };
+    ctx.items.push(item);
+    return item;
+  }
+
+  function noteRef(ctx, item) {
+    if (item.refs.length < 8) item.refs.push(ctx.path.join('.'));
+  }
+
+  // Returns a JSON-safe deep copy of v with media replaced by { $media: id }. Never mutates v.
+  function extractMedia(v, ctx) {
+    if (ctx.path.length > 100) throw new Error('Data is nested too deeply to export.');
+    if (typeof v === 'string') {
+      if (v.length < MEDIA_MIN_CHARS) return v;
+      const m = DATA_URL_RE.exec(v);
+      if (!m || !MEDIA_MIME_RE.test(m[1])) return v;
+      let item = ctx.byString.get(v);
+      if (!item) {
+        let bytes;
+        try { bytes = base64ToBytes(v.slice(m[0].length)); } catch (e) {
+          ctx.warnings.push('One embedded image could not be decoded and was kept inside the backup data instead.');
+          return v;
+        }
+        item = addMediaItem(ctx, m[1].toLowerCase(), 'dataUrl', { bytes: bytes });
+        ctx.byString.set(v, item);
+      }
+      noteRef(ctx, item);
+      return { $media: item.id };
+    }
+    if (typeof Blob !== 'undefined' && v instanceof Blob) {
+      // Only real media is packaged. Other Blobs/Files (e.g. a local music File held in memory) are runtime-only.
+      if (!MEDIA_MIME_RE.test(v.type)) return undefined;
+      let item = ctx.byBlob.get(v);
+      if (!item) { item = addMediaItem(ctx, v.type.toLowerCase(), 'blob', { blob: v }); ctx.byBlob.set(v, item); }
+      noteRef(ctx, item);
+      return { $media: item.id };
+    }
+    if (Array.isArray(v)) {
+      return v.map(function (x, i) {
+        ctx.path.push(i);
+        const r = extractMedia(x, ctx);
+        ctx.path.pop();
+        return r === undefined ? null : r;
+      });
+    }
+    if (v && typeof v === 'object') {
+      if (typeof v.toJSON === 'function') return extractMedia(v.toJSON(), ctx);
+      const out = {};
+      Object.keys(v).forEach(function (k) {
+        ctx.path.push(k);
+        const r = extractMedia(v[k], ctx);
+        ctx.path.pop();
+        if (r !== undefined) out[k] = r;
+      });
+      return out;
+    }
+    return (typeof v === 'function' || typeof v === 'symbol') ? undefined : v;
+  }
+
+  async function resolveMediaBytes(ctx) {
+    for (let i = 0; i < ctx.items.length; i++) {
+      const it = ctx.items[i];
+      if (!it.bytes) it.bytes = new Uint8Array(await it.blob.arrayBuffer());
+      it.blob = null;
+      it.size = it.bytes.length;
+      it.crc = crc32(it.bytes);
+    }
+  }
+
+  // ---- rehydration (restore) ----
+
+  // Returns a copy of v with every { $media: id } replaced by its data URL / Blob (null if the media is missing).
+  function rehydrate(v, media, cache, stats) {
+    if (Array.isArray(v)) return v.map(function (x) { return rehydrate(x, media, cache, stats); });
+    if (isPlainObject(v)) {
+      const keys = Object.keys(v);
+      if (keys.length === 1 && keys[0] === '$media' && typeof v.$media === 'string') {
+        const m = media[v.$media];
+        if (!m) { stats.unresolved++; return null; }
+        if (m.as === 'blob') return new Blob([m.bytes], { type: m.mime });
+        if (cache[v.$media] === undefined) cache[v.$media] = bytesToDataUrl(m.bytes, m.mime);
+        return cache[v.$media];
+      }
+      const out = {};
+      keys.forEach(function (k) { if (k !== '__proto__') out[k] = rehydrate(v[k], media, cache, stats); });
+      return out;
+    }
+    return v;
+  }
+
+  // ---- minimal ZIP writer / reader (STORE only for writing; STORE + deflate for reading) ----
+
+  async function zipBuild(entries) {
+    if (entries.length > 65534) throw new Error('TOO_MANY_FILES');
+    const enc = new TextEncoder();
+    const now = new Date();
+    const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    const dosDate = ((Math.max(now.getFullYear(), 1980) - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    const parts = [];
+    const central = [];
+    let offset = 0;
+    let cdSize = 0;
+    entries.forEach(function (e) {
+      const name = enc.encode(e.name);
+      const size = e.bytes.length;
+      const crc = e.crc != null ? e.crc : crc32(e.bytes);
+      if (size > 0xFFFFFFFE || offset > 0xFFFFFFFE) throw new Error('TOO_LARGE');
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint16(8, 0, true); lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+      lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint16(10, 0, true); ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+      ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+      parts.push(new Uint8Array(lh.buffer), name, e.bytes);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + size;
+      cdSize += 46 + name.length;
+    });
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(8, entries.length, true); eocd.setUint16(10, entries.length, true);
+    eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [new Uint8Array(eocd.buffer)]), { type: 'application/zip' });
+  }
+
+  // Parses the central directory. Throws if the structure is damaged.
+  function zipOpen(buf) {
+    const u8 = new Uint8Array(buf);
+    const dv = new DataView(buf);
+    let eocd = -1;
+    for (let i = u8.length - 22; i >= Math.max(0, u8.length - 22 - 65535); i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('NOT_ZIP');
+    const count = dv.getUint16(eocd + 10, true);
+    const cdOff = dv.getUint32(eocd + 16, true);
+    if (count === 0xFFFF || cdOff === 0xFFFFFFFF) throw new Error('ZIP64');
+    const dec = new TextDecoder('utf-8');
+    const entries = {};
+    let p = cdOff;
+    for (let i = 0; i < count; i++) {
+      if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error('BAD_DIRECTORY');
+      const nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+      entries[name] = {
+        flags: dv.getUint16(p + 8, true), method: dv.getUint16(p + 10, true), crc: dv.getUint32(p + 16, true),
+        csize: dv.getUint32(p + 20, true), usize: dv.getUint32(p + 24, true), lho: dv.getUint32(p + 42, true)
+      };
+      p += 46 + nlen + elen + clen;
+    }
+    return { u8: u8, dv: dv, entries: entries };
+  }
+
+  async function inflateRaw(u8) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('UNSUPPORTED_COMPRESSION');
+    const stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  // Returns the verified bytes of one entry. Throws UNSUPPORTED_COMPRESSION / CORRUPT.
+  async function zipFile(z, name) {
+    const e = z.entries[name];
+    if (!e) throw new Error('MISSING');
+    if ((e.flags & 1) || (e.method !== 0 && e.method !== 8)) throw new Error('UNSUPPORTED_COMPRESSION');
+    if (e.lho + 30 > z.u8.length || z.dv.getUint32(e.lho, true) !== 0x04034b50) throw new Error('CORRUPT');
+    const start = e.lho + 30 + z.dv.getUint16(e.lho + 26, true) + z.dv.getUint16(e.lho + 28, true);
+    if (start + e.csize > z.u8.length) throw new Error('CORRUPT');
+    const raw = z.u8.subarray(start, start + e.csize);
+    const bytes = e.method === 0 ? raw : await inflateRaw(raw).catch(function (err) {
+      throw new Error(err && err.message === 'UNSUPPORTED_COMPRESSION' ? err.message : 'CORRUPT');
+    });
+    if (bytes.length !== e.usize || crc32(bytes) !== e.crc) throw new Error('CORRUPT');
+    return bytes;
+  }
+
+  // ---- export ----
+
+  async function buildPackage() {
+    const warnings = [];
+    if (typeof Gallery !== 'undefined' && typeof Gallery.ready === 'function') {
+      let ok = false;
+      try { ok = await Gallery.ready(); } catch (e) { ok = false; }
+      if (!ok) warnings.push('The gallery could not be read, so its photos are NOT included in this backup.');
+    }
+    const data = build();
+    if (typeof CanonicalTaskStore !== 'undefined' && data.canonicalTasks === null) {
+      warnings.push('Planner tasks could not be read and are NOT included in this backup.');
+    }
+    data.providers = {};
+    for (let i = 0; i < providers.length; i++) {
+      try {
+        const payload = await providers[i].collect();
+        if (payload !== null && payload !== undefined) data.providers[providers[i].key] = payload;
+      } catch (e) {
+        warnings.push('"' + (providers[i].label || providers[i].key) + '" could not be read and are NOT included in this backup.');
+      }
+    }
+
+    const ctx = newMediaCtx();
+    const slim = extractMedia(data, ctx);
+    await resolveMediaBytes(ctx);
+    ctx.warnings.forEach(function (w) { warnings.push(w); });
+
+    let mediaBytes = 0;
+    ctx.items.forEach(function (it) { mediaBytes += it.size; });
+    const stats = {
+      photos: (data.gallery && data.gallery.photos ? Object.keys(data.gallery.photos).length : 0)
+        + (data.providers.mediaStore && data.providers.mediaStore.records ? data.providers.mediaStore.records.length : 0),
+      mediaFiles: ctx.items.length,
+      mediaBytes: mediaBytes,
+      tasks: countMap(data.planner.tasks),
+      plannerTasks: data.canonicalTasks && Array.isArray(data.canonicalTasks.tasks) ? data.canonicalTasks.tasks.length : 0,
+      journalEntries: countMap(data.journal.journalEntries)
+    };
+    slim.contents = stats;
+
+    const manifest = {
+      format: BACKUP_FORMAT,
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: data.exportedAt,
+      media: ctx.items.map(function (it) {
+        return {
+          id: it.id, path: 'media/' + it.id + '.' + (MEDIA_EXT[it.mime] || 'bin'), mime: it.mime,
+          size: it.size, crc32: it.crc, as: it.as, refs: it.refs
+        };
+      })
+    };
+
+    const enc = new TextEncoder();
+    const entries = [
+      { name: 'backup.json', bytes: enc.encode(JSON.stringify(slim)) },
+      { name: 'manifest.json', bytes: enc.encode(JSON.stringify(manifest, null, 1)) }
+    ];
+    ctx.items.forEach(function (it, i) {
+      entries.push({ name: manifest.media[i].path, bytes: it.bytes, crc: it.crc });
+    });
+    const blob = await zipBuild(entries);
+    return { blob: blob, filename: 'lavender-backup-' + new Date().toISOString().slice(0, 10) + '.zip', stats: stats, warnings: warnings };
+  }
+
   // Local file download only, no network call — works fully offline.
-  function downloadExport() {
-    const json = exportJson();
-    const blob = new Blob([json], { type: 'application/json' });
+  function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'lavender-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000); // large files: don't revoke before the download starts
+  }
+
+  // Returns { ok:true, filename, size, stats, warnings } or { ok:false, error }. Never throws.
+  async function downloadExport() {
+    try {
+      const pkg = await buildPackage();
+      triggerDownload(pkg.blob, pkg.filename);
+      return { ok: true, filename: pkg.filename, size: pkg.blob.size, stats: pkg.stats, warnings: pkg.warnings };
+    } catch (e) {
+      const m = e && e.message;
+      let error = "The backup couldn't be created.";
+      if (m === 'TOO_MANY_FILES' || m === 'TOO_LARGE') error = 'Your library is too large to fit in a single backup file.';
+      else if (e instanceof RangeError) error = 'This device ran out of memory while building the backup. Close other tabs or apps and try again.';
+      else if (isQuotaError(e)) error = 'There is not enough free space on this device to create the backup.';
+      return { ok: false, error: error };
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -373,6 +798,16 @@ const Backup = (function () {
     return out;
   }
 
+  // dateStr -> media id string
+  function cleanCalendarPhotos(rawMap) {
+    const out = {};
+    if (!isPlainObject(rawMap)) return out;
+    Object.keys(rawMap).forEach(function (d) {
+      if (isValidDateStr(d) && typeof rawMap[d] === 'string' && rawMap[d]) out[d] = rawMap[d];
+    });
+    return out;
+  }
+
   function validDailySummary(rec) {
     if (rec.studyMs !== undefined && !isNonNegNum(rec.studyMs)) return false;
     if (rec.breakMs !== undefined && !isNonNegNum(rec.breakMs)) return false;
@@ -422,6 +857,7 @@ const Backup = (function () {
     const a = isPlainObject(parsed.assistant) ? parsed.assistant : {};
         const al = isPlainObject(parsed.alarms) ? parsed.alarms : {};
     const tm = isPlainObject(parsed.tests) ? parsed.tests : {};
+    const ex = isPlainObject(parsed.extras) ? parsed.extras : {};
 
     return {
       dateHubs: c.dateHubs,
@@ -454,7 +890,12 @@ const Backup = (function () {
             myWorld: parsed.myWorld,
       gallery: parsed.gallery,
       dailySummaries: parsed.dailySummaries,
-      planningHistory: parsed.planningHistory
+      planningHistory: parsed.planningHistory,
+      canonicalTasks: parsed.canonicalTasks,
+      providers: parsed.providers,
+      calendarPhotos: ex.calendarPhotos,
+      itineraryTemplates: ex.itineraryTemplates,
+      dailyItinerarySummaries: ex.dailyItinerarySummaries
     };
   }
 
@@ -514,7 +955,13 @@ const Backup = (function () {
         ? flat.notepadFolders.filter(function (f) { return typeof f === 'string' && f.trim().length > 0; })
         : [],
             myWorld: cleanMyWorld(flat.myWorld),
-      gallery: cleanGallery(flat.gallery)
+      gallery: cleanGallery(flat.gallery),
+      // Optional v3 fields — absent in v1/v2 backups. Their owners re-validate every record on merge.
+      canonicalTasks: (isPlainObject(flat.canonicalTasks) && Array.isArray(flat.canonicalTasks.tasks)) ? flat.canonicalTasks : null,
+      providers: isPlainObject(flat.providers) ? flat.providers : {},
+      calendarPhotos: cleanCalendarPhotos(flat.calendarPhotos),
+      itineraryTemplates: cleanIdMap(flat.itineraryTemplates, null, null),
+      dailyItinerarySummaries: cleanDateKeyedMap(flat.dailyItinerarySummaries, {})
     };
 
     return { ok: true, schemaVersion: schemaVersion, exportedAt: parsed.exportedAt, cleaned: cleaned };
@@ -640,7 +1087,9 @@ const Backup = (function () {
     const backupBringsLegacy = c.habitsMigrated !== true
       && (countAdditions(c.waterEvents, cur.waterEvents) > 0 || countAdditions(c.sleepRecords, cur.sleepRecords) > 0);
 
-    return {
+    // Base = live state, so keys this merge doesn't handle (runtime itinerary/candle/weather state, future keys)
+    // keep their live value instead of being reset to defaults by State.replace().
+    return Object.assign({}, cur, {
       currentScreen: cur.currentScreen,
       dateHubs: mergeIdMap(c.dateHubs, cur.dateHubs),
       studyStreak: cur.studyStreak,
@@ -677,8 +1126,11 @@ const Backup = (function () {
       subjects: mergeSubjects(c.subjects, cur),
       studyTemplates: mergeIdMap(backupTemplates, liveTemplates),
       musicPlaylist: mergedPlaylist,
-      notepadFolders: Array.from(new Set([].concat(cur.notepadFolders || [], c.notepadFolders || [])))
-    };
+      notepadFolders: Array.from(new Set([].concat(cur.notepadFolders || [], c.notepadFolders || []))),
+      calendarPhotos: mergeIdMap(c.calendarPhotos, cur.calendarPhotos),
+      itineraryTemplates: mergeIdMap(c.itineraryTemplates, cur.itineraryTemplates),
+      dailyItinerarySummaries: mergeIdMap(c.dailyItinerarySummaries, cur.dailyItinerarySummaries)
+    });
   }
 
   function countAdditions(cleanedMap, curMap) {
@@ -889,47 +1341,243 @@ const Backup = (function () {
         return settled;
   }
 
-  // Merges the backup's Gallery through its own module (it isn't part of State). Live wins on id
-  // conflict, backup-only records are added. Always resolves.
-  function restoreGallery(g) {
-    if (!g || typeof Gallery === 'undefined' || typeof Gallery.mergeBackup !== 'function') return Promise.resolve(true);
-    try {
-      return Gallery.mergeBackup(g).settled;
-    } catch (e) { /* leave the live gallery untouched */ }
-    return Promise.resolve(true);
+  // ---- opening a backup file (validation happens here, before anything live is touched) ----
+
+  function emptyReport() {
+    return { total: 0, ok: 0, bytes: 0, missing: [], corrupt: [], unsupported: [], duplicates: 0 };
   }
 
-  // Returns { ok, error } or { ok:true, summary, settled }. Never throws. Rejects (with zero state changes)
-  // a structurally-unrecognized backup or a schemaVersion newer than this app understands.
-  // Individually corrupt records inside an otherwise-valid backup are dropped, not fatal. Safe to
-  // call with the same backup twice — merging is idempotent, so no duplicates are created.
-  function restoreFromJson(jsonText) {
-    if (_restoring) {
-      return { ok: false, error: 'A restore is already in progress.' };
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function mediaWarnings(r) {
+    const w = [];
+    if (r.missing.length) w.push(plural(r.missing.length, 'media file') + ' listed in the backup could not be found in the ZIP and will be skipped.');
+    if (r.corrupt.length) w.push(plural(r.corrupt.length, 'media file') + ' failed the integrity check and will be skipped.');
+    if (r.unsupported.length) w.push(plural(r.unsupported.length, 'media file') + ' use an unsupported type or compression and will be skipped.');
+    if (r.duplicates) w.push(plural(r.duplicates, 'duplicate media entry') + ' ignored.');
+    return w;
+  }
+
+  function stripBom(text) { return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text; }
+
+  function openJsonText(text) {
+    const parsed = safeParse(stripBom(String(text)));
+    if (parsed === null) return { ok: false, error: "That file isn't a valid Lavender backup." };
+    return { ok: true, format: 'json', parsed: parsed, media: {}, report: emptyReport() };
+  }
+
+  // Fallback when manifest.json is missing/unreadable: derive the media list from media/<id>.<ext> names.
+  function deriveMediaList(z) {
+    const out = [];
+    Object.keys(z.entries).forEach(function (n) {
+      const m = /^media\/([^/]+?)(?:\.([A-Za-z0-9]+))?$/.exec(n);
+      if (m) out.push({ id: m[1], path: n, mime: EXT_MIME[(m[2] || '').toLowerCase()] || 'application/octet-stream', as: 'dataUrl' });
+    });
+    return out;
+  }
+
+  // Accepts a ZIP package (v3) or a plain JSON backup (v1/v2). Returns { ok:false, error } or
+  // { ok:true, format, parsed, media, report, notes }. Reads and verifies every media file up front.
+  async function openFile(file) {
+    let buf;
+    try { buf = await file.arrayBuffer(); } catch (e) {
+      return { ok: false, error: "Couldn't read that file. It may be too large for this device's memory." };
     }
+    const head = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));
+    if (!(head.length === 2 && head[0] === 0x50 && head[1] === 0x4B)) {
+      return openJsonText(new TextDecoder('utf-8').decode(buf));
+    }
+    let z;
+    try { z = zipOpen(buf); } catch (e) {
+      return { ok: false, error: "That ZIP file is damaged or isn't a Lavender backup." };
+    }
+    if (!z.entries['backup.json']) return { ok: false, error: "That ZIP isn't a Lavender backup (backup.json is missing)." };
+    const dec = new TextDecoder('utf-8');
+    let parsed;
+    try { parsed = safeParse(stripBom(dec.decode(await zipFile(z, 'backup.json')))); } catch (e) { parsed = null; }
+    if (parsed === null) return { ok: false, error: 'The backup data inside this ZIP is damaged and cannot be read.' };
+
+    const notes = [];
+    let list = null;
+    if (z.entries['manifest.json']) {
+      try {
+        const mf = safeParse(dec.decode(await zipFile(z, 'manifest.json')));
+        if (isPlainObject(mf) && Array.isArray(mf.media)) list = mf.media;
+      } catch (e) { /* fall through to derived list */ }
+    }
+    if (!list) {
+      list = deriveMediaList(z);
+      notes.push('The backup manifest was missing or damaged; photos were matched using their file names.');
+    }
+
+    const report = emptyReport();
+    const media = {};
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i];
+      if (!isPlainObject(m) || typeof m.id !== 'string' || typeof m.path !== 'string') continue;
+      report.total++;
+      if (Object.prototype.hasOwnProperty.call(media, m.id)) { report.duplicates++; continue; }
+      if (typeof m.mime !== 'string' || !MEDIA_MIME_RE.test(m.mime)) { report.unsupported.push(m.id); continue; }
+      if (!z.entries[m.path]) { report.missing.push(m.id); continue; }
+      if (typeof m.crc32 === 'number' && m.crc32 !== z.entries[m.path].crc) { report.corrupt.push(m.id); continue; }
+      let bytes;
+      try { bytes = await zipFile(z, m.path); } catch (e) {
+        (e && e.message === 'UNSUPPORTED_COMPRESSION' ? report.unsupported : report.corrupt).push(m.id);
+        continue;
+      }
+      media[m.id] = { mime: m.mime.toLowerCase(), as: m.as === 'blob' ? 'blob' : 'dataUrl', bytes: bytes };
+      report.ok++;
+      report.bytes += bytes.length;
+    }
+    return { ok: true, format: 'zip', parsed: parsed, media: media, report: report, notes: notes };
+  }
+
+  function galleryStats(g, media) {
+    const out = { total: 0, restorable: 0, added: 0 };
+    if (!g) return out;
+    const live = (typeof Gallery !== 'undefined' && typeof Gallery.exportBackup === 'function') ? Gallery.exportBackup() : null;
+    Object.keys(g.photos).forEach(function (id) {
+      const src = isPlainObject(g.photos[id]) ? g.photos[id].src : null;
+      out.total++;
+      const ok = typeof src === 'string' ? src.indexOf('data:image/') === 0
+        : (isPlainObject(src) && typeof src.$media === 'string' && !!media[src.$media]);
+      if (!ok) return;
+      out.restorable++;
+      if (!live || !live.photos || !live.photos[id]) out.added++;
+    });
+    return out;
+  }
+
+  // Validates an opened backup and builds the preview. Touches nothing live.
+  async function inspectPackage(pkg) {
+    const v = validateAndClean(pkg.parsed);
+    if (!v.ok) return { ok: false, error: v.error };
+    const cur = State.get();
+    const summary = computeSummary(v, cur);
+    const compare = computeCompare(v, cur);
+    const g = galleryStats(v.cleaned.gallery, pkg.media);
+    const ct = v.cleaned.canonicalTasks;
+    let liveIds = {};
+    if (ct && typeof CanonicalTaskStore !== 'undefined' && typeof CanonicalTaskStore.exportBackup === 'function') {
+      try { CanonicalTaskStore.exportBackup().tasks.forEach(function (t) { liveIds[t.id] = true; }); } catch (e) { liveIds = {}; }
+    }
+    summary.counts.photos = g.restorable;
+    summary.counts.mediaFiles = pkg.report.ok;
+    summary.counts.plannerTasks = ct ? ct.tasks.length : 0;
+    summary.willChange.photosAdded = g.added;
+    summary.willChange.plannerTasksAdded = ct ? ct.tasks.filter(function (t) { return t && !liveIds[t.id]; }).length : 0;
+    const mp = pkg.parsed.providers && pkg.parsed.providers.mediaStore;
+    const liveKeys = {};
+    try { (await mediaStoreOp('readonly', function (st) { return st.getAllKeys(); })).forEach(function (k) { liveKeys[k] = true; }); } catch (e) { /* unknown: count all as new */ }
+    (mp && Array.isArray(mp.records) ? mp.records : []).forEach(function (r) {
+      const ref = r && r.blob && r.blob.$media;
+      if (typeof ref !== 'string' || !pkg.media[ref]) return;
+      summary.counts.photos++;
+      if (!liveKeys[r.id]) summary.willChange.photosAdded++;
+    });
+    const warnings = (pkg.notes || []).concat(mediaWarnings(pkg.report));
+    if (g.total > g.restorable) warnings.push(plural(g.total - g.restorable, 'photo') + " can't be restored because the image data is missing or damaged.");
+    if (v.schemaVersion < SCHEMA_VERSION) warnings.push('This backup uses an older format (v' + v.schemaVersion + ') and will be upgraded automatically.');
+    return { ok: true, exportedAt: v.exportedAt, schemaVersion: v.schemaVersion, format: pkg.format, summary: summary, compare: compare, warnings: warnings, pkg: pkg };
+  }
+
+  async function inspectFile(file) {
+    const pkg = await openFile(file);
+    return pkg.ok ? inspectPackage(pkg) : pkg;
+  }
+
+  // ---- restore ----
+
+  // Returns { ok:false, error } or { ok:true, summary, warnings }. Never throws. Order: stores with atomic
+  // writes first (Gallery, providers, planner tasks), then State (the single in-memory-built object), then My
+  // World. If any step fails, the steps already applied are rolled back, so a failed restore leaves live data as it
+  // was. The merge rule is unchanged: live data wins on id conflict, backup-only records are added.
+  async function restorePackage(pkg) {
+    if (_restoring) return { ok: false, error: 'A restore is already in progress.' };
+    if (!pkg || !pkg.ok || !pkg.parsed) return { ok: false, error: 'There is no backup to restore.' };
     _restoring = true;
+    const undos = [];
+    async function abort(message) {
+      let clean = true;
+      for (let i = undos.length - 1; i >= 0; i--) {
+        try { if ((await undos[i]()) === false) clean = false; } catch (e) { clean = false; }
+      }
+      return { ok: false, error: message + (clean ? ' No changes were made.' : ' Some imported items may remain on this device; restoring the same backup again is safe.') };
+    }
     try {
-      const parsed = safeParse(jsonText);
-      if (parsed === null) return { ok: false, error: "That file isn't valid backup JSON." };
-
-      const v = validateAndClean(parsed);
+      const v = validateAndClean(rehydrate(pkg.parsed, pkg.media || {}, {}, { unresolved: 0 }));
       if (!v.ok) return { ok: false, error: v.error };
-
+      const c = v.cleaned;
       const cur = State.get();
-      const merged = buildMergedState(v, cur);
       const summary = summarizeApplied(v, cur);
+      const merged = buildMergedState(v, cur); // pure, in memory
+      const snapshot = Object.assign({}, cur);
+      const warnings = mediaWarnings(pkg.report || emptyReport());
 
-      State.replace(merged);
-            const settled = Promise.all([restoreMyWorld(v.cleaned.myWorld), restoreGallery(v.cleaned.gallery)])
-        .then(function () { return true; });
+      // 1. Gallery (one IndexedDB transaction)
+      if (c.gallery && (Object.keys(c.gallery.photos).length || Object.keys(c.gallery.folders).length)) {
+        if (typeof Gallery === 'undefined' || typeof Gallery.mergeBackup !== 'function') {
+          warnings.push('The gallery is not available, so the photos in this backup were not restored.');
+        } else {
+          const r = await Gallery.mergeBackup(c.gallery).settled;
+          if (!r.ok) return await abort(r.quota ? QUOTA_MSG : (r.error || 'The gallery could not be restored.'));
+          undos.push(function () { return Gallery.rollbackBackup(r); });
+          summary.photosAdded = r.addedPhotos.length;
+          if (r.invalid) warnings.push(plural(r.invalid, 'photo') + " could not be restored because the image data is missing or damaged.");
+        }
+      }
+      // 2. Registered providers
+      const wanted = wantedMediaIds(merged);
+      const results = {};
+      for (let i = 0; i < providers.length; i++) {
+        const p = providers[i];
+        if (c.providers[p.key] === undefined && !p.always) continue;
+        let r;
+        try { r = await p.restore(c.providers[p.key], { merged: merged, wanted: wanted }); } catch (e) { r = { ok: false, quota: isQuotaError(e) }; }
+        if (!r || r.ok === false) return await abort(r && r.quota ? QUOTA_MSG : '"' + (p.label || p.key) + '" could not be restored.');
+        results[p.key] = r;
+        if (typeof p.undo === 'function') undos.push(function () { return p.undo(r); });
+      }
+      const ms = results.mediaStore;
+      if (ms) {
+        // Drop restored calendar-photo mappings whose image isn't available, rather than leave dangling ids.
+        const present = {};
+        (ms.present || []).forEach(function (id) { present[id] = true; });
+        Object.keys(merged.calendarPhotos || {}).forEach(function (d) {
+          if (!(cur.calendarPhotos && cur.calendarPhotos[d]) && !present[merged.calendarPhotos[d]]) delete merged.calendarPhotos[d];
+        });
+        summary.mediaAdded = ms.added.length;
+        if (ms.missing) warnings.push(plural(ms.missing, 'journal or calendar photo') + ' could not be restored: the image data is unavailable.');
+      }
+      // 3. Planner tasks (one localStorage write)
+      if (c.canonicalTasks && typeof CanonicalTaskStore !== 'undefined' && typeof CanonicalTaskStore.mergeBackup === 'function') {
+        const r = CanonicalTaskStore.mergeBackup(c.canonicalTasks);
+        if (!r.ok) return await abort('Planner tasks could not be saved (storage may be full).');
+        undos.push(function () { return CanonicalTaskStore.rollbackBackup(r); });
+        summary.plannerTasksAdded = r.added.length;
+      }
+      // 4. State
+      let stateOk = true, stateErr = null;
+      try { State.replace(merged); stateOk = persistedMatches(); } catch (e) { stateOk = false; stateErr = e; }
+      if (!stateOk) {
+        try { State.replace(snapshot); } catch (e2) { /* nothing more to do */ }
+        return await abort(!stateErr || isQuotaError(stateErr) ? QUOTA_MSG : 'Your data could not be saved.');
+      }
+      // 5. My World (own storage; must run after State.replace — see restoreMyWorld). Best-effort.
+      await restoreMyWorld(c.myWorld);
       runPostRestoreHooks();
-
-      return { ok: true, summary: summary, settled: settled };
+      return { ok: true, summary: summary, warnings: warnings };
     } catch (e) {
-      return { ok: false, error: 'Restore failed unexpectedly; no changes were made.' };
+      return await abort('Restore failed unexpectedly.');
     } finally {
       _restoring = false;
     }
+  }
+
+  // Legacy entry point (plain JSON text, schema v1/v2). Now async.
+  async function restoreFromJson(jsonText) {
+    const pkg = openJsonText(jsonText);
+    return pkg.ok ? restorePackage(pkg) : pkg;
   }
 
   function clearAllData() {
@@ -944,6 +1592,13 @@ const Backup = (function () {
       }
       myWorldKeys.forEach(function (k) { localStorage.removeItem(k); });
         } catch (e) { /* localStorage unavailable — nothing to clear */ }
+    // The planner's canonical task store has its own localStorage key.
+    if (typeof CanonicalTaskStore !== 'undefined' && typeof CanonicalTaskStore.clearAll === 'function') {
+      try { CanonicalTaskStore.clearAll(); } catch (e) { /* best-effort */ }
+    }
+    providers.forEach(function (p) {
+      if (typeof p.clear === 'function') { try { Promise.resolve(p.clear()).catch(function () { /* best-effort */ }); } catch (e) { /* best-effort */ } }
+    });
     // Gallery persists in its own IndexedDB store.
     if (typeof Gallery !== 'undefined' && typeof Gallery.clearAll === 'function') {
       try { Gallery.clearAll(); } catch (e) { /* best-effort */ }
@@ -954,6 +1609,9 @@ const Backup = (function () {
     downloadExport: downloadExport,
     exportJson: exportJson,
     restoreFromJson: restoreFromJson,
+    restorePackage: restorePackage,
+    inspectFile: inspectFile,
+    registerProvider: registerProvider,
     inspectBackup: inspectBackup,
     getSummary: getSummary,
     getCompare: getCompare,
