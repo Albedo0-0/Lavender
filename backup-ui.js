@@ -9,8 +9,9 @@
 // style, and the Cancel action uses .btn-secondary. The summary grid, change list, and compare
 // table stay bespoke.
 const BackupUI = (function () {
-  let _pendingJsonText = null;
+  let _pendingPkg = null;
   let _confirmBusy = false;
+  let _exportBusy = false;
 
   function escapeHtml(str) {
     const d = document.createElement('div');
@@ -20,6 +21,37 @@ const BackupUI = (function () {
 
   function changeLi(label, n) {
     return '<li>' + label + ': <strong>' + n + '</strong></li>';
+  }
+
+  function warningsHtml(list) {
+    if (!list || !list.length) return '';
+    return '<div class="backup-warning"><strong>Please note</strong><ul class="backup-change-list">'
+      + list.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('')
+      + '</ul></div>';
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return Math.round(n / 1024) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  function renderExportHtml(res) {
+    const st = res.stats;
+    return '<div class="backup-modal">'
+      + '<div class="backup-modal-header"><h3>Backup Created</h3>'
+      + '<button class="modal-close-btn" id="backup-modal-close-btn" aria-label="Close">&#10006;</button></div>'
+      + '<p>' + escapeHtml(res.filename) + ' (' + formatBytes(res.size) + ') was sent to your downloads. Keep the ZIP file as it is &mdash; your photos are stored inside it.</p>'
+      + '<ul class="backup-change-list">'
+      + changeLi('Photos', st.photos)
+      + changeLi('Media files', st.mediaFiles + ' (' + formatBytes(st.mediaBytes) + ')')
+      + changeLi('Tasks', st.tasks)
+      + changeLi('Planner tasks', st.plannerTasks)
+      + changeLi('Journal entries', st.journalEntries)
+      + '</ul>'
+      + warningsHtml(res.warnings)
+      + '<div class="backup-modal-actions"><button id="backup-result-ok-btn" class="backup-confirm-btn">Done</button></div>'
+      + '</div>';
   }
 
   function compareRow(label, cmp) {
@@ -42,9 +74,12 @@ const BackupUI = (function () {
       + '<div><span>' + s.counts.journalEntries + '</span>Journal</div>'
       + '<div><span>' + s.counts.alarms + '</span>Alarms</div>'
       + '<div><span>' + s.counts.sessions + '</span>Sessions</div>'
+      + '<div><span>' + s.counts.photos + '</span>Photos</div>'
+      + '<div><span>' + s.counts.plannerTasks + '</span>Planner tasks</div>'
       + '</div>'
       + (s.sessionDateRange ? '<p class="backup-range">Sessions: ' + escapeHtml(s.sessionDateRange.from) + ' &rarr; ' + escapeHtml(s.sessionDateRange.to) + '</p>' : '')
       + (s.journalDateRange ? '<p class="backup-range">Journal: ' + escapeHtml(s.journalDateRange.from) + ' &rarr; ' + escapeHtml(s.journalDateRange.to) + '</p>' : '')
+      + warningsHtml(insp.warnings)
       + '<h4>What will change</h4>'
       + '<ul class="backup-change-list">'
       + changeLi('New topics', s.willChange.topicsAdded)
@@ -60,6 +95,8 @@ const BackupUI = (function () {
       + changeLi('New alarms', s.willChange.generalAlarmsAdded)
       + changeLi('New notes', s.willChange.assistantNotesAdded)
       + changeLi('New EXP ledger entries', s.willChange.expLedgerAdded)
+      + changeLi('New photos', s.willChange.photosAdded)
+      + changeLi('New planner tasks', s.willChange.plannerTasksAdded)
       + '</ul>'
       + '<details class="backup-compare-details"><summary>Compare backup vs. current (advanced)</summary>'
       + '<table class="backup-compare-table"><thead><tr><th></th><th>Backup only</th><th>Current only</th><th>In both</th><th>Conflicts*</th></tr></thead><tbody>'
@@ -81,16 +118,16 @@ const BackupUI = (function () {
       + '</div>';
   }
 
-  function renderErrorHtml(message) {
+  function renderErrorHtml(message, title) {
     return '<div class="backup-modal">'
-      + '<div class="backup-modal-header"><h3>Restore Failed</h3>'
+      + '<div class="backup-modal-header"><h3>' + escapeHtml(title || 'Restore Failed') + '</h3>'
       + '<button class="modal-close-btn" id="backup-modal-close-btn" aria-label="Close">&#10006;</button></div>'
       + '<p class="backup-error">' + escapeHtml(message) + '</p>'
       + '<div class="backup-modal-actions"><button id="backup-error-ok-btn" class="backup-confirm-btn">OK</button></div>'
       + '</div>';
   }
 
-  function renderResultHtml(summary) {
+  function renderResultHtml(summary, warnings) {
     return '<div class="backup-modal">'
       + '<div class="backup-modal-header"><h3>Restore Complete</h3>'
       + '<button class="modal-close-btn" id="backup-modal-close-btn" aria-label="Close">&#10006;</button></div>'
@@ -102,7 +139,10 @@ const BackupUI = (function () {
       + changeLi('Subtargets added', summary.subtargetsAdded)
       + changeLi('Sessions added', summary.sessionRecordsAdded)
       + changeLi('Alarms added', summary.generalAlarmsAdded)
+      + changeLi('Photos added', summary.photosAdded || 0)
+      + changeLi('Planner tasks added', summary.plannerTasksAdded || 0)
       + '</ul>'
+      + warningsHtml(warnings)
       + '<div class="backup-modal-actions"><button id="backup-result-ok-btn" class="backup-confirm-btn">Done</button></div>'
       + '</div>';
   }
@@ -113,66 +153,87 @@ const BackupUI = (function () {
     return el;
   }
 
-  function showError(message) {
+  function showError(message, title) {
     if (typeof MiscSound !== 'undefined') MiscSound.play('uiError');
-    Modal.open(renderErrorHtml(message));
+    Modal.open(renderErrorHtml(message, title));
     bindOnce('backup-modal-close-btn', 'click', Modal.close);
     bindOnce('backup-error-ok-btn', 'click', Modal.close);
   }
 
-  function openInspectModal(jsonText) {
-    const insp = Backup.inspectBackup(jsonText);
-    if (!insp.ok) {
-      _pendingJsonText = null;
-      showError(insp.error);
-      return;
-    }
-    _pendingJsonText = jsonText;
+  function openInspectModal(insp) {
+    _pendingPkg = insp.pkg;
     Modal.open(renderInspectHtml(insp));
-    bindOnce('backup-modal-close-btn', 'click', function () { _pendingJsonText = null; Modal.close(); });
-    bindOnce('backup-restore-cancel-btn', 'click', function () { _pendingJsonText = null; Modal.close(); });
+    bindOnce('backup-modal-close-btn', 'click', function () { _pendingPkg = null; Modal.close(); });
+    bindOnce('backup-restore-cancel-btn', 'click', function () { _pendingPkg = null; Modal.close(); });
     bindOnce('backup-restore-confirm-btn', 'click', onConfirmRestore);
   }
 
   function onConfirmRestore() {
-    if (_confirmBusy || Backup.isRestoring() || !_pendingJsonText) return; // double-submit guard
+    if (_confirmBusy || Backup.isRestoring() || !_pendingPkg) return; // double-submit guard
     _confirmBusy = true;
     const btn = document.getElementById('backup-restore-confirm-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Restoring…'; }
     const cancelBtn = document.getElementById('backup-restore-cancel-btn');
     if (cancelBtn) cancelBtn.disabled = true;
 
-    const jsonText = _pendingJsonText;
-    _pendingJsonText = null;
-    const result = Backup.restoreFromJson(jsonText);
-    _confirmBusy = false;
-
-    if (!result.ok) {
-      showError(result.error);
-      return;
-    }
-    Modal.open(renderResultHtml(result.summary));
-    bindOnce('backup-modal-close-btn', 'click', Modal.close);
-    bindOnce('backup-result-ok-btn', 'click', Modal.close);
+    const pkg = _pendingPkg;
+    _pendingPkg = null;
+    Backup.restorePackage(pkg).then(function (result) {
+      _confirmBusy = false;
+      if (!result.ok) { showError(result.error); return; }
+      Modal.open(renderResultHtml(result.summary, result.warnings));
+      bindOnce('backup-modal-close-btn', 'click', Modal.close);
+      bindOnce('backup-result-ok-btn', 'click', Modal.close);
+    }).catch(function () {
+      _confirmBusy = false;
+      showError('Restore failed unexpectedly.');
+    });
   }
 
   function onFileSelected(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = ''; // reset so selecting the same file again still fires 'change'
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function () { openInspectModal(String(reader.result || '')); };
-    reader.onerror = function () { showError("Couldn't read that file."); };
-    reader.readAsText(file);
+    _confirmBusy = false; // a new file always starts clean
+    _pendingPkg = null;
+    Modal.open('<div class="backup-modal"><p>Checking backup&hellip;</p></div>');
+    Backup.inspectFile(file).then(function (insp) {
+      if (!insp.ok) { _pendingPkg = null; showError(insp.error); return; }
+      openInspectModal(insp);
+    }).catch(function () { showError("Couldn't read that file."); });
   }
 
+  function onExportClicked() {
+    if (_exportBusy) return;
+    _exportBusy = true;
+    Modal.open('<div class="backup-modal"><p>Creating backup&hellip;</p></div>');
+    Backup.downloadExport().then(function (res) {
+      if (!res.ok) { showError(res.error, 'Backup Failed'); return; }
+      Modal.open(renderExportHtml(res));
+      bindOnce('backup-modal-close-btn', 'click', Modal.close);
+      bindOnce('backup-result-ok-btn', 'click', Modal.close);
+    }).catch(function () {
+      showError("The backup couldn't be created.", 'Backup Failed');
+    }).then(function () { _exportBusy = false; });
+  }
+
+  let _bound = false;
+
+  // Delegated listeners on document: they keep working even if the page re-renders the drawer buttons
+  // or the hidden file input after a restore.
   function init() {
-    bindOnce('backup-export-btn', 'click', function () { Backup.downloadExport(); });
-    bindOnce('backup-restore-btn', 'click', function () {
+    if (_bound) return;
+    _bound = true;
+    document.addEventListener('click', function (e) {
+      const t = e.target && e.target.closest ? e.target.closest('#backup-export-btn, #backup-restore-btn') : null;
+      if (!t) return;
+      if (t.id === 'backup-export-btn') { onExportClicked(); return; }
       const input = document.getElementById('backup-restore-file-input');
       if (input) input.click();
     });
-    bindOnce('backup-restore-file-input', 'change', onFileSelected);
+    document.addEventListener('change', function (e) {
+      if (e.target && e.target.id === 'backup-restore-file-input') onFileSelected(e);
+    });
   }
 
   return { init: init };
