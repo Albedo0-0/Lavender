@@ -1,0 +1,40 @@
+/* Lavender — mobile.css
+   Layout-only overrides. Load AFTER style.css:
+   <link rel="stylesheet" href="mobile.css">
+   Breakpoint matches the shell's existing phone breakpoint in style.css (560px). */
+
+@media (max-width: 560px) {
+
+  /* Safety net: nothing may widen the page sideways (clip does not create a scroller, sticky header unaffected) */
+  body { overflow-x: clip; }
+
+  /* Header: fit title, assistant slot, search, menu and meter bar on one row.
+     Right padding stays 18px so the fixed utility drawer (right: 18px) still lines up. */
+  #app-header { padding: 8px 18px 8px 12px; gap: var(--space-2); }
+  #app-header-left { min-width: 0; gap: var(--space-2); }
+  #app-header-right { min-width: 0; gap: 4px; }
+  #header-assistant-slot { margin-left: 0; margin-right: 0; }
+  #top-meter-bar { width: clamp(96px, 28vw, 176px); }
+
+  /* Main nav: five tabs do not fit a phone width, so the row scrolls sideways instead of overflowing */
+  #main-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #main-nav::-webkit-scrollbar { display: none; }
+  #main-nav .nav-btn { flex: 0 0 auto; }
+}
+
+/* Notepad hanging panel: style.css forces left/width with !important, which defeats its own
+   (max-width: 700px) bottom-sheet rule and pushes the panel off the left edge on phones.
+   Same 700px breakpoint that rule already uses. */
+@media (max-width: 700px) {
+  #notepad-hanging-panel {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+  }
+}
