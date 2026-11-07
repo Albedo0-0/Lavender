@@ -74,6 +74,7 @@ const TimeEngine = (function () {
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function sfx(name) { try { if (typeof MiscSound !== 'undefined') MiscSound.play(name); } catch (e) {} }
   function todayStr() {
     const t = new Date();
     return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
@@ -451,6 +452,7 @@ const TimeEngine = (function () {
       adjustedEndAt: now + Math.max(0, durationMs)
     });
     setEngine({ activeSessionId: sessionId, prompt: null });
+    sfx('studyStart');
   }
   // "Started" chosen at a START prompt (or Study's "Start Now" shortcut, or Planner's "Start in Study").
   function startTaskSession(taskId) {
@@ -513,6 +515,7 @@ const TimeEngine = (function () {
     const active = getActiveSession();
     if (!active) return;
     pauseSessionInternal(active.sessionId);
+    sfx('timerPause');
     notify();
   }
 
@@ -525,6 +528,7 @@ const TimeEngine = (function () {
     // a fixed default like the prompt-driven breaks), and shift the rest of the day the same amount —
     // otherwise a manual mid-session pause would silently shorten the remaining study time.
     extendActiveAndShift(pauseDur);
+    sfx('timerResume');
     notify();
   }
 
@@ -546,6 +550,7 @@ const TimeEngine = (function () {
     const label = 'Study session (' + (task ? (task.taskType === 'custom' ? task.title : task.topicName) : 'Task') + ')';
     pushLog(active.date, label, Math.max(0, studyMs - safeMs(active.carriedStudyMs)), 'hr'); // only the part not already banked to earlier dates
     setEngine({ activeSessionId: null, prompt: null, manualBreakUntil: null });
+    sfx('sessionComplete');
     notify();
   }
 
@@ -674,6 +679,7 @@ const TimeEngine = (function () {
       resumeSessionInternal(engine.activeSessionId);
     }
     setEngine({ globalBreak: null });
+    sfx('breakComplete');
   }
 
     function processPrompt() {
@@ -712,6 +718,7 @@ const TimeEngine = (function () {
     const active = getActiveSession();
     if (active && active.state === 'paused') resumeSessionInternal(active.sessionId);
     setEngine({ manualBreakUntil: null });
+    sfx('breakComplete');
   }
 
   function detectDue() {
