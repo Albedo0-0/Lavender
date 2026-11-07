@@ -81,12 +81,7 @@ const Settings = (function () {
       (((cur.studyWallpaperSlideshow || {}).intervalMin) || 5) + '"> <span class="micro-label">min</span></div>' +
             '</section>' +
 
-            '<section class="settings-section"><h4 class="section-title settings-section-title">Assistant</h4>' +
-
-      '<button id="settings-save-btn">Save</button>' +
-      '<hr class="divider">' +
-
-             '</section><section class="settings-section"><h4 class="section-title settings-section-title">My World LV Packs</h4>' +
+            '<section class="settings-section"><h4 class="section-title settings-section-title">My World LV Packs</h4>' +
       '<div class="form-row"><button id="settings-import-content-btn" class="btn-secondary">Import My World LV Pack</button>' +
       '<input type="file" id="settings-import-content-input" accept=".lvpack" style="display:none">' +
       '<span id="settings-import-content-status" class="micro-label"></span></div>' +
@@ -190,7 +185,6 @@ const Settings = (function () {
   function open() {
     Modal.open(formHtml());
 
-        document.getElementById('settings-save-btn').addEventListener('click', save);
 
     [
       ['settings-notifications', 'notificationsEnabled'],
