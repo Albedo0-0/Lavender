@@ -863,3 +863,17 @@ body.dashboard-open #main-nav .nav-brand-mark { color: var(--color-sage-800); }
   #screen-dashboard .drf-pl-ctl { justify-content: center; }
   #screen-dashboard .drf-pl-time { display: none; }
 }
+
+
+/* Dark theme — colour-only overrides (activated by <html data-theme="dark">) */
+:root[data-theme="dark"] #screen-dashboard {
+  --dash-ink: #ece5d6;
+  --dash-ink-faint: rgba(236, 229, 214, 0.62);
+  --dash-moss-soft: #2f382c;
+}
+:root[data-theme="dark"] #screen-dashboard .dcal-events { border-top-color: rgba(236, 229, 214, 0.16); }
+:root[data-theme="dark"] #screen-dashboard .dcal-event,
+:root[data-theme="dark"] #screen-dashboard .dtk-row,
+:root[data-theme="dark"] #screen-dashboard .dal-row { border-bottom-color: rgba(236, 229, 214, 0.1); }
+:root[data-theme="dark"] #screen-dashboard .dcal-ev-title,
+:root[data-theme="dark"] #screen-dashboard .dtk-title { color: rgba(236, 229, 214, 0.85); }
