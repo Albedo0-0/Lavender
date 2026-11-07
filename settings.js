@@ -37,6 +37,7 @@ const Settings = (function () {
       '<section class="settings-section"><h4 class="section-title settings-section-title">Experience</h4>' +
       toggleRow('settings-wish-butterfly', 'Wish Butterfly &#129419;', 'A little butterfly that visits once a day.', cur.wishButterflyEnabled === true) +
       toggleRow('settings-force-fullscreen', 'Force fullscreen', '', typeof ForcedFullscreen !== 'undefined' && ForcedFullscreen.isEnabled()) +
+      toggleRow('settings-dark-mode', 'Dark mode', '', cur.theme === 'dark') +
       '</section>' +
 
       '<section class="settings-section"><h4 class="section-title settings-section-title">Alerts</h4>' +
@@ -207,6 +208,16 @@ const Settings = (function () {
         flashSaved();
       });
     });
+
+    const darkModeToggle = document.getElementById('settings-dark-mode');
+    if (darkModeToggle) {
+      darkModeToggle.addEventListener('change', function () {
+        const theme = darkModeToggle.checked ? 'dark' : 'light';
+        if (!State.patch('settings', { theme: theme })) return;
+        document.documentElement.setAttribute('data-theme', theme);
+        flashSaved();
+      });
+    }
 
     const forceFullscreenToggle = document.getElementById('settings-force-fullscreen');
     if (forceFullscreenToggle && typeof ForcedFullscreen !== 'undefined') {
