@@ -6,6 +6,10 @@
  * stamp, butterfly chime, firefly sparkle, candle ignite/ambience,
  * rain/sunlight ambience, ladybug tap.
  *
+ * Also holds the polished-moments set (selection, confirm, page turn, study/
+ * timer events, reminders/alerts, achievements). All synthesized — nothing is
+ * downloaded or decoded, and the AudioContext is only created on first play().
+ *
  * Reuses the existing Settings sound flag (State.get().settings.soundEnabled)
  * instead of creating a second global settings system — see isEnabled()
  * below. Ambience sounds are strictly opt-in (never auto-played by this
@@ -49,13 +53,17 @@ const MiscSound = (function () {
     manualOverride = null;
   }
 
+  let activeVoices = 0;
+  const MAX_VOICES = 24; // safety cap against rapid repeated triggers
+
   function tone(spec) {
     const audioCtx = ensureContext();
-    if (!audioCtx) return;
+    if (!audioCtx || activeVoices >= MAX_VOICES) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    const now = audioCtx.currentTime;
+    const now = audioCtx.currentTime + (spec.delay || 0);
     const duration = spec.duration || 0.18;
+    const attack = spec.attack || 0.015;
 
     osc.type = spec.type || 'sine';
     osc.frequency.setValueAtTime(spec.freq, now);
@@ -64,13 +72,27 @@ const MiscSound = (function () {
     }
 
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(spec.gain || 0.6, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(spec.gain || 0.6, now + attack);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     osc.connect(gain);
     gain.connect(masterGain);
+    activeVoices++;
+    osc.onended = function () {
+      activeVoices = Math.max(0, activeVoices - 1);
+      try { osc.disconnect(); gain.disconnect(); } catch (e) { /* already gone */ }
+    };
     osc.start(now);
     osc.stop(now + duration + 0.02);
+  }
+
+  // Soft bell: sine fundamental plus a quiet octave partial. Keeps notes warm
+  // and round (fundamentals stay below ~1.1 kHz, partial below ~2.2 kHz).
+  function bell(freq, delay, duration, gain) {
+    const g = gain || 0.15;
+    const d = duration || 0.35;
+    tone({ freq: freq, delay: delay, duration: d, gain: g, attack: 0.01 });
+    tone({ freq: freq * 2, delay: delay, duration: d * 0.55, gain: g * 0.18, attack: 0.01 });
   }
 
   function noiseBurst(spec) {
@@ -91,7 +113,10 @@ const MiscSound = (function () {
     filter.frequency.value = spec.cutoff || 2500;
     source.connect(filter);
     filter.connect(masterGain);
-    source.start();
+    source.onended = function () {
+      try { source.disconnect(); filter.disconnect(); } catch (e) { /* already gone */ }
+    };
+    source.start(audioCtx.currentTime + (spec.delay || 0));
   }
 
   const RECIPES = {
@@ -118,18 +143,77 @@ const MiscSound = (function () {
     uiClose: function () { tone({ freq: 600, freqTo: 460, duration: 0.09, type: 'sine', gain: 0.16 }); },
     uiSave: function () { tone({ freq: 660, freqTo: 880, duration: 0.16, type: 'sine', gain: 0.24 }); },
     uiSuccess: function () { tone({ freq: 900, freqTo: 1100, duration: 0.08, type: 'sine', gain: 0.16 }); },
-    uiError: function () { tone({ freq: 340, freqTo: 260, duration: 0.16, type: 'triangle', gain: 0.2 }); }
+    uiError: function () { tone({ freq: 340, freqTo: 260, duration: 0.16, type: 'triangle', gain: 0.2 }); },
+
+    // --- Polished-moments layer (selection, study/timer events, notices, wins) ---
+    // All peak around the same perceived level as uiSave/uiSuccess. Event
+    // sounds are 2-4 soft notes at most; no loops, no ambience.
+
+    // UI
+    uiSelect: function () { tone({ freq: 600, freqTo: 680, duration: 0.05, type: 'sine', gain: 0.14 }); },
+    uiToggleOn: function () { tone({ freq: 560, freqTo: 720, duration: 0.07, type: 'sine', gain: 0.15 }); },
+    uiToggleOff: function () { tone({ freq: 720, freqTo: 560, duration: 0.07, type: 'sine', gain: 0.13 }); },
+    uiConfirm: function () { bell(523, 0, 0.22, 0.14); bell(659, 0.08, 0.3, 0.14); },
+    pageTurn: function () {
+      noiseBurst({ duration: 0.14, intensity: 0.16, cutoff: 2000 });
+      noiseBurst({ duration: 0.06, intensity: 0.08, cutoff: 1400, delay: 0.1 });
+    },
+
+    // Study & timers
+    studyStart: function () { tone({ freq: 392, freqTo: 523, duration: 0.32, type: 'sine', gain: 0.16, attack: 0.04 }); },
+    timerPause: function () { tone({ freq: 520, freqTo: 420, duration: 0.1, type: 'sine', gain: 0.15 }); },
+    timerResume: function () { tone({ freq: 420, freqTo: 520, duration: 0.1, type: 'sine', gain: 0.15 }); },
+    sessionComplete: function () { bell(440, 0, 0.35, 0.15); bell(554, 0.15, 0.35, 0.15); bell(659, 0.3, 0.6, 0.16); },
+    breakComplete: function () { bell(659, 0, 0.25, 0.14); bell(659, 0.14, 0.4, 0.14); },
+
+    // Notifications
+    reminderGentle: function () { bell(660, 0, 0.5, 0.13); },
+    alertImportant: function () { bell(740, 0, 0.3, 0.19); bell(740, 0.22, 0.4, 0.19); },
+    taskComplete: function () { bell(698, 0, 0.2, 0.14); bell(932, 0.07, 0.3, 0.14); },
+
+    // Achievements
+    achievementUnlock: function () { bell(659, 0, 0.3, 0.14); bell(988, 0.09, 0.45, 0.14); },
+    milestone: function () {
+      bell(523, 0, 0.3, 0.14); bell(659, 0.12, 0.3, 0.14);
+      bell(784, 0.24, 0.3, 0.14); bell(1046, 0.36, 0.7, 0.15);
+    }
   };
+
+  // Minimum gap (ms) before the same sound can replay. Frequent UI sounds use
+  // the default; multi-note event sounds wait for the previous one to finish.
+  const DEFAULT_GAP_MS = 80;
+  const GAP_MS = {
+    uiConfirm: 300, pageTurn: 200, studyStart: 400, sessionComplete: 1200,
+    breakComplete: 800, reminderGentle: 800, alertImportant: 1000,
+    taskComplete: 400, achievementUnlock: 1000, milestone: 1800
+  };
+  const lastPlayed = {};
 
   function play(name) {
     if (!isEnabled()) return;
     const recipe = RECIPES[name];
     if (!recipe) return;
-    // Audio needs a user gesture in most browsers; play() is only ever
-    // called from click/keyboard handlers by the modules that use it,
-    // so resuming a suspended context on first gesture happens naturally.
-    if (ctx && ctx.state === 'suspended') ctx.resume();
-    try { recipe(); } catch (e) { /* never let a decorative sound break the UI */ }
+    // Drop rapid repeats of the same sound.
+    const t = Date.now();
+    if (lastPlayed[name] && t - lastPlayed[name] < (GAP_MS[name] || DEFAULT_GAP_MS)) return;
+    lastPlayed[name] = t;
+
+    const audioCtx = ensureContext();
+    if (!audioCtx) return; // no Web Audio support — stay silent
+    const run = function () {
+      try { recipe(); } catch (e) { /* never let a decorative sound break the UI */ }
+    };
+    // Audio needs a user gesture in most browsers (and iOS/Android WebViews can
+    // suspend or "interrupt" the context). Resume first, then play; if resume
+    // is refused, skip quietly.
+    if (audioCtx.state !== 'running') {
+      try {
+        const r = audioCtx.resume();
+        // A resume that only settles after a later gesture would play a stale sound — skip those.
+        if (r && r.then) { r.then(function () { if (Date.now() - t < 1500) run(); }, function () {}); return; }
+      } catch (e) { return; }
+    }
+    run();
   }
 
   // --- Global UI click layer ---------------------------------------------
