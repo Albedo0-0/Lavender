@@ -134,3 +134,13 @@
   .gal-tile, .gal-viewer { transition: none; animation: none; }
   .gal-tile:hover { transform: none; }
             }
+
+
+/* Dark theme — colour-only overrides (activated by <html data-theme="dark">) */
+:root[data-theme="dark"] .gal-tag.is-active { background: #4a7060; border-color: #365546; color: #fffdf8; }
+:root[data-theme="dark"] .gal-badge { background: rgba(42, 39, 34, 0.9); }
+:root[data-theme="dark"] .gal-tile.is-selected .gal-check::after { border-color: #fffdf8; }
+:root[data-theme="dark"] .gal-viewer,
+:root[data-theme="dark"] .gal-v-btn,
+:root[data-theme="dark"] .gal-v-nav,
+:root[data-theme="dark"] .gal-v-tag { color: #faf6ec; }
