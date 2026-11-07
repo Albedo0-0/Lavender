@@ -94,7 +94,8 @@ const Calendar = (function () {
     if (!host) return;
     const ae = document.activeElement;
     let focusSel = null;
-    if (ae && host.contains(ae)) focusSel = ae.dataset && ae.dataset.view ? '[data-view="' + ae.dataset.view + '"]' : (ae.id ? '#' + ae.id : null);
+    const ctl = document.getElementById('calendar-lens-controls');
+    if (ae && (host.contains(ae) || (ctl && ctl.contains(ae)))) focusSel = ae.dataset && ae.dataset.view ? '[data-view="' + ae.dataset.view + '"]' : (ae.id ? '#' + ae.id : null);
 
     const hasPTPE = typeof PTPE !== 'undefined';
     const lens = hasPTPE ? getLens() : { mode: 'normal', tagId: null };
@@ -102,11 +103,11 @@ const Calendar = (function () {
     const tagId = hasPTPE ? activeLensTag(lens) : null;
     const showLens = hasPTPE && viewMode !== 'week';
 
-        let html = '<div class="cal-views">';
+        let html = '';
+        let ctlHtml = '';
 
     if (showLens) {
-      html += '<span class="cal-views-spacer"></span>' +
-        '<label class="cal-lens-label" for="calendar-lens-select">Heatmap</label>' +
+      ctlHtml += '<label class="cal-lens-label" for="calendar-lens-select">Heatmap</label>' +
         '<select id="calendar-lens-select" class="cal-lens-select" title="Heatmap" aria-label="Heatmap">' +
           PTPE.LENSES.map(function (l) { return '<option value="' + l.key + '"' + (l.key === lens.mode ? ' selected' : '') + '>' + escHtml(l.label) + '</option>'; }).join('') +
         '</select>' +
@@ -115,7 +116,7 @@ const Calendar = (function () {
             tags.map(function (t) { return '<option value="' + escHtml(t.tagId) + '"' + (t.tagId === tagId ? ' selected' : '') + '>' + escHtml(t.name) + '</option>'; }).join('') + '</select>'
           : '');
     }
-    html += '</div>';
+    if (!ctl && ctlHtml) html = '<div class="cal-views">' + ctlHtml + '</div>' + html;
 
     if (showLens && lens.mode !== 'normal') {
       const info = PTPE.LENSES.filter(function (l) { return l.key === lens.mode; })[0];
@@ -146,22 +147,24 @@ const Calendar = (function () {
     }
 
     host.innerHTML = html;
+    if (ctl) ctl.innerHTML = ctlHtml;
+    const ctlRoot = ctl || host;
 
     host.querySelectorAll('.cal-view-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { setView(btn.dataset.view); });
     });
     const todayBtn = host.querySelector('[data-act="today"]');
     if (todayBtn) todayBtn.addEventListener('click', goToday);
-    const lensSel = host.querySelector('#calendar-lens-select');
+    const lensSel = ctlRoot.querySelector('#calendar-lens-select');
     if (lensSel) lensSel.addEventListener('change', function (e) {
       State.patch('settings', { calendarLens: e.target.value });
       render();
     });
-    const tagSel = host.querySelector('#calendar-lens-tag');
+    const tagSel = ctlRoot.querySelector('#calendar-lens-tag');
     if (tagSel) tagSel.addEventListener('change', function (e) { State.patch('settings', { calendarLensTagId: e.target.value }); render(); });
 
     if (focusSel) {
-      const f = host.querySelector(focusSel);
+      const f = ctlRoot.querySelector(focusSel) || host.querySelector(focusSel);
       if (f && !f.disabled) f.focus();
     }
   }
